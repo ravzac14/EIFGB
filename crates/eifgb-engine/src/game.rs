@@ -209,7 +209,26 @@ impl<H: ScriptHost> Game<H> {
         self.push(kind, s);
     }
 
-    fn render_str(&mut self, text: &Text, ctx: &Ctx) -> String {
+    /// Adds a sentence to the end of the last text line (the same
+    /// paragraph) when `attach` is set and there is one, otherwise as a new line.
+    pub(crate) fn push_sentence(&mut self, s: String, attach: bool) {
+        match self.out.lines.last_mut() {
+            Some(line) if attach && line.kind == LineKind::Text && !s.trim().is_empty() => {
+                line.text.push(' ');
+                line.text.push_str(&s);
+            }
+            _ => self.push(LineKind::Text, s),
+        }
+    }
+
+    pub(crate) fn msg_str(&mut self, key: &str, ctx: &Ctx) -> String {
+        match self.world.story().messages.get(key).cloned() {
+            Some(t) => self.render_str(&t, ctx),
+            None => format!("[missing message '{key}']"),
+        }
+    }
+
+    pub(crate) fn render_str(&mut self, text: &Text, ctx: &Ctx) -> String {
         match render(&mut self.host, &mut self.world, text, ctx) {
             Ok(r) => {
                 self.apply(r.effects);

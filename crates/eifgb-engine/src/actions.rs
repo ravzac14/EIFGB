@@ -70,16 +70,14 @@ impl<H: ScriptHost> Game<H> {
             (d.name.clone(), d.description.clone(), d.exits.clone())
         };
         self.push(LineKind::Title, name);
+        let before = self.out.lines.len();
         if let Some(d) = &description {
             self.render_line(LineKind::Text, d, &Ctx::new().this(here));
         }
-        let things = self.listable(here);
-        if !things.is_empty() {
-            let list = self.list_a(&things);
-            self.msg("look.you_see", &Ctx::new().text("list", list));
-        }
-        // Things not in the list above (scenery) still get their state
+        let described = self.out.lines.len() > before;
+        // Things that won't be listed (scenery) still get their state
         // mentioned, unless the room description already covers it.
+        let things = self.listable(here);
         for c in self.world.contents(here) {
             if self.world.is_hidden(c) || c == PLAYER || things.contains(&c) {
                 continue;
@@ -89,9 +87,14 @@ impl<H: ScriptHost> Game<H> {
             }
             for tag in self.state_tags(c) {
                 if tag != "worn" {
-                    self.msg(&format!("state.here.{tag}"), &Ctx::new().entity("target", c));
+                    let s = self.msg_str(&format!("state.here.{tag}"), &Ctx::new().entity("target", c));
+                    self.push_sentence(s, described);
                 }
             }
+        }
+        if !things.is_empty() {
+            let list = self.list_a(&things);
+            self.msg("look.you_see", &Ctx::new().text("list", list));
         }
         for c in self.world.contents(here) {
             if !self.world.is_hidden(c) && c != PLAYER {
@@ -140,13 +143,15 @@ impl<H: ScriptHost> Game<H> {
             return true;
         }
         let description = def.description.clone();
+        let before = self.out.lines.len();
         match &description {
             Some(d) => self.render_line(LineKind::Text, d, &Ctx::new().this(t)),
             None if t == PLAYER => self.msg("examine.self", &Ctx::new()),
             None if !self.state_tags(t).is_empty() => {}
             None => self.msg("examine.default", &Ctx::new().entity("target", t)),
         }
-        self.describe_state(t, description.as_ref());
+        let described = self.out.lines.len() > before;
+        self.describe_state(t, description.as_ref(), described);
         self.describe_contents(t);
         true
     }
@@ -346,13 +351,15 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// The sentences EXAMINE adds after a description.
-    fn describe_state(&mut self, id: EntityId, description: Option<&Text>) {
+    /// `attach` adds the sentences to the description's paragraph.
+    fn describe_state(&mut self, id: EntityId, description: Option<&Text>, attach: bool) {
         let skip_door_state = description.is_some_and(|d| self.mentions_state(d, id, true));
         for tag in self.state_tags(id) {
             if tag != "worn" && skip_door_state {
                 continue;
             }
-            self.msg(&format!("state.{tag}"), &Ctx::new().entity("target", id));
+            let s = self.msg_str(&format!("state.{tag}"), &Ctx::new().entity("target", id));
+            self.push_sentence(s, attach);
         }
     }
 

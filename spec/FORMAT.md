@@ -108,31 +108,105 @@ While a choice is open, input switches from the parser to numbered options. The 
 
 The goal is that a player should never feel the game doesn't understand
 what they meant. To get there, the parser works through a fallback chain.
-It stops at the first step that produces a valid action:
+It stops at the first step that produces a valid action. Steps marked
+*(planned)* are not built yet. See **Parser behavior** below for what
+players actually see.
 
 1. **Exact match** against the game's vocabulary: author words plus the standard library.
-2. **Normalization.** Inflected forms are reduced to their base word (`grabbed` → `grab`, `lamps` → `lamp`). Filler like "please" and "try to" is dropped, and pronouns (`it`, `them`) are resolved.
-3. **Built-in synonym lexicon.** The engine ships a large, curated English synonym map for verbs and common nouns, e.g. `snatch` → `take` and `peer at` → `examine`. It is part of the standard library, so it grows with each release.
-4. **Typo correction.** Edit distance is checked against the words this game actually uses, never the whole dictionary, so corrections stay relevant.
-5. **Clarifying question**, when the input matches more than one thing ("Which do you mean, the brass key or the iron key?"), or when it is a near miss ("Did you mean *fill the lamp*?").
+2. **Normalization.** Inflected forms are reduced to their base word (`grabbed` → `grab`, `keys` → `key`). Filler like "please" and "I'd like to" is dropped, and pronouns (`it`, `them`) are resolved.
+3. **Built-in synonym lexicon.** The standard library maps synonym phrases to verbs, e.g. `snatch` → `take` and `peer at` → `examine`. It grows with each release. v1 has about 27 verb phrases; noun synonyms come only from authors for now.
+4. **Typo correction.** Edit distance is checked against the words this game actually uses, never the whole dictionary, so corrections stay relevant. A confident correction is applied silently. If two words are equally close, nothing is corrected.
+5. **Clarifying question**, when the input matches more than one thing ("Which do you mean, the brass key or the iron key?") or is missing a part ("What do you want to fill the great lamp with?"). The player's next input is merged back into the command. *(Planned: "Did you mean …?" for near misses that are too uncertain to correct silently.)*
 6. **Author hook:** `on.parse_failed` gets the raw input, so an author can handle unexpected attempts with custom responses.
-7. **AI fallback** *(optional, off by default, hosted web only)*. The author turns it on per game with `game.ai_fallback: true`. The engine sends the input plus a list of actions that are valid right now, i.e. what's in scope and which verbs apply. The model must pick one of those actions or answer "none". It cannot write prose or change state. Its pick then runs through the normal action pipeline. Responses are rate-limited and cached. Offline and desktop builds skip this step.
+7. **AI fallback** *(planned; optional, off by default, hosted web only)*. The author turns it on per game with `game.ai_fallback: true`. The engine sends the input plus a list of actions that are valid right now, i.e. what's in scope and which verbs apply. The model must pick one of those actions or answer "none". It cannot write prose or change state. Its pick then runs through the normal action pipeline. Responses are rate-limited and cached. Offline and desktop builds skip this step.
 8. **Helpful failure.** The game never prints a bare "I don't understand." It names the part of the input it did understand and suggests verbs that apply here.
 
-**Synonyms are generated when the game is built, not while it runs.** For every
+**Synonyms are generated when the game is built, not while it runs** *(planned)*. For every
 author noun and verb, the compiler suggests extra synonyms. The web editor
 shows them so the author can accept or reject each one. Accepted synonyms
 are saved into the bundle. At runtime the game is therefore deterministic,
 works offline, and behaves the same in the web and desktop builds.
 
-**Tests for the parser.** Each standard library release ships with a corpus of
+**Tests for the parser** *(planned)*. Each standard library release ships with a corpus of
 real player phrasings, together with the action each one should map to.
 Changes to the parser are checked against that corpus, so a regression
-shows up in CI.
+shows up in CI. For now, the examples in **Parser behavior** are covered by
+end-to-end tests in `crates/eifgb-lua/tests/play.rs`.
 
 **Learning from players** *(later, opt-in)*. Hosted web games can report
 inputs that failed to parse, grouped together, e.g. "14 players tried
 *climb rocks* on Rocky Shore". The author sees these in the editor.
+
+## Parser behavior
+
+This is what players see, using the lighthouse game unless noted. Each
+reply comes from a standard message (key in brackets), so authors can
+reword any of them under `messages:`.
+
+### Understood without fuss
+
+| Player types | What happens | Why |
+|---|---|---|
+| `serch pool`, `examin brass kye`, `nrth` | Runs as `search pool`, `examine brass key`, `north` | Typo correction (step 4), using only words this game uses |
+| `grabbed the can` | Runs as `take the can` | Stemming (`grabbed` → `grab`), then the synonym `grab` → `take` |
+| `peer at keys` | Examines the brass key | Synonym phrase, plus the plural `keys` → `key` |
+| `please drop the can`, `i'd like to snatch the kerosene` | Drop / take the oil can | Filler dropped; `kerosene` is an author synonym |
+| `pool` | Examines the tide pool | A bare noun means EXAMINE |
+| `x key` then `drop it` | Drops the key | `it` is the last thing mentioned |
+| `take all`, `drop everything` | `cup: Taken.` / `plate: Taken.` … | ALL works with TAKE and DROP |
+| `unlock gate` | "You unlock the iron gate with the brass key." | The right key is used if you're carrying it |
+| `up` (gate unlocked but shut) | "(first opening the iron gate)", then the move | Unlocked doors open on the way through |
+| `search pool. n then take can` | Runs all three | `.`, `;` and `then` chain commands; the chain stops at the first failure |
+| `again` / `g` | Repeats the last command | |
+
+### Clarifying questions
+
+The player's next input answers the question. If it doesn't fit the
+question, it's treated as a new command.
+
+| Player types | Reply | Then |
+|---|---|---|
+| `take key` (two keys here) | "Which do you mean, the brass key or the iron key?" `[parser.ambiguous]` | `iron` takes the iron key |
+| `x` | "What do you want to examine?" `[parser.need_target]` | `pool` examines it |
+| `fill lamp` | "What do you want to fill the great lamp with?" `[parser.need_tool]` | `oil` fills it |
+
+Before asking which thing is meant, the parser narrows the matches by what
+makes sense for the verb. TAKE prefers things you aren't holding. DROP, PUT,
+WEAR and EAT prefer things you are holding. TAKE OFF prefers things you're
+wearing.
+
+### When it can't help
+
+The game never prints a bare "I don't understand." The author's
+`parse_failed` handler runs first. If it prints anything, that is the
+reply, e.g. `swim` → "The waves would smash you against the rocks."
+Otherwise:
+
+| Player types | Reply |
+|---|---|
+| `dance` | "I don't know the verb "dance". Things to try here: SEARCH, EXAMINE, TAKE, LOOK or INVENTORY." `[parser.unknown_verb]` The suggestions are verbs that nearby objects respond to, plus basics. |
+| `take zorkmid` | "I don't know the word "zorkmid"." `[parser.unknown_word]` |
+| `take radio` (radio is elsewhere) | "You can't see any such thing." `[parser.not_here]` |
+| `take key from` | "I only understood you as far as wanting to take." `[parser.partial]` |
+| `take it` (nothing mentioned yet) | "I'm not sure what you're referring to." `[parser.no_pronoun]` |
+| `open all` | "You can't use "all" with that." `[parser.no_all]` |
+| *(blank)* | "Pardon?" `[parser.empty]` |
+
+A failed parse doesn't take a turn and can't be undone, because nothing happened.
+
+### Inside a choice
+
+While a menu or dialogue is open, input picks an option instead of being
+parsed. The player can type the option's number or part of its text
+(`goodbye`). Anything else gets "Please choose one of the numbered
+options." `[choice.invalid]`, and the options are shown again. UNDO,
+SAVE, RESTORE, RESTART and QUIT still work.
+
+### Known gaps
+
+- PUT and WEAR don't pick the thing up for you: "You need to be holding the wooden box first." `[put.not_held]`.
+- There's no setting for proper names yet, so article helpers would say "the Bob".
+- Doors are one-sided: an exit `through` a door only checks it from the room the door is in.
 
 ## Standard library versioning
 

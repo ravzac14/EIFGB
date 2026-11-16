@@ -214,6 +214,12 @@ fn unknown_stdlib_version_or_language() {
 }
 
 #[test]
+fn state_fields_cannot_shadow_builtin_fields_or_methods() {
+    assert_error(&with("objects:\n  box: { name: box, state: { contents: 3 } }\n"), "built-in field or method");
+    assert_error(&with("objects:\n  box: { name: box, state: { location: hall } }\n"), "built-in field or method");
+}
+
+#[test]
 fn script_paths_cannot_escape_the_project() {
     assert_error(&with("scripts: ['../../etc/passwd']\n"), "must not contain '..'");
 }

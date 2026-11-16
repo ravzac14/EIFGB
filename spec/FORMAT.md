@@ -67,15 +67,26 @@ Handlers on the target object (the direct object) run first, then the room's, th
 
 A handler can be a block of statements or a single expression.
 
-**API draft:** `say`, `block`, `score`, `end_game`, `open_choice`, `random`.
-Also `world.<id>`, `player`, `here` (the current room), `vars`, `game.turn`
-and `args.target`, `args.tool`, `args.text`. On entities:
-`:move_to(x)`, `:is_in(x)`, plus state fields read and written directly.
+**API (implemented in `eifgb-lua`):**
+
+- **Functions:** `say(...)` (also `print`), `block(msg?)`, `score(n)`, `end_game(key)`, `open_choice(key)`, `random(a, b)` (or `random(n)` for 1..n).
+- **Text helpers:** `the(x)`, `The(x)`, `a(x)`, `A(x)`. These come from a module per language.
+- **Names:** `world.<id>`, `player`, `here` (the current room), `vars.<name>`, `game.turn`, `game.score`, `game.max_score`, `game.title`.
+- **Arguments:** `args.target`, `args.tool`, `args.text`, `args.direction`.
+- **Fields on every entity:** `key`, `name`, `kind`, `location`. These are read-only; use `:move_to` to change `location`.
+- **Methods on every entity:** `:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`.
+- **State fields** are read and written directly (`self.fueled = true`). Setting one to `nil` removes it. The built-in field and method names above are reserved and can't be used as state fields.
+- **Each entity has exactly one Lua object**, so `==` works as expected (`args.tool == world.oil_can`).
+- **`vars` must be declared** in the `vars:` section. Reading or writing an undeclared name is an error, which catches typos like `vars.lamp_lt`.
+- **Stored values** can be booleans, numbers, strings, lists and string-keyed tables. Objects can't be stored; store `x.key` instead. Tables are stored as copies, so to change one, assign the whole table back: `local l = vars.log; table.insert(l, x); vars.log = l`.
+
+**Effects.** Scripts change world state immediately. Everything else they do (printing, scoring, endings, opening a choice) is queued as an effect, and the engine handles it, in order, once the script returns.
 
 ### Sandbox rules (these matter for an online service and for saves)
 
 - There is no `io`, `os`, `require`, `load`, `dofile` or `debug`. `string`, `table` and `math` are available, but `math.random` is replaced by the engine's seeded `random()`.
-- Each handler runs on an instruction budget, so runaway loops get aborted with an error message.
+- Each handler runs on an instruction budget (5M instructions), so runaway loops get aborted with an error message. `pcall` can't swallow that error. The whole VM also has a 64 MB memory limit.
+- Reading an undefined global is an error, not `nil`, so a misspelled function name fails loudly.
 - **Story state lives only in `vars` and in entity state.** Script globals are for functions. That rule is what makes save, restore and undo possible: saving is just serializing `vars` and entity state.
 - On the server, scripts are only parsed and checked during compilation, never executed. They run on the player's machine. *(Optional later: a sandboxed automated playtest.)*
 

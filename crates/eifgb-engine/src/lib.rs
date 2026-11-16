@@ -9,14 +9,19 @@
 //! Modules:
 //! * [`state`]: the mutable game state, and save files;
 //! * [`world`]: world-model queries and changes (location, scope, doors);
-//! * [`rng`]: a deterministic, serializable random number generator.
+//! * [`rng`]: a deterministic, serializable random number generator;
+//! * [`script`]: the [`ScriptHost`] interface that script languages implement;
+//! * [`text`]: template rendering and reflowing prose.
 //!
-//! Still to come: the parser pipeline, the action rules and the Lua host.
+//! Still to come: the parser pipeline and the action rules.
 
 pub mod rng;
+pub mod script;
 pub mod state;
+pub mod text;
 pub mod world;
 
 pub use eifgb_ir as ir;
+pub use script::{Arg, Ctx, Effect, Outcome, ScriptError, ScriptHost, ScriptValue};
 pub use state::{GameState, SaveError, SaveFile};
 pub use world::{MoveError, World};

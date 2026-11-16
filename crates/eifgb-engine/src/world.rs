@@ -111,6 +111,10 @@ impl World {
         self.state.entities[id.index()].state.insert(field.to_string(), value);
     }
 
+    pub fn unset(&mut self, id: EntityId, field: &str) {
+        self.state.entities[id.index()].state.remove(field);
+    }
+
     /// A boolean state field. A missing or non-boolean field counts as false.
     pub fn flag(&self, id: EntityId, field: &str) -> bool {
         self.get(id, field).and_then(Value::as_bool).unwrap_or(false)

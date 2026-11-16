@@ -12,6 +12,9 @@ use eifgb_ir::*;
 use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+/// Names scripts already use on every entity: built-in fields and methods.
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "move_to", "is_in", "contents", "has"];
+
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
     files: &'a dyn FileProvider,
@@ -466,6 +469,15 @@ impl<'a> Lowerer<'a> {
                     let hint = did_you_mean(name, candidates);
                     self.d.error(format!("{path}.traits[{i}]"), format!("unknown trait '{name}'{hint}"));
                 }
+            }
+        }
+
+        for field in state.keys() {
+            if RESERVED_FIELDS.contains(&field.as_str()) {
+                self.d.error(
+                    format!("{path}.state.{field}"),
+                    format!("'{field}' is a built-in field or method name and can't be used as state"),
+                );
             }
         }
 

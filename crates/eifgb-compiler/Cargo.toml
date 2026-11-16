@@ -1,0 +1,16 @@
+[package]
+name = "eifgb-compiler"
+description = "Validates EIFGB source (YAML + Lua) and lowers it to Story IR"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+eifgb-ir.workspace = true
+eifgb-stdlib.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+indexmap.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

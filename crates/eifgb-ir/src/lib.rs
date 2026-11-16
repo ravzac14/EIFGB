@@ -1,0 +1,674 @@
+//! Story IR: the compiled, normalized form of a game.
+//!
+//! The compiler produces a [`Story`] and every runtime target reads one.
+//! Compared with the source format, the IR:
+//!
+//! * contains no syntax sugar: every reference is a resolved numeric ID
+//!   and every template has already been parsed into segments;
+//! * is self-contained: the pinned standard library (verbs, lexicon and
+//!   messages) is copied into it, so a story behaves the same no matter
+//!   which engine release runs it;
+//! * is language-neutral in structure: every piece of player-facing text
+//!   is data, and none of it lives in engine code.
+//!
+//! Bump [`IR_VERSION`] whenever a change would make an older engine
+//! misread a newer story.
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+pub const IR_VERSION: u32 = 1;
+
+macro_rules! id_type {
+    ($(#[$m:meta])* $name:ident) => {
+        $(#[$m])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        #[serde(transparent)]
+        pub struct $name(pub u32);
+
+        impl $name {
+            pub fn index(self) -> usize {
+                self.0 as usize
+            }
+        }
+    };
+}
+
+id_type!(
+    /// Index into [`Story::entities`].
+    EntityId
+);
+id_type!(
+    /// Index into [`Story::choices`].
+    ChoiceId
+);
+id_type!(
+    /// Index into [`Story::endings`].
+    EndingId
+);
+
+/// The player is always entity 0.
+pub const PLAYER: EntityId = EntityId(0);
+pub const PLAYER_KEY: &str = "player";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Story {
+    pub ir_version: u32,
+    pub meta: Meta,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro: Option<Text>,
+    /// Initial values of global story variables.
+    pub vars: BTreeMap<String, Value>,
+    /// Every entity in the game: the player, rooms, objects and characters.
+    /// Entity 0 is always the player.
+    pub entities: Vec<Entity>,
+    /// Verbs in the order they are matched: author verbs first, then the
+    /// standard library's.
+    pub verbs: Vec<Verb>,
+    pub lexicon: Lexicon,
+    /// Message catalog: the standard library's messages, with any author
+    /// overrides already applied.
+    pub messages: BTreeMap<String, Text>,
+    pub choices: Vec<ChoiceGraph>,
+    /// Global event handlers.
+    pub handlers: Vec<Handler>,
+    pub endings: Vec<Ending>,
+    /// Lua chunks loaded once, in order, before any handler runs.
+    pub scripts: Vec<Script>,
+}
+
+impl Story {
+    pub fn entity(&self, id: EntityId) -> &Entity {
+        &self.entities[id.index()]
+    }
+
+    pub fn entity_by_key(&self, key: &str) -> Option<EntityId> {
+        self.entities
+            .iter()
+            .position(|e| e.key == key)
+            .map(|i| EntityId(i as u32))
+    }
+
+    pub fn choice(&self, id: ChoiceId) -> &ChoiceGraph {
+        &self.choices[id.index()]
+    }
+
+    pub fn ending_by_key(&self, key: &str) -> Option<EndingId> {
+        self.endings
+            .iter()
+            .position(|e| e.key == key)
+            .map(|i| EndingId(i as u32))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Meta {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    pub version: String,
+    /// BCP 47-style language tag. It chooses the parser grammar module.
+    pub language: String,
+    /// The standard library version that was copied into this story.
+    pub stdlib: u32,
+    pub start: EntityId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_score: Option<i64>,
+    #[serde(default)]
+    pub ai_fallback: bool,
+}
+
+// ------------------------------------------------------------------ entities
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityKind {
+    Player,
+    Room,
+    Object,
+    Character,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Entity {
+    /// The author's identifier. Lua scripts see the entity as `world.<key>`.
+    pub key: String,
+    pub kind: EntityKind,
+    /// Display name, e.g. "brass key".
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vocab::is_empty")]
+    pub vocab: Vocab,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<Text>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub traits: Vec<Trait>,
+    /// Initial mutable state. Built-in traits read well-known fields:
+    /// `open`, `locked`, `hidden`, `worn`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub state: BTreeMap<String, Value>,
+    /// Initial location. `None` means off-stage, which is always true for rooms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<EntityId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exits: Vec<Exit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unlocks_with: Option<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub talk: Option<ChoiceId>,
+    /// Maximum number of directly carried or contained items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capacity: Option<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub handlers: Vec<Handler>,
+}
+
+impl Entity {
+    pub fn has(&self, t: Trait) -> bool {
+        self.traits.contains(&t)
+    }
+}
+
+/// Words the parser accepts for an entity. Everything is lowercase.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Vocab {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nouns: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub adjectives: Vec<String>,
+}
+
+impl Vocab {
+    pub fn is_empty(&self) -> bool {
+        self.nouns.is_empty() && self.adjectives.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Trait {
+    Portable,
+    Scenery,
+    Container,
+    Supporter,
+    Openable,
+    Lockable,
+    Door,
+    Wearable,
+    LightSource,
+    Edible,
+}
+
+impl Trait {
+    pub const ALL: [Trait; 10] = [
+        Trait::Portable,
+        Trait::Scenery,
+        Trait::Container,
+        Trait::Supporter,
+        Trait::Openable,
+        Trait::Lockable,
+        Trait::Door,
+        Trait::Wearable,
+        Trait::LightSource,
+        Trait::Edible,
+    ];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Trait::Portable => "portable",
+            Trait::Scenery => "scenery",
+            Trait::Container => "container",
+            Trait::Supporter => "supporter",
+            Trait::Openable => "openable",
+            Trait::Lockable => "lockable",
+            Trait::Door => "door",
+            Trait::Wearable => "wearable",
+            Trait::LightSource => "light_source",
+            Trait::Edible => "edible",
+        }
+    }
+
+    pub fn from_key(s: &str) -> Option<Trait> {
+        Trait::ALL.into_iter().find(|t| t.key() == s)
+    }
+}
+
+/// A direction is an ID, not a word. Each language's lexicon maps its
+/// words onto these IDs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Direction {
+    North,
+    South,
+    East,
+    West,
+    Northeast,
+    Northwest,
+    Southeast,
+    Southwest,
+    Up,
+    Down,
+    In,
+    Out,
+}
+
+impl Direction {
+    pub const ALL: [Direction; 12] = [
+        Direction::North,
+        Direction::South,
+        Direction::East,
+        Direction::West,
+        Direction::Northeast,
+        Direction::Northwest,
+        Direction::Southeast,
+        Direction::Southwest,
+        Direction::Up,
+        Direction::Down,
+        Direction::In,
+        Direction::Out,
+    ];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Direction::North => "north",
+            Direction::South => "south",
+            Direction::East => "east",
+            Direction::West => "west",
+            Direction::Northeast => "northeast",
+            Direction::Northwest => "northwest",
+            Direction::Southeast => "southeast",
+            Direction::Southwest => "southwest",
+            Direction::Up => "up",
+            Direction::Down => "down",
+            Direction::In => "in",
+            Direction::Out => "out",
+        }
+    }
+
+    pub fn from_key(s: &str) -> Option<Direction> {
+        Direction::ALL.into_iter().find(|d| d.key() == s)
+    }
+}
+
+/// One exit from a room.
+///
+/// * `to` set, no `when`: an ordinary exit, optionally through a door.
+/// * `to` set, with `when`: the exit works only while `when` is true;
+///   otherwise the game prints `blocked` (or a default message).
+/// * `to` unset: the exit is always blocked, and the game prints `blocked`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Exit {
+    pub direction: Direction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub through: Option<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<Text>,
+}
+
+// --------------------------------------------------------------- text & code
+
+/// A parsed text template. Single newlines inside a literal are soft
+/// wraps from the source file, and the engine reflows them. A blank line
+/// starts a new paragraph.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Text(pub Vec<Segment>);
+
+impl Text {
+    pub fn literal(s: impl Into<String>) -> Text {
+        Text(vec![Segment::Lit(s.into())])
+    }
+
+    /// The text when it contains no script segments, otherwise `None`.
+    pub fn as_literal(&self) -> Option<String> {
+        let mut out = String::new();
+        for seg in &self.0 {
+            match seg {
+                Segment::Lit(s) => out.push_str(s),
+                _ => return None,
+            }
+        }
+        Some(out)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Segment {
+    Lit(String),
+    /// `${expr}`: the value of a Lua expression, converted to text.
+    Expr(Code),
+    /// `${if cond}...${elseif c}...${else}...${end}`. An `elseif` chain
+    /// is stored as nested `If`s in `otherwise`.
+    If {
+        cond: Code,
+        then: Text,
+        #[serde(default, skip_serializing_if = "is_empty_text")]
+        otherwise: Text,
+    },
+}
+
+fn is_empty_text(t: &Text) -> bool {
+    t.0.is_empty()
+}
+
+/// A Lua snippet. Whether it is an expression or a block of statements
+/// is settled when the snippet is loaded, the way Lua's REPL does it:
+/// the script host first tries to load `return <src>`, and if that is a
+/// syntax error, loads `<src>` as statements.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Code {
+    pub src: String,
+    /// Where the snippet came from in the source, e.g.
+    /// `objects.great_lamp.on.light`. Used in error messages.
+    pub origin: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Script {
+    pub name: String,
+    pub src: String,
+}
+
+// --------------------------------------------------------------------- verbs
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Verb {
+    /// Verb ID. Handlers refer to it as `before_<key>`, `<key>` and `after_<key>`.
+    pub key: String,
+    pub patterns: Vec<Pattern>,
+    pub action: VerbAction,
+    /// Reply when nothing handles a custom verb.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<Text>,
+    pub origin: VerbOrigin,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbOrigin {
+    Stdlib,
+    Author,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbAction {
+    /// The engine has default behaviour for this verb, which handlers can
+    /// wrap or replace.
+    Builtin(BuiltinAction),
+    /// No default behaviour: only handlers act, otherwise `default` is printed.
+    Script,
+}
+
+/// Behaviour the engine implements itself. New stdlib releases can add
+/// variants. Changing what an existing variant does needs a new stdlib
+/// version, so that stories pinned to the old version keep its behaviour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BuiltinAction {
+    Look,
+    Examine,
+    Inventory,
+    Go,
+    Take,
+    Drop,
+    PutIn,
+    PutOn,
+    Open,
+    Close,
+    Lock,
+    Unlock,
+    Search,
+    Talk,
+    Wear,
+    TakeOff,
+    Eat,
+    Wait,
+    Score,
+    Undo,
+    Save,
+    Restore,
+    Restart,
+    Help,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Pattern(pub Vec<PatternToken>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PatternToken {
+    Word(String),
+    Slot(Slot),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Slot {
+    /// The direct object, available to scripts as `args.target`.
+    Target,
+    /// The indirect object, available as `args.tool`.
+    Tool,
+    /// Free text, available as `args.text`.
+    Text,
+    /// A direction word, available as `args.direction`.
+    Direction,
+}
+
+impl Slot {
+    pub fn key(self) -> &'static str {
+        match self {
+            Slot::Target => "target",
+            Slot::Tool => "tool",
+            Slot::Text => "text",
+            Slot::Direction => "direction",
+        }
+    }
+
+    pub fn from_key(s: &str) -> Option<Slot> {
+        [Slot::Target, Slot::Tool, Slot::Text, Slot::Direction]
+            .into_iter()
+            .find(|k| k.key() == s)
+    }
+}
+
+/// Language-specific word lists the parser uses. Everything is lowercase.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Lexicon {
+    /// Synonym phrase → canonical phrase, e.g. `grab` → `take` or
+    /// `peer at` → `examine`. The parser tries the longest phrase first.
+    #[serde(default)]
+    pub phrases: BTreeMap<String, String>,
+    #[serde(default)]
+    pub directions: BTreeMap<String, Direction>,
+    /// Words dropped before matching, e.g. "the" or "a".
+    #[serde(default)]
+    pub articles: Vec<String>,
+    /// Phrases dropped from the start of input, e.g. "please" or "try to".
+    #[serde(default)]
+    pub filler: Vec<String>,
+    /// Words that refer back to the most recently mentioned object.
+    #[serde(default)]
+    pub pronouns: Vec<String>,
+    /// Words that mean "everything", e.g. "all".
+    #[serde(default)]
+    pub all_words: Vec<String>,
+    /// Words that refer to the player, e.g. "me" or "myself".
+    #[serde(default)]
+    pub self_words: Vec<String>,
+}
+
+// ------------------------------------------------------------------ handlers
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Phase {
+    Before,
+    On,
+    After,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Handler {
+    pub phase: Phase,
+    /// A verb key, or one of the events in [`GLOBAL_EVENTS`] or [`ROOM_EVENTS`].
+    pub event: String,
+    pub code: Code,
+}
+
+/// Events that aren't verbs, and where each may be declared.
+pub const GLOBAL_EVENTS: &[&str] = &["start", "turn", "parse_failed"];
+pub const ROOM_EVENTS: &[&str] = &["enter", "leave", "turn"];
+
+// ------------------------------------------------------------------- choices
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChoiceGraph {
+    pub key: String,
+    /// Index into `nodes`.
+    pub start: u32,
+    pub nodes: Vec<ChoiceNode>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChoiceNode {
+    pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<Text>,
+    /// Runs when the node is entered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<Code>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<ChoiceOption>,
+    /// Only used when there are no options: where to go after showing the node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<Next>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChoiceOption {
+    pub text: Text,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say: Option<Text>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<Code>,
+    pub next: Next,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Next {
+    /// Index of a node in the same graph.
+    Goto(u32),
+    End,
+    /// Show the current node again.
+    Stay,
+}
+
+// ------------------------------------------------------------------- endings
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Ending {
+    pub key: String,
+    pub kind: EndingKind,
+    pub text: Text,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndingKind {
+    Win,
+    Loss,
+    Neutral,
+}
+
+// -------------------------------------------------------------------- values
+
+/// A story value. Variables and entity state use these, so this enum
+/// defines everything that can be saved.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Value {
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Str(String),
+    List(Vec<Value>),
+    Map(BTreeMap<String, Value>),
+}
+
+impl Value {
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Value::Bool(_) => "boolean",
+            Value::Int(_) => "integer",
+            Value::Float(_) => "number",
+            Value::Str(_) => "string",
+            Value::List(_) => "list",
+            Value::Map(_) => "map",
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn values_round_trip_through_json() {
+        let v: Value = serde_json::from_str(r#"{"a": [1, 2.5, true, "x"]}"#).unwrap();
+        let Value::Map(m) = &v else { panic!("expected map") };
+        assert_eq!(
+            m["a"],
+            Value::List(vec![
+                Value::Int(1),
+                Value::Float(2.5),
+                Value::Bool(true),
+                Value::Str("x".into())
+            ])
+        );
+        let back: Value = serde_json::from_str(&serde_json::to_string(&v).unwrap()).unwrap();
+        assert_eq!(v, back);
+    }
+
+    #[test]
+    fn segments_serialize_compactly() {
+        let t = Text(vec![
+            Segment::Lit("It is ".into()),
+            Segment::If {
+                cond: Code { src: "self.open".into(), origin: "t".into() },
+                then: Text::literal("open"),
+                otherwise: Text::literal("shut"),
+            },
+        ]);
+        let json = serde_json::to_string(&t).unwrap();
+        assert!(json.starts_with(r#"[{"lit":"It is "},{"if":"#), "{json}");
+        let back: Text = serde_json::from_str(&json).unwrap();
+        assert_eq!(t, back);
+    }
+
+    #[test]
+    fn trait_and_direction_keys_round_trip() {
+        for t in Trait::ALL {
+            assert_eq!(Trait::from_key(t.key()), Some(t));
+        }
+        for d in Direction::ALL {
+            assert_eq!(Direction::from_key(d.key()), Some(d));
+        }
+    }
+}

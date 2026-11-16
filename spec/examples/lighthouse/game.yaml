@@ -1,0 +1,266 @@
+# Sample game for format draft 0.1. It exercises every feature in the draft:
+# rooms, objects with built-in traits, a door with a key, custom verbs,
+# Lua event handlers, text templates, a choice puzzle, dialogue, a timer
+# and endings.
+
+format: eifgb/0.1
+
+game:
+  id: lighthouse
+  title: "The Last Light"
+  author: "Example Author"
+  version: 1.0.0
+  language: en          # chooses the parser grammar and the default message set
+  stdlib: 1             # pinned version of the standard verb library; engine upgrades never change it silently
+  start: shore
+  max_score: 30
+  intro: |
+    The storm has been building all afternoon. Out past the rocks, a ship's
+    lights blink in and out of the rain. The lighthouse is dark.
+
+# Extra Lua files, loaded into the sandbox before any handler runs.
+scripts:
+  - scripts/helpers.lua
+
+# Global story state. Everything here is saved, restored and undone.
+vars:
+  lamp_lit: false
+  ship_contacted: false
+  keeper_trust: 0
+
+player:
+  description: "Soaked to the bone, but determined."
+  capacity: 5
+
+# ---------------------------------------------------------------- rooms
+
+rooms:
+  shore:
+    name: Rocky Shore
+    description: |
+      Waves break against black rocks. A tide pool shivers in a hollow
+      nearby. A narrow path climbs north to the lighthouse${if not vars.lamp_lit}, its lamp dark${end}.
+    exits:
+      north: lighthouse_base
+      south: "The sea. Not tonight."        # a plain string means the exit is blocked, with this message
+
+  lighthouse_base:
+    name: Base of the Lighthouse
+    description: |
+      A cramped round room that smells of salt and kerosene. An iron
+      staircase spirals upward behind a gate.
+    exits:
+      south: shore
+      up:
+        to: lamp_room
+        through: iron_gate                  # the engine checks that the door is open
+
+  lamp_room:
+    name: Lamp Room
+    description: |
+      Rain lashes the windows on every side. The great lamp takes up the
+      middle of the room. A battered radio sits on a shelf.
+    exits:
+      down: lighthouse_base
+
+# -------------------------------------------------------------- objects
+# Every object says where it starts with `in:` (a room, an object or a
+# character). Built-in traits give default behaviour for free.
+
+objects:
+  tide_pool:
+    name: tide pool
+    synonyms: [pool, water]
+    in: shore
+    traits: [scenery, container, open]
+    description: |
+      Cold water collects between the rocks.${if world.brass_key.hidden} Something glints at the bottom.${end}
+    on:
+      search: |
+        if world.brass_key.hidden then
+          world.brass_key.hidden = false
+          world.brass_key:move_to(player)
+          say("You plunge your hand into the icy water and pull out a small brass key.")
+          score(5)
+        else
+          say("Nothing but seaweed.")
+        end
+
+  brass_key:
+    name: brass key
+    adjectives: [brass, small]
+    synonyms: [key]
+    in: tide_pool
+    traits: [portable]
+    state: { hidden: true }                 # hidden objects can't be seen or referred to
+    description: A small brass key, green with age.
+
+  iron_gate:
+    name: iron gate
+    synonyms: [gate, door]
+    in: lighthouse_base
+    traits: [door, openable, lockable]
+    state: { open: false, locked: true }
+    unlocks_with: brass_key                 # so "unlock gate with key" works without any script
+    description: |
+      Wrought iron, flecked with rust. It is ${self.locked and "locked" or (self.open and "open" or "closed")}.
+
+  oil_can:
+    name: oil can
+    synonyms: [can, oil, kerosene]
+    in: lighthouse_base
+    traits: [portable]
+    state: { full: true }
+    description: |
+      A dented can of lamp oil.${if not self.full} It's empty now.${end}
+
+  great_lamp:
+    name: great lamp
+    synonyms: [lamp, light, wick, lens]
+    in: lamp_room
+    traits: [scenery]
+    state: { fueled: false }
+    description: |
+      A huge wick lamp ringed by glass prisms. ${if self.fueled}Its reservoir is full.${else}Its reservoir is bone dry.${end}
+    on:
+      fill: |
+        if args.tool ~= world.oil_can then
+          return block("That won't fuel a lamp.")
+        end
+        if not world.oil_can.full then
+          return block("The can is empty.")
+        end
+        world.oil_can.full = false
+        self.fueled = true
+        say("You pour the kerosene into the reservoir until it's full.")
+      before_light: |
+        if not self.fueled then
+          return block("You strike a match, but the wick is dry. It needs oil.")
+        end
+      light: |
+        vars.lamp_lit = true
+        say("The wick catches. Through the prisms, a beam of light sweeps out over the water.")
+        score(10)
+
+  radio:
+    name: radio
+    synonyms: [set, transmitter, dial]
+    in: lamp_room
+    traits: [scenery]
+    description: An old marine radio with a heavy channel dial.
+    on:
+      use: open_choice("radio_dial")        # a one-line handler can be a single expression
+      tune: open_choice("radio_dial")
+
+# ----------------------------------------------------------- characters
+
+characters:
+  keeper:
+    name: old keeper
+    synonyms: [keeper, man, ghost]
+    in: lighthouse_base
+    description: |
+      A grey-bearded man in an oilskin coat. Rain runs straight through him.
+    talk: keeper_talk                       # "talk to keeper" opens this choice graph
+
+# ---------------------------------------------------------------- verbs
+# Custom verbs and their grammar. {target} is the direct object, {tool}
+# is the indirect object, and {text} is free text. Handlers on the
+# target object run first; `default` is the reply when nothing handles it.
+# Built-in verbs (take, drop, examine, open, unlock, go, search...) don't
+# need to be listed here.
+
+verbs:
+  fill:
+    patterns:
+      - "fill {target} with {tool}"
+      - "pour {tool} into {target}"
+      - "refuel {target} with {tool}"
+    default: "You can't fill that."
+  light:
+    patterns: ["light {target}", "ignite {target}", "turn on {target}"]
+    default: "That won't burn."
+  use:
+    patterns: ["use {target}"]
+    default: "You're not sure how."
+  tune:
+    patterns: ["tune {target}", "tune {target} to {text}"]
+    default: "There's nothing to tune."
+
+# -------------------------------------------------------------- choices
+# Menus and dialogue use the same structure: a graph of nodes. A
+# one-node graph is a simple menu. While a choice is open, the player
+# picks a numbered option instead of typing a command.
+
+choices:
+  radio_dial:
+    start: dial
+    nodes:
+      dial:
+        text: "The dial clicks between channels. Which one do you try?"
+        options:
+          - text: "Channel 9: harbour master"
+            say: "Only static. The harbour station was abandoned years ago."
+            goto: dial
+          - text: "Channel 16: distress and calling"
+            do: |
+              if vars.lamp_lit then
+                vars.ship_contacted = true
+                end_game("saved")
+              else
+                say("A voice crackles: \"...can't see the coast! Is anyone there? We need a light!\"")
+              end
+            goto: dial
+          - text: "Switch the radio off"
+            end: true
+
+  keeper_talk:
+    start: greet
+    nodes:
+      greet:
+        text: '"Another storm," the old man murmurs. "Another ship."'
+        options:
+          - text: "Ask about the gate"
+            goto: gate
+          - text: "Ask about the lamp"
+            when: world.iron_gate.open          # hidden until this is true
+            goto: lamp
+          - text: "Say goodbye"
+            end: true
+      gate:
+        text: '"Dropped the key in the tide pool. Clumsy old hands."'
+        do: vars.keeper_trust = vars.keeper_trust + 1
+        goto: greet
+      lamp:
+        text: '"Lamp drinks oil. There''s a can by the stairs, if it hasn''t gone dry."'
+        do: vars.keeper_trust = vars.keeper_trust + 1
+        goto: greet
+
+# --------------------------------------------------------- global events
+
+on:
+  turn: |
+    if game.turn == 40 and not vars.ship_contacted then
+      say("Out at sea, the ship's lights swing dangerously close to the rocks.")
+    elseif game.turn >= 60 and not vars.ship_contacted then
+      end_game("lost")
+    end
+
+  # Runs only after the whole fallback chain has failed (see FORMAT.md,
+  # "Never leave the player stuck"). args.text is the raw input.
+  parse_failed: |
+    if here == world.shore and args.text:find("swim") then
+      say("The waves would smash you against the rocks.")
+    end
+
+endings:
+  saved:
+    kind: win
+    text: |
+      "We see you! We see the light!" The ship turns slowly away from the
+      rocks. Behind you, the old keeper smiles, then fades into the rain.
+  lost:
+    kind: loss
+    text: |
+      A terrible grinding carries over the wind. The ship's lights tilt,
+      flicker and go out.

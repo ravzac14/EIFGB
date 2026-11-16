@@ -1,0 +1,219 @@
+use eifgb_compiler::{compile, compile_str, DirFiles, Output};
+use eifgb_ir::*;
+use std::path::PathBuf;
+
+fn example(name: &str) -> Output {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples").join(name);
+    compile(&DirFiles { root }, "game.yaml")
+}
+
+fn errors(out: &Output) -> Vec<String> {
+    out.errors().map(|d| d.to_string()).collect()
+}
+
+fn warnings(out: &Output) -> Vec<String> {
+    out.warnings().map(|d| d.to_string()).collect()
+}
+
+/// A minimal valid game. Tests add sections to it.
+const BASE: &str = r#"
+format: eifgb/0.1
+game: { id: t, title: T, version: "1", start: hall }
+rooms:
+  hall: { name: Hall }
+"#;
+
+fn with(extra: &str) -> Output {
+    compile_str(&format!("{BASE}{extra}"))
+}
+
+fn assert_error(out: &Output, needle: &str) {
+    let errs = errors(out);
+    assert!(errs.iter().any(|e| e.contains(needle)), "expected an error containing {needle:?}, got {errs:#?}");
+    assert!(out.story.is_none());
+}
+
+// ------------------------------------------------------------- the example
+
+#[test]
+fn lighthouse_compiles_without_errors_or_warnings() {
+    let out = example("lighthouse");
+    assert!(errors(&out).is_empty(), "{:#?}", errors(&out));
+    assert!(warnings(&out).is_empty(), "{:#?}", warnings(&out));
+    let story = out.story.unwrap();
+
+    assert_eq!(story.ir_version, IR_VERSION);
+    assert_eq!(story.meta.stdlib, 1);
+    assert_eq!(story.entity(PLAYER).kind, EntityKind::Player);
+    assert_eq!(story.entity(story.meta.start).key, "shore");
+    assert_eq!(story.entity(PLAYER).location, Some(story.meta.start));
+
+    let key = story.entity_by_key("brass_key").unwrap();
+    let pool = story.entity_by_key("tide_pool").unwrap();
+    assert_eq!(story.entity(key).location, Some(pool));
+    assert_eq!(story.entity(key).state["hidden"], Value::Bool(true));
+    assert!(story.entity(key).vocab.adjectives.contains(&"brass".to_string()));
+
+    // The `open` trait is shorthand for state.
+    assert!(!story.entity(pool).traits.iter().any(|t| t.key() == "open"));
+    assert_eq!(story.entity(pool).state["open"], Value::Bool(true));
+
+    let base = story.entity(story.entity_by_key("lighthouse_base").unwrap());
+    let up = base.exits.iter().find(|e| e.direction == Direction::Up).unwrap();
+    assert_eq!(up.through, story.entity_by_key("iron_gate"));
+
+    let shore = story.entity(story.meta.start);
+    let south = shore.exits.iter().find(|e| e.direction == Direction::South).unwrap();
+    assert!(south.to.is_none() && south.blocked.is_some());
+
+    // Author verbs come first, then the standard library's.
+    assert_eq!(story.verbs[0].key, "fill");
+    assert_eq!(story.verbs[0].origin, VerbOrigin::Author);
+    assert!(story.verbs.iter().any(|v| v.key == "take" && v.origin == VerbOrigin::Stdlib));
+
+    let lamp = story.entity(story.entity_by_key("great_lamp").unwrap());
+    assert!(lamp.handlers.iter().any(|h| h.phase == Phase::Before && h.event == "light"));
+
+    let keeper = story.entity(story.entity_by_key("keeper").unwrap());
+    assert_eq!(story.choice(keeper.talk.unwrap()).key, "keeper_talk");
+
+    assert_eq!(story.scripts.len(), 1);
+    assert!(story.scripts[0].src.contains("trust_level"));
+    assert!(story.messages.contains_key("take.done"));
+}
+
+#[test]
+fn lighthouse_ir_round_trips_through_json() {
+    let story = example("lighthouse").story.unwrap();
+    let json = serde_json::to_string(&story).unwrap();
+    let back: Story = serde_json::from_str(&json).unwrap();
+    assert_eq!(story, back);
+}
+
+// -------------------------------------------------------------- validation
+
+#[test]
+fn minimal_game_compiles() {
+    let out = with("");
+    assert!(out.story.is_some(), "{:#?}", errors(&out));
+}
+
+#[test]
+fn yaml_typos_in_field_names_are_errors() {
+    assert_error(&with("objects:\n  lamp: { name: lamp, in: hall, discription: x }\n"), "discription");
+}
+
+#[test]
+fn unknown_references_suggest_fixes() {
+    let out = with("objects:\n  lamp: { name: lamp, in: hal }\n");
+    assert_error(&out, "did you mean 'hall'?");
+}
+
+#[test]
+fn exit_to_unknown_room_is_an_error_but_prose_is_a_blocked_message() {
+    assert_error(&with("  cellar: { name: Cellar, exits: { up: hal } }\n"), "unknown ID 'hal'");
+    let out = with("  cellar: { name: Cellar, exits: { up: \"The hatch is stuck.\" } }\n");
+    assert!(out.story.is_some(), "{:#?}", errors(&out));
+}
+
+#[test]
+fn duplicate_ids_across_sections_are_errors() {
+    assert_error(&with("objects:\n  hall: { name: hall }\n"), "already used in rooms");
+}
+
+#[test]
+fn reserved_and_keyword_ids_are_errors() {
+    assert_error(&with("objects:\n  world: { name: globe }\n"), "reserved");
+    assert_error(&with("objects:\n  end: { name: end }\n"), "Lua keyword");
+}
+
+#[test]
+fn unknown_trait_and_direction() {
+    assert_error(&with("objects:\n  box: { name: box, traits: [contaner] }\n"), "did you mean 'container'?");
+    assert_error(&with("  cellar: { name: Cellar, exits: { nrth: hall } }\n"), "did you mean 'north'?");
+}
+
+#[test]
+fn handler_for_unknown_verb_suggests_one() {
+    let out = with("objects:\n  box: { name: box, on: { serch: 'say(1)' } }\n");
+    assert_error(&out, "did you mean 'search'?");
+}
+
+#[test]
+fn before_and_after_work_on_verbs_but_not_events() {
+    let ok = with("objects:\n  box: { name: box, on: { before_take: 'say(1)', after_take: 'say(2)' } }\n");
+    assert!(ok.story.is_some(), "{:#?}", errors(&ok));
+    assert_error(&with("on: { before_turn: 'say(1)' }\n"), "no before_/after_ form");
+}
+
+#[test]
+fn bad_templates_report_their_path() {
+    assert_error(&with("  cellar: { name: Cellar, description: '${if x}dark' }\n"), "rooms.cellar.description");
+}
+
+#[test]
+fn things_inside_non_containers_are_errors() {
+    let src = "objects:\n  rock: { name: rock, in: hall }\n  pebble: { name: pebble, in: rock }\n";
+    assert_error(&with(src), "isn't a container");
+}
+
+#[test]
+fn containment_loops_are_errors() {
+    let src = "objects:\n  a: { name: a, in: b, traits: [container] }\n  b: { name: b, in: a, traits: [container] }\n";
+    assert_error(&with(src), "loop");
+}
+
+#[test]
+fn through_requires_a_door() {
+    let src = "  cellar:\n    name: Cellar\n    exits: { up: { to: hall, through: crate } }\nobjects:\n  crate: { name: crate, in: cellar }\n";
+    assert_error(&with(src), "needs the 'door' trait");
+}
+
+#[test]
+fn literal_script_references_are_checked() {
+    let src = "on: { turn: 'end_game(\"won\")' }\nendings:\n  win: { kind: win, text: Yay }\n";
+    assert_error(&with(src), "no such ending (did you mean 'win'?)");
+    assert_error(&with("on: { turn: 'open_choice(\"nope\")' }\n"), "no such choice");
+}
+
+#[test]
+fn talk_is_only_for_characters() {
+    let src = "objects:\n  rock: { name: rock, talk: chat }\nchoices:\n  chat: { start: a, nodes: { a: { text: hi } } }\n";
+    assert_error(&with(src), "only characters");
+}
+
+#[test]
+fn choice_gotos_are_checked() {
+    let src = "choices:\n  c:\n    start: a\n    nodes:\n      a: { text: hi, options: [ { text: go, goto: bb } ] }\n      b: { text: there }\n";
+    assert_error(&with(src), "unknown node 'bb'");
+}
+
+#[test]
+fn author_verb_replacing_stdlib_verb_keeps_builtin_action_and_warns() {
+    let out = with("verbs:\n  take: { patterns: ['grab {target}'] }\n");
+    let story = out.story.as_ref().expect("should compile");
+    let take: Vec<_> = story.verbs.iter().filter(|v| v.key == "take").collect();
+    assert_eq!(take.len(), 1);
+    assert_eq!(take[0].action, VerbAction::Builtin(BuiltinAction::Take));
+    assert!(warnings(&out).iter().any(|w| w.contains("replaces the patterns")));
+}
+
+#[test]
+fn shadowing_a_stdlib_pattern_warns() {
+    let out = with("verbs:\n  peek: { patterns: ['search {target}'] }\n");
+    assert!(out.story.is_some());
+    assert!(warnings(&out).iter().any(|w| w.contains("shadows standard verb 'search'")), "{:#?}", warnings(&out));
+}
+
+#[test]
+fn unknown_stdlib_version_or_language() {
+    let bad_version = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall, stdlib: 99 }\nrooms: { hall: { name: Hall } }\n");
+    assert_error(&bad_version, "no standard library v99");
+    let bad_lang = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall, language: fr }\nrooms: { hall: { name: Hall } }\n");
+    assert_error(&bad_lang, "game.language");
+}
+
+#[test]
+fn script_paths_cannot_escape_the_project() {
+    assert_error(&with("scripts: ['../../etc/passwd']\n"), "must not contain '..'");
+}

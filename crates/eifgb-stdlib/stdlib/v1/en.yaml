@@ -1,0 +1,269 @@
+# Standard library v1, English.
+#
+# This file is FROZEN once v1 ships. Additions and changes go into v2/,
+# so games pinned to v1 keep behaving exactly the same.
+#
+# Message templates can use the same ${...} syntax as game text, with
+# these helpers: the(x), The(x), a(x), A(x). In messages, `args` holds
+# the parsed command: args.target, args.tool, args.text, args.direction.
+
+verbs:
+  look:
+    action: look
+    patterns: ["look", "l", "look around"]
+  examine:
+    action: examine
+    patterns:
+      - "examine {target}"
+      - "x {target}"
+      - "look at {target}"
+      - "inspect {target}"
+      - "describe {target}"
+      - "check {target}"
+  inventory:
+    action: inventory
+    patterns: ["inventory", "i", "inv"]
+  go:
+    action: go
+    patterns: ["go {direction}", "walk {direction}", "{direction}"]
+  take:
+    action: take
+    patterns:
+      - "take {target}"
+      - "get {target}"
+      - "pick up {target}"
+      - "pick {target} up"
+      - "take {target} from {tool}"
+  drop:
+    action: drop
+    patterns:
+      - "drop {target}"
+      - "put down {target}"
+      - "put {target} down"
+      - "discard {target}"
+  put_in:
+    action: put_in
+    patterns:
+      - "put {target} in {tool}"
+      - "put {target} into {tool}"
+      - "put {target} inside {tool}"
+      - "insert {target} in {tool}"
+      - "insert {target} into {tool}"
+  put_on:
+    action: put_on
+    patterns:
+      - "put {target} on {tool}"
+      - "put {target} onto {tool}"
+      - "place {target} on {tool}"
+  open:
+    action: open
+    patterns: ["open {target}"]
+  close:
+    action: close
+    patterns: ["close {target}", "shut {target}"]
+  unlock:
+    action: unlock
+    patterns: ["unlock {target} with {tool}", "unlock {target}"]
+  lock:
+    action: lock
+    patterns: ["lock {target} with {tool}", "lock {target}"]
+  search:
+    action: search
+    patterns:
+      - "search {target}"
+      - "look in {target}"
+      - "look inside {target}"
+      - "look under {target}"
+      - "look behind {target}"
+      - "feel in {target}"
+      - "rummage in {target}"
+  talk:
+    action: talk
+    patterns:
+      - "talk to {target}"
+      - "talk with {target}"
+      - "speak to {target}"
+      - "speak with {target}"
+      - "chat with {target}"
+      - "greet {target}"
+  wear:
+    action: wear
+    patterns: ["wear {target}", "put on {target}", "put {target} on"]
+  take_off:
+    action: take_off
+    patterns: ["take off {target}", "take {target} off", "remove {target}"]
+  eat:
+    action: eat
+    patterns: ["eat {target}", "consume {target}"]
+  wait:
+    action: wait
+    patterns: ["wait", "z"]
+  score:
+    action: score
+    patterns: ["score"]
+  undo:
+    action: undo
+    patterns: ["undo"]
+  save:
+    action: save
+    patterns: ["save"]
+  restore:
+    action: restore
+    patterns: ["restore", "load"]
+  restart:
+    action: restart
+    patterns: ["restart"]
+  help:
+    action: help
+    patterns: ["help", "hint", "hints"]
+
+lexicon:
+  phrases:
+    grab: take
+    snatch: take
+    nab: take
+    collect: take
+    acquire: take
+    peer at: examine
+    study: examine
+    observe: examine
+    view: examine
+    read: examine
+    look over: examine
+    toss: drop
+    throw away: drop
+    head: go
+    run: go
+    travel: go
+    proceed: go
+    enter: go in
+    exit: go out
+    leave: go out
+    devour: eat
+    munch: eat
+    don: wear
+    doff: take off
+    rest: wait
+    slam: close
+    unbolt: unlock
+  directions:
+    n: north
+    north: north
+    s: south
+    south: south
+    e: east
+    east: east
+    w: west
+    west: west
+    ne: northeast
+    northeast: northeast
+    nw: northwest
+    northwest: northwest
+    se: southeast
+    southeast: southeast
+    sw: southwest
+    southwest: southwest
+    u: up
+    up: up
+    upstairs: up
+    d: down
+    down: down
+    downstairs: down
+    in: in
+    inside: in
+    out: out
+    outside: out
+  articles: [the, a, an, some]
+  filler: ["please", "try to", "i want to", "i'd like to", "let me", "i will", "i'll"]
+  pronouns: [it, them, him, her]
+  all_words: [all, everything]
+  self_words: [me, myself, self]
+
+messages:
+  # the player
+  player.name: "yourself"
+  # parser
+  parser.empty: "Pardon?"
+  parser.unknown_verb: "I understood \"${args.text}\" only as far as \"${args.known}\". Try a verb like ${args.suggestions}."
+  parser.unknown_noun: "You don't see any \"${args.text}\" here."
+  parser.ambiguous: "Which do you mean: ${args.options}?"
+  parser.need_target: "What do you want to ${args.verb}?"
+  parser.need_tool: "What do you want to ${args.verb} ${the(args.target)} with?"
+  parser.did_you_mean: "Did you mean \"${args.text}\"?"
+  parser.no_pronoun: "I'm not sure what you're referring to."
+  # looking
+  look.exits: "Exits: ${args.list}."
+  look.no_exits: "There's no obvious way out."
+  look.you_see: "You can see ${args.list} here."
+  examine.default: "You see nothing special about ${the(args.target)}."
+  examine.self: "As good-looking as ever."
+  search.nothing: "You find nothing of interest."
+  search.contents: "In ${the(args.target)} you find ${args.list}."
+  # inventory
+  inventory.empty: "You're empty-handed."
+  inventory.list: "You're carrying ${args.list}."
+  # movement
+  go.no_exit: "You can't go that way."
+  go.door_closed: "${The(args.door)} is closed."
+  go.blocked: "You can't go that way right now."
+  # taking and dropping
+  take.done: "Taken."
+  take.already: "You already have ${the(args.target)}."
+  take.fixed: "${The(args.target)} won't budge."
+  take.scenery: "That's hardly portable."
+  take.person: "${The(args.target)} wouldn't care for that."
+  take.self: "You can't take yourself."
+  take.full: "You're carrying too much already."
+  drop.done: "Dropped."
+  drop.not_held: "You're not carrying ${the(args.target)}."
+  put.done: "You put ${the(args.target)} ${args.preposition} ${the(args.tool)}."
+  put.not_container: "You can't put anything in ${the(args.tool)}."
+  put.not_supporter: "You can't put anything on ${the(args.tool)}."
+  put.closed: "${The(args.tool)} is closed."
+  put.into_self: "You can't put something inside itself."
+  put.full: "There's no more room in ${the(args.tool)}."
+  # doors and containers
+  open.done: "You open ${the(args.target)}."
+  open.already: "${The(args.target)} is already open."
+  open.locked: "${The(args.target)} is locked."
+  open.cannot: "That's not something you can open."
+  close.done: "You close ${the(args.target)}."
+  close.already: "${The(args.target)} is already closed."
+  close.cannot: "That's not something you can close."
+  unlock.done: "You unlock ${the(args.target)} with ${the(args.tool)}."
+  unlock.not_locked: "${The(args.target)} isn't locked."
+  unlock.wrong_key: "${The(args.tool)} doesn't fit."
+  unlock.no_key: "You don't have anything that unlocks it."
+  unlock.cannot: "That doesn't have a lock."
+  lock.done: "You lock ${the(args.target)} with ${the(args.tool)}."
+  lock.already: "${The(args.target)} is already locked."
+  lock.close_first: "You'll need to close ${the(args.target)} first."
+  lock.no_key: "You don't have anything that locks it."
+  lock.cannot: "That doesn't have a lock."
+  # people
+  talk.no_response: "${The(args.target)} doesn't respond."
+  talk.not_person: "You'd get more conversation out of a brick."
+  # clothing and food
+  wear.done: "You put on ${the(args.target)}."
+  wear.already: "You're already wearing ${the(args.target)}."
+  wear.cannot: "You can't wear that."
+  take_off.done: "You take off ${the(args.target)}."
+  take_off.not_worn: "You're not wearing ${the(args.target)}."
+  eat.done: "You eat ${the(args.target)}."
+  eat.cannot: "That's not edible."
+  # meta
+  wait.done: "Time passes."
+  score.report: "You have scored ${game.score}${if game.max_score} out of a possible ${game.max_score}${end}, in ${game.turn} turns."
+  score.gained: "[Your score has gone up by ${args.points}.]"
+  undo.done: "[Undone.]"
+  undo.none: "There's nothing to undo."
+  save.done: "[Saved.]"
+  restore.done: "[Restored.]"
+  restore.none: "There's no saved game."
+  restart.confirm: "Restart from the beginning?"
+  help.text: "Type commands like LOOK, EXAMINE LAMP, TAKE KEY, GO NORTH or TALK TO KEEPER. Type INVENTORY to see what you carry and UNDO to take back a move."
+  ending.win: "*** You have won ***"
+  ending.loss: "*** You have lost ***"
+  ending.neutral: "*** The End ***"
+  choice.prompt: "Choose an option (1-${args.count}):"
+  choice.invalid: "Please choose one of the numbered options."

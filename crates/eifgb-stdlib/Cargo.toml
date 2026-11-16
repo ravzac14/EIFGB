@@ -1,0 +1,12 @@
+[package]
+name = "eifgb-stdlib"
+description = "Versioned standard library: verbs, lexicon and messages for each language"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+eifgb-ir.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+indexmap.workspace = true

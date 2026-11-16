@@ -19,6 +19,7 @@ You unlock the pantry door with the small key.
 
 - [Quick start](#quick-start)
 - [Tutorial: Midnight Snack](#tutorial-midnight-snack)
+- [States and descriptions](#states-and-descriptions)
 - [Command reference](#command-reference)
 - [Cheat sheet](#cheat-sheet)
 - [Where to go next](#where-to-go-next)
@@ -206,7 +207,8 @@ objects:
   locked.", and the kitchen mentions "The pantry door is locked." Things
   that are listed get a tag instead, like "a wooden box (open)". The same
   goes for states you invent: give the apple `state: { ripe: true }` and
-  `x apple` adds "It's ripe." Start a field's name with `_` to keep it private.
+  `x apple` adds "It's ripe." [States and descriptions](#states-and-descriptions)
+  has the details.
 
 `check` catches mistakes before you play. Misspell the key as `smal_key` and you get:
 
@@ -308,6 +310,177 @@ Replay it at any time, to check that your changes haven't broken the game:
 That's a complete game. Compare yours with
 [`spec/examples/midnight_snack/game.yaml`](spec/examples/midnight_snack/game.yaml).
 
+## States and descriptions
+
+Objects change during play: doors open, lamps get lit, oil runs out. EIFGB
+keeps track of these changes as **state**, and describes them for you, so
+most descriptions never need to mention them.
+
+### Declaring state
+
+List an object's starting state under `state:`. Values can be true/false,
+numbers or text:
+
+```yaml
+objects:
+  lantern:
+    name: brass lantern
+    synonyms: [lantern, lamp]
+    in: shed
+    traits: [portable]
+    state: { lit: false, oil: 3, _times_lit: 0 }
+    description: A dented brass lantern.
+    on:
+      light: |
+        self.lit = true
+        self.oil = self.oil - 1
+        self._times_lit = self._times_lit + 1
+        say("The wick catches.")
+
+  cupboard:
+    name: cupboard
+    in: shed
+    traits: [container, openable, scenery]
+
+verbs:
+  light:
+    patterns: ["light {target}"]
+    default: "That won't light."
+```
+
+Scripts read and change state through the object (`self.lit = true`, or
+`world.lantern.oil` from anywhere). They can also add fields that weren't
+declared. The built-in verbs keep a few states up to date for you:
+
+| State | Set by | Meaning |
+|---|---|---|
+| `open` | OPEN and CLOSE, on `openable` things | Open or shut. A container that isn't `openable` is always open. |
+| `locked` | LOCK and UNLOCK, on `lockable` things | Locked. A locked thing can't be opened. |
+| `worn` | WEAR and TAKE OFF, on `wearable` things | Being worn. |
+| `hidden` | only scripts | Out of the game: it can't be seen or referred to until a script sets it to `false`. |
+
+### What players see
+
+With nothing more than the declarations above, playing gives:
+
+```
+Garden Shed
+A cramped wooden shed. The cupboard is closed.
+You can see a brass lantern here.
+There's no obvious way out.
+
+> x lantern
+A dented brass lantern. It isn't lit. Its oil is 3.
+
+> light lantern
+The wick catches.
+
+> x lantern
+A dented brass lantern. It's lit. Its oil is 2.
+
+> take lantern
+Taken.
+
+> i
+You're carrying a brass lantern (lit).
+```
+
+State is mentioned in three places:
+
+| Where | What's added | Example |
+|---|---|---|
+| Examining a thing | Every state, after its description | "It isn't lit. Its oil is 3." |
+| Lists (room contents, inventory, inside containers) | Tags for states that are "on" | "a brass lantern (lit)", "an iron gate (locked)" |
+| Room descriptions | A sentence for things that aren't listed (scenery), for "on" states | "The cupboard is closed." |
+
+Lists and rooms leave out "off" states and numbers, because "a lantern
+(not lit, oil: 3)" in every list would be clutter. Examine the thing to
+see everything.
+
+### How your own states are worded
+
+The sentence comes from the field's name and value:
+
+| Field | Examining | In lists |
+|---|---|---|
+| `lit: true` | "It's lit." | "(lit)" |
+| `lit: false` | "It isn't lit." | *(nothing)* |
+| `is_broken: true` | "It's broken." (a leading `is_` is dropped) | "(broken)" |
+| `oil: 3` | "Its oil is 3." | *(nothing)* |
+| `color: red` | "Its color is red." | *(nothing)* |
+| `_times_lit: 1` | *(private: never shown)* | *(nothing)* |
+
+Some tips:
+- **Name true/false states with an adjective:** `lit`, `broken`, `ripe`, `fueled`, `full`. Underscores become spaces, so `half_full` reads "It's half full."
+- **Start bookkeeping fields with `_`**, like `_times_lit` or `_visits`. They work in scripts like any other field but are never described.
+- **Lists and tables in state** are never described.
+
+### Writing your own state text
+
+When you want better prose than the automatic sentence, write it into the
+description with a template. Any field your description reads is left out
+of the automatic sentences, so it isn't said twice:
+
+```yaml
+    description: "A dented brass lantern${if self.lit}, glowing warmly${else}, cold and dark${end}."
+```
+
+```
+> x lantern
+A dented brass lantern, cold and dark. Its oil is 3.
+```
+
+`lit` is now covered by your text, and `oil` is still described
+automatically. For a door, mentioning either `open` or `locked` covers
+both. A room description that mentions `world.cupboard.open` stops the room
+from adding "The cupboard is closed."
+
+### Rewording or turning it off
+
+Every sentence comes from a message you can override under `messages:`.
+For example:
+
+```yaml
+messages:
+  state.custom.value: "It has ${args.value} ${args.state} left."
+  state.open: "It's standing open."
+```
+
+```
+> x lantern
+A dented brass lantern. It isn't lit. It has 3 oil left.
+
+> x cupboard
+It's standing open.
+```
+
+| Message | Used for | Default |
+|---|---|---|
+| `state.open`, `state.closed`, `state.locked`, `state.worn` | Examining | "It's open." … "You're wearing it." |
+| `state.tag.open`, `.closed`, `.locked`, `.worn` | Lists | "open" … "worn" |
+| `state.here.open`, `.closed`, `.locked` | Room descriptions | "${The(args.target)} is open." … |
+| `state.custom.on`, `state.custom.off` | Examining your true/false fields | "It's ${args.state}." / "It isn't ${args.state}." |
+| `state.custom.value` | Examining your number and text fields | "Its ${args.state} is ${args.value}." |
+| `state.here.custom.on` | Room descriptions, your fields | "${The(args.target)} is ${args.state}." |
+
+To turn automatic state descriptions off for the whole game and write all
+state text yourself:
+
+```yaml
+settings:
+  describe_state: false
+```
+
+```
+Garden Shed
+A cramped wooden shed.
+You can see a brass lantern here.
+There's no obvious way out.
+
+> x lantern
+A dented brass lantern.
+```
+
 ## Command reference
 
 | Command | What it does |
@@ -341,10 +514,8 @@ SCORE, HELP and QUIT.
 shorthand for `state: { open: true }`.
 
 **Settings:** `describe_state` (default `true`) describes state
-automatically in examine text, room descriptions and lists. That covers
-open, closed, locked and worn, and your own fields too: `fueled: true` →
-"It's fueled.", `channel: 16` → "Its channel is 16." Fields starting with
-`_` are private.
+automatically in examine text, room descriptions and lists, including
+your own fields. See [States and descriptions](#states-and-descriptions).
 
 **Exits:** `north: pantry` (to a room); `south: "The sea. Not tonight."`
 (always blocked, with this message); or a map with `to`, `through` (a

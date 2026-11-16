@@ -275,7 +275,7 @@ messages:
   restore.done: "[Restored.]"
   restore.none: "There's no saved game."
   restore.failed: "That save couldn't be restored: ${args.reason}"
-  help.text: "Type commands like LOOK, EXAMINE LAMP, TAKE KEY, GO NORTH or TALK TO KEEPER. Type INVENTORY to see what you carry and UNDO to take back a move."
+  help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, and SAVE and RESTORE keep your place."
   ending.win: "*** You have won ***"
   ending.loss: "*** You have lost ***"
   ending.neutral: "*** The End ***"

@@ -111,6 +111,7 @@ pub fn play(story: Story, commands: Option<&Path>, seed: Option<u64>, save_file:
         }
     }
     let s = &game.world().state;
-    println!("\n[{} turns, score {}]", s.turn, s.score);
+    let turns = if s.turn == 1 { "turn" } else { "turns" };
+    println!("\n[{} {turns}, score {}]", s.turn, s.score);
     Ok(())
 }

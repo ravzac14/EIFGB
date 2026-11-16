@@ -518,7 +518,8 @@ impl<'a> Lowerer<'a> {
             }
             Some(id)
         });
-        if has(Trait::Lockable) && unlocks_with.is_none() && state.get("locked") == Some(&Value::Bool(true)) {
+        // Only when no key was named at all: a misspelled key already has its own error.
+        if has(Trait::Lockable) && t.unlocks_with.is_none() && state.get("locked") == Some(&Value::Bool(true)) {
             self.d.warn(&path, "starts locked but has no 'unlocks_with', so only a script can unlock it");
         }
 

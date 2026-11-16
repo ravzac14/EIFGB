@@ -214,6 +214,14 @@ fn unknown_stdlib_version_or_language() {
 }
 
 #[test]
+fn a_misspelled_key_gives_one_error_and_no_follow_on_warning() {
+    let src = "objects:\n  box: { name: box, traits: [container, openable, lockable], state: { locked: true }, unlocks_with: kye }\n  key: { name: key }\n";
+    let out = with(src);
+    assert_error(&out, "did you mean 'key'?");
+    assert!(warnings(&out).is_empty(), "{:#?}", warnings(&out));
+}
+
+#[test]
 fn state_fields_cannot_shadow_builtin_fields_or_methods() {
     assert_error(&with("objects:\n  box: { name: box, state: { contents: 3 } }\n"), "built-in field or method");
     assert_error(&with("objects:\n  box: { name: box, state: { location: hall } }\n"), "built-in field or method");

@@ -41,20 +41,42 @@ fn assert_says(g: &mut Game<LuaHost>, input: &str, needle: &str) {
 
 // --------------------------------------------------------- the lighthouse
 
+/// Every example game with a walkthrough.txt must play through to a win
+/// without script errors. This keeps the README tutorial honest.
 #[test]
-fn walkthrough_wins() {
+fn every_example_walkthrough_wins() {
+    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples");
+    let mut played = 0;
+    for entry in std::fs::read_dir(&examples).unwrap() {
+        let dir = entry.unwrap().path();
+        let Ok(walkthrough) = std::fs::read_to_string(dir.join("walkthrough.txt")) else { continue };
+        let out = compile(&DirFiles { root: dir.clone() }, "game.yaml");
+        assert!(out.diagnostics.is_empty(), "{}: {:#?}", dir.display(), out.diagnostics);
+        let mut g = game(out.story.unwrap());
+        let mut last = Output::default();
+        for line in walkthrough.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+            last = g.input(line);
+            assert!(
+                !last.lines.iter().any(|l| l.kind == LineKind::Error),
+                "{}\n> {line}\n{}",
+                dir.display(),
+                last.text()
+            );
+        }
+        assert_eq!(last.ended, Some(EndingKind::Win), "{}\n{}", dir.display(), last.text());
+        played += 1;
+    }
+    assert!(played >= 2, "expected at least the lighthouse and midnight_snack walkthroughs");
+}
+
+#[test]
+fn lighthouse_walkthrough_scores_15() {
     let mut g = game(lighthouse());
     let walkthrough = std::fs::read_to_string(lighthouse_dir().join("walkthrough.txt")).unwrap();
     let mut last = Output::default();
     for line in walkthrough.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
         last = g.input(line);
-        assert!(
-            !last.lines.iter().any(|l| l.kind == LineKind::Error),
-            "> {line}\n{}",
-            last.text()
-        );
     }
-    assert_eq!(last.ended, Some(EndingKind::Win), "{}", last.text());
     assert_eq!(last.status.score, 15);
     assert!(last.text().contains("We see the light!"));
 }

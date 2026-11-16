@@ -1,0 +1,8 @@
+# Winning playthrough of Midnight Snack.
+n
+x mat
+look under the mat
+unlock door
+n
+take the fruit
+eat it

@@ -1,0 +1,74 @@
+# The finished game from the README tutorial.
+format: eifgb/0.1
+
+game:
+  id: midnight_snack
+  title: "Midnight Snack"
+  version: "1.0"
+  start: kitchen
+  intro: You wake up hungry. Something in the pantry is calling your name.
+
+rooms:
+  kitchen:
+    name: Kitchen
+    description: |
+      A small kitchen, lit only by the glow of the fridge. A worn mat
+      lies in front of the pantry door to the north.
+    exits:
+      north:
+        to: pantry
+        through: pantry_door
+
+  pantry:
+    name: Pantry
+    description: Shelves of jars, and the sweet smell of apples.
+    exits:
+      south: kitchen
+
+objects:
+  pantry_door:
+    name: pantry door
+    synonyms: [door]
+    in: kitchen
+    traits: [door, openable, lockable, scenery]
+    state: { locked: true }
+    unlocks_with: small_key
+    description: A sturdy wooden door. It's ${if self.locked}locked${else}unlocked${end}.
+
+  mat:
+    name: worn mat
+    synonyms: [rug]
+    in: kitchen
+    traits: [scenery]
+    description: A threadbare mat.${if world.small_key.hidden} One corner looks lumpy.${end}
+    on:
+      search: |
+        if world.small_key.hidden then
+          world.small_key.hidden = false
+          world.small_key:move_to(player)
+          say("You lift the corner of the mat. Underneath is a small key, which you take.")
+        else
+          say("Just dust.")
+        end
+
+  small_key:
+    name: small key
+    synonyms: [key]
+    in: kitchen
+    traits: [portable]
+    state: { hidden: true }
+    description: A small brass key.
+
+  apple:
+    name: red apple
+    synonyms: [fruit]
+    in: pantry
+    traits: [portable, edible]
+    description: Shiny, red and perfect.
+    on:
+      after_eat: end_game("fed")
+
+endings:
+  fed:
+    kind: win
+    text: Crisp, sweet and worth getting up for. Time to go back to bed.

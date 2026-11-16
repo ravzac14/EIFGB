@@ -116,6 +116,12 @@ verbs:
   help:
     action: help
     patterns: ["help", "hint", "hints"]
+  again:
+    action: again
+    patterns: ["again", "g"]
+  quit:
+    action: quit
+    patterns: ["quit", "q"]
 
 lexicon:
   phrases:
@@ -184,19 +190,24 @@ messages:
   player.name: "yourself"
   # parser
   parser.empty: "Pardon?"
-  parser.unknown_verb: "I understood \"${args.text}\" only as far as \"${args.known}\". Try a verb like ${args.suggestions}."
-  parser.unknown_noun: "You don't see any \"${args.text}\" here."
-  parser.ambiguous: "Which do you mean: ${args.options}?"
+  parser.unknown_verb: "I don't know the verb \"${args.word}\". Things to try here: ${args.suggestions}."
+  parser.unknown_word: "I don't know the word \"${args.word}\"."
+  parser.not_here: "You can't see any such thing."
+  parser.partial: "I only understood you as far as wanting to ${args.verb}."
+  parser.ambiguous: "Which do you mean, ${args.options}?"
   parser.need_target: "What do you want to ${args.verb}?"
-  parser.need_tool: "What do you want to ${args.verb} ${the(args.target)} with?"
-  parser.did_you_mean: "Did you mean \"${args.text}\"?"
+  parser.need_tool: "What do you want to ${args.verb} ${the(args.target)} ${args.word}?"
   parser.no_pronoun: "I'm not sure what you're referring to."
+  parser.no_all: "You can't use \"all\" with that."
+  parser.all_none: "There's nothing suitable here."
   # looking
   look.exits: "Exits: ${args.list}."
   look.no_exits: "There's no obvious way out."
   look.you_see: "You can see ${args.list} here."
   examine.default: "You see nothing special about ${the(args.target)}."
   examine.self: "As good-looking as ever."
+  examine.contents: "In ${the(args.target)} you can see ${args.list}."
+  examine.on_top: "On ${the(args.target)} you can see ${args.list}."
   search.nothing: "You find nothing of interest."
   search.contents: "In ${the(args.target)} you find ${args.list}."
   # inventory
@@ -206,6 +217,7 @@ messages:
   go.no_exit: "You can't go that way."
   go.door_closed: "${The(args.door)} is closed."
   go.blocked: "You can't go that way right now."
+  go.opening_first: "(first opening ${the(args.door)})"
   # taking and dropping
   take.done: "Taken."
   take.already: "You already have ${the(args.target)}."
@@ -216,7 +228,9 @@ messages:
   take.full: "You're carrying too much already."
   drop.done: "Dropped."
   drop.not_held: "You're not carrying ${the(args.target)}."
-  put.done: "You put ${the(args.target)} ${args.preposition} ${the(args.tool)}."
+  put_in.done: "You put ${the(args.target)} in ${the(args.tool)}."
+  put_on.done: "You put ${the(args.target)} on ${the(args.tool)}."
+  put.not_held: "You need to be holding ${the(args.target)} first."
   put.not_container: "You can't put anything in ${the(args.tool)}."
   put.not_supporter: "You can't put anything on ${the(args.tool)}."
   put.closed: "${The(args.tool)} is closed."
@@ -260,10 +274,11 @@ messages:
   save.done: "[Saved.]"
   restore.done: "[Restored.]"
   restore.none: "There's no saved game."
-  restart.confirm: "Restart from the beginning?"
+  restore.failed: "That save couldn't be restored: ${args.reason}"
   help.text: "Type commands like LOOK, EXAMINE LAMP, TAKE KEY, GO NORTH or TALK TO KEEPER. Type INVENTORY to see what you carry and UNDO to take back a move."
   ending.win: "*** You have won ***"
   ending.loss: "*** You have lost ***"
   ending.neutral: "*** The End ***"
-  choice.prompt: "Choose an option (1-${args.count}):"
+  ending.options: "Type UNDO to take back your last move, RESTORE to load a saved game, or RESTART."
+  action.nothing: "Nothing happens."
   choice.invalid: "Please choose one of the numbered options."

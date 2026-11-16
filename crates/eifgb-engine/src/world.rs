@@ -205,6 +205,14 @@ impl World {
         self.undo.push_back(self.state.clone());
     }
 
+    /// Records a state taken before a turn, so UNDO can return to it.
+    pub fn push_undo(&mut self, state: GameState) {
+        if self.undo.len() == UNDO_LIMIT {
+            self.undo.pop_front();
+        }
+        self.undo.push_back(state);
+    }
+
     /// Returns false when there's nothing to undo.
     pub fn undo(&mut self) -> bool {
         match self.undo.pop_back() {

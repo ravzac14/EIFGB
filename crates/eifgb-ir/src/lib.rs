@@ -435,6 +435,26 @@ pub enum BuiltinAction {
     Restore,
     Restart,
     Help,
+    /// Repeat the previous command.
+    Again,
+    Quit,
+}
+
+impl BuiltinAction {
+    /// Out-of-world commands: they never take a turn and can't be undone.
+    pub fn is_meta(self) -> bool {
+        matches!(
+            self,
+            BuiltinAction::Score
+                | BuiltinAction::Undo
+                | BuiltinAction::Save
+                | BuiltinAction::Restore
+                | BuiltinAction::Restart
+                | BuiltinAction::Help
+                | BuiltinAction::Again
+                | BuiltinAction::Quit
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

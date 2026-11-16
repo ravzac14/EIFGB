@@ -142,6 +142,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "eifgb-compiler",
+ "eifgb-engine",
+ "eifgb-lua",
  "serde_json",
 ]
 

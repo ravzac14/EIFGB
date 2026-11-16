@@ -3,6 +3,8 @@ use eifgb_compiler::{compile, DirFiles, Output};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+mod play;
+
 #[derive(Parser)]
 #[command(name = "eifgb", version, about = "Build interactive fiction games from EIFGB source")]
 struct Cli {
@@ -27,9 +29,23 @@ enum Command {
         #[arg(long)]
         pretty: bool,
     },
+    /// Play a game in the terminal.
+    Play {
+        game: PathBuf,
+        /// Run the commands in this file (one per line) instead of reading
+        /// the keyboard, echoing each one. Useful for walkthroughs.
+        #[arg(long)]
+        commands: Option<PathBuf>,
+        /// Random seed. The same seed and commands always give the same game.
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Where SAVE and RESTORE keep the saved game. Defaults to <game id>.sav.
+        #[arg(long)]
+        save_file: Option<PathBuf>,
+    },
 }
 
-fn run_compile(game: &Path) -> Result<Output, String> {
+pub(crate) fn run_compile(game: &Path) -> Result<Output, String> {
     let root = game.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
     let entry = game
         .file_name()
@@ -64,6 +80,10 @@ fn main() -> ExitCode {
             std::fs::write(&path, json).map_err(|e| format!("{}: {e}", path.display()))?;
             eprintln!("wrote {}", path.display());
             Ok(true)
+        }),
+        Command::Play { game, commands, seed, save_file } => run_compile(&game).and_then(|o| {
+            let Some(story) = o.story else { return Ok(false) };
+            play::play(story, commands.as_deref(), seed, save_file).map(|()| true)
         }),
     };
     match result {

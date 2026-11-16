@@ -1,0 +1,17 @@
+# A winning playthrough of The Last Light.
+# Run it with: eifgb play spec/examples/lighthouse/game.yaml --commands spec/examples/lighthouse/walkthrough.txt --seed 1
+look at the pool
+search the pool
+n
+talk to the old man
+ask about the gate
+goodbye
+unlock gate
+up
+down
+grab the oil can
+u
+fill lamp with oil
+light it
+tune radio
+2

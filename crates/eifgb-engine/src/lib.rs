@@ -11,15 +11,22 @@
 //! * [`world`]: world-model queries and changes (location, scope, doors);
 //! * [`rng`]: a deterministic, serializable random number generator;
 //! * [`script`]: the [`ScriptHost`] interface that script languages implement;
-//! * [`text`]: template rendering and reflowing prose.
-//!
-//! Still to come: the parser pipeline and the action rules.
+//! * [`text`]: template rendering and reflowing prose;
+//! * [`parser`]: turns input into commands, with typo correction and clarifying questions;
+//! * [`game`]: the turn loop, which is the entry point for hosts;
+//! * [`lang`]: language rules such as stemming, articles and lists.
 
+mod actions;
+pub mod game;
+pub mod lang;
+pub mod parser;
 pub mod rng;
 pub mod script;
 pub mod state;
 pub mod text;
 pub mod world;
+
+pub use game::{Game, Line, LineKind, Output, Status};
 
 pub use eifgb_ir as ir;
 pub use script::{Arg, Ctx, Effect, Outcome, ScriptError, ScriptHost, ScriptValue};

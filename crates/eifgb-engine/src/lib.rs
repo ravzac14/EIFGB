@@ -31,4 +31,4 @@ pub use game::{Game, Line, LineKind, Output, Status};
 pub use eifgb_ir as ir;
 pub use script::{Arg, Ctx, Effect, Outcome, ScriptError, ScriptHost, ScriptValue};
 pub use state::{GameState, SaveError, SaveFile};
-pub use world::{MoveError, World};
+pub use world::{Blocked, MoveError, World};

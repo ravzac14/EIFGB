@@ -8,6 +8,13 @@ use std::collections::VecDeque;
 /// How many turns UNDO can go back.
 pub const UNDO_LIMIT: usize = 100;
 
+/// How a door is blocked, seen from one side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Blocked {
+    Both,
+    ThisSide,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum MoveError {
     /// Rooms are fixed and the player always has a location.
@@ -157,6 +164,11 @@ impl World {
         let here = self.here();
         out.push(here);
         self.collect_visible(here, &mut out);
+        for d in self.doors_of(here) {
+            if !out.contains(&d) && !self.is_hidden(d) {
+                out.push(d);
+            }
+        }
         if !out.contains(&PLAYER) {
             out.push(PLAYER);
             self.collect_visible(PLAYER, &mut out);
@@ -176,6 +188,46 @@ impl World {
             if self.exposes_contents(c) {
                 self.collect_visible(c, out);
             }
+        }
+    }
+
+    /// Doors that this room's exits go through. A door belongs to every
+    /// room it connects, not just the one its `in:` names.
+    pub fn doors_of(&self, room: EntityId) -> Vec<EntityId> {
+        let mut out = Vec::new();
+        for e in &self.def(room).exits {
+            if let Some(d) = e.through
+                && !out.contains(&d)
+            {
+                out.push(d);
+            }
+        }
+        out
+    }
+
+    /// Everything physically present in a room: its contents, plus the
+    /// doors its exits use (a door's other side is present too).
+    pub fn present(&self, room: EntityId) -> Vec<EntityId> {
+        let mut out = self.contents(room);
+        for d in self.doors_of(room) {
+            if !out.contains(&d) {
+                out.push(d);
+            }
+        }
+        out
+    }
+
+    /// Whether `door` is blocked when passing through it from `from`.
+    /// `blocked` is `true` (both sides), a room key, or a list of room keys.
+    pub fn door_blocked(&self, door: EntityId, from: EntityId) -> Option<Blocked> {
+        let key = &self.def(from).key;
+        match self.get(door, "blocked")? {
+            Value::Bool(true) => Some(Blocked::Both),
+            Value::Str(s) if s == key => Some(Blocked::ThisSide),
+            Value::List(sides) if sides.iter().any(|v| matches!(v, Value::Str(s) if s == key)) => {
+                Some(Blocked::ThisSide)
+            }
+            _ => None,
         }
     }
 

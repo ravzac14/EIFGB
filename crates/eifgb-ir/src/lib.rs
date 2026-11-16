@@ -304,6 +304,24 @@ impl Direction {
     pub fn from_key(s: &str) -> Option<Direction> {
         Direction::ALL.into_iter().find(|d| d.key() == s)
     }
+
+    pub fn opposite(self) -> Direction {
+        use Direction::*;
+        match self {
+            North => South,
+            South => North,
+            East => West,
+            West => East,
+            Northeast => Southwest,
+            Southwest => Northeast,
+            Northwest => Southeast,
+            Southeast => Northwest,
+            Up => Down,
+            Down => Up,
+            In => Out,
+            Out => In,
+        }
+    }
 }
 
 /// One exit from a room.

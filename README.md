@@ -220,6 +220,11 @@ error: objects.pantry_door.unlocks_with: unknown ID 'smal_key' (did you mean 'sm
 Fix it and play: `n` (locked), `take key`, `unlock door`, `n`. An unlocked
 door opens on its own as you walk through it.
 
+Doors work from both sides. The pantry's `south: kitchen` exit now goes
+through the pantry door too, without you changing it, and the door can be
+examined, closed and locked from inside the pantry. If a room has no exit
+back at all, one is added in the opposite direction.
+
 If you'd rather describe states yourself, turn the automatic descriptions
 off with a top-level `settings` section:
 
@@ -358,6 +363,7 @@ declared. The built-in verbs keep a few states up to date for you:
 | `locked` | LOCK and UNLOCK, on `lockable` things | Locked. A locked thing can't be opened. |
 | `worn` | WEAR and TAKE OFF, on `wearable` things | Being worn. |
 | `hidden` | only scripts | Out of the game: it can't be seen or referred to until a script sets it to `false`. |
+| `blocked` | only scripts, on `door`s | The way through is blocked. `true` blocks both sides; a room ID (`blocked: cellar`) or a list of room IDs blocks only from those sides. |
 
 ### What players see
 
@@ -516,6 +522,24 @@ shorthand for `state: { open: true }`.
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including
 your own fields. See [States and descriptions](#states-and-descriptions).
+
+**Doors:** give the door the `door` trait (usually with `openable` and
+`lockable`), put it in one of the rooms with `in:`, and send an exit
+`through:` it. It works from both rooms. The return exit is linked or
+added for you. Block it with the `blocked` state:
+
+```yaml
+  trapdoor:
+    name: trapdoor
+    in: hall
+    traits: [door, openable]
+    state: { blocked: cellar }    # can't get through from the cellar side
+```
+
+Scripts change it during play: `world.trapdoor.blocked = true` (both
+sides), `= "cellar"` (one side), or `= false` (clear). Players see "You
+can't get through the trapdoor from this side." and, when examining it,
+"It's blocked from this side."
 
 **Exits:** `north: pantry` (to a room); `south: "The sea. Not tonight."`
 (always blocked, with this message); or a map with `to`, `through` (a

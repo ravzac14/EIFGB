@@ -103,6 +103,7 @@ impl<'a> Lowerer<'a> {
         for (key, thing) in &s.characters {
             entities.push(self.lower_thing("characters", key, thing, EntityKind::Character));
         }
+        self.link_doors(&mut entities);
         self.check_world(&entities);
 
         let handlers = self.lower_handlers("on", &s.on, GLOBAL_EVENTS);
@@ -593,6 +594,94 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// Makes doors work from both sides. For every exit from room A to
+    /// room B through a door, B's way back to A uses the same door:
+    /// * an exit back to A through the door already exists: nothing to do;
+    /// * exactly one plain exit back to A exists: the door is attached to it;
+    /// * there's no way back: one is added in the opposite direction;
+    /// * that direction already leads elsewhere: a warning, since guessing
+    ///   would change the author's map.
+    fn link_doors(&mut self, entities: &mut [Entity]) {
+        let mut links = Vec::new();
+        for (a, room) in entities.iter().enumerate() {
+            for e in &room.exits {
+                if let (Some(b), Some(door)) = (e.to, e.through) {
+                    links.push((EntityId(a as u32), e.direction, b, door));
+                }
+            }
+        }
+        for (a, dir, b, door) in links {
+            if a == b {
+                continue;
+            }
+            let (a_key, door_key) = (entities[a.index()].key.clone(), entities[door.index()].key.clone());
+            let b_key = entities[b.index()].key.clone();
+            let back = &mut entities[b.index()].exits;
+            if back.iter().any(|e| e.to == Some(a) && e.through == Some(door)) {
+                continue;
+            }
+            let plain: Vec<usize> =
+                back.iter().enumerate().filter(|(_, e)| e.to == Some(a) && e.through.is_none()).map(|(i, _)| i).collect();
+            match plain.len() {
+                1 => {
+                    back[plain[0]].through = Some(door);
+                    continue;
+                }
+                n if n > 1 => {
+                    self.d.warn(
+                        format!("rooms.{b_key}.exits"),
+                        format!("several exits lead back to '{a_key}', so '{door_key}' only works one way; add 'through: {door_key}' to the right one"),
+                    );
+                    continue;
+                }
+                _ => {}
+            }
+            let opposite = dir.opposite();
+            if let Some(other) = back.iter().find(|e| e.direction == opposite) {
+                let where_to = other.to.map_or("is blocked".to_string(), |t| format!("leads to '{}'", entities[t.index()].key));
+                self.d.warn(
+                    format!("rooms.{b_key}.exits.{}", opposite.key()),
+                    format!("'{door_key}' only works one way: this exit already {where_to}; add an exit back to '{a_key}' through '{door_key}'"),
+                );
+                continue;
+            }
+            back.push(Exit { direction: opposite, to: Some(a), through: Some(door), when: None, blocked: None });
+        }
+    }
+
+    /// A door's `blocked` state is true/false, a room ID, or a list of room IDs.
+    fn check_blocked(&mut self, door: &Entity, entities: &[Entity]) {
+        let Some(v) = door.state.get("blocked") else { return };
+        let path = format!("objects.{}.state.blocked", door.key);
+        let rooms: Vec<&Value> = match v {
+            Value::Bool(_) => return,
+            Value::Str(_) => vec![v],
+            Value::List(items) => items.iter().collect(),
+            other => {
+                self.d.error(&path, format!("must be true, false, a room ID or a list of room IDs, not a {}", other.type_name()));
+                return;
+            }
+        };
+        for r in rooms {
+            let Value::Str(key) = r else {
+                self.d.error(&path, "a list of sides must contain room IDs");
+                continue;
+            };
+            let uses_door = entities.iter().any(|e| {
+                e.kind == EntityKind::Room && &e.key == key && e.exits.iter().any(|x| x.through.is_some_and(|d| entities[d.index()].key == door.key))
+            });
+            if !uses_door {
+                let sides: Vec<&str> = entities
+                    .iter()
+                    .filter(|e| e.kind == EntityKind::Room && e.exits.iter().any(|x| x.through.is_some_and(|d| entities[d.index()].key == door.key)))
+                    .map(|e| e.key.as_str())
+                    .collect();
+                let hint = did_you_mean(key, sides.iter().copied());
+                self.d.error(&path, format!("'{key}' isn't a room on either side of this door{hint}"));
+            }
+        }
+    }
+
     /// Checks that need every entity: containment and doors.
     fn check_world(&mut self, entities: &[Entity]) {
         let path_of = |e: &Entity| match e.kind {
@@ -638,6 +727,7 @@ impl<'a> Lowerer<'a> {
         }
 
         // Doors used by exits.
+        let mut checked = HashSet::new();
         for room in entities.iter().filter(|e| e.kind == EntityKind::Room) {
             for exit in &room.exits {
                 let Some(door_id) = exit.through else { continue };
@@ -646,8 +736,8 @@ impl<'a> Lowerer<'a> {
                 if !door.has(Trait::Door) {
                     self.d.error(&path, format!("'{}' needs the 'door' trait", door.key));
                 }
-                if door.location.is_some_and(|l| entities[l.index()].key != room.key) {
-                    self.d.warn(&path, format!("'{}' isn't in this room, so players here can't open it", door.key));
+                if checked.insert(door_id) {
+                    self.check_blocked(door, entities);
                 }
             }
         }

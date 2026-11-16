@@ -8,16 +8,21 @@
 use crate::game::{Game, LineKind, Pending};
 use crate::parser::Command;
 use crate::script::{Ctx, ScriptHost};
+use crate::world::Blocked;
 use eifgb_ir::{BuiltinAction, EntityId, EntityKind, Exit, PatternToken, Segment, Text, Trait, Value, VerbAction, PLAYER};
 
 /// State fields with built-in meaning. `open`, `locked` and `worn` are
 /// described by [`StateNote::Builtin`]; `hidden` is never described.
+/// `blocked` is built in on doors only (see [`World::door_blocked`]).
+///
+/// [`World::door_blocked`]: crate::World::door_blocked
 const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden"];
 
 /// One thing the automatic state descriptions can say.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum StateNote {
-    /// "open", "closed", "locked" or "worn".
+    /// "open", "closed", "locked", "worn", "blocked" (both sides) or
+    /// "blocked_here" (from the player's side).
     Builtin(&'static str),
     /// An author's boolean field, e.g. `fueled`. `words` is the display form.
     Flag { field: String, words: String, on: bool },
@@ -93,7 +98,7 @@ impl<H: ScriptHost> Game<H> {
         // Things that won't be listed (scenery) still get their state
         // mentioned, unless the room description already covers it.
         let things = self.listable(here);
-        for c in self.world.contents(here) {
+        for c in self.world.present(here) {
             if self.world.is_hidden(c) || c == PLAYER || things.contains(&c) {
                 continue;
             }
@@ -122,9 +127,14 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// Things worth naming in a room description or a list of contents.
+    /// For a room, that includes doors from either side.
     fn listable(&self, holder: EntityId) -> Vec<EntityId> {
-        self.world
-            .contents(holder)
+        let things = if self.world.def(holder).kind == EntityKind::Room {
+            self.world.present(holder)
+        } else {
+            self.world.contents(holder)
+        };
+        things
             .into_iter()
             .filter(|&e| e != PLAYER && !self.world.is_hidden(e) && !self.world.has(e, Trait::Scenery))
             .collect()
@@ -292,6 +302,13 @@ impl<H: ScriptHost> Game<H> {
     fn travel(&mut self, here: EntityId, exit: &Exit) -> bool {
         let Some(to) = exit.to else { return false };
         if let Some(door) = exit.through
+            && let Some(b) = self.world.door_blocked(door, here)
+        {
+            let key = if b == Blocked::Both { "go.door_blocked" } else { "go.door_blocked_here" };
+            self.msg(key, &Ctx::new().entity("door", door));
+            return false;
+        }
+        if let Some(door) = exit.through
             && !self.world.is_open(door)
         {
             if self.world.flag(door, "locked") {
@@ -336,8 +353,16 @@ impl<H: ScriptHost> Game<H> {
         if w.flag(id, "worn") {
             notes.push(StateNote::Builtin("worn"));
         }
+        let is_door = w.has(id, Trait::Door);
+        if is_door {
+            match w.door_blocked(id, w.here()) {
+                Some(Blocked::Both) => notes.push(StateNote::Builtin("blocked")),
+                Some(Blocked::ThisSide) => notes.push(StateNote::Builtin("blocked_here")),
+                None => {}
+            }
+        }
         for (field, value) in &w.state.entities[id.index()].state {
-            if BUILTIN_STATE.contains(&field.as_str()) || field.starts_with('_') {
+            if BUILTIN_STATE.contains(&field.as_str()) || field.starts_with('_') || (is_door && field == "blocked") {
                 continue;
             }
             match value {
@@ -409,6 +434,7 @@ impl<H: ScriptHost> Game<H> {
         let Some(text) = text else { return false };
         match note {
             StateNote::Builtin("worn") => self.mentions(text, id, &["worn"], is_own),
+            StateNote::Builtin("blocked" | "blocked_here") => self.mentions(text, id, &["blocked"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
         }

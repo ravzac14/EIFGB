@@ -517,3 +517,76 @@ fn describe_state_off_also_silences_author_states() {
     let out = say(&mut g, "look");
     assert!(!out.contains("broken"), "{out}");
 }
+
+// ------------------------------------------------------- two-way doors
+
+fn midnight_snack() -> Game<LuaHost> {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples/midnight_snack");
+    let out = compile(&DirFiles { root: dir }, "game.yaml");
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+#[test]
+fn doors_work_from_the_far_side() {
+    let mut g = midnight_snack();
+    say(&mut g, "look under mat");
+    say(&mut g, "unlock door");
+    say(&mut g, "n");
+    // The door is reachable from the pantry, even though its `in:` is the kitchen.
+    assert_says(&mut g, "close door", "You close the pantry door.");
+    assert_says(&mut g, "lock door", "You lock the pantry door with the small key.");
+    assert_says(&mut g, "s", "The pantry door is locked.");
+    assert_says(&mut g, "unlock door", "You unlock");
+    let out = say(&mut g, "s");
+    assert!(out.contains("(first opening the pantry door)") && out.contains("Kitchen"), "{out}");
+}
+
+const TRAPDOOR: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { down: { to: cellar, through: trapdoor } } }
+  cellar: { name: Cellar }
+objects:
+  trapdoor: { name: trapdoor, in: hall, traits: [door, openable], state: { open: true, blocked: BLOCKED } }
+  lever: { name: lever, in: cellar, traits: [scenery], on: { pull: 'world.trapdoor.blocked = not world.trapdoor.blocked' } }
+verbs:
+  pull: { patterns: ['pull {target}'] }
+";
+
+fn trapdoor(blocked: &str) -> Game<LuaHost> {
+    let out = compile_str(&TRAPDOOR.replace("BLOCKED", blocked));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+#[test]
+fn a_door_can_be_blocked_from_one_side() {
+    let mut g = trapdoor("cellar");
+    // From the hall it's fine.
+    assert_says(&mut g, "d", "Cellar");
+    assert_says(&mut g, "u", "You can't get through the trapdoor from this side.");
+    assert_says(&mut g, "x trapdoor", "It's blocked from this side.");
+    assert_says(&mut g, "look", "a trapdoor (open, blocked from this side)");
+}
+
+#[test]
+fn a_door_can_be_blocked_both_ways_and_scripts_can_clear_it() {
+    let mut g = trapdoor("true");
+    assert_says(&mut g, "d", "The trapdoor is blocked.");
+    assert_says(&mut g, "x trapdoor", "It's open. It's blocked.");
+    let mut g = trapdoor("false");
+    say(&mut g, "d");
+    say(&mut g, "pull lever");
+    assert_says(&mut g, "u", "The trapdoor is blocked.");
+    say(&mut g, "pull lever");
+    assert_says(&mut g, "u", "Hall");
+}
+
+#[test]
+fn blocked_is_saved_and_undone_like_any_state() {
+    let mut g = trapdoor("false");
+    say(&mut g, "d");
+    say(&mut g, "pull lever");
+    say(&mut g, "undo");
+    assert_says(&mut g, "u", "Hall");
+}

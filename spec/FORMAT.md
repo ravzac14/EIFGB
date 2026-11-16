@@ -51,6 +51,19 @@ IDs are `snake_case` and unique across rooms, objects, characters and choices.
   - **None:** the first `blocked` message in the list is shown, or a default.
 
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
+- **Doors work from both sides.** A door is an object with the `door` trait. It's placed in one room with `in:`, and exits go `through:` it. For every exit from room A to room B through a door, B's way back to A uses the same door:
+  - **An exit back to A through the door exists:** nothing changes.
+  - **Exactly one plain exit back to A exists:** the door is attached to it.
+  - **There's no way back:** one is added in the opposite direction (north ↔ south, up ↔ down, in ↔ out, and so on).
+  - **That direction already leads elsewhere:** the compiler warns and leaves the map alone.
+
+  The door is in scope, listed and described in every room it connects, so it can be examined, opened, closed, locked and unlocked from either side. Its `in:` only decides which room `:is_in` and scripts see as its location.
+- **Blocking doors.** The `blocked` state on a door obstructs the passage without affecting opening and closing:
+  - `true` blocks both sides: "The trapdoor is blocked."
+  - A room ID, or a list of room IDs, blocks only from those sides: "You can't get through the trapdoor from this side."
+  - `false`, or no value, clears it.
+
+  The compiler checks that the named rooms are on a side of the door. Scripts change it like any state (`world.trapdoor.blocked = "cellar"`), and it's saved and undone with everything else. Automatic descriptions show it as "It's blocked." / "It's blocked from this side." and the tag "(blocked)" / "(blocked from this side)", from the player's current side. On things that aren't doors, `blocked` is an ordinary author state.
 - **Automatic state descriptions** (`settings.describe_state`, on by default). The engine describes state itself, for both the built-in states and any state fields an author adds:
 
   | State | When examining | In lists | In room descriptions (scenery only) |
@@ -232,7 +245,6 @@ SAVE, RESTORE, RESTART and QUIT still work.
 
 - PUT and WEAR don't pick the thing up for you: "You need to be holding the wooden box first." `[put.not_held]`.
 - There's no setting for proper names yet, so article helpers would say "the Bob".
-- Doors are one-sided: an exit `through` a door only checks it from the room the door is in.
 
 ## Standard library versioning
 

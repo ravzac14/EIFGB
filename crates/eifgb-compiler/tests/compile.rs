@@ -169,6 +169,59 @@ fn containment_loops_are_errors() {
     assert_error(&with(src), "loop");
 }
 
+fn exits_of<'a>(story: &'a Story, room: &str) -> Vec<&'a Exit> {
+    story.entity(story.entity_by_key(room).unwrap()).exits.iter().collect()
+}
+
+#[test]
+fn doors_work_both_ways_by_adding_the_return_exit() {
+    let src = "  cellar: { name: Cellar }\nobjects:\n  hatch: { name: hatch, in: hall, traits: [door, openable] }\n";
+    let src = src.replace("  cellar: { name: Cellar }", "  cellar: { name: Cellar }\n  attic:\n    name: Attic\n    exits: { down: { to: hall, through: hatch } }");
+    let out = with(&src);
+    let story = out.story.as_ref().unwrap_or_else(|| panic!("{:#?}", out.diagnostics));
+    let back: Vec<_> = exits_of(story, "hall");
+    assert_eq!(back.len(), 1);
+    assert_eq!(back[0].direction, Direction::Up);
+    assert_eq!(back[0].to, story.entity_by_key("attic"));
+    assert_eq!(back[0].through, story.entity_by_key("hatch"));
+}
+
+#[test]
+fn an_existing_way_back_gets_the_door() {
+    let out = compile_str(
+        "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: a }\nrooms:\n  a: { name: A, exits: { north: { to: b, through: d } } }\n  b: { name: B, exits: { west: a } }\nobjects:\n  d: { name: door, in: a, traits: [door, openable] }\n",
+    );
+    let story = out.story.as_ref().unwrap();
+    let back = exits_of(story, "b");
+    assert_eq!(back.len(), 1, "the existing exit is reused, not duplicated");
+    assert_eq!((back[0].direction, back[0].through), (Direction::West, story.entity_by_key("d")));
+}
+
+#[test]
+fn a_door_that_cannot_be_linked_back_warns() {
+    let out = compile_str(
+        "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: a }\nrooms:\n  a: { name: A, exits: { north: { to: b, through: d } } }\n  b: { name: B, exits: { south: c } }\n  c: { name: C }\nobjects:\n  d: { name: door, in: a, traits: [door, openable] }\n",
+    );
+    assert!(out.story.is_some());
+    assert!(
+        warnings(&out).iter().any(|w| w.contains("'d' only works one way") && w.contains("leads to 'c'")),
+        "{:#?}",
+        warnings(&out)
+    );
+}
+
+#[test]
+fn blocked_must_name_a_side_of_the_door() {
+    let base = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: a }\nrooms:\n  a: { name: A, exits: { north: { to: b, through: d } } }\n  b: { name: B }\n  far: { name: Far }\nobjects:\n  d: { name: door, in: a, traits: [door, openable], state: { blocked: BLOCKED } }\n";
+    for ok in ["true", "false", "b", "[a, b]"] {
+        let out = compile_str(&base.replace("BLOCKED", ok));
+        assert!(out.story.is_some(), "blocked: {ok}: {:#?}", out.diagnostics);
+    }
+    assert_error(&compile_str(&base.replace("BLOCKED", "far")), "'far' isn't a room on either side of this door");
+    assert_error(&compile_str(&base.replace("BLOCKED", "bb")), "did you mean 'b'?");
+    assert_error(&compile_str(&base.replace("BLOCKED", "3")), "must be true, false, a room ID");
+}
+
 #[test]
 fn through_requires_a_door() {
     let src = "  cellar:\n    name: Cellar\n    exits: { up: { to: hall, through: crate } }\nobjects:\n  crate: { name: crate, in: cellar }\n";

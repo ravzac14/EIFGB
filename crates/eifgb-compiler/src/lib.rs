@@ -48,6 +48,13 @@ pub fn compile(files: &dyn FileProvider, entry: &str) -> Output {
             d.error("", e);
             None
         }
+        // Parsing into a generic value first catches duplicate keys (two
+        // rooms with the same ID, the same exit direction twice), which
+        // typed parsing would silently merge into one.
+        Ok(text) if let Err(e) = serde_yaml::from_str::<serde_yaml::Value>(&text) => {
+            d.error("", format!("{entry}: {e}"));
+            None
+        }
         Ok(text) => match serde_yaml::from_str::<source::Source>(&text) {
             Err(e) => {
                 d.error("", format!("{entry}: {e}"));

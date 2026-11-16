@@ -99,6 +99,12 @@ fn minimal_game_compiles() {
 }
 
 #[test]
+fn duplicate_keys_are_errors_not_silent_overwrites() {
+    assert_error(&with("  hall2: { name: A, exits: { north: hall, north: hall2 } }\n"), "duplicate entry with key \"north\"");
+    assert_error(&with("objects:\n  lamp: { name: lamp }\n  lamp: { name: other lamp }\n"), "duplicate entry with key \"lamp\"");
+}
+
+#[test]
 fn yaml_typos_in_field_names_are_errors() {
     assert_error(&with("objects:\n  lamp: { name: lamp, in: hall, discription: x }\n"), "discription");
 }

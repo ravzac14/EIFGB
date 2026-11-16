@@ -332,6 +332,11 @@ impl<H: ScriptHost> Game<H> {
         if self.world.move_to(PLAYER, Some(to)).is_err() {
             return false;
         }
+        // Having come through a door, the player knows it's there, even if
+        // it was hidden from this side.
+        if let Some(door) = exit.through {
+            self.world.unset(door, "hidden");
+        }
         self.look();
         self.room_event(to, "enter");
         true

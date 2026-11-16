@@ -131,8 +131,30 @@ impl World {
         self.def(id).has(t)
     }
 
+    /// Hidden from the player where they are now. A door's `hidden` may
+    /// name the sides it's hidden from (see [`World::hidden_from`]).
     pub fn is_hidden(&self, id: EntityId) -> bool {
-        self.flag(id, "hidden")
+        if self.def(id).has(Trait::Door) {
+            self.hidden_from(id, self.here())
+        } else {
+            self.flag(id, "hidden")
+        }
+    }
+
+    /// Whether a door is hidden when seen from `room`: `hidden` is `true`
+    /// (both sides), a room key, or a list of room keys.
+    pub fn hidden_from(&self, door: EntityId, room: EntityId) -> bool {
+        self.side_listed(door, "hidden", room)
+    }
+
+    fn side_listed(&self, door: EntityId, field: &str, room: EntityId) -> bool {
+        let key = &self.def(room).key;
+        match self.get(door, field) {
+            Some(Value::Bool(b)) => *b,
+            Some(Value::Str(s)) => s == key,
+            Some(Value::List(sides)) => sides.iter().any(|v| matches!(v, Value::Str(s) if s == key)),
+            _ => false,
+        }
     }
 
     /// Open, or not openable at all: containers without `openable` are
@@ -235,7 +257,7 @@ impl World {
     pub fn reveals(&self, verb: &str, target: EntityId) -> Vec<EntityId> {
         self.ids()
             .filter(|&id| self.is_hidden(id))
-            .filter(|&id| self.def(id).revealed_by.iter().any(|r| r.verb == verb && r.target == target))
+            .filter(|&id| self.def(id).revealed_by.iter().any(|r| r.target == target && r.verbs.iter().any(|v| v == verb)))
             .collect()
     }
 

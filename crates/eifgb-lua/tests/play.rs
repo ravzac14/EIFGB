@@ -675,7 +675,8 @@ fn other_actions_reveal_after_their_usual_reply() {
 fn custom_verbs_without_handlers_reveal_instead_of_nothing_happening() {
     let mut g = secrets();
     assert_eq!(say(&mut g, "kick rug"), "You find a hatch.");
-    assert_eq!(say(&mut g, "kick rug"), "Nothing happens.");
+    // Once found, KICK goes back to its usual reply.
+    assert_eq!(say(&mut g, "kick rug"), "Kicking that won't help.");
 }
 
 #[test]
@@ -705,4 +706,109 @@ fn undo_hides_it_again() {
     say(&mut g, "search rug");
     say(&mut g, "undo");
     assert_says(&mut g, "take coin", "You can't see any such thing.");
+}
+
+// -------------------------------------------- categories and one-sided secrets
+
+const CATEGORY_SECRETS: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: study }
+rooms:
+  study: { name: Study }
+objects:
+  rug: { name: rug, in: study, traits: [scenery] }
+  candle: { name: candle, in: study, traits: [scenery] }
+  coin: { name: coin, in: study, traits: [portable], state: { hidden: true }, revealed_by: (physical action) rug }
+  scroll: { name: scroll, in: study, traits: [portable], state: { hidden: true }, revealed_by: (sense) candle }
+";
+
+fn category_game() -> Game<LuaHost> {
+    let out = compile_str(CATEGORY_SECRETS);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn any_verb_in_a_category_reveals() {
+    for attempt in ["kick rug", "drag the rug", "punch rug", "pull rug", "lift rug", "shove rug", "rub rug"] {
+        let mut g = category_game();
+        assert_eq!(say(&mut g, attempt), "You find a coin.", "{attempt}");
+    }
+    // Verbs outside the category don't.
+    let mut g = category_game();
+    assert_says(&mut g, "x rug", "You see nothing special about the rug.");
+    assert_says(&mut g, "take coin", "You can't see any such thing.");
+    assert_eq!(say(&mut g, "sniff candle"), "You find a scroll.");
+}
+
+#[test]
+fn the_new_verbs_have_sensible_defaults() {
+    let mut g = category_game();
+    assert_eq!(say(&mut g, "kick candle"), "Kicking that won't help.");
+    assert_eq!(say(&mut g, "push candle"), "Nothing obvious happens.");
+    assert_eq!(say(&mut g, "listen"), "You hear nothing unusual.");
+    assert_eq!(say(&mut g, "taste rug"), "You'd rather not.");
+}
+
+const BOOKCASE: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: library }
+rooms:
+  library: { name: Library, exits: { north: { to: den, through: bookcase } } }
+  den: { name: Secret Den }
+objects:
+  bookcase: { name: bookcase door, synonyms: [bookcase], in: den, traits: [door, openable], state: { hidden: library }, revealed_by: (physical action) books }
+  books: { name: books, in: library, traits: [scenery] }
+";
+
+fn bookcase(start: &str) -> Game<LuaHost> {
+    let out = compile_str(&BOOKCASE.replace("start: library", &format!("start: {start}")));
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn a_door_hidden_from_one_side_is_plain_from_the_other() {
+    let mut g = bookcase("library");
+    let out = say(&mut g, "look");
+    assert!(out.contains("There's no obvious way out.") && !out.contains("bookcase"), "{out}");
+    assert_says(&mut g, "n", "You can't go that way.");
+
+    let mut g = bookcase("den");
+    let out = say(&mut g, "look");
+    assert!(out.contains("bookcase door (closed)") && out.contains("Exits: south."), "{out}");
+    // Coming through from the plain side reveals it on the hidden side too.
+    let out = say(&mut g, "s");
+    assert!(out.contains("Library") && out.contains("Exits: north."), "{out}");
+    assert_says(&mut g, "x bookcase", "It's open.");
+}
+
+#[test]
+fn revealing_a_one_sided_secret_door() {
+    let mut g = bookcase("library");
+    assert_eq!(say(&mut g, "pull books"), "You find a bookcase door (closed).");
+    assert_says(&mut g, "n", "Secret Den");
+}
+
+#[test]
+fn turning_things_and_entering_doors_dont_fire_the_same_named_events() {
+    let src = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+vars: { ticks: 0, arrivals: 0 }
+rooms:
+  hall: { name: Hall, exits: { north: { to: den, through: door } } }
+  den: { name: Den, on: { enter: 'vars.arrivals = vars.arrivals + 1' } }
+objects:
+  dial: { name: dial, in: hall, traits: [scenery] }
+  door: { name: door, in: hall, traits: [door, openable] }
+on:
+  turn: 'vars.ticks = vars.ticks + 1'
+";
+    let out = compile_str(src);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    assert_says(&mut g, "turn dial", "Nothing obvious happens.");
+    assert_eq!(g.world().state.vars["ticks"], eifgb_engine::ir::Value::Int(1), "one turn passed, so the event ran once");
+    say(&mut g, "enter door");
+    assert_eq!(g.world().state.vars["arrivals"], eifgb_engine::ir::Value::Int(1), "the den's enter event ran once");
 }

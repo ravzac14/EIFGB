@@ -20,6 +20,10 @@ pub const LATEST: u32 = 1;
 #[serde(deny_unknown_fields)]
 pub struct Stdlib {
     pub verbs: IndexMap<String, StdVerb>,
+    /// Action categories for `revealed_by`, e.g. `physical_action` →
+    /// push, pull, kick… Each verb named must be in `verbs`.
+    #[serde(default)]
+    pub categories: IndexMap<String, Vec<String>>,
     pub lexicon: Lexicon,
     /// Message key → template source.
     pub messages: IndexMap<String, String>,
@@ -28,8 +32,13 @@ pub struct Stdlib {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StdVerb {
-    pub action: BuiltinAction,
+    /// Built-in behaviour, or none for verbs that only exist for authors
+    /// to hook into (push, kick, smell…), which reply with `default`.
+    #[serde(default)]
+    pub action: Option<BuiltinAction>,
     pub patterns: Vec<String>,
+    #[serde(default)]
+    pub default: Option<String>,
 }
 
 /// Raw source for a version and language, if that combination exists.
@@ -86,6 +95,34 @@ mod tests {
                 let lib = load(v, lang).unwrap_or_else(|e| panic!("v{v}/{lang}: {e}"));
                 assert!(!lib.verbs.is_empty());
                 assert!(!lib.messages.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn verb_keys_never_clash_with_event_names() {
+        for v in 1..=LATEST {
+            for lang in languages(v) {
+                let lib = load(v, lang).unwrap();
+                for key in lib.verbs.keys() {
+                    let clash = eifgb_ir::GLOBAL_EVENTS.contains(&key.as_str())
+                        || eifgb_ir::ROOM_EVENTS.contains(&key.as_str());
+                    assert!(!clash, "v{v}/{lang}: verb '{key}' has the same name as an event");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn categories_name_real_verbs() {
+        for v in 1..=LATEST {
+            for lang in languages(v) {
+                let lib = load(v, lang).unwrap();
+                for (cat, verbs) in &lib.categories {
+                    for verb in verbs {
+                        assert!(lib.verbs.contains_key(verb), "v{v}/{lang}: category {cat} names unknown verb {verb}");
+                    }
+                }
             }
         }
     }

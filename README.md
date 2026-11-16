@@ -265,7 +265,9 @@ Then add the mat:
   Any way of saying it counts: `search mat`, `look under the mat`, `look
   under rug`. The game replies "You find a small key." and the key appears
   where it is. A list such as `[search mat, examine mat]` lets any of
-  several actions reveal it.
+  several actions reveal it. Or use an action category, such as
+  `revealed_by: (physical action) mat`, so that kicking, pulling, dragging,
+  lifting or pushing the mat all work.
 - **`${if ...}...${else}...${end}`** makes text react to the game. Here it
   gives players a clue, and the lumpy corner disappears once the key is
   found. Inside a template, `world.<id>` is any object and `self` is the
@@ -361,7 +363,7 @@ declared. The built-in verbs keep a few states up to date for you:
 | `open` | OPEN and CLOSE, on `openable` things | Open or shut. A container that isn't `openable` is always open. |
 | `locked` | LOCK and UNLOCK, on `lockable` things | Locked. A locked thing can't be opened. |
 | `worn` | WEAR and TAKE OFF, on `wearable` things | Being worn. |
-| `hidden` | `revealed_by`, or scripts | Out of the game: it can't be seen or referred to until revealed. A hidden door is a secret door: its exits aren't listed or usable until it's found. |
+| `hidden` | `revealed_by`, or scripts | Out of the game: it can't be seen or referred to until revealed. A hidden door is a secret door: its exits aren't listed or usable until it's found. On a door, `hidden` can name the side it's hidden from (`hidden: library`), like `blocked`. |
 | `blocked` | scripts, on `door`s | Held shut: barred, bolted or wedged. `true` means from both sides; a room ID (`blocked: cellar`) or a list of room IDs means only from those sides. A blocked door is always closed. Opening it from an unblocked side lifts the block. |
 
 ### What players see
@@ -504,9 +506,18 @@ Options for `play`:
 
 In-game commands that every game understands include LOOK, EXAMINE (X),
 TAKE, DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
-TAKE OFF, EAT, GO THROUGH / ENTER (a door), INVENTORY (I), WAIT (Z), directions (N, S, E, W, NE, NW, SE,
-SW, UP, DOWN, IN, OUT), plus UNDO, AGAIN (G), SAVE, RESTORE, RESTART,
-SCORE, HELP and QUIT.
+TAKE OFF, EAT, GO THROUGH / ENTER (a door), INVENTORY (I), WAIT (Z),
+directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
+AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
+
+Some verbs exist so that players can try them and authors can respond:
+PUSH, PULL, KICK, HIT, MOVE (DRAG), LIFT, SHAKE, TURN (TWIST), TOUCH (FEEL),
+SMELL, LISTEN and TASTE. On their own they give a mild reply ("Nothing
+obvious happens."). Use them in `revealed_by`, or with a handler such as
+`on: { pull: ... }`. The handler names are the verb IDs `push`, `pull`,
+`kick`, `hit`, `move`, `lift`, `shake`, `twist`, `touch`, `smell`,
+`listen` and `taste`. TURN's ID is `twist` because `turn` is the
+end-of-turn event.
 
 ## Cheat sheet
 
@@ -523,10 +534,29 @@ automatically in examine text, room descriptions and lists, including
 your own fields. See [States and descriptions](#states-and-descriptions).
 
 **Hidden things:** `state: { hidden: true }` plus `revealed_by: search mat`
-(or a list) reveals it when the player does that. SEARCH and custom verbs
-with no handler say "You find a small key." instead of their usual reply.
-Other actions add it after: "You open the desk. You find a note." Hide a
-door to make a secret door.
+(or a list) reveals it when the player does that. SEARCH and verbs with no
+handler say "You find a small key." instead of their usual reply. Other
+actions add it after: "You open the desk. You find a note."
+
+Instead of one verb, a rule can name an **action category** in brackets.
+Case and spacing don't matter:
+
+| Category | Covers |
+|---|---|
+| `(physical action)` | push, press, shove, pull, tug, yank, kick, hit, punch, strike, smash, break, move, drag, shift, slide, lift, raise, shake, turn, twist, rotate, touch, feel, rub |
+| `(inspect)` | examine, look at, search, look under/behind/in |
+| `(sense)` | smell, sniff, listen to, taste, lick, touch, feel |
+
+```yaml
+  coin:
+    state: { hidden: true }
+    revealed_by: (physical action) rug    # KICK RUG, DRAG RUG, LIFT RUG... all find it
+```
+
+Hide a door to make a secret door. To hide it from one side only, name
+that side: a bookcase door with `hidden: library` can't be seen from the
+library, but is plain to see from the secret room. Coming through it from
+the plain side reveals it on the other side too.
 
 **Doors:** give the door the `door` trait (usually with `openable` and
 `lockable`), put it in one of the rooms with `in:`, and send an exit
@@ -597,6 +627,10 @@ verbs:
 ```
 
 `{target}` is the thing acted on and `{tool}` is a second thing (`fill {target} with {tool}`).
+A verb's ID can't be an event name (`start`, `turn`, `parse_failed`,
+`enter`, `leave`), but its patterns can use any words. Defining a verb
+with the same ID as one of the try-it verbs above (`kick`, `pull`…) adds
+your patterns to it.
 
 ## Where to go next
 

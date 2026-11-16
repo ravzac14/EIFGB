@@ -75,6 +75,9 @@ pub struct Story {
     pub endings: Vec<Ending>,
     /// Lua chunks loaded once, in order, before any handler runs.
     pub scripts: Vec<Script>,
+    /// Action categories from the stdlib: name → verb keys.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub categories: BTreeMap<String, Vec<String>>,
 }
 
 impl Story {
@@ -188,10 +191,15 @@ impl Entity {
     }
 }
 
-/// "Doing `verb` to `target` reveals me", e.g. SEARCH MAT reveals a key.
+/// "Doing any of `verbs` to `target` reveals me", e.g. SEARCH MAT reveals
+/// a key. A category such as `(physical action)` is expanded into its
+/// verbs at compile time, so the pinned stdlib decides what it covers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Reveal {
-    pub verb: String,
+    pub verbs: Vec<String>,
+    /// The category the rule was written with, kept for display.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     pub target: EntityId,
 }
 

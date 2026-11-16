@@ -26,7 +26,9 @@ verbs:
   go:
     action: go
     patterns: ["go {direction}", "walk {direction}", "{direction}"]
-  enter:
+  # Verb keys must not clash with event names (start, turn, parse_failed,
+  # enter, leave), because handlers use both. Hence `go_through`, not `enter`.
+  go_through:
     action: enter
     patterns: ["go through {target}", "walk through {target}", "go in {target}", "go into {target}", "pass through {target}"]
   take:
@@ -119,12 +121,57 @@ verbs:
   help:
     action: help
     patterns: ["help", "hint", "hints"]
+  # Verbs with no built-in behaviour. They exist so players can try them and
+  # authors can hook into them with handlers, revealed_by or categories.
+  push:
+    patterns: ["push {target}", "press {target}", "shove {target}"]
+    default: "Nothing obvious happens."
+  pull:
+    patterns: ["pull {target}", "tug {target}", "yank {target}"]
+    default: "Nothing obvious happens."
+  kick:
+    patterns: ["kick {target}"]
+    default: "Kicking that won't help."
+  hit:
+    patterns: ["hit {target}", "punch {target}", "strike {target}", "smash {target}", "break {target}", "attack {target}"]
+    default: "Violence isn't the answer here."
+  move:
+    patterns: ["move {target}", "drag {target}", "shift {target}", "slide {target}"]
+    default: "Nothing obvious happens."
+  lift:
+    patterns: ["lift {target}", "raise {target}", "lift up {target}"]
+    default: "Nothing obvious happens."
+  shake:
+    patterns: ["shake {target}"]
+    default: "Nothing obvious happens."
+  twist:
+    patterns: ["turn {target}", "twist {target}", "rotate {target}", "spin {target}"]
+    default: "Nothing obvious happens."
+  touch:
+    patterns: ["touch {target}", "feel {target}", "rub {target}", "pat {target}"]
+    default: "You feel nothing unexpected."
+  smell:
+    patterns: ["smell {target}", "sniff {target}", "smell", "sniff"]
+    default: "You smell nothing unexpected."
+  listen:
+    patterns: ["listen to {target}", "listen"]
+    default: "You hear nothing unusual."
+  taste:
+    patterns: ["taste {target}", "lick {target}"]
+    default: "You'd rather not."
   again:
     action: again
     patterns: ["again", "g"]
   quit:
     action: quit
     patterns: ["quit", "q"]
+
+# Action categories for `revealed_by: (physical action) rug`. Authors write
+# the name in brackets; case and spaces/underscores don't matter.
+categories:
+  physical_action: [push, pull, kick, hit, move, lift, shake, twist, touch]
+  inspect: [examine, search]
+  sense: [smell, listen, taste, touch]
 
 lexicon:
   phrases:

@@ -23,6 +23,7 @@ pub(crate) struct Lowerer<'a> {
     entity_kinds: Vec<EntityKind>,
     choice_ids: HashMap<String, ChoiceId>,
     verb_keys: Vec<String>,
+    categories: Vec<(String, Vec<String>)>,
 }
 
 impl<'a> Lowerer<'a> {
@@ -35,6 +36,7 @@ impl<'a> Lowerer<'a> {
             entity_kinds: Vec::new(),
             choice_ids: HashMap::new(),
             verb_keys: Vec::new(),
+            categories: Vec::new(),
         }
     }
 
@@ -66,6 +68,7 @@ impl<'a> Lowerer<'a> {
         };
 
         self.allocate_ids(&s);
+        self.categories = stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         let verbs = self.lower_verbs(&s.verbs, &stdlib);
 
         let messages = self.lower_messages(&s.messages, &stdlib);
@@ -137,6 +140,7 @@ impl<'a> Lowerer<'a> {
             handlers,
             endings,
             scripts,
+            categories: stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -260,23 +264,44 @@ impl<'a> Lowerer<'a> {
             if key.starts_with("before_") || key.starts_with("after_") {
                 self.d.error(&path, "verb IDs can't start with 'before_' or 'after_'");
             }
+            if GLOBAL_EVENTS.contains(&key.as_str()) || ROOM_EVENTS.contains(&key.as_str()) {
+                self.d.error(
+                    &path,
+                    format!("'{key}' is the name of an event, so a verb can't use it; pick another ID (the patterns can still say \"{key} ...\")"),
+                );
+            }
             if v.patterns.is_empty() {
                 self.d.error(&path, "a verb needs at least one pattern");
             }
-            // An author verb with a stdlib verb's name replaces its grammar
-            // but keeps its built-in behaviour.
-            let action = match stdlib.verbs.get(key) {
-                Some(std) => {
+            // An author verb with a built-in stdlib verb's name replaces its
+            // grammar but keeps its behaviour. One with a hookable stdlib
+            // verb's name (push, kick...) adds to it: there's nothing to
+            // override, so there's nothing to warn about.
+            let std = stdlib.verbs.get(key);
+            let action = match std.and_then(|s| s.action) {
+                Some(a) => {
                     self.d.warn(
                         &path,
                         format!("replaces the patterns of standard verb '{key}'; its built-in behaviour is kept"),
                     );
-                    VerbAction::Builtin(std.action)
+                    VerbAction::Builtin(a)
                 }
                 None => VerbAction::Script,
             };
-            let patterns = self.patterns(&v.patterns, &format!("{path}.patterns"));
-            let default = self.text_opt(v.default.as_deref(), &format!("{path}.default"));
+            let mut patterns = self.patterns(&v.patterns, &format!("{path}.patterns"));
+            let mut default = self.text_opt(v.default.as_deref(), &format!("{path}.default"));
+            if let Some(std) = std
+                && std.action.is_none()
+            {
+                for p in self.patterns(&std.patterns, &format!("stdlib.verbs.{key}")) {
+                    if !patterns.contains(&p) {
+                        patterns.push(p);
+                    }
+                }
+                if default.is_none() {
+                    default = self.text_opt(std.default.as_deref(), &format!("stdlib.verbs.{key}.default"));
+                }
+            }
             verbs.push(Verb { key: key.clone(), patterns, action, default, origin: VerbOrigin::Author });
         }
 
@@ -305,13 +330,9 @@ impl<'a> Lowerer<'a> {
                     );
                 }
             }
-            verbs.push(Verb {
-                key: key.clone(),
-                patterns,
-                action: VerbAction::Builtin(std.action),
-                default: None,
-                origin: VerbOrigin::Stdlib,
-            });
+            let action = std.action.map_or(VerbAction::Script, VerbAction::Builtin);
+            let default = self.text_opt(std.default.as_deref(), &format!("stdlib.verbs.{key}.default"));
+            verbs.push(Verb { key: key.clone(), patterns, action, default, origin: VerbOrigin::Stdlib });
         }
         self.verb_keys = verbs.iter().map(|v| v.key.clone()).collect();
         verbs
@@ -528,7 +549,12 @@ impl<'a> Lowerer<'a> {
         }
 
         // Built-in state fields must be booleans and get sensible defaults.
+        let is_door = t.traits.iter().any(|n| n == "door");
         for field in ["open", "locked", "hidden", "worn"] {
+            // On doors, `hidden` may also name the sides it's hidden from.
+            if field == "hidden" && is_door {
+                continue;
+            }
             if let Some(v) = state.get(field)
                 && v.as_bool().is_none()
             {
@@ -591,24 +617,57 @@ impl<'a> Lowerer<'a> {
         if let Some(rules) = &t.revealed_by {
             let rpath = format!("{path}.revealed_by");
             for rule in rules.items() {
-                let words: Vec<&str> = rule.split_whitespace().collect();
-                let [verb, target] = words[..] else {
-                    self.d.error(&rpath, format!("'{rule}': write it as '<verb> <object>', e.g. 'search mat'"));
+                let shape = || format!("'{rule}': write it as '<verb> <object>' or '(<category>) <object>', e.g. 'search mat' or '(physical action) rug'");
+                // "(physical action) rug" names a category; "search mat" a verb.
+                let (verbs, category, rest) = if let Some(inner) = rule.trim().strip_prefix('(') {
+                    let Some((name, rest)) = inner.split_once(')') else {
+                        self.d.error(&rpath, shape());
+                        continue;
+                    };
+                    let name = name.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join("_");
+                    match self.categories.iter().find(|(k, _)| *k == name) {
+                        Some((_, verbs)) => (verbs.clone(), Some(name), rest),
+                        None => {
+                            let names: Vec<String> = self.categories.iter().map(|(k, _)| k.replace('_', " ")).collect();
+                            let hint = did_you_mean(&name.replace('_', " "), names.iter().map(String::as_str));
+                            self.d.error(
+                                &rpath,
+                                format!("'({})' is not an action category{hint}; the categories are ({})", name.replace('_', " "), names.join("), (")),
+                            );
+                            continue;
+                        }
+                    }
+                } else {
+                    let Some((verb, rest)) = rule.trim().split_once(char::is_whitespace) else {
+                        self.d.error(&rpath, shape());
+                        continue;
+                    };
+                    if !self.verb_keys.iter().any(|v| v == verb) {
+                        let hint = did_you_mean(verb, self.verb_keys.iter().map(String::as_str));
+                        self.d.error(&rpath, format!("'{verb}' is not a verb{hint}"));
+                        continue;
+                    }
+                    (vec![verb.to_string()], None, rest)
+                };
+                let words: Vec<&str> = rest.split_whitespace().collect();
+                let [target] = words[..] else {
+                    self.d.error(&rpath, shape());
                     continue;
                 };
-                if !self.verb_keys.iter().any(|v| v == verb) {
-                    let hint = did_you_mean(verb, self.verb_keys.iter().map(String::as_str));
-                    self.d.error(&rpath, format!("'{verb}' is not a verb{hint}"));
-                    continue;
-                }
                 let Some(target_id) = self.entity_ref(target, &rpath) else { continue };
                 if target == key {
                     self.d.error(&rpath, "a hidden thing can't be revealed by acting on itself, since it can't be seen");
                     continue;
                 }
-                revealed_by.push(Reveal { verb: verb.to_string(), target: target_id });
+                revealed_by.push(Reveal { verbs, category, target: target_id });
             }
-            if state.get("hidden") != Some(&Value::Bool(true)) {
+            let starts_hidden = match state.get("hidden") {
+                Some(Value::Bool(b)) => *b,
+                Some(Value::Str(s)) => !s.is_empty(),
+                Some(Value::List(l)) => !l.is_empty(),
+                _ => false,
+            };
+            if !starts_hidden {
                 self.d.warn(&rpath, "this has 'revealed_by' but doesn't start hidden; add 'state: { hidden: true }'");
             }
         }
@@ -687,10 +746,11 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// A door's `blocked` state is true/false, a room ID, or a list of room IDs.
-    fn check_blocked(&mut self, door: &Entity, entities: &[Entity]) {
-        let Some(v) = door.state.get("blocked") else { return };
-        let path = format!("objects.{}.state.blocked", door.key);
+    /// A door's `blocked` and `hidden` states are true/false, a room ID,
+    /// or a list of room IDs: the sides they apply to.
+    fn check_sides(&mut self, door: &Entity, entities: &[Entity], field: &str) {
+        let Some(v) = door.state.get(field) else { return };
+        let path = format!("objects.{}.state.{field}", door.key);
         let rooms: Vec<&Value> = match v {
             Value::Bool(_) => return,
             Value::Str(_) => vec![v],
@@ -775,7 +835,8 @@ impl<'a> Lowerer<'a> {
                     self.d.error(&path, format!("'{}' needs the 'door' trait", door.key));
                 }
                 if checked.insert(door_id) {
-                    self.check_blocked(door, entities);
+                    self.check_sides(door, entities, "blocked");
+                    self.check_sides(door, entities, "hidden");
                 }
             }
         }

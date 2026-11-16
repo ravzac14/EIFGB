@@ -232,7 +232,10 @@ fn revealed_by_rules_are_checked() {
     let out = thing("search mat", true);
     let story = out.story.as_ref().unwrap_or_else(|| panic!("{:#?}", out.diagnostics));
     let key = story.entity(story.entity_by_key("key").unwrap());
-    assert_eq!(key.revealed_by, vec![Reveal { verb: "search".into(), target: story.entity_by_key("mat").unwrap() }]);
+    assert_eq!(
+        key.revealed_by,
+        vec![Reveal { verbs: vec!["search".into()], category: None, target: story.entity_by_key("mat").unwrap() }]
+    );
     assert!(out.diagnostics.is_empty());
 
     assert_error(&thing("serch mat", true), "'serch' is not a verb (did you mean 'search'?)");
@@ -241,6 +244,55 @@ fn revealed_by_rules_are_checked() {
     assert_error(&thing("search key", true), "can't be revealed by acting on itself");
     let out = thing("search mat", false);
     assert!(warnings(&out).iter().any(|w| w.contains("doesn't start hidden")), "{:#?}", warnings(&out));
+}
+
+#[test]
+fn verbs_cannot_be_named_after_events() {
+    assert_error(&with("verbs:\n  turn: { patterns: ['crank {target}'] }\n"), "'turn' is the name of an event");
+    assert_error(&with("verbs:\n  enter: { patterns: ['enter {target}'] }\n"), "'enter' is the name of an event");
+    // The turn event still works, and doesn't fire on TURN DIAL.
+    let out = with("objects:\n  dial: { name: dial, in: hall }\non: { turn: 'say(1)' }\n");
+    assert!(out.story.is_some(), "{:#?}", out.diagnostics);
+}
+
+#[test]
+fn categories_expand_to_their_verbs() {
+    let thing = |rule: &str| {
+        with(&format!("objects:\n  rug: {{ name: rug, in: hall }}\n  coin: {{ name: coin, in: hall, state: {{ hidden: true }}, revealed_by: '{rule}' }}\n"))
+    };
+    for spelling in ["(physical action) rug", "(PHYSICAL ACTION) rug", "(physical_action) rug", "( Physical  Action ) rug"] {
+        let out = thing(spelling);
+        let story = out.story.as_ref().unwrap_or_else(|| panic!("{spelling}: {:#?}", out.diagnostics));
+        let r = &story.entity(story.entity_by_key("coin").unwrap()).revealed_by[0];
+        assert_eq!(r.category.as_deref(), Some("physical_action"));
+        assert!(r.verbs.contains(&"kick".to_string()) && r.verbs.contains(&"move".to_string()), "{:?}", r.verbs);
+    }
+    assert_error(&thing("(physical acton) rug"), "did you mean 'physical action'?");
+    assert_error(&thing("(dancing) rug"), "the categories are (physical action), (inspect), (sense)");
+    assert_error(&thing("(physical action rug"), "write it as");
+}
+
+#[test]
+fn author_verbs_add_to_hookable_stdlib_verbs_without_warnings() {
+    let out = with("verbs:\n  kick: { patterns: ['boot {target}'] }\n");
+    let story = out.story.as_ref().unwrap();
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    let kick: Vec<_> = story.verbs.iter().filter(|v| v.key == "kick").collect();
+    assert_eq!(kick.len(), 1);
+    assert_eq!(kick[0].patterns.len(), 2, "the author's 'boot' plus the stdlib's 'kick'");
+    assert!(kick[0].default.is_some(), "keeps the stdlib's default reply");
+}
+
+#[test]
+fn door_hidden_sides_are_checked() {
+    let base = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: a }\nrooms:\n  a: { name: A, exits: { north: { to: b, through: d } } }\n  b: { name: B }\nobjects:\n  d: { name: door, in: a, traits: [door, openable], state: { hidden: HIDDEN } }\n  box: { name: box, in: a, state: { hidden: b } }\n";
+    let out = compile_str(&base.replace("HIDDEN", "b"));
+    // The door can name a side; a non-door can't.
+    assert!(errors(&out).iter().any(|e| e.contains("objects.box.state.hidden") && e.contains("true or false")), "{:#?}", errors(&out));
+    assert!(!errors(&out).iter().any(|e| e.contains("objects.d.state.hidden")), "{:#?}", errors(&out));
+    let fixed = base.replace("box: { name: box, in: a, state: { hidden: b } }", "box: { name: box, in: a }");
+    assert!(compile_str(&fixed.replace("HIDDEN", "[a, b]")).story.is_some());
+    assert_error(&compile_str(&fixed.replace("HIDDEN", "c")), "'c' isn't a room on either side of this door");
 }
 
 #[test]

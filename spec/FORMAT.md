@@ -39,7 +39,7 @@ stay interchangeable.
 | `on`         | Global event handlers (`turn`, `start`, ...). |
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
 
-IDs are `snake_case` and unique across rooms, objects, characters and choices.
+IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `enter`, `leave`), because handlers are keyed by both.
 
 ## Entities
 
@@ -53,8 +53,12 @@ IDs are `snake_case` and unique across rooms, objects, characters and choices.
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
 - **Hidden things** (`state: { hidden: true }`) can't be seen or referred to. Things the player carries are the exception. `revealed_by` reveals one without a script:
   - **The rule** is `"<verb> <object>"` (`search mat`, `open desk`, `kick rug`), or a list of rules where any one will do. Any phrasing of the verb counts.
+  - **Action categories:** a rule can name a stdlib category instead of a verb: `"(physical action) rug"`. Case and spaces/underscores in the name don't matter. Categories are expanded into verb keys at compile time and stored in the IR with the category name. That pins them to the game's stdlib version, so a later stdlib that adds a verb to `(physical action)` doesn't change an existing game. v1 has:
+    - `(physical action)`: push, pull, kick, hit, move, lift, shake, twist, touch
+    - `(inspect)`: examine, search
+    - `(sense)`: smell, listen, taste, touch
   - **What the player sees:** when the action happens (and isn't blocked by a `before_` handler), the thing becomes visible where it is, and the game says "You find a small key." `[reveal.found]`. For SEARCH, and for custom verbs with no handler, that replaces the usual reply. Otherwise it follows it.
-  - **Secret doors:** a hidden door's exits, from both sides, aren't listed or usable until it's revealed.
+  - **Secret doors:** a hidden door's exits aren't listed or usable until it's revealed. Like `blocked`, a door's `hidden` can be `true` (both sides), a room ID or a list of room IDs (hidden only from those sides). That covers a bookcase door hidden from the library but plain from the secret room. Revealing a door clears `hidden` entirely, and so does passing through it from a side where it's visible.
   - **Compiler checks:** the verb and object must exist (with "did you mean"), the rule must have exactly two words, and it can't name the hidden thing itself. There's a warning if the thing doesn't start hidden.
   - **Scripts** can still reveal by setting `hidden = false`, for anything more involved.
 - **Doors work from both sides.** A door is an object with the `door` trait. It's placed in one room with `in:`, and exits go `through:` it. For every exit from room A to room B through a door, B's way back to A uses the same door:

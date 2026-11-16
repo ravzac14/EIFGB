@@ -51,6 +51,17 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   - **None:** the first `blocked` message in the list is shown, or a default.
 
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
+- **Containers and supporters.** These are the `container` and `supporter` traits, with `in:` placing things inside or on top:
+  - **Visibility:** a closed container hides its contents, unless it's `transparent`, in which case they're visible but out of reach: "You can't reach the jewel: the glass case is closed." Built-in actions that touch things check reach; EXAMINE and SEARCH don't. A container without `openable` is always open. Characters' belongings are never in scope.
+  - **Descriptions:** LOOK, EXAMINE and SEARCH describe contents as deep as the player can see. The inventory nests them: "a cloth bag (open) (containing a coin)" `[list.containing, list.supporting]`.
+  - **TAKE X FROM Y** checks that X is in or on Y, at any depth: "The coin isn't in the glass jar." `[take.not_in, take.not_on]`.
+  - **ALL with a second object:** TAKE ALL FROM Y means what's in Y. PUT ALL IN/ON Y means what you carry, except Y itself, anything containing Y, and worn things.
+  - **EMPTY X** tips X's portable contents where X is, or where the player is if they're holding X. EMPTY X INTO/ONTO Y moves them to Y, as far as they fit.
+  - **`enterable`** (needs `container` or `supporter`): GET IN/INTO/ON, CLIMB IN/INTO/ON, SIT/STAND/LIE ON, HIDE IN to enter. GET OUT/OFF/UP, CLIMB OUT/OFF, STAND UP and OUT to leave.
+    - The room title becomes "Hall (in the wardrobe)".
+    - A closed opaque container the player is in becomes their view: "You're shut inside the wardrobe." They can't see or reach out.
+    - Moving away, or climbing into something else, gets out first, opening the container if needed.
+  - **Size:** `size` (default 1) and `capacity`. With a capacity, the total size of what's directly in or on the holder can't go over it. The player's capacity counts what they carry. Without a capacity, a thing can't go in or on something smaller than itself, but the player can carry anything. Replies are "too big for" `[put.too_big, take.too_big]` and "no more room" `[put.full, take.full]`. The compiler warns when a holder starts out over capacity.
 - **Hidden things** (`state: { hidden: true }`) can't be seen or referred to. Things the player carries are the exception. `revealed_by` reveals one without a script:
   - **The rule** is `"<verb> <object>"` (`search mat`, `open desk`, `kick rug`), or a list of rules where any one will do. Any phrasing of the verb counts.
   - **Action categories:** a rule can name a stdlib category instead of a verb: `"(physical action) rug"`. Case and spaces/underscores in the name don't matter. Categories are expanded into verb keys at compile time and stored in the IR with the category name. That pins them to the game's stdlib version, so a later stdlib that adds a verb to `(physical action)` doesn't change an existing game. v1 has:

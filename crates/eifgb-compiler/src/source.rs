@@ -93,6 +93,8 @@ pub struct Player {
     pub description: Option<String>,
     #[serde(default)]
     pub capacity: Option<u32>,
+    #[serde(default)]
+    pub size: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -161,6 +163,8 @@ pub struct Thing {
     pub talk: Option<String>,
     #[serde(default)]
     pub capacity: Option<u32>,
+    #[serde(default)]
+    pub size: Option<u32>,
     /// `"search mat"` or a list of them: the actions that reveal this
     /// thing while it's hidden.
     #[serde(default)]

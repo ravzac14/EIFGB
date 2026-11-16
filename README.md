@@ -20,6 +20,7 @@ You unlock the pantry door with the small key.
 - [Quick start](#quick-start)
 - [Tutorial: Midnight Snack](#tutorial-midnight-snack)
 - [States and descriptions](#states-and-descriptions)
+- [Containers and supporters](#containers-and-supporters)
 - [Command reference](#command-reference)
 - [Cheat sheet](#cheat-sheet)
 - [Where to go next](#where-to-go-next)
@@ -488,6 +489,75 @@ There's no obvious way out.
 A dented brass lantern.
 ```
 
+## Containers and supporters
+
+Bags, boxes and jars are **containers**: things go *in* them. Tables and
+shelves are **supporters**: things go *on* them. Put things there with `in:`:
+
+```yaml
+objects:
+  table: { name: table, in: hall, traits: [supporter, scenery] }
+  bag:   { name: cloth bag, in: table, traits: [portable, container, openable], capacity: 2 }
+  coin:  { name: coin, in: bag, traits: [portable] }
+  case:  { name: glass case, in: hall, traits: [container, openable, transparent, scenery] }
+  jewel: { name: jewel, in: case, traits: [portable] }
+  wardrobe: { name: wardrobe, in: hall, traits: [container, openable, enterable, scenery], size: 5 }
+  bed:   { name: bed, in: hall, traits: [supporter, enterable, scenery] }
+```
+
+| Trait | Effect |
+|---|---|
+| `container` | Holds things in it. Without `openable` it's always open (a jar, a bowl). |
+| `supporter` | Holds things on it, always visible. |
+| `openable`, `lockable` | Can be opened and closed, locked and unlocked (with `unlocks_with:`). A closed container hides what's inside. |
+| `transparent` | A closed container whose contents can be seen but not reached: "You can't reach the jewel: the glass case is closed." |
+| `enterable` | The player can get in it (a container) or on it (a supporter): GET IN, CLIMB INTO, SIT ON, LIE ON, then GET OUT, GET OFF or STAND UP. |
+
+What players can do and see:
+
+```
+> look
+...
+On the table you can see a cloth bag (closed) and a small box.
+In the small box you can see a ring.
+
+> take coin from jar
+The coin isn't in the glass jar.
+
+> i
+You're carrying a cloth bag (open) (containing a coin) and a small box (containing a ring).
+
+> put all in bag
+> empty bag                  (onto the floor)
+> empty jar into box         (or onto a supporter)
+> take all from box
+```
+
+- **LOOK and EXAMINE** describe contents as deep as the player can see.
+  The inventory shows what's inside carried containers.
+- **Getting in or on something** shows in the room title: "Hall (in the
+  wardrobe)", "Hall (on the bed)".
+  - Closing an `enterable` container from inside shuts the player in, and
+    they can't see out: "You're shut inside the wardrobe."
+  - Walking away, or climbing into something else, gets out first: "(first
+    getting off the bed)". OUT gets out too.
+
+**Size and capacity.** Every thing has a `size`, 1 by default. A
+container, supporter or the player can have a `capacity`, which limits the
+total size of what's directly in or on it (or carried). Without a
+`capacity`, nothing bigger than the holder itself fits, so a piano never
+goes into a jar. The player can carry anything unless given a capacity
+with `player: { capacity: 10 }`.
+
+```
+> put piano in jar
+The piano is too big for the glass jar.
+> take boulder
+The boulder is too big to carry.
+> take sack
+You're carrying too much already.
+```
+
 ## Command reference
 
 | Command | What it does |
@@ -505,8 +575,9 @@ Options for `play`:
 | `--save-file <path>` | Where SAVE and RESTORE keep the saved game. Defaults to `<game id>.sav`. |
 
 In-game commands that every game understands include LOOK, EXAMINE (X),
-TAKE, DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
-TAKE OFF, EAT, GO THROUGH / ENTER (a door), INVENTORY (I), WAIT (Z),
+TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
+TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
+SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -526,8 +597,10 @@ end-of-turn event.
 `scripts`.
 
 **Traits:** `portable`, `scenery`, `container`, `supporter`, `openable`,
-`lockable`, `door`, `wearable`, `edible`, `light_source`. `open` is
-shorthand for `state: { open: true }`.
+`lockable`, `door`, `wearable`, `edible`, `light_source`, `enterable`,
+`transparent`. `open` is shorthand for `state: { open: true }`. Things can
+also have a `size` (default 1) and a `capacity`; see
+[Containers and supporters](#containers-and-supporters).
 
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including

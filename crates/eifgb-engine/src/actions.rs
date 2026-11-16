@@ -8,8 +8,8 @@
 use crate::game::{Game, LineKind, Pending};
 use crate::parser::Command;
 use crate::script::{Ctx, ScriptHost};
-use crate::world::Blocked;
-use eifgb_ir::{BuiltinAction, EntityId, EntityKind, Exit, PatternToken, Segment, Text, Trait, Value, VerbAction, PLAYER};
+use crate::world::{Blocked, Fit};
+use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToken, Segment, Text, Trait, Value, VerbAction, PLAYER};
 
 /// State fields with built-in meaning. `open`, `locked` and `worn` are
 /// described by [`StateNote::Builtin`]; `hidden` is never described.
@@ -60,8 +60,10 @@ impl<H: ScriptHost> Game<H> {
             }
             (A::Go, _) => self.go(cmd, ctx),
             (A::Enter, Some(t)) => self.enter(t, ctx),
+            (A::GetOut, t) => self.get_out(t),
+            (A::Empty, Some(t)) => self.empty(t, cmd.tool, ctx),
             (A::Examine, Some(t)) => self.examine(t),
-            (A::Take, Some(t)) => self.take(t, ctx),
+            (A::Take, Some(t)) => self.take(t, cmd.tool, ctx),
             (A::Drop, Some(t)) => self.drop_thing(t, ctx),
             (A::PutIn, Some(t)) => self.put(t, cmd.tool, false, ctx),
             (A::PutOn, Some(t)) => self.put(t, cmd.tool, true, ctx),
@@ -89,7 +91,26 @@ impl<H: ScriptHost> Game<H> {
             let d = self.world.def(here);
             (d.name.clone(), d.description.clone(), d.exits.clone())
         };
-        self.push(LineKind::Title, name);
+        // "Hall (in the wardrobe)" when the player is in or on something.
+        let title = match self.world.location(PLAYER) {
+            Some(holder) if holder != here => {
+                let key = if self.world.has(holder, Trait::Supporter) { "look.title_on" } else { "look.title_in" };
+                self.msg_str(key, &Ctx::new().text("room", name.clone()).entity("target", holder))
+            }
+            _ => name,
+        };
+        self.push(LineKind::Title, title);
+        // Shut inside something: that's all there is to see.
+        let ceiling = self.world.ceiling();
+        if ceiling != here {
+            self.msg("look.enclosed", &Ctx::new().entity("target", ceiling));
+            let items: Vec<EntityId> = self.listable(ceiling);
+            if !items.is_empty() {
+                let list = self.list_a(&items);
+                self.msg("examine.contents", &Ctx::new().entity("target", ceiling).text("list", list));
+            }
+            return;
+        }
         let before = self.out.lines.len();
         if let Some(d) = &description {
             self.render_line(LineKind::Text, d, &Ctx::new().this(here));
@@ -108,7 +129,7 @@ impl<H: ScriptHost> Game<H> {
             let list = self.list_a(&things);
             self.msg("look.you_see", &Ctx::new().text("list", list));
         }
-        for c in self.world.contents(here) {
+        for c in self.world.present(here) {
             if !self.world.is_hidden(c) && c != PLAYER {
                 self.describe_contents(c);
             }
@@ -140,8 +161,14 @@ impl<H: ScriptHost> Game<H> {
             .collect()
     }
 
+    /// "On the table you can see a box. In the box you can see a coin."
+    /// Goes as deep as the player can see.
     fn describe_contents(&mut self, holder: EntityId) {
-        if self.world.def(holder).kind != EntityKind::Object || !self.world.exposes_contents(holder) {
+        self.describe_contents_depth(holder, 0);
+    }
+
+    fn describe_contents_depth(&mut self, holder: EntityId, depth: usize) {
+        if depth > 8 || self.world.def(holder).kind != EntityKind::Object || !self.world.shows_contents(holder) {
             return;
         }
         let items = self.listable(holder);
@@ -151,6 +178,9 @@ impl<H: ScriptHost> Game<H> {
         let key = if self.world.has(holder, Trait::Supporter) { "examine.on_top" } else { "examine.contents" };
         let list = self.list_a(&items);
         self.msg(key, &Ctx::new().entity("target", holder).text("list", list));
+        for item in items {
+            self.describe_contents_depth(item, depth + 1);
+        }
     }
 
     fn examine(&mut self, t: EntityId) -> bool {
@@ -174,7 +204,7 @@ impl<H: ScriptHost> Game<H> {
     }
 
     fn search(&mut self, t: EntityId, ctx: &Ctx) -> bool {
-        let items = if self.world.exposes_contents(t) { self.listable(t) } else { Vec::new() };
+        let items = if self.world.shows_contents(t) { self.listable(t) } else { Vec::new() };
         if items.is_empty() {
             self.msg("search.nothing", ctx);
         } else {
@@ -189,10 +219,29 @@ impl<H: ScriptHost> Game<H> {
         if items.is_empty() {
             self.msg("inventory.empty", &Ctx::new());
         } else {
-            let list = self.list_a(&items);
+            let list = self.list_tree(&items, 0);
             self.msg("inventory.list", &Ctx::new().text("list", list));
         }
         true
+    }
+
+    /// Like `list_a`, but with what's in or on each item you can see into:
+    /// "a cloth bag (open) (containing a pebble and a coin)".
+    fn list_tree(&mut self, ids: &[EntityId], depth: usize) -> String {
+        let lang = self.grammar.lang();
+        let mut names = Vec::new();
+        for &id in ids {
+            let tags = self.state_tag_texts(id);
+            let mut item = (lang.tagged)(&self.a(id), &tags);
+            let inside = if depth < 8 && self.world.shows_contents(id) { self.listable(id) } else { Vec::new() };
+            if !inside.is_empty() {
+                let list = self.list_tree(&inside, depth + 1);
+                let key = if self.world.has(id, Trait::Supporter) { "list.supporting" } else { "list.containing" };
+                item = self.msg_str(key, &Ctx::new().text("item", item).text("list", list));
+            }
+            names.push(item);
+        }
+        (lang.list_and)(&names)
     }
 
     // ----------------------------------------------------------- movement
@@ -203,6 +252,20 @@ impl<H: ScriptHost> Game<H> {
             self.msg("go.no_exit", ctx);
             return false;
         };
+        // In or on something: OUT means getting out of it; any other
+        // direction gets out first, then goes.
+        if self.world.location(PLAYER) != Some(here) {
+            if dir == Direction::Out && self.world.exit(here, Direction::Out).is_none() {
+                return self.get_out(None);
+            }
+            while let Some(holder) = self.world.location(PLAYER)
+                && holder != here
+            {
+                if !self.leave_holder(holder, true) {
+                    return false;
+                }
+            }
+        }
         let group: Vec<Exit> = self
             .world
             .def(here)
@@ -245,6 +308,9 @@ impl<H: ScriptHost> Game<H> {
 
     /// GO THROUGH, ENTER and the like: leave by the exit that uses this door.
     fn enter(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        if self.world.has(t, Trait::Enterable) {
+            return self.get_into(t, ctx);
+        }
         let here = self.world.here();
         let routes: Vec<Exit> = self
             .world
@@ -499,9 +565,14 @@ impl<H: ScriptHost> Game<H> {
 
     // ---------------------------------------------------- taking and dropping
 
-    fn take(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+    fn take(&mut self, t: EntityId, from: Option<EntityId>, ctx: &Ctx) -> bool {
         let w = &self.world;
-        let key = if t == PLAYER {
+        let fit = w.fits(t, PLAYER);
+        let key = if let Some(f) = from
+            && !w.is_within(t, f)
+        {
+            Some(if w.has(f, Trait::Supporter) { "take.not_on" } else { "take.not_in" })
+        } else if t == PLAYER {
             Some("take.self")
         } else if w.location(t) == Some(PLAYER) {
             Some("take.already")
@@ -511,7 +582,11 @@ impl<H: ScriptHost> Game<H> {
             Some("take.scenery")
         } else if !w.has(t, Trait::Portable) {
             Some("take.fixed")
-        } else if w.def(PLAYER).capacity.is_some_and(|cap| w.inventory().len() >= cap as usize) {
+        } else if w.is_within(PLAYER, t) {
+            Some("enter.held")
+        } else if fit == Fit::TooBig {
+            Some("take.too_big")
+        } else if fit == Fit::Full {
             Some("take.full")
         } else {
             None
@@ -554,7 +629,9 @@ impl<H: ScriptHost> Game<H> {
             Some("put.not_container")
         } else if !on && !w.is_open(dest) {
             Some("put.closed")
-        } else if w.def(dest).capacity.is_some_and(|cap| w.contents(dest).len() >= cap as usize) {
+        } else if w.fits(t, dest) == Fit::TooBig {
+            Some("put.too_big")
+        } else if w.fits(t, dest) == Fit::Full {
             Some("put.full")
         } else {
             None
@@ -660,6 +737,160 @@ impl<H: ScriptHost> Game<H> {
         self.world.set(t, "locked", Value::Bool(lock));
         self.msg(&format!("{verb}.done"), &ctx);
         true
+    }
+
+    // ------------------------------------------------- getting in and out
+
+    fn get_into(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        let on = self.world.has(t, Trait::Supporter) && !self.world.has(t, Trait::Container);
+        if self.world.location(PLAYER) == Some(t) {
+            self.msg(if on { "enter.already_on" } else { "enter.already_in" }, ctx);
+            return false;
+        }
+        if self.world.is_within(t, PLAYER) {
+            self.msg("enter.held", ctx);
+            return false;
+        }
+        // Climbing from one thing into another: get out of the first.
+        while let Some(holder) = self.world.location(PLAYER)
+            && holder != self.world.here()
+            && !self.world.is_within(t, holder)
+        {
+            if !self.leave_holder(holder, true) {
+                return false;
+            }
+        }
+        if self.world.has(t, Trait::Container) && !self.world.is_open(t) {
+            if self.world.flag(t, "locked") || !self.world.has(t, Trait::Openable) {
+                self.msg("put.closed", &ctx.clone().entity("tool", t));
+                return false;
+            }
+            self.msg_kind(LineKind::Notice, "go.opening_first", &Ctx::new().entity("door", t));
+            self.world.set(t, "open", Value::Bool(true));
+        }
+        if self.world.fits(PLAYER, t) != Fit::Yes {
+            self.msg("enter.full", ctx);
+            return false;
+        }
+        if self.world.move_to(PLAYER, Some(t)).is_err() {
+            self.msg("enter.held", ctx);
+            return false;
+        }
+        self.msg(if on { "enter.done_on" } else { "enter.done_in" }, ctx);
+        true
+    }
+
+    /// GET OUT, STAND UP and the like. With a target, it must be what the
+    /// player is in or on.
+    fn get_out(&mut self, target: Option<EntityId>) -> bool {
+        let here = self.world.here();
+        let Some(holder) = self.world.location(PLAYER).filter(|h| *h != here) else {
+            self.msg("get_out.nothing", &Ctx::new());
+            return false;
+        };
+        if let Some(t) = target
+            && t != holder
+        {
+            self.msg("get_out.not_there", &Ctx::new().entity("target", t));
+            return false;
+        }
+        self.leave_holder(holder, false)
+    }
+
+    /// Moves the player out of `holder` to wherever it is, opening it first
+    /// if needed. `implicit` gives the "(first getting out of ...)" form.
+    fn leave_holder(&mut self, holder: EntityId, implicit: bool) -> bool {
+        let ctx = Ctx::new().entity("target", holder);
+        if self.world.has(holder, Trait::Container) && !self.world.is_open(holder) {
+            if self.world.flag(holder, "locked") || !self.world.has(holder, Trait::Openable) {
+                self.msg("put.closed", &Ctx::new().entity("tool", holder));
+                return false;
+            }
+            self.msg_kind(LineKind::Notice, "go.opening_first", &Ctx::new().entity("door", holder));
+            self.world.set(holder, "open", Value::Bool(true));
+        }
+        let on = self.world.has(holder, Trait::Supporter) && !self.world.has(holder, Trait::Container);
+        let outer = self.world.location(holder);
+        if self.world.move_to(PLAYER, outer).is_err() {
+            return false;
+        }
+        if implicit {
+            self.msg_kind(LineKind::Notice, if on { "go.getting_off_first" } else { "go.getting_out_first" }, &ctx);
+        } else {
+            self.msg(if on { "get_out.done_on" } else { "get_out.done_in" }, &ctx);
+        }
+        true
+    }
+
+    // ------------------------------------------------------------ emptying
+
+    /// EMPTY X tips what's in or on X onto the floor (wherever X is, or
+    /// where the player is if they're holding it). EMPTY X INTO/ONTO Y moves
+    /// it to Y instead, as far as it fits.
+    fn empty(&mut self, t: EntityId, into: Option<EntityId>, ctx: &Ctx) -> bool {
+        let w = &self.world;
+        if !w.has(t, Trait::Container) && !w.has(t, Trait::Supporter) {
+            self.msg("empty.cannot", ctx);
+            return false;
+        }
+        if w.has(t, Trait::Container) && !w.is_open(t) {
+            self.msg("empty.closed", ctx);
+            return false;
+        }
+        let items: Vec<EntityId> = self.listable(t).into_iter().filter(|i| self.world.has(*i, Trait::Portable)).collect();
+        if items.is_empty() {
+            self.msg("empty.nothing", ctx);
+            return false;
+        }
+        let dest = match into {
+            Some(d) => {
+                let w = &self.world;
+                let tctx = ctx.clone().entity("target", t);
+                let key = if d == t || w.is_within(d, t) {
+                    Some("put.into_self")
+                } else if !w.has(d, Trait::Container) && !w.has(d, Trait::Supporter) {
+                    Some("put.not_container")
+                } else if w.has(d, Trait::Container) && !w.is_open(d) {
+                    Some("put.closed")
+                } else {
+                    None
+                };
+                if let Some(k) = key {
+                    self.msg(k, &tctx);
+                    return false;
+                }
+                d
+            }
+            None => match self.world.location(t) {
+                Some(l) if l == PLAYER => self.world.location(PLAYER).unwrap_or(self.world.here()),
+                Some(l) => l,
+                None => self.world.here(),
+            },
+        };
+        let mut moved = Vec::new();
+        let mut full = false;
+        for item in items {
+            if into.is_some() && self.world.fits(item, dest) != Fit::Yes {
+                full = true;
+                continue;
+            }
+            if self.world.move_to(item, Some(dest)).is_ok() {
+                moved.push(item);
+            }
+        }
+        if !moved.is_empty() {
+            let list = self.list_a(&moved);
+            let key = match into {
+                None => "empty.done",
+                Some(d) if self.world.has(d, Trait::Supporter) && !self.world.has(d, Trait::Container) => "empty.onto",
+                Some(_) => "empty.into",
+            };
+            self.msg(key, &ctx.clone().text("list", list));
+        }
+        if full {
+            self.msg("put.full", ctx);
+        }
+        !moved.is_empty()
     }
 
     // ------------------------------------------------------------- people

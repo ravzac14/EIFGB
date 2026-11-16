@@ -30,7 +30,52 @@ verbs:
   # enter, leave), because handlers use both. Hence `go_through`, not `enter`.
   go_through:
     action: enter
-    patterns: ["go through {target}", "walk through {target}", "go in {target}", "go into {target}", "pass through {target}"]
+    patterns:
+      - "go through {target}"
+      - "walk through {target}"
+      - "go in {target}"
+      - "go into {target}"
+      - "pass through {target}"
+      - "get in {target}"
+      - "get into {target}"
+      - "get on {target}"
+      - "get onto {target}"
+      - "climb in {target}"
+      - "climb into {target}"
+      - "climb on {target}"
+      - "climb onto {target}"
+      - "sit on {target}"
+      - "sit in {target}"
+      - "stand on {target}"
+      - "lie on {target}"
+      - "lie in {target}"
+      - "hide in {target}"
+  get_out:
+    action: get_out
+    patterns:
+      - "get out"
+      - "get off"
+      - "get up"
+      - "get out of {target}"
+      - "get off {target}"
+      - "climb out"
+      - "climb off"
+      - "climb out of {target}"
+      - "climb off {target}"
+      - "stand up"
+      - "step out"
+      - "step off"
+  empty:
+    action: empty
+    patterns:
+      - "empty {target}"
+      - "empty out {target}"
+      - "empty {target} out"
+      - "tip out {target}"
+      - "empty {target} into {tool}"
+      - "empty {target} in {tool}"
+      - "empty {target} onto {tool}"
+      - "empty {target} on {tool}"
   take:
     action: take
     patterns:
@@ -269,7 +314,7 @@ messages:
   go.door_closed: "${The(args.door)} is closed."
   go.blocked: "You can't go that way right now."
   go.opening_first: "(first opening ${the(args.door)})"
-  enter.cannot: "That's not something you can go through."
+  enter.cannot: "That's not something you can get into or go through."
   # automatic state descriptions (settings.describe_state)
   state.open: "It's open."
   state.closed: "It's closed."
@@ -301,6 +346,9 @@ messages:
   take.person: "${The(args.target)} wouldn't care for that."
   take.self: "You can't take yourself."
   take.full: "You're carrying too much already."
+  take.too_big: "${The(args.target)} is too big to carry."
+  take.not_in: "${The(args.target)} isn't in ${the(args.tool)}."
+  take.not_on: "${The(args.target)} isn't on ${the(args.tool)}."
   drop.done: "Dropped."
   drop.not_held: "You're not carrying ${the(args.target)}."
   put_in.done: "You put ${the(args.target)} in ${the(args.tool)}."
@@ -311,6 +359,35 @@ messages:
   put.closed: "${The(args.tool)} is closed."
   put.into_self: "You can't put something inside itself."
   put.full: "There's no more room in ${the(args.tool)}."
+  put.too_big: "${The(args.target)} is too big for ${the(args.tool)}."
+  # carried containers in lists
+  list.containing: "${args.item} (containing ${args.list})"
+  list.supporting: "${args.item} (with ${args.list} on it)"
+  # emptying
+  empty.done: "You tip ${args.list} out of ${the(args.target)}."
+  empty.into: "You tip ${args.list} from ${the(args.target)} into ${the(args.tool)}."
+  empty.onto: "You tip ${args.list} from ${the(args.target)} onto ${the(args.tool)}."
+  empty.nothing: "${The(args.target)} is already empty."
+  empty.cannot: "That's not something you can empty."
+  empty.closed: "${The(args.target)} is closed."
+  # getting in and out of things
+  enter.done_in: "You get into ${the(args.target)}."
+  enter.done_on: "You get onto ${the(args.target)}."
+  enter.already_in: "You're already in ${the(args.target)}."
+  enter.already_on: "You're already on ${the(args.target)}."
+  enter.held: "You'll need to put ${the(args.target)} down first."
+  enter.full: "There's no room for you in ${the(args.target)}."
+  get_out.done_in: "You get out of ${the(args.target)}."
+  get_out.done_on: "You get off ${the(args.target)}."
+  get_out.nothing: "You're not in or on anything."
+  get_out.not_there: "You're not in or on ${the(args.target)}."
+  go.getting_out_first: "(first getting out of ${the(args.target)})"
+  go.getting_off_first: "(first getting off ${the(args.target)})"
+  look.title_in: "${args.room} (in ${the(args.target)})"
+  look.title_on: "${args.room} (on ${the(args.target)})"
+  look.enclosed: "You're shut inside ${the(args.target)}."
+  # transparent containers
+  reach.closed: "You can't reach ${the(args.target)}: ${the(args.holder)} is closed."
   # doors and containers
   open.done: "You open ${the(args.target)}."
   open.already: "${The(args.target)} is already open."

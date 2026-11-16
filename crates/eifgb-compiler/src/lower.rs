@@ -95,6 +95,7 @@ impl<'a> Lowerer<'a> {
             unlocks_with: None,
             talk: None,
             capacity: s.player.capacity,
+            size: s.player.size.unwrap_or(1),
             revealed_by: vec![],
             handlers: vec![],
         }];
@@ -454,6 +455,7 @@ impl<'a> Lowerer<'a> {
             unlocks_with: None,
             talk: None,
             capacity: None,
+            size: 1,
             revealed_by: vec![],
             handlers,
         }
@@ -586,6 +588,12 @@ impl<'a> Lowerer<'a> {
         if has(Trait::Door) && blocked && state.get("open") == Some(&Value::Bool(true)) {
             self.d.error(format!("{path}.state"), "a blocked door is held shut, so it can't start open");
         }
+        if has(Trait::Enterable) && !has(Trait::Container) && !has(Trait::Supporter) {
+            self.d.error(format!("{path}.traits"), "'enterable' needs 'container' (to get in) or 'supporter' (to get on)");
+        }
+        if has(Trait::Transparent) && !has(Trait::Container) {
+            self.d.warn(format!("{path}.traits"), "'transparent' only matters on a 'container'");
+        }
         if has(Trait::Portable) && has(Trait::Scenery) {
             self.d.error(format!("{path}.traits"), "'portable' and 'scenery' contradict each other");
         }
@@ -686,6 +694,7 @@ impl<'a> Lowerer<'a> {
             unlocks_with,
             talk,
             capacity: t.capacity,
+            size: t.size.unwrap_or(1),
             revealed_by,
             handlers,
         }
@@ -804,6 +813,18 @@ impl<'a> Lowerer<'a> {
                 self.d.error(
                     &path,
                     format!("'{}' isn't a container or supporter, so nothing can be in it", holder.key),
+                );
+            }
+        }
+
+        // Things that start out overfilling their holder.
+        for holder in entities {
+            let Some(cap) = holder.capacity else { continue };
+            let load: u32 = entities.iter().filter(|e| e.location.is_some_and(|l| entities[l.index()].key == holder.key)).map(|e| e.size).sum();
+            if load > cap {
+                self.d.warn(
+                    format!("{}.capacity", path_of(holder)),
+                    format!("starts holding things of total size {load}, more than its capacity of {cap}"),
                 );
             }
         }

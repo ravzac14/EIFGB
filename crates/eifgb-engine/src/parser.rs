@@ -437,7 +437,7 @@ impl Grammar {
             return Parsed::Fail(Failure::Partial { verb: toks[0].clone() });
         }
         // A bare noun means "examine it".
-        if let Ok(ids) = self.resolve(world, toks, None)
+        if let Ok(ids) = self.resolve(world, toks, None, None)
             && ids.len() == 1
             && let Some(vi) = story.verbs.iter().position(|v| v.action == VerbAction::Builtin(BuiltinAction::Examine))
         {
@@ -481,13 +481,11 @@ impl Grammar {
             }
         };
 
-        let targets = match c.caps.target {
-            Some(span) => self.resolve(world, &toks[span.0..span.1], action).map_err(|e| fail(e, span))?,
-            None => Vec::new(),
-        };
+        // The second object first: "take all from the bag" and "put all in
+        // the jar" need it to know what "all" means.
         let tool = match c.caps.tool {
             Some(span) => {
-                let ids = self.resolve(world, &toks[span.0..span.1], None).map_err(|e| fail(e, span))?;
+                let ids = self.resolve(world, &toks[span.0..span.1], None, None).map_err(|e| fail(e, span))?;
                 if ids.len() != 1 {
                     return Err(Parsed::Fail(Failure::NoAll));
                 }
@@ -495,12 +493,22 @@ impl Grammar {
             }
             None => None,
         };
+        let targets = match c.caps.target {
+            Some(span) => self.resolve(world, &toks[span.0..span.1], action, tool).map_err(|e| fail(e, span))?,
+            None => Vec::new(),
+        };
         let text = c.caps.text.map(|(s, e)| toks[s..e].join(" "));
         Ok(Command { verb: c.verb, targets, tool, text, direction: c.caps.direction, words: toks.to_vec() })
     }
 
     /// Resolves a noun phrase against what's in scope.
-    fn resolve(&self, world: &World, phrase: &[String], action: Option<BuiltinAction>) -> Result<Vec<EntityId>, NounFail> {
+    fn resolve(
+        &self,
+        world: &World,
+        phrase: &[String],
+        action: Option<BuiltinAction>,
+        tool: Option<EntityId>,
+    ) -> Result<Vec<EntityId>, NounFail> {
         let words: Vec<&String> = phrase.iter().filter(|w| !self.articles.contains(*w)).collect();
         if words.is_empty() {
             return Err(NounFail::Missing);
@@ -521,7 +529,7 @@ impl Grammar {
                 };
             }
             if self.all_words.contains(w) {
-                return self.resolve_all(world, &scope, action);
+                return self.resolve_all(world, &scope, action, tool);
             }
         }
 
@@ -625,16 +633,29 @@ impl Grammar {
         if filtered.is_empty() { matches.to_vec() } else { filtered }
     }
 
-    fn resolve_all(&self, world: &World, scope: &[EntityId], action: Option<BuiltinAction>) -> Result<Vec<EntityId>, NounFail> {
-        let items: Vec<EntityId> = match action {
-            Some(BuiltinAction::Take) => scope
-                .iter()
-                .copied()
-                .filter(|&id| {
-                    id != PLAYER && world.has(id, Trait::Portable) && !world.is_within(id, PLAYER)
-                })
+    /// What "all" means for a verb. With a second object, TAKE ALL FROM X
+    /// means what's in X, and PUT ALL IN X means what you carry except X.
+    fn resolve_all(
+        &self,
+        world: &World,
+        scope: &[EntityId],
+        action: Option<BuiltinAction>,
+        tool: Option<EntityId>,
+    ) -> Result<Vec<EntityId>, NounFail> {
+        let portable = |id: EntityId| id != PLAYER && world.has(id, Trait::Portable);
+        let items: Vec<EntityId> = match (action, tool) {
+            (Some(BuiltinAction::Take), Some(from)) => {
+                world.contents(from).into_iter().filter(|id| portable(*id) && scope.contains(id)).collect()
+            }
+            (Some(BuiltinAction::Take), None) => {
+                scope.iter().copied().filter(|&id| portable(id) && !world.is_within(id, PLAYER)).collect()
+            }
+            (Some(BuiltinAction::Drop), _) => world.inventory(),
+            (Some(BuiltinAction::PutIn | BuiltinAction::PutOn), Some(dest)) => world
+                .inventory()
+                .into_iter()
+                .filter(|&id| id != dest && !world.is_within(dest, id) && !world.flag(id, "worn"))
                 .collect(),
-            Some(BuiltinAction::Drop) => world.inventory(),
             _ => return Err(NounFail::NoAll),
         };
         if items.is_empty() { Err(NounFail::AllNone) } else { Ok(items) }

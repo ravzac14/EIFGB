@@ -453,7 +453,7 @@ fn separate_passages_ask_which_door() {
     say(&mut g, "s");
     assert_says(&mut g, "enter red door", "Library");
     say(&mut g, "s");
-    assert_says(&mut g, "go through statue", "That's not something you can go through.");
+    assert_says(&mut g, "go through statue", "That's not something you can get into or go through.");
 }
 
 #[test]
@@ -811,4 +811,141 @@ on:
     assert_eq!(g.world().state.vars["ticks"], eifgb_engine::ir::Value::Int(1), "one turn passed, so the event ran once");
     say(&mut g, "enter door");
     assert_eq!(g.world().state.vars["arrivals"], eifgb_engine::ir::Value::Int(1), "the den's enter event ran once");
+}
+
+// ------------------------------------------------------------ containers
+
+const CONTAINERS: &str = "\
+format: eifgb/0.1
+game: { id: c, title: C, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { north: yard } }
+  yard: { name: Yard, exits: { south: hall } }
+objects:
+  table: { name: table, in: hall, traits: [supporter, scenery] }
+  bag: { name: cloth bag, synonyms: [bag], in: table, traits: [portable, container, openable], capacity: 2 }
+  box: { name: small box, synonyms: [box], in: table, traits: [portable, container] }
+  ring: { name: ring, in: box, traits: [portable] }
+  jar: { name: glass jar, synonyms: [jar], in: hall, traits: [portable, container] }
+  marble: { name: marble, in: jar, traits: [portable] }
+  coin: { name: coin, in: bag, traits: [portable] }
+  pebble: { name: pebble, in: hall, traits: [portable] }
+  piano: { name: piano, in: hall, traits: [portable], size: 10 }
+  case: { name: glass case, synonyms: [case], in: hall, traits: [container, openable, transparent, scenery] }
+  jewel: { name: jewel, in: case, traits: [portable] }
+  wardrobe: { name: wardrobe, in: hall, traits: [container, openable, enterable, scenery], size: 5 }
+  bed: { name: bed, in: hall, traits: [supporter, enterable, scenery] }
+";
+
+fn containers() -> Game<LuaHost> {
+    let out = compile_str(CONTAINERS);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn take_from_checks_where_the_thing_is() {
+    let mut g = containers();
+    say(&mut g, "open bag");
+    assert_says(&mut g, "take coin from jar", "The coin isn't in the glass jar.");
+    assert_says(&mut g, "take bag from table", "Taken.");
+    // Things in a box on the table count as being on the table.
+    assert_says(&mut g, "take marble from table", "The marble isn't on the table.");
+    assert_says(&mut g, "take ring from table", "Taken.");
+    assert_says(&mut g, "take coin from bag", "Taken.");
+}
+
+#[test]
+fn inventory_shows_what_is_in_carried_containers() {
+    let mut g = containers();
+    say(&mut g, "open bag");
+    say(&mut g, "take bag");
+    say(&mut g, "take box");
+    assert_eq!(
+        say(&mut g, "i"),
+        "You're carrying a cloth bag (open) (containing a coin) and a small box (containing a ring)."
+    );
+    say(&mut g, "close bag");
+    assert_says(&mut g, "i", "a cloth bag (closed) and a small box (containing a ring)");
+}
+
+#[test]
+fn look_describes_nested_contents() {
+    let mut g = containers();
+    let out = say(&mut g, "look");
+    assert!(out.contains("On the table you can see a cloth bag (closed) and a small box."), "{out}");
+    assert!(out.contains("In the small box you can see a ring."), "{out}");
+}
+
+#[test]
+fn empty_and_all_with_a_second_object() {
+    let mut g = containers();
+    assert_says(&mut g, "take all from box", "Taken.");
+    assert_says(&mut g, "take pebble", "Taken.");
+    say(&mut g, "open bag");
+    say(&mut g, "take bag");
+    // The bag holds 2 and already has the coin, so only one more fits.
+    let out = say(&mut g, "put all in bag");
+    assert!(out.contains("ring: You put the ring in the cloth bag."), "{out}");
+    assert!(out.contains("pebble: There's no more room in the cloth bag."), "{out}");
+    assert_says(&mut g, "empty bag", "You tip a ring and a coin out of the cloth bag.");
+    assert_says(&mut g, "empty bag", "The cloth bag is already empty.");
+    assert_says(&mut g, "empty jar into box", "You tip a marble from the glass jar into the small box.");
+    assert_says(&mut g, "empty box onto table", "You tip a marble from the small box onto the table.");
+    assert_says(&mut g, "empty pebble", "That's not something you can empty.");
+}
+
+#[test]
+fn transparent_containers_show_but_dont_let_you_reach() {
+    let mut g = containers();
+    assert_says(&mut g, "look", "In the glass case you can see a jewel.");
+    assert_says(&mut g, "x jewel", "You see nothing special about the jewel.");
+    assert_says(&mut g, "take jewel", "You can't reach the jewel: the glass case is closed.");
+    say(&mut g, "open case");
+    assert_says(&mut g, "take jewel", "Taken.");
+}
+
+#[test]
+fn getting_in_and_on_things() {
+    let mut g = containers();
+    let out = say(&mut g, "get in wardrobe");
+    assert!(out.contains("(first opening the wardrobe)") && out.contains("You get into the wardrobe."), "{out}");
+    assert_says(&mut g, "get in wardrobe", "You're already in the wardrobe.");
+    assert_says(&mut g, "look", "Hall (in the wardrobe)");
+    say(&mut g, "close wardrobe");
+    let out = say(&mut g, "look");
+    assert!(out.contains("You're shut inside the wardrobe.") && !out.contains("piano"), "you can't see out: {out}");
+    let out = say(&mut g, "get out");
+    assert!(out.contains("(first opening the wardrobe)") && out.contains("You get out of the wardrobe."), "{out}");
+    assert_says(&mut g, "get out", "You're not in or on anything.");
+
+    assert_says(&mut g, "sit on bed", "You get onto the bed.");
+    assert_says(&mut g, "look", "Hall (on the bed)");
+    // Moving away gets off first.
+    let out = say(&mut g, "n");
+    assert!(out.contains("(first getting off the bed)") && out.contains("Yard"), "{out}");
+}
+
+#[test]
+fn out_gets_you_out_and_climbing_between_things_works() {
+    let mut g = containers();
+    say(&mut g, "sit on bed");
+    assert_says(&mut g, "out", "You get off the bed.");
+    say(&mut g, "sit on bed");
+    let out = say(&mut g, "get in wardrobe");
+    assert!(out.contains("(first getting off the bed)") && out.contains("You get into the wardrobe."), "{out}");
+}
+
+#[test]
+fn sizes_decide_what_fits() {
+    let mut g = containers();
+    // No capacity on the jar, so the rule is: nothing bigger than the jar itself.
+    assert_says(&mut g, "take piano", "Taken.");
+    assert_says(&mut g, "put piano in jar", "The piano is too big for the glass jar.");
+    let mut g = small(
+        "player: { capacity: 3 }\nobjects:\n  crate: { name: crate, in: hall, traits: [portable], size: 2 }\n  sack: { name: sack, in: hall, traits: [portable], size: 2 }\n  boulder: { name: boulder, in: hall, traits: [portable], size: 9 }\n",
+    );
+    assert_says(&mut g, "take boulder", "The boulder is too big to carry.");
+    assert_says(&mut g, "take crate", "Taken.");
+    assert_says(&mut g, "take sack", "You're carrying too much already.");
 }

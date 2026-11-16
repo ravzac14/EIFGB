@@ -175,14 +175,26 @@ pub struct Entity {
     pub unlocks_with: Option<EntityId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub talk: Option<ChoiceId>,
-    /// Maximum number of directly carried or contained items.
+    /// How much this can hold: the total `size` of what's directly in or
+    /// on it (or, for the player, carried). No limit when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capacity: Option<u32>,
+    /// How much room this takes up in a container or in the player's hands.
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub size: u32,
     /// Actions that reveal this entity while it's `hidden`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revealed_by: Vec<Reveal>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
+}
+
+fn one() -> u32 {
+    1
+}
+
+fn is_one(n: &u32) -> bool {
+    *n == 1
 }
 
 impl Entity {
@@ -231,10 +243,15 @@ pub enum Trait {
     Wearable,
     LightSource,
     Edible,
+    /// The player can get in or on it (a wardrobe, a bed, a boat). Needs
+    /// `container` or `supporter`.
+    Enterable,
+    /// A container whose contents can be seen, but not reached, while closed.
+    Transparent,
 }
 
 impl Trait {
-    pub const ALL: [Trait; 10] = [
+    pub const ALL: [Trait; 12] = [
         Trait::Portable,
         Trait::Scenery,
         Trait::Container,
@@ -245,6 +262,8 @@ impl Trait {
         Trait::Wearable,
         Trait::LightSource,
         Trait::Edible,
+        Trait::Enterable,
+        Trait::Transparent,
     ];
 
     pub fn key(self) -> &'static str {
@@ -259,6 +278,8 @@ impl Trait {
             Trait::Wearable => "wearable",
             Trait::LightSource => "light_source",
             Trait::Edible => "edible",
+            Trait::Enterable => "enterable",
+            Trait::Transparent => "transparent",
         }
     }
 
@@ -493,8 +514,12 @@ pub enum BuiltinAction {
     Restore,
     Restart,
     Help,
-    /// Go through a door named by the player.
+    /// Go through a door, or get into or onto an `enterable` thing.
     Enter,
+    /// Get out of or off whatever the player is in or on.
+    GetOut,
+    /// Tip a container's contents out, or into/onto something else.
+    Empty,
     /// Repeat the previous command.
     Again,
     Quit,

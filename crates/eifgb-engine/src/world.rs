@@ -8,6 +8,16 @@ use std::collections::VecDeque;
 /// How many turns UNDO can go back.
 pub const UNDO_LIMIT: usize = 100;
 
+/// Whether something fits in a holder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fit {
+    Yes,
+    /// It's bigger than the holder's whole capacity.
+    TooBig,
+    /// It would fit in an empty holder, but not with what's there now.
+    Full,
+}
+
 /// How a door is blocked, seen from one side.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Blocked {
@@ -175,20 +185,97 @@ impl World {
         }
     }
 
+    /// Whether you can see what's in or on `id`: everything that exposes
+    /// its contents, plus closed `transparent` containers.
+    pub fn shows_contents(&self, id: EntityId) -> bool {
+        self.exposes_contents(id) || (self.has(id, Trait::Container) && self.has(id, Trait::Transparent))
+    }
+
+    // ------------------------------------------------------------- size
+
+    pub fn size(&self, id: EntityId) -> u32 {
+        self.def(id).size
+    }
+
+    /// Total size of what's directly in or on `holder`.
+    pub fn load(&self, holder: EntityId) -> u32 {
+        self.contents(holder).iter().map(|c| self.size(*c)).sum()
+    }
+
+    /// Whether `item` would fit in or on `holder`. With a `capacity`, the
+    /// total size of what's there can't go over it. Without one, nothing
+    /// bigger than the holder itself fits (no piano in a jar), except that
+    /// the player can carry anything.
+    pub fn fits(&self, item: EntityId, holder: EntityId) -> Fit {
+        let size = self.size(item);
+        let Some(cap) = self.def(holder).capacity else {
+            let bigger = holder != PLAYER && self.def(holder).kind == EntityKind::Object && size > self.size(holder);
+            return if bigger { Fit::TooBig } else { Fit::Yes };
+        };
+        if size > cap {
+            Fit::TooBig
+        } else if self.load(holder) + size > cap {
+            Fit::Full
+        } else {
+            Fit::Yes
+        }
+    }
+
     // --------------------------------------------------------------- scope
 
-    /// Everything the player can currently refer to: the room, its visible
-    /// contents (descending into open containers and supporters), the
-    /// player and what they carry. Hidden things are left out, except
-    /// for things the player carries.
+    /// How far the player can see: the room, or the closed opaque
+    /// container they're shut inside (a wardrobe with its door shut).
+    pub fn ceiling(&self) -> EntityId {
+        let mut cur = self.location(PLAYER);
+        while let Some(c) = cur {
+            if self.def(c).kind == EntityKind::Room {
+                return c;
+            }
+            if self.has(c, Trait::Container) && !self.is_open(c) && !self.has(c, Trait::Transparent) {
+                return c;
+            }
+            cur = self.location(c);
+        }
+        self.here()
+    }
+
+    /// The closed container that keeps the player from reaching `id`, if any.
+    /// Things in a closed `transparent` container are in scope (you can see
+    /// them) but not reachable.
+    pub fn blocked_reach(&self, id: EntityId) -> Option<EntityId> {
+        let ceiling = self.ceiling();
+        let mut cur = self.location(id);
+        while let Some(c) = cur {
+            if c == ceiling || c == PLAYER || self.def(c).kind == EntityKind::Room {
+                return None;
+            }
+            // The player inside a closed container can reach out to its walls.
+            if self.is_within(PLAYER, c) {
+                return None;
+            }
+            if self.has(c, Trait::Container) && !self.is_open(c) {
+                return Some(c);
+            }
+            cur = self.location(c);
+        }
+        None
+    }
+
+    /// Everything the player can currently refer to: what's around them up
+    /// to their [`World::ceiling`] (descending into containers they can see
+    /// into, and supporters), the room's doors, the player and what they
+    /// carry. Hidden things are left out, except for things the player carries.
     pub fn scope(&self) -> Vec<EntityId> {
         let mut out = Vec::new();
         let here = self.here();
-        out.push(here);
-        self.collect_visible(here, &mut out);
-        for d in self.doors_of(here) {
-            if !out.contains(&d) && !self.is_hidden(d) {
-                out.push(d);
+        let ceiling = self.ceiling();
+        out.push(ceiling);
+        self.collect_visible(ceiling, &mut out);
+        if ceiling == here {
+            for d in self.doors_of(here) {
+                if !out.contains(&d) && !self.is_hidden(d) {
+                    out.push(d);
+                }
             }
         }
         if !out.contains(&PLAYER) {
@@ -207,7 +294,7 @@ impl World {
                 continue;
             }
             out.push(c);
-            if self.exposes_contents(c) {
+            if self.shows_contents(c) {
                 self.collect_visible(c, out);
             }
         }

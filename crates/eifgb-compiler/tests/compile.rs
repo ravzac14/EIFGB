@@ -296,6 +296,15 @@ fn door_hidden_sides_are_checked() {
 }
 
 #[test]
+fn container_traits_are_checked() {
+    assert_error(&with("objects:\n  rug: { name: rug, in: hall, traits: [enterable] }\n"), "'enterable' needs 'container'");
+    let out = with("objects:\n  pane: { name: pane, in: hall, traits: [transparent] }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("'transparent' only matters on a 'container'")), "{:#?}", warnings(&out));
+    let out = with("objects:\n  cup: { name: cup, in: hall, traits: [container], capacity: 1 }\n  a: { name: a, in: cup }\n  b: { name: b, in: cup, size: 2 }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("total size 3, more than its capacity of 1")), "{:#?}", warnings(&out));
+}
+
+#[test]
 fn through_requires_a_door() {
     let src = "  cellar:\n    name: Cellar\n    exits: { up: { to: hall, through: crate } }\nobjects:\n  crate: { name: crate, in: cellar }\n";
     assert_error(&with(src), "needs the 'door' trait");

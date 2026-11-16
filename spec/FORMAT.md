@@ -51,6 +51,12 @@ IDs are `snake_case` and unique across rooms, objects, characters and choices.
   - **None:** the first `blocked` message in the list is shown, or a default.
 
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
+- **Hidden things** (`state: { hidden: true }`) can't be seen or referred to. Things the player carries are the exception. `revealed_by` reveals one without a script:
+  - **The rule** is `"<verb> <object>"` (`search mat`, `open desk`, `kick rug`), or a list of rules where any one will do. Any phrasing of the verb counts.
+  - **What the player sees:** when the action happens (and isn't blocked by a `before_` handler), the thing becomes visible where it is, and the game says "You find a small key." `[reveal.found]`. For SEARCH, and for custom verbs with no handler, that replaces the usual reply. Otherwise it follows it.
+  - **Secret doors:** a hidden door's exits, from both sides, aren't listed or usable until it's revealed.
+  - **Compiler checks:** the verb and object must exist (with "did you mean"), the rule must have exactly two words, and it can't name the hidden thing itself. There's a warning if the thing doesn't start hidden.
+  - **Scripts** can still reveal by setting `hidden = false`, for anything more involved.
 - **Doors work from both sides.** A door is an object with the `door` trait. It's placed in one room with `in:`, and exits go `through:` it. For every exit from room A to room B through a door, B's way back to A uses the same door:
   - **An exit back to A through the door exists:** nothing changes.
   - **Exactly one plain exit back to A exists:** the door is attached to it.

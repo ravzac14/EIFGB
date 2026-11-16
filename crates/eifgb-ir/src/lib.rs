@@ -175,6 +175,9 @@ pub struct Entity {
     /// Maximum number of directly carried or contained items.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capacity: Option<u32>,
+    /// Actions that reveal this entity while it's `hidden`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub revealed_by: Vec<Reveal>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
 }
@@ -183,6 +186,13 @@ impl Entity {
     pub fn has(&self, t: Trait) -> bool {
         self.traits.contains(&t)
     }
+}
+
+/// "Doing `verb` to `target` reveals me", e.g. SEARCH MAT reveals a key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Reveal {
+    pub verb: String,
+    pub target: EntityId,
 }
 
 /// Words the parser accepts for an entity. Everything is lowercase.

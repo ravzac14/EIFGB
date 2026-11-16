@@ -480,8 +480,18 @@ impl<H: ScriptHost> Game<H> {
             }
         }
 
+        // `revealed_by` rules matching this action. Revealing happens after
+        // the action, but for verbs with nothing else to say here (SEARCH,
+        // or a custom verb with no handler) "You find ..." replaces their
+        // default reply.
+        let reveals = target.map(|t| self.world.reveals(&verb.key, t)).unwrap_or_default();
+        let quiet = !reveals.is_empty()
+            && matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search));
+
+        let before_action = self.out.lines.len();
         let ok = match self.handlers(target, here, Phase::On, &verb.key).into_iter().next() {
             Some((owner, code)) => self.run(&code, &with_owner(owner)) != ScriptValue::Block,
+            None if quiet => true,
             None => match verb.action {
                 VerbAction::Builtin(a) => self.builtin(a, target, cmd, &ctx),
                 VerbAction::Script => {
@@ -493,6 +503,17 @@ impl<H: ScriptHost> Game<H> {
                 }
             },
         };
+
+        let found: Vec<EntityId> = reveals.into_iter().filter(|id| self.world.is_hidden(*id)).collect();
+        if !found.is_empty() {
+            for id in &found {
+                self.world.unset(*id, "hidden");
+            }
+            let list = self.list_a(&found);
+            let sentence = self.msg_str("reveal.found", &Ctx::new().text("list", list));
+            // Joins the action's own reply ("You open the desk. You find a note.").
+            self.push_sentence(sentence, self.out.lines.len() > before_action);
+        }
 
         if ok && self.end_requested.is_none() {
             for (owner, code) in self.handlers(target, here, Phase::After, &verb.key) {

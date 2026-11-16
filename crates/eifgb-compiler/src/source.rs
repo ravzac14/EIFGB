@@ -161,8 +161,28 @@ pub struct Thing {
     pub talk: Option<String>,
     #[serde(default)]
     pub capacity: Option<u32>,
+    /// `"search mat"` or a list of them: the actions that reveal this
+    /// thing while it's hidden.
+    #[serde(default)]
+    pub revealed_by: Option<OneOrMany>,
     #[serde(default)]
     pub on: IndexMap<String, String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum OneOrMany {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl OneOrMany {
+    pub fn items(&self) -> Vec<&str> {
+        match self {
+            OneOrMany::One(s) => vec![s.as_str()],
+            OneOrMany::Many(v) => v.iter().map(String::as_str).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -2,6 +2,7 @@
 n
 x mat
 look under the mat
+take key
 unlock door
 n
 take the fruit

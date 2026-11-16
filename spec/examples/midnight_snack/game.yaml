@@ -41,15 +41,6 @@ objects:
     in: kitchen
     traits: [scenery]
     description: A threadbare mat.${if world.small_key.hidden} One corner looks lumpy.${end}
-    on:
-      search: |
-        if world.small_key.hidden then
-          world.small_key.hidden = false
-          world.small_key:move_to(player)
-          say("You lift the corner of the mat. Underneath is a small key, which you take.")
-        else
-          say("Just dust.")
-        end
 
   small_key:
     name: small key
@@ -57,6 +48,7 @@ objects:
     in: kitchen
     traits: [portable]
     state: { hidden: true }
+    revealed_by: search mat
     description: A small brass key.
 
   apple:

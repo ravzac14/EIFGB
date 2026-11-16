@@ -115,7 +115,7 @@ impl<H: ScriptHost> Game<H> {
         }
         let ways: Vec<String> = exits
             .iter()
-            .filter(|x| x.to.is_some())
+            .filter(|x| x.to.is_some() && self.world.exit_visible(x))
             .map(|x| self.grammar.direction_word(x.direction))
             .collect();
         if ways.is_empty() {
@@ -203,7 +203,14 @@ impl<H: ScriptHost> Game<H> {
             self.msg("go.no_exit", ctx);
             return false;
         };
-        let group: Vec<Exit> = self.world.def(here).exits.iter().filter(|e| e.direction == dir).cloned().collect();
+        let group: Vec<Exit> = self
+            .world
+            .def(here)
+            .exits
+            .iter()
+            .filter(|e| e.direction == dir && self.world.exit_visible(e))
+            .cloned()
+            .collect();
         if group.is_empty() {
             self.msg("go.no_exit", ctx);
             return false;

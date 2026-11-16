@@ -231,6 +231,20 @@ impl World {
         }
     }
 
+    /// Hidden entities that doing `verb` to `target` reveals.
+    pub fn reveals(&self, verb: &str, target: EntityId) -> Vec<EntityId> {
+        self.ids()
+            .filter(|&id| self.is_hidden(id))
+            .filter(|&id| self.def(id).revealed_by.iter().any(|r| r.verb == verb && r.target == target))
+            .collect()
+    }
+
+    /// Whether an exit can be seen and used: one through a hidden (secret)
+    /// door can't be, until the door is found.
+    pub fn exit_visible(&self, e: &Exit) -> bool {
+        e.through.is_none_or(|d| !self.is_hidden(d))
+    }
+
     /// Whether a door is blocked from any side at all.
     pub fn blocked_anywhere(&self, door: EntityId) -> bool {
         match self.get(door, "blocked") {

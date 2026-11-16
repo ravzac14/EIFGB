@@ -212,6 +212,7 @@ messages:
   examine.contents: "In ${the(args.target)} you can see ${args.list}."
   examine.on_top: "On ${the(args.target)} you can see ${args.list}."
   search.nothing: "You find nothing of interest."
+  reveal.found: "You find ${args.list}."
   search.contents: "In ${the(args.target)} you find ${args.list}."
   # inventory
   inventory.empty: "You're empty-handed."

@@ -92,6 +92,7 @@ impl<'a> Lowerer<'a> {
             unlocks_with: None,
             talk: None,
             capacity: s.player.capacity,
+            revealed_by: vec![],
             handlers: vec![],
         }];
         for (key, room) in &s.rooms {
@@ -432,6 +433,7 @@ impl<'a> Lowerer<'a> {
             unlocks_with: None,
             talk: None,
             capacity: None,
+            revealed_by: vec![],
             handlers,
         }
     }
@@ -585,6 +587,32 @@ impl<'a> Lowerer<'a> {
             (None, _) => None,
         };
 
+        let mut revealed_by = Vec::new();
+        if let Some(rules) = &t.revealed_by {
+            let rpath = format!("{path}.revealed_by");
+            for rule in rules.items() {
+                let words: Vec<&str> = rule.split_whitespace().collect();
+                let [verb, target] = words[..] else {
+                    self.d.error(&rpath, format!("'{rule}': write it as '<verb> <object>', e.g. 'search mat'"));
+                    continue;
+                };
+                if !self.verb_keys.iter().any(|v| v == verb) {
+                    let hint = did_you_mean(verb, self.verb_keys.iter().map(String::as_str));
+                    self.d.error(&rpath, format!("'{verb}' is not a verb{hint}"));
+                    continue;
+                }
+                let Some(target_id) = self.entity_ref(target, &rpath) else { continue };
+                if target == key {
+                    self.d.error(&rpath, "a hidden thing can't be revealed by acting on itself, since it can't be seen");
+                    continue;
+                }
+                revealed_by.push(Reveal { verb: verb.to_string(), target: target_id });
+            }
+            if state.get("hidden") != Some(&Value::Bool(true)) {
+                self.d.warn(&rpath, "this has 'revealed_by' but doesn't start hidden; add 'state: { hidden: true }'");
+            }
+        }
+
         let handlers = self.lower_handlers(&format!("{path}.on"), &t.on, &[]);
         Entity {
             key: key.into(),
@@ -599,6 +627,7 @@ impl<'a> Lowerer<'a> {
             unlocks_with,
             talk,
             capacity: t.capacity,
+            revealed_by,
             handlers,
         }
     }

@@ -530,6 +530,7 @@ fn midnight_snack() -> Game<LuaHost> {
 fn doors_work_from_the_far_side() {
     let mut g = midnight_snack();
     say(&mut g, "look under mat");
+    say(&mut g, "take key");
     say(&mut g, "unlock door");
     say(&mut g, "n");
     // The door is reachable from the pantry, even though its `in:` is the kitchen.
@@ -620,4 +621,88 @@ fn blocked_is_saved_and_undone_like_any_state() {
     say(&mut g, "pull lever");
     say(&mut g, "undo");
     assert_says(&mut g, "u", "won't open from this side");
+}
+
+// ------------------------------------------------------- revealed_by
+
+const SECRETS: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: study }
+rooms:
+  study:
+    name: Study
+    exits:
+      east: { to: vault, through: panel }
+  vault: { name: Vault }
+objects:
+  desk: { name: desk, in: study, traits: [scenery, container, openable] }
+  painting: { name: painting, in: study, traits: [scenery], description: A gloomy oil painting. }
+  rug: { name: rug, in: study, traits: [scenery] }
+  note: { name: note, in: desk, traits: [portable], state: { hidden: true }, revealed_by: open desk }
+  coin: { name: coin, in: study, traits: [portable], state: { hidden: true }, revealed_by: [search rug, examine rug] }
+  panel: { name: sliding panel, synonyms: [panel], in: study, traits: [door, openable], state: { hidden: true }, revealed_by: examine painting }
+  hatch: { name: hatch, in: study, traits: [portable], state: { hidden: true }, revealed_by: kick rug }
+verbs:
+  kick: { patterns: ['kick {target}'] }
+";
+
+fn secrets() -> Game<LuaHost> {
+    let out = compile_str(SECRETS);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn searching_reveals_instead_of_finding_nothing() {
+    let mut g = secrets();
+    assert_says(&mut g, "take coin", "You can't see any such thing.");
+    assert_eq!(say(&mut g, "look under the rug"), "You find a coin.");
+    assert_says(&mut g, "take coin", "Taken.");
+    // Once found, the rule is spent and SEARCH behaves normally again.
+    assert_eq!(say(&mut g, "search rug"), "You find nothing of interest.");
+}
+
+#[test]
+fn other_actions_reveal_after_their_usual_reply() {
+    let mut g = secrets();
+    let out = say(&mut g, "open desk");
+    assert_eq!(out, "You open the desk. You find a note.");
+    let out = say(&mut g, "x painting");
+    assert_eq!(out, "A gloomy oil painting. You find a sliding panel (closed).");
+}
+
+#[test]
+fn custom_verbs_without_handlers_reveal_instead_of_nothing_happening() {
+    let mut g = secrets();
+    assert_eq!(say(&mut g, "kick rug"), "You find a hatch.");
+    assert_eq!(say(&mut g, "kick rug"), "Nothing happens.");
+}
+
+#[test]
+fn any_rule_in_a_list_reveals() {
+    let mut g = secrets();
+    assert_says(&mut g, "x rug", "You find a coin.");
+}
+
+#[test]
+fn secret_doors_and_their_exits_appear_when_found() {
+    let mut g = secrets();
+    let out = say(&mut g, "look");
+    assert!(out.contains("There's no obvious way out.") && !out.contains("panel"), "{out}");
+    assert_says(&mut g, "e", "You can't go that way.");
+    assert_says(&mut g, "open panel", "You can't see any such thing.");
+    say(&mut g, "x painting");
+    assert_says(&mut g, "look", "Exits: east.");
+    let out = say(&mut g, "e");
+    assert!(out.contains("(first opening the sliding panel)") && out.contains("Vault"), "{out}");
+    // The return exit is linked through the same panel.
+    assert_says(&mut g, "look", "Exits: west.");
+}
+
+#[test]
+fn undo_hides_it_again() {
+    let mut g = secrets();
+    say(&mut g, "search rug");
+    say(&mut g, "undo");
+    assert_says(&mut g, "take coin", "You can't see any such thing.");
 }

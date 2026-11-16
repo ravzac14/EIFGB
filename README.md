@@ -236,8 +236,8 @@ settings:
 ### Step 5: hide the key
 
 The key lying in plain sight is too easy. Hide it under a mat. Give the key
-the state `hidden: true`, which keeps it out of the game until a script
-reveals it:
+the state `hidden: true`, which keeps it out of the game, and say what
+reveals it with `revealed_by`:
 
 ```yaml
   small_key:
@@ -246,6 +246,7 @@ reveals it:
     in: kitchen
     traits: [portable]
     state: { hidden: true }
+    revealed_by: search mat
     description: A small brass key.
 ```
 
@@ -258,27 +259,24 @@ Then add the mat:
     in: kitchen
     traits: [scenery]
     description: A threadbare mat.${if world.small_key.hidden} One corner looks lumpy.${end}
-    on:
-      search: |
-        if world.small_key.hidden then
-          world.small_key.hidden = false
-          world.small_key:move_to(player)
-          say("You lift the corner of the mat. Underneath is a small key, which you take.")
-        else
-          say("Just dust.")
-        end
 ```
 
-- **`${if ...}...${else}...${end}`** makes text react to the game. Here the
-  lumpy corner disappears once the key is found. Inside a template, `self`
-  is the object the text belongs to. If an object's own description already
-  talks about it being open or locked this way, the automatic sentence is
-  left out, so nothing is said twice.
-- **`world.<id>`** gives scripts access to any object. Its state fields can
-  be read and written directly.
-- **`search`** replaces the built-in SEARCH for this one object. Players can
-  trigger it with `search mat`, `look under the mat` or `look under rug`.
-- **`say(...)`** prints text, and **`:move_to(player)`** puts the key in the player's hands.
+- **`revealed_by: search mat`** means searching the mat reveals the key.
+  Any way of saying it counts: `search mat`, `look under the mat`, `look
+  under rug`. The game replies "You find a small key." and the key appears
+  where it is. A list such as `[search mat, examine mat]` lets any of
+  several actions reveal it.
+- **`${if ...}...${else}...${end}`** makes text react to the game. Here it
+  gives players a clue, and the lumpy corner disappears once the key is
+  found. Inside a template, `world.<id>` is any object and `self` is the
+  object the text belongs to. If an object's own description already talks
+  about one of its states this way, the automatic sentence about that state
+  is left out, so nothing is said twice.
+
+For anything `revealed_by` can't express, such as revealing only on the
+third search or handing the key straight to the player, write a Lua handler
+instead. See [`spec/examples/lighthouse/game.yaml`](spec/examples/lighthouse/game.yaml),
+where searching the tide pool finds a key and scores points.
 
 Finally, mention the mat in the kitchen description so players know it's there:
 
@@ -300,6 +298,7 @@ command per line. Lines starting with `#` are comments:
 n
 x mat
 look under the mat
+take key
 unlock door
 n
 take the fruit
@@ -362,7 +361,7 @@ declared. The built-in verbs keep a few states up to date for you:
 | `open` | OPEN and CLOSE, on `openable` things | Open or shut. A container that isn't `openable` is always open. |
 | `locked` | LOCK and UNLOCK, on `lockable` things | Locked. A locked thing can't be opened. |
 | `worn` | WEAR and TAKE OFF, on `wearable` things | Being worn. |
-| `hidden` | only scripts | Out of the game: it can't be seen or referred to until a script sets it to `false`. |
+| `hidden` | `revealed_by`, or scripts | Out of the game: it can't be seen or referred to until revealed. A hidden door is a secret door: its exits aren't listed or usable until it's found. |
 | `blocked` | scripts, on `door`s | Held shut: barred, bolted or wedged. `true` means from both sides; a room ID (`blocked: cellar`) or a list of room IDs means only from those sides. A blocked door is always closed. Opening it from an unblocked side lifts the block. |
 
 ### What players see
@@ -522,6 +521,12 @@ shorthand for `state: { open: true }`.
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including
 your own fields. See [States and descriptions](#states-and-descriptions).
+
+**Hidden things:** `state: { hidden: true }` plus `revealed_by: search mat`
+(or a list) reveals it when the player does that. SEARCH and custom verbs
+with no handler say "You find a small key." instead of their usual reply.
+Other actions add it after: "You open the desk. You find a note." Hide a
+door to make a secret door.
 
 **Doors:** give the door the `door` trait (usually with `openable` and
 `lockable`), put it in one of the rooms with `in:`, and send an exit

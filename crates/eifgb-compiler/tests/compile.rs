@@ -223,6 +223,27 @@ fn blocked_must_name_a_side_of_the_door() {
 }
 
 #[test]
+fn revealed_by_rules_are_checked() {
+    let thing = |rule: &str, hidden: bool| {
+        with(&format!(
+            "objects:\n  mat: {{ name: mat, in: hall }}\n  key: {{ name: key, in: hall, state: {{ hidden: {hidden} }}, revealed_by: {rule} }}\n"
+        ))
+    };
+    let out = thing("search mat", true);
+    let story = out.story.as_ref().unwrap_or_else(|| panic!("{:#?}", out.diagnostics));
+    let key = story.entity(story.entity_by_key("key").unwrap());
+    assert_eq!(key.revealed_by, vec![Reveal { verb: "search".into(), target: story.entity_by_key("mat").unwrap() }]);
+    assert!(out.diagnostics.is_empty());
+
+    assert_error(&thing("serch mat", true), "'serch' is not a verb (did you mean 'search'?)");
+    assert_error(&thing("search mta", true), "did you mean 'mat'?");
+    assert_error(&thing("look under mat", true), "write it as '<verb> <object>'");
+    assert_error(&thing("search key", true), "can't be revealed by acting on itself");
+    let out = thing("search mat", false);
+    assert!(warnings(&out).iter().any(|w| w.contains("doesn't start hidden")), "{:#?}", warnings(&out));
+}
+
+#[test]
 fn through_requires_a_door() {
     let src = "  cellar:\n    name: Cellar\n    exits: { up: { to: hall, through: crate } }\nobjects:\n  crate: { name: crate, in: cellar }\n";
     assert_error(&with(src), "needs the 'door' trait");

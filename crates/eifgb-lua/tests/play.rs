@@ -338,3 +338,132 @@ fn before_handlers_can_block_and_after_handlers_follow_success() {
     assert!(out.contains("You eat the cake.") && out.contains("Delicious."), "{out}");
     assert_says(&mut g2, "x cake", "You can't see any such thing.");
 }
+
+// ------------------------------------------------- automatic state descriptions
+
+const BOX_AND_SCARF: &str = "objects:\n  box: { name: wooden box, in: hall, traits: [container, openable, lockable], state: { locked: true }, unlocks_with: key }\n  key: { name: key, in: hall, traits: [portable] }\n  scarf: { name: scarf, in: hall, traits: [portable, wearable] }\n  hatch: { name: hatch, in: hall, traits: [openable, scenery] }\n";
+
+#[test]
+fn states_are_described_when_examining_listing_and_looking() {
+    let mut g = small(BOX_AND_SCARF);
+    let out = say(&mut g, "look");
+    assert!(out.contains("You can see a wooden box (locked), a key and a scarf here."), "{out}");
+    // The hatch is scenery, so it isn't listed, but its state is still mentioned.
+    assert!(out.contains("The hatch is closed."), "{out}");
+
+    assert_says(&mut g, "x box", "It's locked.");
+    say(&mut g, "take key");
+    say(&mut g, "unlock box");
+    assert_says(&mut g, "x box", "It's closed.");
+    say(&mut g, "open box");
+    assert_says(&mut g, "x box", "It's open.");
+    assert_says(&mut g, "look", "a wooden box (open)");
+
+    say(&mut g, "take scarf");
+    say(&mut g, "wear scarf");
+    assert_says(&mut g, "i", "a scarf (worn)");
+    assert_says(&mut g, "x scarf", "You're wearing it.");
+}
+
+#[test]
+fn objects_without_a_description_show_just_their_state() {
+    let mut g = small(BOX_AND_SCARF);
+    assert_eq!(say(&mut g, "x hatch"), "It's closed.");
+    assert_says(&mut g, "x key", "You see nothing special about the key.");
+}
+
+#[test]
+fn describe_state_can_be_switched_off() {
+    let mut g = small(&format!("settings: {{ describe_state: false }}\n{BOX_AND_SCARF}"));
+    let out = say(&mut g, "look");
+    assert!(out.contains("You can see a wooden box, a key and a scarf here."), "{out}");
+    assert!(!out.contains("hatch"), "{out}");
+    let out = say(&mut g, "x box");
+    assert!(!out.contains("locked"), "{out}");
+}
+
+#[test]
+fn hand_written_state_text_is_not_repeated() {
+    let mut g = small(
+        "objects:\n  door: { name: door, in: hall, traits: [openable, scenery], description: 'A door, ${if self.open}wide open${else}shut tight${end}.' }\n",
+    );
+    assert_eq!(say(&mut g, "x door"), "A door, shut tight.");
+    // The room description doesn't mention the door, so LOOK still does.
+    assert_says(&mut g, "look", "The door is closed.");
+}
+
+// ------------------------------------------------------- same-direction exits
+
+#[test]
+fn conditional_routes_take_the_first_open_one() {
+    let src = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+vars: { bridge_down: false }
+rooms:
+  hall:
+    name: Hall
+    exits:
+      north:
+        - { to: bridge, when: vars.bridge_down }
+        - { blocked: \"The bridge is raised.\" }
+  bridge: { name: Bridge, exits: { south: hall } }
+verbs:
+  lower: { patterns: ['lower bridge'] }
+on:
+  lower: 'vars.bridge_down = true; say(\"The bridge thuds down.\")'
+";
+    let out = compile_str(src);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    let mut g = game(out.story.unwrap());
+    assert_says(&mut g, "n", "The bridge is raised.");
+    say(&mut g, "lower bridge");
+    assert_says(&mut g, "n", "Bridge");
+}
+
+const TWO_DOORS: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall:
+    name: Hall
+    exits:
+      north:
+        - { to: library, through: red_door }
+        - { to: study, through: blue_door }
+  library: { name: Library, exits: { south: hall } }
+  study: { name: Study, exits: { south: hall } }
+objects:
+  red_door: { name: red door, in: hall, traits: [door, openable, scenery] }
+  blue_door: { name: blue door, in: hall, traits: [door, openable, scenery] }
+  statue: { name: statue, in: hall }
+";
+
+#[test]
+fn separate_passages_ask_which_door() {
+    let out = compile_str(TWO_DOORS);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    let mut g = game(out.story.unwrap());
+    assert_says(&mut g, "n", "Which do you mean, the red door or the blue door?");
+    assert_eq!(g.world().state.turn, 0, "asking which door doesn't take a turn");
+    let out = say(&mut g, "blue");
+    assert!(out.contains("(first opening the blue door)") && out.contains("Study"), "{out}");
+    say(&mut g, "s");
+    assert_says(&mut g, "go through the red door", "Library");
+    say(&mut g, "s");
+    assert_says(&mut g, "enter red door", "Library");
+    say(&mut g, "s");
+    assert_says(&mut g, "go through statue", "That's not something you can go through.");
+}
+
+#[test]
+fn only_doors_or_conditions_can_tell_same_direction_exits_apart() {
+    let src = TWO_DOORS.replace(", through: red_door", "").replace(", through: blue_door", "");
+    let out = compile_str(&src);
+    assert!(out.story.is_some());
+    assert!(
+        out.diagnostics.iter().any(|d| d.message.contains("several exits lead this way")),
+        "{:#?}",
+        out.diagnostics
+    );
+}

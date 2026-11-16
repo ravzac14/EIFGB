@@ -17,6 +17,8 @@ pub struct Source {
     pub format: String,
     pub game: Game,
     #[serde(default)]
+    pub settings: Settings,
+    #[serde(default)]
     pub scripts: Vec<String>,
     #[serde(default)]
     pub vars: IndexMap<String, Value>,
@@ -66,6 +68,24 @@ fn default_language() -> String {
     "en".to_string()
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Settings {
+    /// Describe open, closed, locked and worn automatically. On by default.
+    #[serde(default = "yes")]
+    pub describe_state: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings { describe_state: true }
+    }
+}
+
+fn yes() -> bool {
+    true
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Player {
@@ -88,15 +108,24 @@ pub struct Room {
 }
 
 /// An exit is written as a room ID (`north: hall`), a blocked message
-/// (`south: "The sea. Not tonight."`) or a full map.
+/// (`south: "The sea. Not tonight."`), a full map, or a list of these
+/// for several exits in the same direction.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum Exit {
     Short(String),
     Full(FullExit),
+    Many(Vec<OneExit>),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum OneExit {
+    Short(String),
+    Full(FullExit),
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FullExit {
     #[serde(default)]

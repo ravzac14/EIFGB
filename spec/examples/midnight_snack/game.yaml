@@ -33,7 +33,7 @@ objects:
     traits: [door, openable, lockable, scenery]
     state: { locked: true }
     unlocks_with: small_key
-    description: A sturdy wooden door. It's ${if self.locked}locked${else}unlocked${end}.
+    description: A sturdy wooden door.
 
   mat:
     name: worn mat

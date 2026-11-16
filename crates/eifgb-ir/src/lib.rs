@@ -117,6 +117,22 @@ pub struct Meta {
     pub max_score: Option<i64>,
     #[serde(default)]
     pub ai_fallback: bool,
+    #[serde(default)]
+    pub settings: Settings,
+}
+
+/// Game-wide switches from the source's `settings:` section.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Settings {
+    /// Describe built-in states (open, closed, locked, worn) automatically
+    /// when examining, in room descriptions and in lists of things.
+    pub describe_state: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings { describe_state: true }
+    }
 }
 
 // ------------------------------------------------------------------ entities
@@ -296,6 +312,12 @@ impl Direction {
 /// * `to` set, with `when`: the exit works only while `when` is true;
 ///   otherwise the game prints `blocked` (or a default message).
 /// * `to` unset: the exit is always blocked, and the game prints `blocked`.
+///
+/// A room may have several exits in the same direction, in source order.
+/// When the player goes that way, entries with `to` whose `when` holds are
+/// candidates. One candidate is taken; several (each through a different
+/// door) make the game ask which door is meant. With no candidates, the
+/// first `blocked` message among the entries is shown.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Exit {
     pub direction: Direction,
@@ -435,6 +457,8 @@ pub enum BuiltinAction {
     Restore,
     Restart,
     Help,
+    /// Go through a door named by the player.
+    Enter,
     /// Repeat the previous command.
     Again,
     Quit,

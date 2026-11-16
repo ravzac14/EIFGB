@@ -28,6 +28,7 @@ stay interchangeable.
 |--------------|---------|
 | `format`     | Format version, e.g. `eifgb/0.1`. Required. |
 | `game`       | Metadata, start room, intro text, max score. |
+| `settings`   | Game-wide switches. For now just `describe_state` (default `true`). |
 | `vars`       | Global story state (scalars, lists, maps). |
 | `player`     | Player description and carrying capacity. |
 | `rooms`      | Locations and their exits. |
@@ -43,6 +44,19 @@ IDs are `snake_case` and unique across rooms, objects, characters and choices.
 ## Entities
 
 - **Exits** take one of three forms. A room ID is a plain exit. A string is a blocked exit, with that string as the message. A map `{to, through, when, blocked}` handles doors and conditional exits.
+  A direction can also take a **list** of those forms, for several exits the same way. When the player goes that way, entries with `to` whose `when` holds (or that have no `when`) are candidates:
+  - **One candidate:** the player goes there.
+  - **Several, each through a different door:** the game asks "Which do you mean, the red door or the blue door?". The reply runs as GO THROUGH that door, and asking doesn't take a turn.
+  - **Several without distinct doors:** the first one wins, and the compiler warns that the rest can't be reached.
+  - **None:** the first `blocked` message in the list is shown, or a default.
+
+  So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
+- **Automatic state descriptions** (`settings.describe_state`, on by default). The engine describes the built-in states itself:
+  - **When examining**, it adds "It's open.", "It's closed.", "It's locked." or "You're wearing it." after the description.
+  - **In lists** (room contents, inventory, what's in a container), it adds tags: "an iron gate (locked)", "a scarf (worn)".
+  - **In room descriptions**, things that aren't listed (scenery) get a sentence: "The pantry door is locked."
+
+  If an object's description already reads its `open` or `locked` field in a template (`self.open`, `world.door.locked`), the sentence is left out, so authors who write their own state text aren't repeated. The wording comes from the `state.*` messages.
 - **Traits** give built-in behaviour: `portable`, `scenery`, `container`, `supporter`, `open`, `openable`, `lockable`, `door`, `wearable`, `light_source`, `edible`.
 - **State** is a map of mutable fields on an entity. Built-in traits read these fields, e.g. `open`, `locked` and `hidden`.
 - **Parser vocabulary** comes from `name`, `synonyms` and `adjectives`. The adjectives are used for disambiguation.
@@ -156,6 +170,8 @@ reword any of them under `messages:`.
 | `take all`, `drop everything` | `cup: Taken.` / `plate: Taken.` … | ALL works with TAKE and DROP |
 | `unlock gate` | "You unlock the iron gate with the brass key." | The right key is used if you're carrying it |
 | `up` (gate unlocked but shut) | "(first opening the iron gate)", then the move | Unlocked doors open on the way through |
+| `n` (two doors lead north) | "Which do you mean, the red door or the blue door?" Answering `blue` goes through it | Several exits the same way, told apart by their doors |
+| `go through red door`, `enter red door` | Leaves by the exit that uses that door | |
 | `search pool. n then take can` | Runs all three | `.`, `;` and `then` chain commands; the chain stops at the first failure |
 | `again` / `g` | Repeats the last command | |
 
@@ -207,6 +223,7 @@ SAVE, RESTORE, RESTART and QUIT still work.
 - PUT and WEAR don't pick the thing up for you: "You need to be holding the wooden box first." `[put.not_held]`.
 - There's no setting for proper names yet, so article helpers would say "the Bob".
 - Doors are one-sided: an exit `through` a door only checks it from the room the door is in.
+- Automatic state descriptions cover only built-in states (open, closed, locked, worn). States an author invents, like `fueled`, still need a template.
 
 ## Standard library versioning
 

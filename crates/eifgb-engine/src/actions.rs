@@ -5,10 +5,25 @@
 //! Each action returns whether it succeeded. `after_` handlers run only
 //! on success.
 
-use crate::game::{Game, LineKind};
+use crate::game::{Game, LineKind, Pending};
 use crate::parser::Command;
 use crate::script::{Ctx, ScriptHost};
-use eifgb_ir::{BuiltinAction, EntityId, EntityKind, Trait, Value, PLAYER};
+use eifgb_ir::{BuiltinAction, EntityId, EntityKind, Exit, PatternToken, Segment, Text, Trait, Value, VerbAction, PLAYER};
+
+/// Calls `f` with the source of every Lua snippet in a template.
+fn visit_text_code(text: &Text, f: &mut dyn FnMut(&str)) {
+    for seg in &text.0 {
+        match seg {
+            Segment::Lit(_) => {}
+            Segment::Expr(c) => f(&c.src),
+            Segment::If { cond, then, otherwise } => {
+                f(&cond.src);
+                visit_text_code(then, f);
+                visit_text_code(otherwise, f);
+            }
+        }
+    }
+}
 
 impl<H: ScriptHost> Game<H> {
     pub(crate) fn builtin(&mut self, a: BuiltinAction, target: Option<EntityId>, cmd: &Command, ctx: &Ctx) -> bool {
@@ -24,6 +39,7 @@ impl<H: ScriptHost> Game<H> {
                 true
             }
             (A::Go, _) => self.go(cmd, ctx),
+            (A::Enter, Some(t)) => self.enter(t, ctx),
             (A::Examine, Some(t)) => self.examine(t),
             (A::Take, Some(t)) => self.take(t, ctx),
             (A::Drop, Some(t)) => self.drop_thing(t, ctx),
@@ -54,13 +70,28 @@ impl<H: ScriptHost> Game<H> {
             (d.name.clone(), d.description.clone(), d.exits.clone())
         };
         self.push(LineKind::Title, name);
-        if let Some(d) = description {
-            self.render_line(LineKind::Text, &d, &Ctx::new().this(here));
+        if let Some(d) = &description {
+            self.render_line(LineKind::Text, d, &Ctx::new().this(here));
         }
         let things = self.listable(here);
         if !things.is_empty() {
             let list = self.list_a(&things);
             self.msg("look.you_see", &Ctx::new().text("list", list));
+        }
+        // Things not in the list above (scenery) still get their state
+        // mentioned, unless the room description already covers it.
+        for c in self.world.contents(here) {
+            if self.world.is_hidden(c) || c == PLAYER || things.contains(&c) {
+                continue;
+            }
+            if description.as_ref().is_some_and(|d| self.mentions_state(d, c, false)) {
+                continue;
+            }
+            for tag in self.state_tags(c) {
+                if tag != "worn" {
+                    self.msg(&format!("state.here.{tag}"), &Ctx::new().entity("target", c));
+                }
+            }
         }
         for c in self.world.contents(here) {
             if !self.world.is_hidden(c) && c != PLAYER {
@@ -108,11 +139,14 @@ impl<H: ScriptHost> Game<H> {
             self.look();
             return true;
         }
-        match def.description.clone() {
-            Some(d) => self.render_line(LineKind::Text, &d, &Ctx::new().this(t)),
+        let description = def.description.clone();
+        match &description {
+            Some(d) => self.render_line(LineKind::Text, d, &Ctx::new().this(t)),
             None if t == PLAYER => self.msg("examine.self", &Ctx::new()),
+            None if !self.state_tags(t).is_empty() => {}
             None => self.msg("examine.default", &Ctx::new().entity("target", t)),
         }
+        self.describe_state(t, description.as_ref());
         self.describe_contents(t);
         true
     }
@@ -147,23 +181,104 @@ impl<H: ScriptHost> Game<H> {
             self.msg("go.no_exit", ctx);
             return false;
         };
-        let Some(exit) = self.world.exit(here, dir).cloned() else {
+        let group: Vec<Exit> = self.world.def(here).exits.iter().filter(|e| e.direction == dir).cloned().collect();
+        if group.is_empty() {
             self.msg("go.no_exit", ctx);
             return false;
-        };
-        let blocked = |g: &mut Self, key: &str| {
-            match &exit.blocked {
-                Some(t) => g.render_line(LineKind::Text, t, &Ctx::new().this(here)),
-                None => g.msg(key, &Ctx::new()),
-            }
-            false
-        };
-        let Some(to) = exit.to else { return blocked(self, "go.no_exit") };
-        if let Some(when) = &exit.when
-            && !self.run(when, &Ctx::new().this(here)).truthy()
-        {
-            return blocked(self, "go.blocked");
         }
+        let mut open_routes = Vec::new();
+        for e in group.iter().filter(|e| e.to.is_some()) {
+            if self.exit_allowed(e, here) {
+                open_routes.push(e.clone());
+            }
+        }
+        match open_routes.len() {
+            0 => {
+                match group.iter().find_map(|e| e.blocked.clone()) {
+                    Some(t) => self.render_line(LineKind::Text, &t, &Ctx::new().this(here)),
+                    None if group.iter().any(|e| e.to.is_some()) => self.msg("go.blocked", ctx),
+                    None => self.msg("go.no_exit", ctx),
+                }
+                false
+            }
+            1 => self.travel(here, &open_routes[0]),
+            _ => {
+                let mut doors: Vec<EntityId> = open_routes.iter().filter_map(|e| e.through).collect();
+                doors.dedup();
+                if doors.len() == open_routes.len() && self.ask_which_door(&doors) {
+                    false
+                } else {
+                    self.travel(here, &open_routes[0])
+                }
+            }
+        }
+    }
+
+    /// GO THROUGH, ENTER and the like: leave by the exit that uses this door.
+    fn enter(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        let routes: Vec<Exit> = self
+            .world
+            .def(here)
+            .exits
+            .iter()
+            .filter(|e| e.through == Some(t) && e.to.is_some())
+            .cloned()
+            .collect();
+        if routes.is_empty() {
+            self.msg("enter.cannot", ctx);
+            return false;
+        }
+        for e in &routes {
+            if self.exit_allowed(e, here) {
+                return self.travel(here, e);
+            }
+        }
+        match &routes[0].blocked {
+            Some(b) => self.render_line(LineKind::Text, b, &Ctx::new().this(here)),
+            None => self.msg("go.blocked", ctx),
+        }
+        false
+    }
+
+    fn exit_allowed(&mut self, e: &Exit, here: EntityId) -> bool {
+        match &e.when {
+            Some(w) => self.run(w, &Ctx::new().this(here)).truthy(),
+            None => true,
+        }
+    }
+
+    /// Asks "which do you mean?" between doors leading the same way. The
+    /// reply runs as GO THROUGH <door>. Returns false if the story has no
+    /// such verb.
+    fn ask_which_door(&mut self, doors: &[EntityId]) -> bool {
+        let story = self.world.story();
+        let Some(lead) = story
+            .verbs
+            .iter()
+            .find(|v| v.action == VerbAction::Builtin(BuiltinAction::Enter))
+            .and_then(|v| v.patterns.first())
+            .map(|p| {
+                p.0.iter()
+                    .map_while(|t| match t {
+                        PatternToken::Word(w) => Some(w.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<String>>()
+            })
+        else {
+            return false;
+        };
+        let names: Vec<String> = doors.iter().map(|d| self.the(*d)).collect();
+        let list = (self.grammar.lang().list_or)(&names);
+        self.msg("parser.ambiguous", &Ctx::new().text("options", list));
+        self.pending = Some(Pending::Which { before: lead, after: Vec::new(), options: doors.to_vec() });
+        self.no_turn = true;
+        true
+    }
+
+    fn travel(&mut self, here: EntityId, exit: &Exit) -> bool {
+        let Some(to) = exit.to else { return false };
         if let Some(door) = exit.through
             && !self.world.is_open(door)
         {
@@ -183,6 +298,65 @@ impl<H: ScriptHost> Game<H> {
         self.room_event(to, "enter");
         true
     }
+
+    // ------------------------------------------------------ state descriptions
+
+    /// Built-in states worth mentioning, as message suffixes: "open",
+    /// "closed", "locked", "worn". Empty when `settings.describe_state` is off.
+    pub(crate) fn state_tags(&self, id: EntityId) -> Vec<&'static str> {
+        if !self.world.story().meta.settings.describe_state {
+            return Vec::new();
+        }
+        let w = &self.world;
+        let mut tags = Vec::new();
+        if w.has(id, Trait::Openable) {
+            tags.push(if w.flag(id, "open") {
+                "open"
+            } else if w.has(id, Trait::Lockable) && w.flag(id, "locked") {
+                "locked"
+            } else {
+                "closed"
+            });
+        } else if w.has(id, Trait::Lockable) && w.flag(id, "locked") {
+            tags.push("locked");
+        }
+        if w.flag(id, "worn") {
+            tags.push("worn");
+        }
+        tags
+    }
+
+    /// Whether a template already talks about `id`'s open/locked state,
+    /// in which case the automatic sentence would repeat it.
+    fn mentions_state(&self, text: &Text, id: EntityId, is_own: bool) -> bool {
+        let key = &self.world.def(id).key;
+        let needles: Vec<String> = ["open", "locked"]
+            .iter()
+            .flat_map(|f| {
+                let mut v = vec![format!("world.{key}.{f}")];
+                if is_own {
+                    v.push(format!("self.{f}"));
+                }
+                v
+            })
+            .collect();
+        let mut found = false;
+        visit_text_code(text, &mut |src| found |= needles.iter().any(|n| src.contains(n.as_str())));
+        found
+    }
+
+    /// The sentences EXAMINE adds after a description.
+    fn describe_state(&mut self, id: EntityId, description: Option<&Text>) {
+        let skip_door_state = description.is_some_and(|d| self.mentions_state(d, id, true));
+        for tag in self.state_tags(id) {
+            if tag != "worn" && skip_door_state {
+                continue;
+            }
+            self.msg(&format!("state.{tag}"), &Ctx::new().entity("target", id));
+        }
+    }
+
+    // ---------------------------------------------------- taking and dropping
 
     // ---------------------------------------------------- taking and dropping
 

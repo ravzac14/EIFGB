@@ -73,7 +73,7 @@ impl Output {
     }
 }
 
-enum Pending {
+pub(crate) enum Pending {
     /// We asked "which do you mean?"; the reply fills in the noun.
     Which { before: Vec<String>, after: Vec<String>, options: Vec<EntityId> },
     /// We asked "what do you want to take?"; the reply completes the command.
@@ -85,8 +85,10 @@ pub struct Game<H: ScriptHost> {
     pub(crate) host: H,
     pub(crate) grammar: Grammar,
     seed: u64,
-    pending: Option<Pending>,
+    pub(crate) pending: Option<Pending>,
     last: Option<Vec<String>>,
+    /// Set by an action that only asked a question, so the turn doesn't count.
+    pub(crate) no_turn: bool,
     pub(crate) out: Output,
     pub(crate) end_requested: Option<String>,
     pub(crate) choice_requested: Option<String>,
@@ -103,6 +105,7 @@ impl<H: ScriptHost> Game<H> {
             seed,
             pending: None,
             last: None,
+            no_turn: false,
             out: Output::default(),
             end_requested: None,
             choice_requested: None,
@@ -348,6 +351,9 @@ impl<H: ScriptHost> Game<H> {
 
         let before = self.world.state.clone();
         self.perform(&verb, &cmd);
+        if std::mem::take(&mut self.no_turn) {
+            return false;
+        }
         let mentioned: Vec<EntityId> = cmd.targets.iter().copied().chain(cmd.tool).collect();
         if !mentioned.is_empty() {
             self.world.state.mentioned = mentioned;
@@ -711,8 +717,21 @@ impl<H: ScriptHost> Game<H> {
         (self.grammar.lang().a)(&self.world.def(id).name, id == PLAYER)
     }
 
+    /// "an iron gate (locked) and an oil can", with state tags when
+    /// `settings.describe_state` is on.
     pub(crate) fn list_a(&self, ids: &[EntityId]) -> String {
-        let names: Vec<String> = ids.iter().map(|id| self.a(*id)).collect();
+        let lang = self.grammar.lang();
+        let names: Vec<String> = ids
+            .iter()
+            .map(|id| {
+                let tags: Vec<String> = self
+                    .state_tags(*id)
+                    .iter()
+                    .filter_map(|t| self.world.story().messages.get(&format!("state.tag.{t}")).and_then(Text::as_literal))
+                    .collect();
+                (lang.tagged)(&self.a(*id), &tags)
+            })
+            .collect();
         (self.grammar.lang().list_and)(&names)
     }
 }

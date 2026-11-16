@@ -26,6 +26,9 @@ verbs:
   go:
     action: go
     patterns: ["go {direction}", "walk {direction}", "{direction}"]
+  enter:
+    action: enter
+    patterns: ["go through {target}", "walk through {target}", "go in {target}", "go into {target}", "pass through {target}"]
   take:
     action: take
     patterns:
@@ -218,6 +221,19 @@ messages:
   go.door_closed: "${The(args.door)} is closed."
   go.blocked: "You can't go that way right now."
   go.opening_first: "(first opening ${the(args.door)})"
+  enter.cannot: "That's not something you can go through."
+  # automatic state descriptions (settings.describe_state)
+  state.open: "It's open."
+  state.closed: "It's closed."
+  state.locked: "It's locked."
+  state.worn: "You're wearing it."
+  state.here.open: "${The(args.target)} is open."
+  state.here.closed: "${The(args.target)} is closed."
+  state.here.locked: "${The(args.target)} is locked."
+  state.tag.open: "open"
+  state.tag.closed: "closed"
+  state.tag.locked: "locked"
+  state.tag.worn: "worn"
   # taking and dropping
   take.done: "Taken."
   take.already: "You already have ${the(args.target)}."

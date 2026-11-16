@@ -14,6 +14,8 @@ pub struct Lang {
     pub list_and: fn(&[String]) -> String,
     /// "x, y or z"
     pub list_or: fn(&[String]) -> String,
+    /// An item with state tags: "an iron gate (locked)".
+    pub tagged: fn(item: &str, tags: &[String]) -> String,
 }
 
 pub fn for_language(code: &str) -> Option<&'static Lang> {
@@ -26,7 +28,11 @@ pub fn for_language(code: &str) -> Option<&'static Lang> {
 mod en {
     use super::Lang;
 
-    pub static LANG: Lang = Lang { stems, a, the, list_and, list_or };
+    pub static LANG: Lang = Lang { stems, a, the, list_and, list_or, tagged };
+
+    fn tagged(item: &str, tags: &[String]) -> String {
+        if tags.is_empty() { item.to_string() } else { format!("{item} ({})", tags.join(", ")) }
+    }
 
     fn stems(w: &str) -> Vec<String> {
         let mut out = Vec::new();

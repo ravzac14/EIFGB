@@ -123,6 +123,7 @@ impl<'a> Lowerer<'a> {
                 start: start.unwrap_or(PLAYER),
                 max_score: s.game.max_score,
                 ai_fallback: s.game.ai_fallback,
+                settings: Settings { describe_state: s.settings.describe_state },
             },
             intro,
             vars: s.vars.into_iter().collect(),
@@ -400,33 +401,21 @@ impl<'a> Lowerer<'a> {
                 self.d.error(&epath, format!("unknown direction '{dir}'{hint}"));
                 continue;
             };
-            match exit {
-                src::Exit::Short(s) if is_identifier(s.trim()) => {
-                    if let Some(to) = self.room_ref(s.trim(), &epath) {
-                        exits.push(Exit { direction, to: Some(to), through: None, when: None, blocked: None });
+            let entries: Vec<(String, src::OneExit)> = match exit {
+                src::Exit::Many(list) => {
+                    if list.is_empty() {
+                        self.d.error(&epath, "an exit list needs at least one entry");
                     }
+                    list.iter().enumerate().map(|(i, e)| (format!("{epath}[{i}]"), e.clone())).collect()
                 }
-                src::Exit::Short(msg) => {
-                    let blocked = Some(self.text(msg, &epath));
-                    exits.push(Exit { direction, to: None, through: None, when: None, blocked });
-                }
-                src::Exit::Full(f) => {
-                    let to = f.to.as_deref().and_then(|t| self.room_ref(t, &format!("{epath}.to")));
-                    let through = f
-                        .through
-                        .as_deref()
-                        .and_then(|t| self.entity_ref(t, &format!("{epath}.through")));
-                    let when = f.when.as_deref().map(|w| self.code(w, &format!("{epath}.when")));
-                    let blocked = self.text_opt(f.blocked.as_deref(), &format!("{epath}.blocked"));
-                    if f.to.is_none() && blocked.is_none() {
-                        self.d.error(&epath, "an exit needs 'to' or 'blocked'");
-                    }
-                    if f.to.is_none() && (f.through.is_some() || f.when.is_some()) {
-                        self.d.warn(&epath, "'through' and 'when' do nothing without 'to'");
-                    }
-                    exits.push(Exit { direction, to, through, when, blocked });
-                }
+                src::Exit::Short(s) => vec![(epath.clone(), src::OneExit::Short(s.clone()))],
+                src::Exit::Full(f) => vec![(epath.clone(), src::OneExit::Full(f.clone()))],
+            };
+            let first = exits.len();
+            for (epath, entry) in &entries {
+                self.lower_exit(direction, entry, epath, &mut exits);
             }
+            self.check_same_direction(&exits[first..], &epath);
         }
         let handlers = self.lower_handlers(&format!("{path}.on"), &r.on, ROOM_EVENTS);
         Entity {
@@ -443,6 +432,60 @@ impl<'a> Lowerer<'a> {
             talk: None,
             capacity: None,
             handlers,
+        }
+    }
+
+    /// Several exits the same way can only be told apart by their
+    /// conditions or their doors.
+    fn check_same_direction(&mut self, group: &[Exit], path: &str) {
+        let routes: Vec<&Exit> = group.iter().filter(|e| e.to.is_some()).collect();
+        let unconditional: Vec<&&Exit> = routes.iter().filter(|e| e.when.is_none()).collect();
+        if unconditional.len() > 1 {
+            let mut doors: Vec<EntityId> = unconditional.iter().filter_map(|e| e.through).collect();
+            doors.sort();
+            doors.dedup();
+            if doors.len() != unconditional.len() {
+                self.d.warn(
+                    path,
+                    "several exits lead this way with no 'when' to choose between them; give each its own door with 'through', or add 'when' conditions",
+                );
+            }
+        }
+        if group.iter().filter(|e| e.to.is_none()).count() > 1 {
+            self.d.warn(path, "only the first 'blocked' entry for a direction is ever shown");
+        }
+    }
+
+    fn lower_exit(&mut self, direction: Direction, exit: &src::OneExit, epath: &str, exits: &mut Vec<Exit>) {
+        let epath = epath.to_string();
+        {
+            match exit {
+                src::OneExit::Short(s) if is_identifier(s.trim()) => {
+                    if let Some(to) = self.room_ref(s.trim(), &epath) {
+                        exits.push(Exit { direction, to: Some(to), through: None, when: None, blocked: None });
+                    }
+                }
+                src::OneExit::Short(msg) => {
+                    let blocked = Some(self.text(msg, &epath));
+                    exits.push(Exit { direction, to: None, through: None, when: None, blocked });
+                }
+                src::OneExit::Full(f) => {
+                    let to = f.to.as_deref().and_then(|t| self.room_ref(t, &format!("{epath}.to")));
+                    let through = f
+                        .through
+                        .as_deref()
+                        .and_then(|t| self.entity_ref(t, &format!("{epath}.through")));
+                    let when = f.when.as_deref().map(|w| self.code(w, &format!("{epath}.when")));
+                    let blocked = self.text_opt(f.blocked.as_deref(), &format!("{epath}.blocked"));
+                    if f.to.is_none() && blocked.is_none() {
+                        self.d.error(&epath, "an exit needs 'to' or 'blocked'");
+                    }
+                    if f.to.is_none() && (f.through.is_some() || f.when.is_some()) {
+                        self.d.warn(&epath, "'through' and 'when' do nothing without 'to'");
+                    }
+                    exits.push(Exit { direction, to, through, when, blocked });
+                }
+            }
         }
     }
 

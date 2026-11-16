@@ -99,11 +99,6 @@ fn templates_react_to_state() {
     let key = t.id("brass_key");
     t.w.set(key, "hidden", Value::Bool(false));
     assert_eq!(t.describe("tide_pool"), "Cold water collects between the rocks.");
-
-    assert!(t.describe("iron_gate").ends_with("It is locked."));
-    let gate = t.id("iron_gate");
-    t.w.set(gate, "locked", Value::Bool(false));
-    assert!(t.describe("iron_gate").ends_with("It is closed."));
 }
 
 #[test]

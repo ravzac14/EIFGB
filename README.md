@@ -183,7 +183,7 @@ objects:
     traits: [door, openable, lockable, scenery]
     state: { locked: true }
     unlocks_with: small_key
-    description: A sturdy wooden door. It's ${if self.locked}locked${else}unlocked${end}.
+    description: A sturdy wooden door.
 
   small_key:
     name: small key
@@ -201,8 +201,10 @@ objects:
   player is carrying the key, it's used automatically.
 - **`scenery`** stops the door from being listed among the room's contents.
   You've already mentioned it in the description.
-- **`${if ...}...${else}...${end}`** makes text react to the game. Inside it,
-  `self` is the object the text belongs to.
+- You don't need to describe whether the door is open, closed or locked.
+  The game adds that itself: `x door` gives "A sturdy wooden door. It's
+  locked.", and the kitchen mentions "The pantry door is locked." Things
+  that are listed get a tag instead, like "a wooden box (open)".
 
 `check` catches mistakes before you play. Misspell the key as `smal_key` and you get:
 
@@ -213,6 +215,14 @@ error: objects.pantry_door.unlocks_with: unknown ID 'smal_key' (did you mean 'sm
 
 Fix it and play: `n` (locked), `take key`, `unlock door`, `n`. An unlocked
 door opens on its own as you walk through it.
+
+If you'd rather describe states yourself, turn the automatic descriptions
+off with a top-level `settings` section:
+
+```yaml
+settings:
+  describe_state: false
+```
 
 ### Step 5: hide the key
 
@@ -250,6 +260,11 @@ Then add the mat:
         end
 ```
 
+- **`${if ...}...${else}...${end}`** makes text react to the game. Here the
+  lumpy corner disappears once the key is found. Inside a template, `self`
+  is the object the text belongs to. If an object's own description already
+  talks about it being open or locked this way, the automatic sentence is
+  left out, so nothing is said twice.
 - **`world.<id>`** gives scripts access to any object. Its state fields can
   be read and written directly.
 - **`search`** replaces the built-in SEARCH for this one object. Players can
@@ -309,13 +324,13 @@ Options for `play`:
 
 In-game commands that every game understands include LOOK, EXAMINE (X),
 TAKE, DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
-TAKE OFF, EAT, INVENTORY (I), WAIT (Z), directions (N, S, E, W, NE, NW, SE,
+TAKE OFF, EAT, GO THROUGH / ENTER (a door), INVENTORY (I), WAIT (Z), directions (N, S, E, W, NE, NW, SE,
 SW, UP, DOWN, IN, OUT), plus UNDO, AGAIN (G), SAVE, RESTORE, RESTART,
 SCORE, HELP and QUIT.
 
 ## Cheat sheet
 
-**Top-level sections:** `format`, `game`, `vars`, `player`, `rooms`,
+**Top-level sections:** `format`, `game`, `settings`, `vars`, `player`, `rooms`,
 `objects`, `characters`, `verbs`, `choices`, `on`, `endings`, `messages`,
 `scripts`.
 
@@ -323,9 +338,25 @@ SCORE, HELP and QUIT.
 `lockable`, `door`, `wearable`, `edible`, `light_source`. `open` is
 shorthand for `state: { open: true }`.
 
+**Settings:** `describe_state` (default `true`) adds open, closed, locked
+and worn to examine text, room descriptions and lists.
+
 **Exits:** `north: pantry` (to a room); `south: "The sea. Not tonight."`
 (always blocked, with this message); or a map with `to`, `through` (a
 door), `when` (a Lua condition) and `blocked` (the message when `when` is false).
+A direction can also take a list:
+
+```yaml
+exits:
+  north:                       # conditional route: the first that applies wins
+    - { to: bridge, when: vars.bridge_down }
+    - { blocked: "The bridge is raised." }
+  east:                        # separate passages: GO EAST asks which door
+    - { to: library, through: red_door }
+    - { to: study, through: blue_door }
+```
+
+Players can also say GO THROUGH, WALK THROUGH or ENTER a door.
 
 **Handlers** go under `on:`. The name is a verb, optionally with
 `before_` or `after_` in front:

@@ -102,8 +102,9 @@ objects:
     traits: [door, openable, lockable]
     state: { open: false, locked: true }
     unlocks_with: brass_key                 # so "unlock gate with key" works without any script
-    description: |
-      Wrought iron, flecked with rust. It is ${self.locked and "locked" or (self.open and "open" or "closed")}.
+    # No need to describe open/closed/locked: the engine adds "It's locked."
+    # and lists the gate as "an iron gate (locked)" (see settings.describe_state).
+    description: Wrought iron, flecked with rust.
 
   oil_can:
     name: oil can

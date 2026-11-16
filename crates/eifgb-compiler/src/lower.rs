@@ -549,6 +549,15 @@ impl<'a> Lowerer<'a> {
         if state.get("open") == Some(&Value::Bool(true)) && state.get("locked") == Some(&Value::Bool(true)) {
             self.d.error(format!("{path}.state"), "can't start both open and locked");
         }
+        let blocked = match state.get("blocked") {
+            Some(Value::Bool(b)) => *b,
+            Some(Value::Str(s)) => !s.is_empty(),
+            Some(Value::List(l)) => !l.is_empty(),
+            _ => false,
+        };
+        if has(Trait::Door) && blocked && state.get("open") == Some(&Value::Bool(true)) {
+            self.d.error(format!("{path}.state"), "a blocked door is held shut, so it can't start open");
+        }
         if has(Trait::Portable) && has(Trait::Scenery) {
             self.d.error(format!("{path}.traits"), "'portable' and 'scenery' contradict each other");
         }

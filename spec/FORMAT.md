@@ -58,12 +58,14 @@ IDs are `snake_case` and unique across rooms, objects, characters and choices.
   - **That direction already leads elsewhere:** the compiler warns and leaves the map alone.
 
   The door is in scope, listed and described in every room it connects, so it can be examined, opened, closed, locked and unlocked from either side. Its `in:` only decides which room `:is_in` and scripts see as its location.
-- **Blocking doors.** The `blocked` state on a door obstructs the passage without affecting opening and closing:
-  - `true` blocks both sides: "The trapdoor is blocked."
-  - A room ID, or a list of room IDs, blocks only from those sides: "You can't get through the trapdoor from this side."
-  - `false`, or no value, clears it.
+- **Blocked doors are held shut.** The `blocked` state means barred, bolted or wedged, so a blocked door is always closed:
+  - `true`: it won't open from either side. "The trapdoor won't open."
+  - A room ID, or a list of room IDs: it won't open from those sides. "The trapdoor won't open from this side." This applies to both OPEN and walking through.
+  - From a side that isn't blocked, it opens normally. Opening it, or walking through it, lifts the block (the bar is on that side), and the way is then clear in both directions.
+  - `false`, or no value: not blocked.
+  - **Rules enforced:** blocking an open door closes it. The engine enforces that after every script, and the compiler refuses a door that starts open and blocked.
 
-  The compiler checks that the named rooms are on a side of the door. Scripts change it like any state (`world.trapdoor.blocked = "cellar"`), and it's saved and undone with everything else. Automatic descriptions show it as "It's blocked." / "It's blocked from this side." and the tag "(blocked)" / "(blocked from this side)", from the player's current side. On things that aren't doors, `blocked` is an ordinary author state.
+  The compiler also checks that the named rooms are on a side of the door. Scripts change `blocked` like any state (`world.trapdoor.blocked = "cellar"`), and it's saved and undone with everything else. Automatic descriptions show it from the player's current side: "It's closed. It's blocked from this side." and "a trapdoor (closed, blocked from this side)". On things that aren't doors, `blocked` is an ordinary author state.
 - **Automatic state descriptions** (`settings.describe_state`, on by default). The engine describes state itself, for both the built-in states and any state fields an author adds:
 
   | State | When examining | In lists | In room descriptions (scenery only) |

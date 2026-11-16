@@ -229,7 +229,9 @@ impl<H: ScriptHost> Game<H> {
     }
 
     pub(crate) fn render_str(&mut self, text: &Text, ctx: &Ctx) -> String {
-        match render(&mut self.host, &mut self.world, text, ctx) {
+        let result = render(&mut self.host, &mut self.world, text, ctx);
+        self.world.enforce_door_rules();
+        match result {
             Ok(r) => {
                 self.apply(r.effects);
                 reflow(&r.text)
@@ -246,7 +248,9 @@ impl<H: ScriptHost> Game<H> {
     }
 
     pub(crate) fn run(&mut self, code: &Code, ctx: &Ctx) -> ScriptValue {
-        match self.host.call(&mut self.world, code, ctx) {
+        let result = self.host.call(&mut self.world, code, ctx);
+        self.world.enforce_door_rules();
+        match result {
             Ok(o) => {
                 self.apply(o.effects);
                 o.value

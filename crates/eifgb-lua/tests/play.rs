@@ -548,10 +548,12 @@ rooms:
   hall: { name: Hall, exits: { down: { to: cellar, through: trapdoor } } }
   cellar: { name: Cellar }
 objects:
-  trapdoor: { name: trapdoor, in: hall, traits: [door, openable], state: { open: true, blocked: BLOCKED } }
-  lever: { name: lever, in: cellar, traits: [scenery], on: { pull: 'world.trapdoor.blocked = not world.trapdoor.blocked' } }
+  trapdoor: { name: trapdoor, in: hall, traits: [door, openable], state: { blocked: BLOCKED } }
+  bolt: { name: bolt, in: hall, traits: [scenery], on: { push: 'world.trapdoor.blocked = \"cellar\"; say(\"The bolt slides home.\")' } }
+  lever: { name: lever, in: cellar, traits: [scenery], on: { pull: 'world.trapdoor.blocked = false; say(\"Clunk.\")' } }
 verbs:
   pull: { patterns: ['pull {target}'] }
+  push: { patterns: ['push {target}'] }
 ";
 
 fn trapdoor(blocked: &str) -> Game<LuaHost> {
@@ -560,33 +562,62 @@ fn trapdoor(blocked: &str) -> Game<LuaHost> {
 }
 
 #[test]
-fn a_door_can_be_blocked_from_one_side() {
+fn opening_from_the_unblocked_side_lifts_the_block() {
     let mut g = trapdoor("cellar");
-    // From the hall it's fine.
-    assert_says(&mut g, "d", "Cellar");
-    assert_says(&mut g, "u", "You can't get through the trapdoor from this side.");
-    assert_says(&mut g, "x trapdoor", "It's blocked from this side.");
-    assert_says(&mut g, "look", "a trapdoor (open, blocked from this side)");
+    assert_says(&mut g, "open trapdoor", "You open the trapdoor.");
+    say(&mut g, "d");
+    assert_says(&mut g, "u", "Hall");
 }
 
 #[test]
-fn a_door_can_be_blocked_both_ways_and_scripts_can_clear_it() {
+fn blocked_both_ways_wont_open_from_either_side() {
     let mut g = trapdoor("true");
-    assert_says(&mut g, "d", "The trapdoor is blocked.");
-    assert_says(&mut g, "x trapdoor", "It's open. It's blocked.");
+    assert_says(&mut g, "open trapdoor", "The trapdoor won't open.");
+    assert_says(&mut g, "d", "The trapdoor won't open.");
+    assert_says(&mut g, "x trapdoor", "It's closed. It's blocked.");
+}
+
+#[test]
+fn bolting_an_open_door_closes_it_and_the_bolted_side_can_still_open_it() {
     let mut g = trapdoor("false");
     say(&mut g, "d");
-    say(&mut g, "pull lever");
-    assert_says(&mut g, "u", "The trapdoor is blocked.");
-    say(&mut g, "pull lever");
-    assert_says(&mut g, "u", "Hall");
+    let id = g.world().id("trapdoor").unwrap();
+    // A script bolts it from the hall side while it's open below.
+    g.input("u");
+    say(&mut g, "push bolt");
+    assert!(!g.world().flag(id, "open"), "blocking an open door closes it");
+    // Walking through from the hall lifts the bolt again.
+    let out = say(&mut g, "d");
+    assert!(out.contains("(first opening the trapdoor)") && out.contains("Cellar"), "{out}");
+    assert!(!g.world().blocked_anywhere(id));
+}
+
+#[test]
+fn from_below_a_bolted_trapdoor_says_so() {
+    let src = TRAPDOOR.replace("BLOCKED", "cellar").replace("start: hall", "start: cellar");
+    let out = compile_str(&src);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    assert_says(&mut g, "u", "The trapdoor won't open from this side.");
+    assert_says(&mut g, "open trapdoor", "The trapdoor won't open from this side.");
+    assert_says(&mut g, "x trapdoor", "It's closed. It's blocked from this side.");
+    assert_says(&mut g, "look", "a trapdoor (closed, blocked from this side)");
+    assert_says(&mut g, "pull lever", "Clunk.");
+    let out = say(&mut g, "u");
+    assert!(out.contains("(first opening the trapdoor)") && out.contains("Hall"), "{out}");
+}
+
+#[test]
+fn a_door_cannot_start_open_and_blocked() {
+    let out = compile_str(&TRAPDOOR.replace("blocked: BLOCKED", "open: true, blocked: true"));
+    assert!(out.story.is_none());
+    assert!(out.diagnostics.iter().any(|d| d.message.contains("held shut")), "{:#?}", out.diagnostics);
 }
 
 #[test]
 fn blocked_is_saved_and_undone_like_any_state() {
-    let mut g = trapdoor("false");
-    say(&mut g, "d");
+    let src = TRAPDOOR.replace("BLOCKED", "cellar").replace("start: hall", "start: cellar");
+    let mut g = game(compile_str(&src).story.unwrap());
     say(&mut g, "pull lever");
     say(&mut g, "undo");
-    assert_says(&mut g, "u", "Hall");
+    assert_says(&mut g, "u", "won't open from this side");
 }

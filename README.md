@@ -363,7 +363,7 @@ declared. The built-in verbs keep a few states up to date for you:
 | `locked` | LOCK and UNLOCK, on `lockable` things | Locked. A locked thing can't be opened. |
 | `worn` | WEAR and TAKE OFF, on `wearable` things | Being worn. |
 | `hidden` | only scripts | Out of the game: it can't be seen or referred to until a script sets it to `false`. |
-| `blocked` | only scripts, on `door`s | The way through is blocked. `true` blocks both sides; a room ID (`blocked: cellar`) or a list of room IDs blocks only from those sides. |
+| `blocked` | scripts, on `door`s | Held shut: barred, bolted or wedged. `true` means from both sides; a room ID (`blocked: cellar`) or a list of room IDs means only from those sides. A blocked door is always closed. Opening it from an unblocked side lifts the block. |
 
 ### What players see
 
@@ -526,20 +526,23 @@ your own fields. See [States and descriptions](#states-and-descriptions).
 **Doors:** give the door the `door` trait (usually with `openable` and
 `lockable`), put it in one of the rooms with `in:`, and send an exit
 `through:` it. It works from both rooms. The return exit is linked or
-added for you. Block it with the `blocked` state:
+added for you. To hold a door shut (barred, bolted, wedged), use the
+`blocked` state:
 
 ```yaml
   trapdoor:
     name: trapdoor
     in: hall
     traits: [door, openable]
-    state: { blocked: cellar }    # can't get through from the cellar side
+    state: { blocked: cellar }    # bolted on the hall side: won't open from the cellar
 ```
 
-Scripts change it during play: `world.trapdoor.blocked = true` (both
-sides), `= "cellar"` (one side), or `= false` (clear). Players see "You
-can't get through the trapdoor from this side." and, when examining it,
-"It's blocked from this side."
+From the cellar, OPEN TRAPDOOR and UP both get "The trapdoor won't open
+from this side.", and examining it says "It's closed. It's blocked from
+this side." From the hall it opens normally, which slides the bolt back.
+Scripts change it during play: `world.trapdoor.blocked = "cellar"` (one
+side), `= true` (both sides: "The trapdoor won't open."), or `= false`.
+Blocking an open door closes it.
 
 **Exits:** `north: pantry` (to a room); `south: "The sea. Not tonight."`
 (always blocked, with this message); or a map with `to`, `through` (a

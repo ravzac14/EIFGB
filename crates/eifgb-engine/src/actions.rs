@@ -304,8 +304,8 @@ impl<H: ScriptHost> Game<H> {
         if let Some(door) = exit.through
             && let Some(b) = self.world.door_blocked(door, here)
         {
-            let key = if b == Blocked::Both { "go.door_blocked" } else { "go.door_blocked_here" };
-            self.msg(key, &Ctx::new().entity("door", door));
+            let key = if b == Blocked::Both { "open.blocked" } else { "open.blocked_here" };
+            self.msg(key, &Ctx::new().entity("target", door));
             return false;
         }
         if let Some(door) = exit.through
@@ -315,8 +315,10 @@ impl<H: ScriptHost> Game<H> {
                 self.msg("open.locked", &Ctx::new().entity("target", door));
                 return false;
             }
-            // An unlocked door opens itself on the way through, which saves a step.
+            // An unlocked door opens itself on the way through, which saves a
+            // step. As with OPEN, that lifts a block on the far side.
             self.msg_kind(LineKind::Notice, "go.opening_first", &Ctx::new().entity("door", door));
+            self.world.set(door, "blocked", Value::Bool(false));
             self.world.set(door, "open", Value::Bool(true));
         }
         self.room_event(here, "leave");
@@ -558,10 +560,16 @@ impl<H: ScriptHost> Game<H> {
     // ----------------------------------------------------------- open, lock
 
     fn open(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        let blocked = if self.world.has(t, Trait::Door) { self.world.door_blocked(t, here) } else { None };
         let key = if !self.world.has(t, Trait::Openable) {
             Some("open.cannot")
         } else if self.world.flag(t, "open") {
             Some("open.already")
+        } else if blocked == Some(Blocked::Both) {
+            Some("open.blocked")
+        } else if blocked == Some(Blocked::ThisSide) {
+            Some("open.blocked_here")
         } else if self.world.flag(t, "locked") {
             Some("open.locked")
         } else {
@@ -570,6 +578,11 @@ impl<H: ScriptHost> Game<H> {
         if let Some(k) = key {
             self.msg(k, ctx);
             return false;
+        }
+        // Blocked only from the far side: opening from this side lifts
+        // the bar, so the way is clear in both directions.
+        if self.world.has(t, Trait::Door) && self.world.blocked_anywhere(t) {
+            self.world.set(t, "blocked", Value::Bool(false));
         }
         self.world.set(t, "open", Value::Bool(true));
         self.msg("open.done", ctx);

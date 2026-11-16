@@ -221,8 +221,6 @@ messages:
   go.door_closed: "${The(args.door)} is closed."
   go.blocked: "You can't go that way right now."
   go.opening_first: "(first opening ${the(args.door)})"
-  go.door_blocked: "${The(args.door)} is blocked."
-  go.door_blocked_here: "You can't get through ${the(args.door)} from this side."
   enter.cannot: "That's not something you can go through."
   # automatic state descriptions (settings.describe_state)
   state.open: "It's open."
@@ -269,6 +267,8 @@ messages:
   open.done: "You open ${the(args.target)}."
   open.already: "${The(args.target)} is already open."
   open.locked: "${The(args.target)} is locked."
+  open.blocked: "${The(args.target)} won't open."
+  open.blocked_here: "${The(args.target)} won't open from this side."
   open.cannot: "That's not something you can open."
   close.done: "You close ${the(args.target)}."
   close.already: "${The(args.target)} is already closed."

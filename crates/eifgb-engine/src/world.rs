@@ -231,6 +231,27 @@ impl World {
         }
     }
 
+    /// Whether a door is blocked from any side at all.
+    pub fn blocked_anywhere(&self, door: EntityId) -> bool {
+        match self.get(door, "blocked") {
+            Some(Value::Bool(b)) => *b,
+            Some(Value::Str(s)) => !s.is_empty(),
+            Some(Value::List(l)) => !l.is_empty(),
+            _ => false,
+        }
+    }
+
+    /// A blocked door is held shut, so a door that has become blocked
+    /// while open (a script barred it) is closed. Called after scripts run.
+    pub fn enforce_door_rules(&mut self) {
+        for i in 0..self.story.entities.len() {
+            let id = EntityId(i as u32);
+            if self.def(id).has(Trait::Door) && self.flag(id, "open") && self.blocked_anywhere(id) {
+                self.set(id, "open", Value::Bool(false));
+            }
+        }
+    }
+
     pub fn in_scope(&self, id: EntityId) -> bool {
         self.scope().contains(&id)
     }

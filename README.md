@@ -204,7 +204,9 @@ objects:
 - You don't need to describe whether the door is open, closed or locked.
   The game adds that itself: `x door` gives "A sturdy wooden door. It's
   locked.", and the kitchen mentions "The pantry door is locked." Things
-  that are listed get a tag instead, like "a wooden box (open)".
+  that are listed get a tag instead, like "a wooden box (open)". The same
+  goes for states you invent: give the apple `state: { ripe: true }` and
+  `x apple` adds "It's ripe." Start a field's name with `_` to keep it private.
 
 `check` catches mistakes before you play. Misspell the key as `smal_key` and you get:
 
@@ -338,8 +340,11 @@ SCORE, HELP and QUIT.
 `lockable`, `door`, `wearable`, `edible`, `light_source`. `open` is
 shorthand for `state: { open: true }`.
 
-**Settings:** `describe_state` (default `true`) adds open, closed, locked
-and worn to examine text, room descriptions and lists.
+**Settings:** `describe_state` (default `true`) describes state
+automatically in examine text, room descriptions and lists. That covers
+open, closed, locked and worn, and your own fields too: `fueled: true` →
+"It's fueled.", `channel: 16` → "Its channel is 16." Fields starting with
+`_` are private.
 
 **Exits:** `north: pantry` (to a room); `south: "The sea. Not tonight."`
 (always blocked, with this message); or a map with `to`, `through` (a

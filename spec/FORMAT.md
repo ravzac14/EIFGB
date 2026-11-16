@@ -51,12 +51,22 @@ IDs are `snake_case` and unique across rooms, objects, characters and choices.
   - **None:** the first `blocked` message in the list is shown, or a default.
 
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
-- **Automatic state descriptions** (`settings.describe_state`, on by default). The engine describes the built-in states itself:
-  - **When examining**, it adds "It's open.", "It's closed.", "It's locked." or "You're wearing it." after the description.
-  - **In lists** (room contents, inventory, what's in a container), it adds tags: "an iron gate (locked)", "a scarf (worn)".
-  - **In room descriptions**, things that aren't listed (scenery) get a sentence: "The pantry door is locked."
+- **Automatic state descriptions** (`settings.describe_state`, on by default). The engine describes state itself, for both the built-in states and any state fields an author adds:
 
-  If an object's description already reads its `open` or `locked` field in a template (`self.open`, `world.door.locked`), the sentence is left out, so authors who write their own state text aren't repeated. The wording comes from the `state.*` messages.
+  | State | When examining | In lists | In room descriptions (scenery only) |
+  |---|---|---|---|
+  | open / closed / locked | "It's locked." | "an iron gate (locked)" | "The pantry door is locked." |
+  | `worn` | "You're wearing it." | "a scarf (worn)" | *(none)* |
+  | `fueled: true` | "It's fueled." | "a lamp (fueled)" | "The great lamp is fueled." |
+  | `fueled: false` | "It isn't fueled." | *(none)* | *(none)* |
+  | `channel: 16`, `color: red` | "Its channel is 16." | *(none)* | *(none)* |
+
+  - **Field names become words:** `_` turns into a space, and a leading `is_` on a true/false field is dropped, so `is_lit` reads "It's lit." Adjectives make the best names: `lit`, `broken`, `fueled`.
+  - **Private fields:** a field whose name starts with `_` (`_visits`) is never described. Use that for bookkeeping.
+  - **Not described:** lists and tables, and `hidden`.
+  - **Fields scripts add during play** are described as well.
+  - **No repetition:** if a description already reads a field in a template (`self.fueled`, `world.door.locked`), that field isn't described again. For open and locked, reading either one counts.
+  - **Wording** comes from the `state.*` messages, so it can be reworded.
 - **Traits** give built-in behaviour: `portable`, `scenery`, `container`, `supporter`, `open`, `openable`, `lockable`, `door`, `wearable`, `light_source`, `edible`.
 - **State** is a map of mutable fields on an entity. Built-in traits read these fields, e.g. `open`, `locked` and `hidden`.
 - **Parser vocabulary** comes from `name`, `synonyms` and `adjectives`. The adjectives are used for disambiguation.
@@ -223,7 +233,6 @@ SAVE, RESTORE, RESTART and QUIT still work.
 - PUT and WEAR don't pick the thing up for you: "You need to be holding the wooden box first." `[put.not_held]`.
 - There's no setting for proper names yet, so article helpers would say "the Bob".
 - Doors are one-sided: an exit `through` a door only checks it from the room the door is in.
-- Automatic state descriptions cover only built-in states (open, closed, locked, worn). States an author invents, like `fueled`, still need a template.
 
 ## Standard library versioning
 

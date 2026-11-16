@@ -467,3 +467,53 @@ fn only_doors_or_conditions_can_tell_same_direction_exits_apart() {
         out.diagnostics
     );
 }
+
+// ------------------------------------------------- author-defined states
+
+const GADGETS: &str = "objects:\n  lamp: { name: lamp, in: hall, traits: [portable], description: A brass lamp., state: { is_lit: false, fuel: 3, _uses: 7 } }\n  radio: { name: radio, in: hall, traits: [scenery], state: { broken: true, channel: \"sixteen\" } }\nverbs:\n  light: { patterns: ['light {target}'] }\non:\n  light: 'args.target.is_lit = true; args.target.fuel = args.target.fuel - 1'\n";
+
+#[test]
+fn author_states_are_described_from_their_names() {
+    let mut g = small(GADGETS);
+    // Off flags and values are described when examining, private (`_`) fields never.
+    assert_eq!(say(&mut g, "x lamp"), "A brass lamp. Its fuel is 3. It isn't lit.");
+    // Lists only tag flags that are on, so the lamp has no tag yet. The radio is
+    // scenery, so the room description mentions its "on" flag instead.
+    let out = say(&mut g, "look");
+    assert!(out.contains("The radio is broken."), "{out}");
+    assert!(out.contains("You can see a lamp here."), "{out}");
+
+    say(&mut g, "light lamp");
+    assert_eq!(say(&mut g, "x lamp"), "A brass lamp. Its fuel is 2. It's lit.");
+    assert_says(&mut g, "look", "You can see a lamp (lit) here.");
+    assert_eq!(say(&mut g, "x radio"), "It's broken. Its channel is sixteen.");
+}
+
+#[test]
+fn fields_added_by_scripts_are_described_too() {
+    let mut g = small(
+        "objects:\n  box: { name: box, in: hall }\nverbs:\n  kick: { patterns: ['kick {target}'] }\non:\n  kick: 'args.target.dented = true'\n",
+    );
+    assert_eq!(say(&mut g, "x box"), "You see nothing special about the box.");
+    say(&mut g, "kick box");
+    assert_eq!(say(&mut g, "x box"), "It's dented.");
+    assert_says(&mut g, "look", "a box (dented)");
+}
+
+#[test]
+fn author_states_written_into_the_description_are_not_repeated() {
+    let mut g = small(
+        "objects:\n  jar: { name: jar, in: hall, state: { sealed: true, opened: false }, description: 'A jar, ${if self.sealed}sealed tight${else}unsealed${end}.' }\n",
+    );
+    // `sealed` is in the description. `opened` isn't, and `self.sealed` doesn't count
+    // as mentioning a field called `seal`, or `open` as mentioning `opened`.
+    assert_eq!(say(&mut g, "x jar"), "A jar, sealed tight. It isn't opened.");
+}
+
+#[test]
+fn describe_state_off_also_silences_author_states() {
+    let mut g = small(&format!("settings: {{ describe_state: false }}\n{GADGETS}"));
+    assert_eq!(say(&mut g, "x lamp"), "A brass lamp.");
+    let out = say(&mut g, "look");
+    assert!(!out.contains("broken"), "{out}");
+}

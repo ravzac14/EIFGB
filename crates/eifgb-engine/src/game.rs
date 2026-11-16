@@ -743,11 +743,7 @@ impl<H: ScriptHost> Game<H> {
         let names: Vec<String> = ids
             .iter()
             .map(|id| {
-                let tags: Vec<String> = self
-                    .state_tags(*id)
-                    .iter()
-                    .filter_map(|t| self.world.story().messages.get(&format!("state.tag.{t}")).and_then(Text::as_literal))
-                    .collect();
+                let tags = self.state_tag_texts(*id);
                 (lang.tagged)(&self.a(*id), &tags)
             })
             .collect();

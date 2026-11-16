@@ -10,6 +10,21 @@ use crate::parser::Command;
 use crate::script::{Ctx, ScriptHost};
 use eifgb_ir::{BuiltinAction, EntityId, EntityKind, Exit, PatternToken, Segment, Text, Trait, Value, VerbAction, PLAYER};
 
+/// State fields with built-in meaning. `open`, `locked` and `worn` are
+/// described by [`StateNote::Builtin`]; `hidden` is never described.
+const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden"];
+
+/// One thing the automatic state descriptions can say.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum StateNote {
+    /// "open", "closed", "locked" or "worn".
+    Builtin(&'static str),
+    /// An author's boolean field, e.g. `fueled`. `words` is the display form.
+    Flag { field: String, words: String, on: bool },
+    /// An author's number or text field, e.g. `channel: 16`.
+    Value { field: String, words: String, value: String },
+}
+
 /// Calls `f` with the source of every Lua snippet in a template.
 fn visit_text_code(text: &Text, f: &mut dyn FnMut(&str)) {
     for seg in &text.0 {
@@ -82,15 +97,7 @@ impl<H: ScriptHost> Game<H> {
             if self.world.is_hidden(c) || c == PLAYER || things.contains(&c) {
                 continue;
             }
-            if description.as_ref().is_some_and(|d| self.mentions_state(d, c, false)) {
-                continue;
-            }
-            for tag in self.state_tags(c) {
-                if tag != "worn" {
-                    let s = self.msg_str(&format!("state.here.{tag}"), &Ctx::new().entity("target", c));
-                    self.push_sentence(s, described);
-                }
-            }
+            self.describe_state_here(c, description.as_ref(), described);
         }
         if !things.is_empty() {
             let list = self.list_a(&things);
@@ -147,7 +154,7 @@ impl<H: ScriptHost> Game<H> {
         match &description {
             Some(d) => self.render_line(LineKind::Text, d, &Ctx::new().this(t)),
             None if t == PLAYER => self.msg("examine.self", &Ctx::new()),
-            None if !self.state_tags(t).is_empty() => {}
+            None if !self.state_notes(t).is_empty() => {}
             None => self.msg("examine.default", &Ctx::new().entity("target", t)),
         }
         let described = self.out.lines.len() > before;
@@ -306,36 +313,77 @@ impl<H: ScriptHost> Game<H> {
 
     // ------------------------------------------------------ state descriptions
 
-    /// Built-in states worth mentioning, as message suffixes: "open",
-    /// "closed", "locked", "worn". Empty when `settings.describe_state` is off.
-    pub(crate) fn state_tags(&self, id: EntityId) -> Vec<&'static str> {
+    /// Everything worth saying about an entity's state, in a fixed order:
+    /// built-in states first, then the author's own fields by name.
+    /// Empty when `settings.describe_state` is off.
+    pub(crate) fn state_notes(&self, id: EntityId) -> Vec<StateNote> {
         if !self.world.story().meta.settings.describe_state {
             return Vec::new();
         }
         let w = &self.world;
-        let mut tags = Vec::new();
+        let mut notes = Vec::new();
         if w.has(id, Trait::Openable) {
-            tags.push(if w.flag(id, "open") {
+            notes.push(StateNote::Builtin(if w.flag(id, "open") {
                 "open"
             } else if w.has(id, Trait::Lockable) && w.flag(id, "locked") {
                 "locked"
             } else {
                 "closed"
-            });
+            }));
         } else if w.has(id, Trait::Lockable) && w.flag(id, "locked") {
-            tags.push("locked");
+            notes.push(StateNote::Builtin("locked"));
         }
         if w.flag(id, "worn") {
-            tags.push("worn");
+            notes.push(StateNote::Builtin("worn"));
         }
-        tags
+        for (field, value) in &w.state.entities[id.index()].state {
+            if BUILTIN_STATE.contains(&field.as_str()) || field.starts_with('_') {
+                continue;
+            }
+            match value {
+                Value::Bool(on) => {
+                    let words = field.strip_prefix("is_").unwrap_or(field).replace('_', " ");
+                    notes.push(StateNote::Flag { field: field.clone(), words, on: *on });
+                }
+                Value::Int(_) | Value::Float(_) | Value::Str(_) => {
+                    let shown = match value {
+                        Value::Int(i) => i.to_string(),
+                        Value::Float(f) if f.fract() == 0.0 => format!("{}", *f as i64),
+                        Value::Float(f) => f.to_string(),
+                        Value::Str(s) => s.clone(),
+                        _ => unreachable!(),
+                    };
+                    if !shown.is_empty() {
+                        notes.push(StateNote::Value { field: field.clone(), words: field.replace('_', " "), value: shown });
+                    }
+                }
+                // Lists and tables don't read well as a sentence.
+                Value::List(_) | Value::Map(_) => {}
+            }
+        }
+        notes
     }
 
-    /// Whether a template already talks about `id`'s open/locked state,
-    /// in which case the automatic sentence would repeat it.
-    fn mentions_state(&self, text: &Text, id: EntityId, is_own: bool) -> bool {
+    /// Short tags for lists: "(locked)", "(worn)", "(fueled)". Only states
+    /// that are "on" get a tag; the rest would just be noise in a list.
+    pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
+        self.state_notes(id)
+            .into_iter()
+            .filter_map(|n| match n {
+                StateNote::Builtin(t) => {
+                    self.world.story().messages.get(&format!("state.tag.{t}")).and_then(Text::as_literal)
+                }
+                StateNote::Flag { words, on: true, .. } => Some(words),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Whether a template already reads one of these fields of `id`, in
+    /// which case an automatic sentence about it would repeat the author.
+    fn mentions(&self, text: &Text, id: EntityId, fields: &[&str], is_own: bool) -> bool {
         let key = &self.world.def(id).key;
-        let needles: Vec<String> = ["open", "locked"]
+        let needles: Vec<String> = fields
             .iter()
             .flat_map(|f| {
                 let mut v = vec![format!("world.{key}.{f}")];
@@ -346,24 +394,68 @@ impl<H: ScriptHost> Game<H> {
             })
             .collect();
         let mut found = false;
-        visit_text_code(text, &mut |src| found |= needles.iter().any(|n| src.contains(n.as_str())));
+        visit_text_code(text, &mut |src| {
+            found |= needles.iter().any(|n| {
+                // Whole field names only: `self.open` shouldn't match `self.opened`.
+                src.match_indices(n.as_str()).any(|(i, _)| {
+                    !src[i + n.len()..].starts_with(|c: char| c.is_alphanumeric() || c == '_')
+                })
+            })
+        });
         found
     }
 
-    /// The sentences EXAMINE adds after a description.
-    /// `attach` adds the sentences to the description's paragraph.
-    fn describe_state(&mut self, id: EntityId, description: Option<&Text>, attach: bool) {
-        let skip_door_state = description.is_some_and(|d| self.mentions_state(d, id, true));
-        for tag in self.state_tags(id) {
-            if tag != "worn" && skip_door_state {
-                continue;
-            }
-            let s = self.msg_str(&format!("state.{tag}"), &Ctx::new().entity("target", id));
-            self.push_sentence(s, attach);
+    fn note_mentioned(&self, note: &StateNote, text: Option<&Text>, id: EntityId, is_own: bool) -> bool {
+        let Some(text) = text else { return false };
+        match note {
+            StateNote::Builtin("worn") => self.mentions(text, id, &["worn"], is_own),
+            StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
+            StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
         }
     }
 
-    // ---------------------------------------------------- taking and dropping
+    /// The sentences EXAMINE adds after a description. `attach` adds them
+    /// to the description's paragraph.
+    fn describe_state(&mut self, id: EntityId, description: Option<&Text>, mut attach: bool) {
+        for note in self.state_notes(id) {
+            if self.note_mentioned(&note, description, id, true) {
+                continue;
+            }
+            let ctx = Ctx::new().entity("target", id);
+            let s = match note {
+                StateNote::Builtin(t) => self.msg_str(&format!("state.{t}"), &ctx),
+                StateNote::Flag { words, on, .. } => {
+                    self.msg_str(if on { "state.custom.on" } else { "state.custom.off" }, &ctx.text("state", words))
+                }
+                StateNote::Value { words, value, .. } => {
+                    self.msg_str("state.custom.value", &ctx.text("state", words).text("value", value))
+                }
+            };
+            self.push_sentence(s, attach);
+            // Later sentences join the first, even when there was no description.
+            attach = true;
+        }
+    }
+
+    /// The sentences a room description adds for things that aren't listed
+    /// (scenery): built-in states other than "worn", and author flags that
+    /// are on.
+    fn describe_state_here(&mut self, id: EntityId, room_description: Option<&Text>, mut attach: bool) {
+        for note in self.state_notes(id) {
+            if self.note_mentioned(&note, room_description, id, false) {
+                continue;
+            }
+            let ctx = Ctx::new().entity("target", id);
+            let s = match note {
+                StateNote::Builtin("worn") => continue,
+                StateNote::Builtin(t) => self.msg_str(&format!("state.here.{t}"), &ctx),
+                StateNote::Flag { words, on: true, .. } => self.msg_str("state.here.custom.on", &ctx.text("state", words)),
+                _ => continue,
+            };
+            self.push_sentence(s, attach);
+            attach = true;
+        }
+    }
 
     // ---------------------------------------------------- taking and dropping
 

@@ -234,6 +234,11 @@ messages:
   state.tag.closed: "closed"
   state.tag.locked: "locked"
   state.tag.worn: "worn"
+  # an author's own state fields, e.g. `fueled: true` or `channel: 16`
+  state.custom.on: "It's ${args.state}."
+  state.custom.off: "It isn't ${args.state}."
+  state.custom.value: "Its ${args.state} is ${args.value}."
+  state.here.custom.on: "${The(args.target)} is ${args.state}."
   # taking and dropping
   take.done: "Taken."
   take.already: "You already have ${the(args.target)}."

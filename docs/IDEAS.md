@@ -27,8 +27,6 @@ Everything from the first list has now been built:
   and the fooled.
 - **Eavesdropping:** `chatter`, loud lines through walls, LISTEN AT THE DOOR.
 
-## Stealth and sneaking
-
 ## Manipulating creatures
 
 ### Giving orders

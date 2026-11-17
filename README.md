@@ -1053,11 +1053,17 @@ You have 12 coins.
 The rope costs 30 coins, and you have only 12 coins.
 
 > sell lamp
+The peddler offers 4 coins for the brass lamp. SELL it again or ACCEPT to take
+that, or ask for more, like "sell the brass lamp for 5".
+
+> accept
 You sell the brass lamp to the peddler for 4 coins.
 ```
 
 - **Prices:** merchants buy at `buys_at` percent of the price (default
-  50), and only things with a price.
+  50), and only things with a price. A merchant who haggles names that
+  price first, so the player knows there's room to bargain; SELL again,
+  or ACCEPT (also DEAL, AGREE), takes it.
 - **Merchant money:** with `money:`, a merchant can only pay what they
   have, and gains what the player spends. Without it they can always pay.
 - **Looking before buying:** a merchant's goods can be examined before
@@ -1070,6 +1076,13 @@ You sell the brass lamp to the peddler for 4 coins.
   peddler.") and cost a point of the merchant's patience. Out of patience,
   the merchant "looks insulted, and won't trade with you any more" until
   the player apologises.
+- **Haggling when selling:** SELL RING FOR 24 (or ASK 24 FOR RING). The
+  merchant pays up to `haggle` percent more than its offer, never more
+  than its own price for the thing or the money it has: "The peddler
+  grumbles, but pays you 24 coins for the gold ring." Ask for more and it
+  counters with the most it'll pay ("\"25 coins, and not a coin more,\"
+  says the peddler."), costing patience as when buying. ACCEPT takes any
+  counter-offer, buying or selling.
 
   ```
   > offer 2 for the lamp
@@ -1143,7 +1156,7 @@ In-game commands that every game understands include LOOK, EXAMINE (X),
 TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
-ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, OFFER … FOR (HAGGLE FOR), HEALTH
+ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO,
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.

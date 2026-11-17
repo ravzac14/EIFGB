@@ -203,7 +203,16 @@ verbs:
     patterns: ["buy {target}", "buy {target} from {tool}", "purchase {target}"]
   sell:
     action: sell
-    patterns: ["sell {target}", "sell {target} to {tool}"]
+    patterns:
+      - "sell {target}"
+      - "sell {target} to {tool}"
+      - "sell {target} for {text}"
+      - "sell {target} to {tool} for {text}"
+      - "ask {text} for {target}"
+      - "demand {text} for {target}"
+  accept:
+    action: accept
+    patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
   wares:
     action: wares
     patterns: ["wares", "list wares", "browse", "shop", "trade", "trade with {target}", "browse {target}"]
@@ -412,6 +421,12 @@ messages:
   sell.worthless: "${The(args.merchant)} isn't interested in ${the(args.target)}."
   sell.merchant_poor: "${The(args.merchant)} can't afford ${the(args.target)}."
   sell.done: "You sell ${the(args.target)} to ${the(args.merchant)} for ${args.price}."
+  sell.offer: "${The(args.merchant)} offers ${args.price} for ${the(args.target)}. SELL it again or ACCEPT to take that, or ask for more, like \"sell ${the(args.target)} for ${args.example}\"."
+  sell.accepted: "${The(args.merchant)} grumbles, but pays you ${args.price} for ${the(args.target)}."
+  sell.counter: "\"${args.price}, and not a coin more,\" says ${the(args.merchant)}."
+  sell.fixed: "${The(args.merchant)} doesn't haggle. It'll pay ${args.price}."
+  sell.how_much: "How much? Try something like \"sell ${the(args.target)} for 5\"."
+  accept.nothing: "There's no offer on the table."
   wares.list: "${The(args.merchant)} has for sale: ${args.list}."
   trade.refused: "${The(args.merchant)} won't trade with you any more."
   offer.how_much: "How much? Try something like \"offer 5 for ${the(args.target)}\"."

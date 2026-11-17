@@ -319,6 +319,7 @@ impl<H: ScriptHost> Game<H> {
     /// A merchant pushed too far won't trade with the player at all.
     fn refuses_trade(&mut self, merchant: EntityId, ctx: &Ctx) -> bool {
         if self.world.flag(merchant, "_refuses") {
+            self.world.unset(merchant, "_deal");
             self.msg("trade.refused", &ctx.clone().entity("merchant", merchant));
             return true;
         }
@@ -368,7 +369,7 @@ impl<H: ScriptHost> Game<H> {
     pub(crate) fn offer(&mut self, t: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
         let Some((seller, price)) = self.seller_of(t, None, ctx) else { return false };
         let ctx = ctx.clone().entity("merchant", seller);
-        let amount = text.and_then(|s| s.split(|c: char| !c.is_ascii_digit()).find(|w| !w.is_empty())).and_then(|w| w.parse::<i64>().ok());
+        let amount = text.and_then(first_number);
         let Some(amount) = amount else {
             self.msg("offer.how_much", &ctx);
             return false;
@@ -403,14 +404,20 @@ impl<H: ScriptHost> Game<H> {
             return false;
         }
         self.world.set(seller, "patience", Value::Int(patience - 1));
-        // Meet the player halfway, but never below the floor.
-        let counter = ((amount + price + 1) / 2).max(floor);
+        // "…and not a coin less": the counter is the least it'll take.
+        let counter = floor;
+        self.set_deal(seller, "buy", t, counter);
         let counter = self.money_text(counter);
         self.msg("offer.counter", &ctx.text("price", counter));
         false
     }
 
-    pub(crate) fn sell(&mut self, t: EntityId, merchant: Option<EntityId>, ctx: &Ctx) -> bool {
+    /// SELL X (TO M) (FOR N). A merchant who haggles names its price first,
+    /// so the player knows they can ask for more; SELL X again (or ACCEPT)
+    /// takes it. FOR N asks for a price: anything up to `haggle` percent
+    /// above the merchant's offer (never above its own selling price) is
+    /// accepted; more gets a counter-offer and costs patience.
+    pub(crate) fn sell(&mut self, t: EntityId, merchant: Option<EntityId>, text: Option<&str>, ctx: &Ctx) -> bool {
         let Some(buyer) = self.pick_merchant(merchant) else {
             self.msg("sell.no_merchant", ctx);
             return false;
@@ -423,27 +430,141 @@ impl<H: ScriptHost> Game<H> {
             self.msg("sell.not_held", &ctx);
             return false;
         }
-        let buys_at = self.world.def(buyer).npc.as_ref().map_or(0, |n| n.buys_at);
-        let offer = self.world.def(t).price.map_or(0, |p| i64::from(p) * i64::from(buys_at) / 100);
+        let n = self.world.def(buyer).npc.clone();
+        let (buys_at, haggle) = n.as_ref().map_or((0, 0), |n| (n.buys_at, n.haggle));
+        let price = self.world.def(t).price.map_or(0, i64::from);
+        let offer = price * i64::from(buys_at) / 100;
         if offer <= 0 {
             self.msg("sell.worthless", &ctx);
             return false;
         }
-        if self.world.has_money(buyer) && self.world.money(buyer) < offer {
+        let purse = self.world.has_money(buyer).then(|| self.world.money(buyer));
+        if purse.is_some_and(|m| m < offer) {
             self.msg("sell.merchant_poor", &ctx);
             return false;
         }
+        let asked = text.and_then(first_number);
+        if text.is_some() && asked.is_none() {
+            self.msg("sell.how_much", &ctx);
+            return false;
+        }
+        // Fixed prices: just sell, at the price shown.
+        if haggle == 0 {
+            if asked.is_some_and(|a| a > offer) {
+                let o = self.money_text(offer);
+                self.msg("sell.fixed", &ctx.text("price", o));
+                return false;
+            }
+            return self.complete_sale(t, buyer, asked.unwrap_or(offer), "sell.done", &ctx);
+        }
+        let Some(asked) = asked else {
+            // A deal on the table for this: SELL again takes it.
+            if let Some(p) = self.deal(buyer, "sell", t) {
+                return self.complete_sale(t, buyer, p, "sell.done", &ctx);
+            }
+            self.set_deal(buyer, "sell", t, offer);
+            let o = self.money_text(offer);
+            let example = offer + (offer / 5).max(1);
+            self.msg("sell.offer", &ctx.text("price", o).value("example", Value::Int(example)));
+            return false;
+        };
+        // The most it'll pay, rounded down: never more than its own price,
+        // or than it has.
+        let ceiling = (offer * i64::from(100 + haggle) / 100).min(price.max(offer)).min(purse.unwrap_or(i64::MAX));
+        if asked <= ceiling {
+            let key = if asked > offer { "sell.accepted" } else { "sell.done" };
+            return self.complete_sale(t, buyer, asked, key, &ctx);
+        }
+        let patience = match self.world.get(buyer, "patience") {
+            Some(Value::Int(i)) => *i,
+            _ => 0,
+        };
+        if patience <= 0 {
+            self.world.set(buyer, "_refuses", Value::Bool(true));
+            self.world.unset(buyer, "_deal");
+            self.msg("offer.insulted", &ctx);
+            return false;
+        }
+        self.world.set(buyer, "patience", Value::Int(patience - 1));
+        // "…and not a coin more": the counter is the most it'll pay.
+        let counter = ceiling;
+        self.set_deal(buyer, "sell", t, counter);
+        let c = self.money_text(counter);
+        self.msg("sell.counter", &ctx.text("price", c));
+        false
+    }
+
+    fn complete_sale(&mut self, t: EntityId, buyer: EntityId, price: i64, key: &str, ctx: &Ctx) -> bool {
         if self.world.has_money(buyer) {
             let m = self.world.money(buyer);
-            self.world.set_money(buyer, m - offer);
+            self.world.set_money(buyer, m - price);
         }
         let have = self.world.money(PLAYER);
-        self.world.set_money(PLAYER, have + offer);
+        self.world.set_money(PLAYER, have + price);
         self.world.unset(t, "worn");
+        self.world.unset(buyer, "_deal");
         let _ = self.world.move_to(t, Some(buyer));
-        let price = self.money_text(offer);
-        self.msg("sell.done", &ctx.text("price", price));
+        let p = self.money_text(price);
+        self.msg(key, &ctx.clone().entity("merchant", buyer).text("price", p));
         true
+    }
+
+    /// A deal on the table: the merchant's last offer or counter-offer,
+    /// which ACCEPT (or repeating SELL) takes.
+    fn set_deal(&mut self, merchant: EntityId, kind: &str, item: EntityId, price: i64) {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("kind".to_string(), Value::Str(kind.into()));
+        m.insert("item".to_string(), Value::Str(self.world.def(item).key.clone()));
+        m.insert("price".to_string(), Value::Int(price));
+        self.world.set(merchant, "_deal", Value::Map(m));
+    }
+
+    /// The price of a deal of this kind on the table for `item`.
+    fn deal(&self, merchant: EntityId, kind: &str, item: EntityId) -> Option<i64> {
+        let Some(Value::Map(m)) = self.world.get(merchant, "_deal") else { return None };
+        let same = m.get("kind") == Some(&Value::Str(kind.into()))
+            && m.get("item") == Some(&Value::Str(self.world.def(item).key.clone()));
+        match m.get("price") {
+            Some(Value::Int(p)) if same => Some(*p),
+            _ => None,
+        }
+    }
+
+    /// ACCEPT: takes the deal a merchant here has on the table.
+    pub(crate) fn accept(&mut self, ctx: &Ctx) -> bool {
+        for m in self.world.merchants_here() {
+            let Some(Value::Map(d)) = self.world.get(m, "_deal").cloned() else { continue };
+            let (Some(Value::Str(kind)), Some(Value::Str(item)), Some(Value::Int(price))) =
+                (d.get("kind"), d.get("item"), d.get("price"))
+            else {
+                continue;
+            };
+            let Some(item) = self.world.id(item) else { continue };
+            let ctx = ctx.clone().entity("target", item).entity("merchant", m);
+            if self.refuses_trade(m, &ctx) {
+                return false;
+            }
+            return match kind.as_str() {
+                // Taking the merchant's own price: a plain sale.
+                "sell" if self.world.location(item) == Some(PLAYER) => self.complete_sale(item, m, *price, "sell.done", &ctx),
+                "buy" if self.world.location(item) == Some(m) => {
+                    if self.world.money(PLAYER) < *price {
+                        let have = self.money_text(self.world.money(PLAYER));
+                        self.msg("offer.cant_afford", &ctx.text("amount", have));
+                        return false;
+                    }
+                    self.world.unset(m, "_deal");
+                    self.purchase(item, m, *price, "buy.done", &ctx)
+                }
+                _ => {
+                    self.world.unset(m, "_deal");
+                    self.msg("accept.nothing", &ctx);
+                    false
+                }
+            };
+        }
+        self.msg("accept.nothing", ctx);
+        false
     }
 
     pub(crate) fn wares(&mut self, merchant: Option<EntityId>, ctx: &Ctx) -> bool {
@@ -490,4 +611,9 @@ impl<H: ScriptHost> Game<H> {
             self.msg_kind(LineKind::Text, "money.have", &Ctx::new().text("amount", amount));
         }
     }
+}
+
+/// The first whole number in some text: "6", "6 coins", "for 6".
+fn first_number(text: &str) -> Option<i64> {
+    text.split(|c: char| !c.is_ascii_digit()).find(|w| !w.is_empty()).and_then(|w| w.parse().ok())
 }

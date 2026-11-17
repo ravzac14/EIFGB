@@ -824,6 +824,8 @@ pub enum BuiltinAction {
     Apologize,
     /// Offer a merchant a price for something.
     Offer,
+    /// Take the deal a merchant has on the table.
+    Accept,
 }
 
 impl BuiltinAction {

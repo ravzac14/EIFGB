@@ -1434,7 +1434,9 @@ fn merchants_buy_and_sell() {
     assert_eq!(say(&mut g, "buy lamp"), "You buy the brass lamp from the peddler for 8 coins.");
     assert_eq!(say(&mut g, "i"), "You're carrying a brass lamp.\nYou have 12 coins.");
     assert_eq!(say(&mut g, "buy rope"), "The rope costs 30 coins, and you have only 12 coins.");
-    // At half price, and the peddler had 5 + 8.
+    // At half price, and the peddler had 5 + 8. A merchant who haggles
+    // names its price first; selling again takes it.
+    assert_says(&mut g, "sell lamp", "The peddler offers 4 coins for the brass lamp.");
     assert_eq!(say(&mut g, "sell lamp"), "You sell the brass lamp to the peddler for 4 coins.");
     assert_says(&mut g, "i", "You have 16 coins.");
     say(&mut g, "w");
@@ -2072,4 +2074,64 @@ fn fixed_prices() {
     let src = SHOP.replace("behavior: merchant, wander: 0", "behavior: merchant, wander: 0, haggle: 0");
     let mut g = game(compile_str(&src).story.unwrap());
     assert_eq!(say(&mut g, "offer 7 for the lamp"), "The peddler doesn't haggle. It's 8 coins.");
+}
+
+const SELLING: &str = "\
+format: eifgb/0.1
+game: { id: s, title: S, version: '1', start: shop }
+player: { money: 20 }
+rooms:
+  shop: { name: Shop }
+objects:
+  lamp: { name: brass lamp, synonyms: [lamp], in: player, traits: [portable], price: 8 }
+  ring: { name: gold ring, synonyms: [ring], in: player, traits: [portable], price: 40 }
+  rope: { name: rope, in: peddler, traits: [portable], price: 12 }
+characters:
+  peddler: { name: peddler, in: shop, behavior: merchant, wander: 0 }
+";
+
+#[test]
+fn selling_shows_the_offer_first_and_accept_takes_it() {
+    let mut g = game(compile_str(SELLING).story.unwrap());
+    assert_eq!(
+        say(&mut g, "sell lamp"),
+        "The peddler offers 4 coins for the brass lamp. SELL it again or ACCEPT to take that, or ask for more, like \"sell the brass lamp for 5\"."
+    );
+    assert_eq!(say(&mut g, "accept"), "You sell the brass lamp to the peddler for 4 coins.");
+    assert_eq!(say(&mut g, "accept"), "There's no offer on the table.");
+}
+
+#[test]
+fn haggling_when_selling() {
+    let mut g = game(compile_str(SELLING).story.unwrap());
+    // Offer 20 (half of 40); it'll go up to 25% more: 25.
+    assert_eq!(say(&mut g, "sell ring for 24"), "The peddler grumbles, but pays you 24 coins for the gold ring.");
+    let mut g = game(compile_str(SELLING).story.unwrap());
+    assert_eq!(say(&mut g, "sell ring for 30"), "\"25 coins, and not a coin more,\" says the peddler.");
+    assert_eq!(say(&mut g, "deal"), "You sell the gold ring to the peddler for 25 coins.");
+    assert_says(&mut g, "i", "You have 45 coins.");
+}
+
+#[test]
+fn greedy_sellers_wear_out_the_same_patience() {
+    let mut g = game(compile_str(SELLING).story.unwrap());
+    say(&mut g, "ask 99 for the ring");
+    say(&mut g, "ask 99 for the ring");
+    assert_eq!(say(&mut g, "ask 99 for the ring"), "The peddler looks insulted, and won't trade with you any more.");
+    assert_eq!(say(&mut g, "sell lamp"), "The peddler won't trade with you any more.");
+}
+
+#[test]
+fn a_buying_counter_offer_can_be_accepted() {
+    let mut g = game(compile_str(SELLING).story.unwrap());
+    assert_eq!(say(&mut g, "offer 2 for the rope"), "\"9 coins, and not a coin less,\" says the peddler.");
+    assert_eq!(say(&mut g, "accept"), "You buy the rope from the peddler for 9 coins.");
+}
+
+#[test]
+fn fixed_price_merchants_buy_straight_away() {
+    let src = SELLING.replace("wander: 0 }", "wander: 0, haggle: 0 }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_eq!(say(&mut g, "sell lamp"), "You sell the brass lamp to the peddler for 4 coins.");
+    assert_eq!(say(&mut g, "sell ring for 30"), "The peddler doesn't haggle. It'll pay 20 coins.");
 }

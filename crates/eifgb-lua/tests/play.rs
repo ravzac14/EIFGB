@@ -2924,3 +2924,77 @@ fn listening_when_nothing_is_said() {
 You hear nothing.");
     assert_eq!(say(&mut g, "listen west"), "There's nothing to listen to that way.");
 }
+
+// ------------------------------------------------------------------ orders
+
+const ORDERS: &str = r#"format: eifgb/0.1
+game: { id: o, title: Orders, version: "1", start: yard }
+player: { health: 30 }
+factions:
+  wolves: { hostile_to: [player] }
+rooms:
+  yard: { name: Yard, exits: { north: field, east: shed } }
+  field: { name: Field, exits: { south: yard } }
+  shed: { name: Shed, exits: { west: yard } }
+objects:
+  bone: { name: bone, in: player, traits: [portable], eaten_by: [wolves] }
+  stick: { name: stick, in: field, traits: [portable] }
+characters:
+  pup: { name: wolf pup, synonyms: [pup], in: yard, faction: wolves, behavior: guard, health: 20, damage: 2, tame_with: [bone], nameable: true }
+  goblin: { name: goblin, in: field, health: 6, behavior: stationary }
+  rat: { name: rat, in: shed, behavior: hunter, range: 0, wander: 0, health: 3, damage: 1 }
+  cat: { name: cat, in: yard }
+"#;
+
+fn pack(cmds: &[&str]) -> Game<LuaHost> {
+    let mut g = game(compile_str(ORDERS).story.unwrap());
+    for c in cmds {
+        say(&mut g, c);
+    }
+    g
+}
+
+#[test]
+fn stay_and_follow() {
+    let mut g = pack(&["give bone to pup", "call pup rex"]);
+    assert_eq!(say(&mut g, "rex, stay"), "Rex stays where it is.");
+    // It doesn't follow while staying.
+    assert!(!say(&mut g, "n").contains("Rex"));
+    say(&mut g, "s");
+    assert_eq!(say(&mut g, "tell rex to come"), "Rex comes back to your side.");
+    assert_says(&mut g, "n", "Rex arrives.");
+}
+
+#[test]
+fn sending_a_companion_after_someone_elsewhere() {
+    let mut g = pack(&["give bone to pup"]);
+    let out = say(&mut g, "tell pup to attack the goblin");
+    assert!(out.contains("The wolf pup goes for the goblin!") && out.contains("The wolf pup goes north."), "{out}");
+    for _ in 0..4 {
+        say(&mut g, "z");
+    }
+    assert_says(&mut g, "n", "a goblin (dead)");
+}
+
+#[test]
+fn fetch_drop_and_go() {
+    let mut g = pack(&["give bone to pup", "n"]);
+    say(&mut g, "z");
+    assert_says(&mut g, "order pup to fetch the stick", "The wolf pup grabs the stick.");
+    assert_says(&mut g, "z", "The wolf pup drops the stick at your feet.");
+    assert_eq!(say(&mut g, "pup, go south"), "The wolf pup heads south.
+The wolf pup goes south.");
+    // It stays where it was sent.
+    say(&mut g, "z");
+    assert!(!say(&mut g, "z").contains("pup"));
+}
+
+#[test]
+fn not_everyone_takes_orders() {
+    let mut g = pack(&[]);
+    assert_says(&mut g, "tell cat to sit", "The cat ignores you.");
+    say(&mut g, "give bone to pup");
+    assert_says(&mut g, "pup, dance", "looks at you blankly");
+    assert_eq!(say(&mut g, "tell pup to attack me"), "The wolf pup won't attack you.");
+    assert_eq!(say(&mut g, "pup, drop it"), "The wolf pup isn't carrying anything.");
+}

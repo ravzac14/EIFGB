@@ -340,6 +340,9 @@ pub struct Thing {
     /// Lines it says to others when it thinks nobody's listening.
     #[serde(default)]
     pub chatter: Vec<ChatterLine>,
+    /// Takes orders from the player.
+    #[serde(default)]
+    pub obeys: Option<bool>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

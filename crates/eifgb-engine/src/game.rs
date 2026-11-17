@@ -125,6 +125,20 @@ impl<H: ScriptHost> Game<H> {
         })
     }
 
+    /// "REX, SIT" is "TELL REX TO SIT", when the words before the comma name
+    /// one character here.
+    fn addressed(&self, line: &str) -> String {
+        let Some((who, what)) = line.split_once(',') else { return line.to_string() };
+        let words: Vec<String> = self.grammar.split_commands(who).concat();
+        let named = self.grammar.name_matches(&self.world, &words);
+        match named.as_slice() {
+            [c] if self.world.def(*c).kind == eifgb_ir::EntityKind::Character && !what.trim().is_empty() => {
+                format!("tell {} to {}", who.trim(), what.trim())
+            }
+            _ => line.to_string(),
+        }
+    }
+
     pub fn world(&self) -> &World {
         &self.world
     }
@@ -141,7 +155,8 @@ impl<H: ScriptHost> Game<H> {
         if self.world.state.choice.is_some() {
             self.choice_input(line);
         } else {
-            let commands = self.grammar.split_commands(line);
+            let line = self.addressed(line);
+            let commands = self.grammar.split_commands(&line);
             if commands.is_empty() {
                 self.msg("parser.empty", &Ctx::new());
             }

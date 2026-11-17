@@ -405,6 +405,9 @@ pub struct Npc {
     /// Things it says to others when it thinks nobody's listening.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chatter: Vec<Chatter>,
+    /// Takes orders from the player (tamed characters always do).
+    #[serde(default)]
+    pub obeys: bool,
 }
 
 /// A line of chatter between characters.
@@ -924,6 +927,8 @@ pub enum BuiltinAction {
     Steal,
     /// Listen for talk in the next room (or rooms).
     Eavesdrop,
+    /// Tell a companion what to do: TELL REX TO STAY.
+    Order,
 }
 
 impl BuiltinAction {

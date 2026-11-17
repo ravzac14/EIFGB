@@ -829,6 +829,7 @@ impl<'a> Lowerer<'a> {
                 ("fetches", t.fetches.is_some()),
                 ("tracker", t.tracker.is_some()),
                 ("chatter", !t.chatter.is_empty()),
+                ("obeys", t.obeys.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -930,6 +931,7 @@ impl<'a> Lowerer<'a> {
                     }
                 })
                 .collect(),
+            obeys: t.obeys.unwrap_or(false),
         })
     }
 

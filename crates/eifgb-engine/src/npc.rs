@@ -688,6 +688,83 @@ impl World {
         Some(f)
     }
 
+    /// Takes the player's orders: tamed, or `obeys`.
+    pub fn obeys(&self, id: EntityId) -> bool {
+        self.is_tamed(id) || self.def(id).npc.as_ref().is_some_and(|n| n.obeys)
+    }
+
+    /// The standing order a companion was given: `stay`, `attack` (with a
+    /// target), or `go` (with a direction). None means its usual ways.
+    pub fn order(&self, id: EntityId) -> Option<(String, Option<String>)> {
+        let Some(Value::Map(m)) = self.get(id, "_order") else { return None };
+        let Some(Value::Str(kind)) = m.get("kind") else { return None };
+        let arg = match m.get("arg") {
+            Some(Value::Str(a)) => Some(a.clone()),
+            _ => None,
+        };
+        Some((kind.clone(), arg))
+    }
+
+    pub fn set_order(&mut self, id: EntityId, kind: Option<&str>, arg: Option<String>) {
+        match kind {
+            None => self.unset(id, "_order"),
+            Some(k) => {
+                let mut m = std::collections::BTreeMap::new();
+                m.insert("kind".to_string(), Value::Str(k.into()));
+                if let Some(a) = arg {
+                    m.insert("arg".to_string(), Value::Str(a));
+                }
+                self.set(id, "_order", Value::Map(m));
+            }
+        }
+    }
+
+    /// Carrying out a standing order, if it has one. None: act as usual.
+    fn follow_order(&mut self, npc: EntityId) -> Option<Vec<NpcEvent>> {
+        let (kind, arg) = self.order(npc)?;
+        match kind.as_str() {
+            "attack" => {
+                let target = arg.as_deref().and_then(|k| self.id(k)).filter(|&t| self.is_active(t) || t == PLAYER);
+                let Some(target) = target else {
+                    // Done with: back to its usual ways.
+                    self.set_order(npc, None, None);
+                    return None;
+                };
+                if self.together(npc, target) && self.can_see(npc, target) {
+                    let weapon = self.best_weapon(npc);
+                    return Some(self.attack(npc, target, weapon).into_iter().collect());
+                }
+                match self.npc_step_toward(npc, target) {
+                    Some(step) => Some(vec![step]),
+                    None => {
+                        self.set_order(npc, None, None);
+                        None
+                    }
+                }
+            }
+            "go" => {
+                let dir = arg.as_deref().and_then(Direction::from_key);
+                self.set_order(npc, Some("stay"), None);
+                Some(dir.and_then(|d| self.npc_go(npc, d)).into_iter().collect())
+            }
+            "stay" => {
+                // Stays put, but still fights anyone hostile to the player here.
+                let enemy = (0..self.story().entities.len() as u32)
+                    .map(EntityId)
+                    .filter(|&c| c != npc && self.def(c).kind == EntityKind::Character && self.together(npc, c))
+                    .find(|&c| self.is_hostile(c, PLAYER) && self.can_see(npc, c));
+                Some(match enemy {
+                    Some(e) => {
+                        let weapon = self.best_weapon(npc);
+                        self.attack(npc, e, weapon).into_iter().collect()
+                    }
+                    None => Vec::new(),
+                })
+            }
+            _ => None,
+        }
+    }
+
     /// Tamed: follows the player and fights the player's enemies.
     pub fn is_tamed(&self, id: EntityId) -> bool {
         self.flag(id, "_tamed")
@@ -1024,6 +1101,12 @@ impl World {
         if let Some(&foe) = self.foes_here(npc).first() {
             let weapon = self.best_weapon(npc);
             return self.attack(npc, foe, weapon).into_iter().collect();
+        }
+        // Under orders: those come first.
+        if self.obeys(npc)
+            && let Some(events) = self.follow_order(npc)
+        {
+            return events;
         }
         // Tamed: fight the player's enemies here, else stay with the player.
         if self.is_tamed(npc) {

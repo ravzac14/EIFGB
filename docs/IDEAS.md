@@ -26,20 +26,9 @@ Everything from the first list has now been built:
 - **Pickpocketing:** STEAL/PICKPOCKET/ROB, from sleepers, the distracted
   and the fooled.
 - **Eavesdropping:** `chatter`, loud lines through walls, LISTEN AT THE DOOR.
+- **Giving orders:** TELL REX TO ATTACK/STAY/FOLLOW/GO/FETCH/DROP, and "REX, …".
 
 ## Manipulating creatures
-
-### Giving orders
-
-TELL REX TO ATTACK THE GOBLIN, REX, STAY, REX, GUARD THE DOOR, REX, GO
-NORTH.
-
-- Builds on: taming, followers, character methods (`step_toward`,
-  `attack`, `go`).
-- Shape: an ORDER/TELL verb and "NAME, command" syntax for tamed
-  companions; a small set of orders (attack, stay, follow, go, fetch,
-  guard) stored as state and used by the tamed behaviour.
-- Effort: medium.
 
 ### Fear and morale
 

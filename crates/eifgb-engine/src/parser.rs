@@ -716,6 +716,26 @@ impl Grammar {
 
     /// Entities in scope whose vocabulary covers every word. Matches that
     /// end on a noun beat matches made only of adjectives.
+    /// The direction a word means ("n", "north", "up"), if any.
+    pub fn direction_of(&self, w: &str) -> Option<Direction> {
+        self.directions.get(w).copied()
+    }
+
+    /// Things in scope that a noun phrase ("the old dog") names. For orders
+    /// and "REX, SIT", outside the usual command patterns.
+    pub fn name_matches(&self, world: &World, phrase: &[String]) -> Vec<EntityId> {
+        self.name_matches_in(world, phrase, &world.scope())
+    }
+
+    /// Like [`Grammar::name_matches`], among the given entities.
+    pub fn name_matches_in(&self, world: &World, phrase: &[String], among: &[EntityId]) -> Vec<EntityId> {
+        let words: Vec<&String> = phrase.iter().filter(|w| !self.articles.contains(*w)).collect();
+        if words.is_empty() {
+            return Vec::new();
+        }
+        self.match_scope(world, among, &words)
+    }
+
     fn match_scope(&self, world: &World, scope: &[EntityId], words: &[&String]) -> Vec<EntityId> {
         let mut best_score = 0;
         let mut out = Vec::new();

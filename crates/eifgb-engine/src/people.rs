@@ -591,6 +591,120 @@ impl<H: ScriptHost> Game<H> {
         self.msg(key, &Ctx::new().text("faction", words));
     }
 
+    /// TELL REX TO ATTACK THE GOBLIN (also ORDER/ASK/COMMAND …, and "REX,
+    /// …"). Tamed characters, and those with `obeys`, take orders: attack,
+    /// stay, follow, go <direction>, fetch, drop.
+    pub(crate) fn order_action(&mut self, npc: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
+        let ctx = ctx.clone().entity("npc", npc);
+        if self.world.def(npc).kind != EntityKind::Character || !self.world.is_active(npc) {
+            self.msg("order.not_person", &ctx);
+            return false;
+        }
+        if self.world.is_asleep(npc) {
+            self.msg("talk.asleep", &ctx.clone().entity("target", npc));
+            return false;
+        }
+        if !self.world.obeys(npc) {
+            self.msg("order.ignored", &ctx);
+            return false;
+        }
+        let words: Vec<String> = self.grammar.split_commands(text.unwrap_or("")).concat();
+        let Some((verb, rest)) = words.split_first() else {
+            self.no_turn = true;
+            self.msg("order.confused", &ctx);
+            return false;
+        };
+        let attackish = matches!(verb.as_str(), "attack" | "kill" | "fight" | "bite" | "maul" | "sic" | "get" | "charge");
+        if attackish && rest.iter().any(|w| w == "me" || w == "myself") {
+            self.msg("order.wont_attack_you", &ctx);
+            return false;
+        }
+        let rest: Vec<String> = rest.iter().filter(|w| !matches!(w.as_str(), "it" | "me" | "here" | "up")).cloned().collect();
+        // Someone to attack can be elsewhere: the companion goes after them.
+        let everyone: Vec<EntityId> = (0..self.world.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&c| self.world.def(c).kind == EntityKind::Character && self.world.is_active(c))
+            .collect();
+        let named = self
+            .grammar
+            .name_matches(&self.world, &rest)
+            .into_iter()
+            .find(|&e| e != npc)
+            .or_else(|| self.grammar.name_matches_in(&self.world, &rest, &everyone).into_iter().find(|&e| e != npc));
+        let dir = rest.iter().find_map(|w| self.grammar_direction(w));
+        let pacifist = self.world.def(npc).npc.as_ref().is_some_and(|n| n.pacifist);
+        match verb.as_str() {
+            "attack" | "kill" | "fight" | "bite" | "maul" | "sic" | "get" | "charge"
+                if named.is_some_and(|t| self.world.def(t).kind == EntityKind::Character) =>
+            {
+                let t = named.unwrap_or(npc);
+                if t == PLAYER {
+                    self.msg("order.wont_attack_you", &ctx);
+                    return false;
+                }
+                if pacifist {
+                    self.msg("order.pacifist", &ctx);
+                    return false;
+                }
+                let key = self.world.def(t).key.clone();
+                self.world.set_order(npc, Some("attack"), Some(key));
+                self.msg("order.attack", &ctx.entity("target", t));
+            }
+            "fetch" | "bring" | "retrieve" | "get" if named.is_some() => {
+                let t = named.unwrap_or(npc);
+                let key = Value::Str(self.world.def(t).key.clone());
+                self.world.set_order(npc, None, None);
+                self.world.set(npc, "_fetching", key);
+                self.msg("order.fetch", &ctx.entity("target", t));
+            }
+            "stay" | "wait" | "sit" | "halt" | "stop" | "guard" | "down" => {
+                self.world.set_order(npc, Some("stay"), None);
+                self.msg("order.stay", &ctx);
+            }
+            "follow" | "come" | "heel" | "return" => {
+                self.world.set_order(npc, None, None);
+                self.msg("order.follow", &ctx);
+            }
+            "go" | "run" | "head" | "move" | "walk" if dir.is_some() => {
+                let d = dir.unwrap_or(eifgb_ir::Direction::North);
+                self.world.set_order(npc, Some("go"), Some(d.key().to_string()));
+                let words = self.grammar.direction_word(d);
+                self.msg("order.go", &ctx.text("direction", words));
+            }
+            "drop" | "release" | "leave" => {
+                let room = self.world.room_of(npc);
+                let items = self.world.contents(npc);
+                if items.is_empty() {
+                    self.msg("order.nothing_to_drop", &ctx);
+                    return false;
+                }
+                for &i in &items {
+                    self.world.unset(i, "worn");
+                    let _ = self.world.move_to(i, room);
+                }
+                let list = self.list_a(&items);
+                self.msg("order.drop", &ctx.text("list", list));
+            }
+            // A bare direction: GO that way.
+            w if self.grammar_direction(w).is_some() => {
+                let d = self.grammar_direction(w).unwrap_or(eifgb_ir::Direction::North);
+                self.world.set_order(npc, Some("go"), Some(d.key().to_string()));
+                let words = self.grammar.direction_word(d);
+                self.msg("order.go", &ctx.text("direction", words));
+            }
+            _ => {
+                self.no_turn = true;
+                self.msg("order.confused", &ctx);
+                return false;
+            }
+        }
+        true
+    }
+
+    fn grammar_direction(&self, w: &str) -> Option<eifgb_ir::Direction> {
+        self.grammar.direction_of(w)
+    }
+
     /// CALL X Y: names something `nameable`.
     pub(crate) fn rename_action(&mut self, t: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
         if !self.world.def(t).nameable {

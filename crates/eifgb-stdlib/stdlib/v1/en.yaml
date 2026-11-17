@@ -281,6 +281,15 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  order:
+    action: order
+    reach: false
+    patterns:
+      - "tell {target} to {text}"
+      - "order {target} to {text}"
+      - "ask {target} to {text}"
+      - "command {target} to {text}"
+      - "instruct {target} to {text}"
   eavesdrop:
     action: eavesdrop
     reach: false
@@ -507,6 +516,18 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  order.not_person: "There's nobody there to give orders to."
+  order.ignored: "${The(args.npc)} ignores you."
+  order.confused: "${The(args.npc)} looks at you blankly. Try something like \"tell ${the(args.npc)} to stay\", \"to attack\" someone, \"to follow\", \"to go north\" or \"to fetch\" something."
+  order.attack: "${The(args.npc)} goes for ${the(args.target)}!"
+  order.stay: "${The(args.npc)} stays where it is."
+  order.follow: "${The(args.npc)} comes back to your side."
+  order.go: "${The(args.npc)} heads ${args.direction}."
+  order.fetch: "${The(args.npc)} goes to fetch ${the(args.target)}."
+  order.drop: "${The(args.npc)} drops ${args.list}."
+  order.nothing_to_drop: "${The(args.npc)} isn't carrying anything."
+  order.wont_attack_you: "${The(args.npc)} won't attack you."
+  order.pacifist: "${The(args.npc)} won't fight."
   chatter.overheard: "${The(args.npc)} says to ${the(args.listener)}, \"${args.line}\""
   chatter.nearby: "You hear a voice ${args.from}: \"${args.line}\""
   eavesdrop.door: "You press your ear to ${the(args.door)} and listen."

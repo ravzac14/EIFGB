@@ -119,6 +119,7 @@ impl<H: ScriptHost> Game<H> {
             }
             (A::Steal, t) => self.steal_action(t, cmd.tool, ctx),
             (A::Eavesdrop, t) => self.eavesdrop_action(t, cmd.direction, ctx),
+            (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
             (A::Light, Some(t)) => self.light(t, true, ctx),
             (A::Extinguish, Some(t)) => self.light(t, false, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),

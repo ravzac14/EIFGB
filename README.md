@@ -995,7 +995,24 @@ characters:
 
 ### Tricks players can find
 
-Fifteen features reward players who try something clever:
+Sixteen features reward players who try something clever:
+
+- **Giving orders:** tamed characters, and any with `obeys: true` (a
+  hireling, a soldier), take orders: TELL REX TO … (or ORDER, ASK,
+  COMMAND, INSTRUCT), or just REX, ….
+
+  | Order | Does |
+  |---|---|
+  | ATTACK / KILL / GET the goblin | Goes after it, even into another room, until it's dead or out of reach. |
+  | STAY / SIT / WAIT / GUARD | Stays put (still fighting the player's enemies that come to it). |
+  | FOLLOW / COME / HEEL | Back to following the player. |
+  | GO NORTH (or just NORTH) | Goes that way, then stays there. |
+  | FETCH / BRING the stick | Fetches it. |
+  | DROP IT | Drops what it's carrying. |
+
+  "The wolf pup goes for the goblin!" Others "ignore you"; a pacifist
+  won't fight; nobody will attack the player; and anything else gets "Rex
+  looks at you blankly", with a hint (which doesn't take a turn).
 
 - **Eavesdropping:** characters with `chatter:` talk among themselves
   when they have someone awake to talk to and can't see the player.
@@ -1329,7 +1346,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH),
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1362,7 +1379,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`; rooms can be `trackless`,
+`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience`, `prints` and `sees_in_dark`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable` and (worn) `sees_in_dark`; the player can have `health`,

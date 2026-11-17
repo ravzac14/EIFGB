@@ -3,18 +3,8 @@
 Things a creative player might try, that we'd like the engine to support
 one day. Each builds on something that already exists. Built so far from
 the same list: disguises, bait, corpse stories, hiding, making noise, apologies (calming
-down, by asking), haggling, and taming, gifts and bribes.
-
-## Throwing
-
-THROW SPEAR AT WOLF hits from across the room. THROW STICK sends a
-follower dog to fetch it. THROW KEY ACROSS CHASM lands it in the next room.
-
-- Builds on: weapons and `damage`, followers, size and weight.
-- Shape: THROW X (AT Y / direction); thrown weapons do damage and land
-  in the room; followers with `fetches: true` bring things back;
-  `throwable_across` on exits.
-- Effort: medium.
+down, by asking), haggling, taming, gifts
+and bribes, and throwing.
 
 ## Naming things
 

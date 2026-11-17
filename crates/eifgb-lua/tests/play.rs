@@ -2203,3 +2203,85 @@ fn a_welcome_gift_is_an_apology_without_the_limit() {
     assert!(!out.contains("aunt attacks"), "{out}");
     assert_says(&mut g, "i", "You're carrying a bone and a pebble.");
 }
+
+// ---------------------------------------------------------------- throwing
+
+const THROWING: &str = r#"format: eifgb/0.1
+game: { id: t, title: Throwing, version: "1", start: ledge }
+player: { health: 30 }
+vars: { bridge: false }
+rooms:
+  ledge:
+    name: Ledge
+    description: A narrow ledge. A chasm yawns to the north; the far ledge is just a stone's throw away.
+    exits:
+      north: [{ to: far_ledge, when: vars.bridge }, { blocked: "The chasm is far too wide to jump." }]
+      east: meadow
+  far_ledge: { name: Far Ledge, exits: { south: ledge } }
+  meadow: { name: Meadow, exits: { west: ledge, east: den } }
+  den: { name: Den, exits: { west: meadow } }
+objects:
+  key: { name: key, in: player, traits: [portable] }
+  stick: { name: stick, in: player, traits: [portable] }
+  spear: { name: spear, in: player, traits: [portable], damage: 4 }
+  rock: { name: rock, in: player, traits: [portable] }
+  boulder: { name: boulder, in: ledge, traits: [portable], size: 5 }
+characters:
+  dog: { name: dog, in: ledge, behavior: follower, fetches: true }
+  wolf: { name: wolf, in: den, behavior: hunter, range: 0, wander: 0, health: 10, damage: 1 }
+"#;
+
+#[test]
+fn throwing_over_a_chasm_and_into_the_next_room() {
+    let mut g = game(compile_str(THROWING).story.unwrap());
+    assert_says(&mut g, "n", "The chasm is far too wide to jump.");
+    // Over an exit the player can't walk through.
+    assert_eq!(say(&mut g, "throw key north"), "You throw the key north, and it lands somewhere out of sight.");
+    assert!(!say(&mut g, "i").contains("key"));
+    // Nowhere to go that way: no turn taken.
+    assert_eq!(say(&mut g, "throw rock west"), "There's nowhere to throw anything that way.");
+    assert_eq!(say(&mut g, "take boulder"), "Taken.");
+    assert_eq!(say(&mut g, "throw boulder"), "The boulder is too heavy to throw.");
+}
+
+#[test]
+fn a_thrown_weapon_hits_and_lands_in_the_room() {
+    // No dog this time: it would fetch the spear.
+    let src = THROWING
+        .replace("in: den, behavior: hunter", "in: ledge, behavior: defender")
+        .replace("  dog: { name: dog, in: ledge, behavior: follower, fetches: true }\n", "");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_eq!(
+        say(&mut g, "throw spear at wolf"),
+        "You throw the spear at the wolf.\nYou hit the wolf with the spear.\nThe wolf attacks you."
+    );
+    assert_says(&mut g, "look", "a spear");
+    // Things that can't be hurt: it bounces off.
+    assert_eq!(
+        say(&mut g, "throw stick at boulder"),
+        "You throw the stick at the boulder.\nThe stick bounces off the boulder.\nThe wolf attacks you."
+    );
+}
+
+#[test]
+fn a_thrown_rock_draws_hunters_to_where_it_lands() {
+    let mut g = game(compile_str(THROWING).story.unwrap());
+    // The meadow is next to the den: the wolf hears the rock land.
+    say(&mut g, "throw rock east");
+    say(&mut g, "z");
+    let out = say(&mut g, "e");
+    assert!(out.contains("and a wolf here.") && out.contains("The wolf attacks you."), "{out}");
+}
+
+#[test]
+fn followers_that_fetch_bring_things_back_but_only_what_they_can_reach() {
+    let mut g = game(compile_str(THROWING).story.unwrap());
+    // Across the chasm: the dog can't get there, so it doesn't try.
+    assert!(!say(&mut g, "throw key north").contains("dog"));
+    let out = say(&mut g, "throw stick east");
+    assert!(out.contains("The dog bounds after the stick.") && out.contains("The dog goes east."), "{out}");
+    say(&mut g, "z");
+    assert_says(&mut g, "z", "The dog arrives.");
+    assert_says(&mut g, "z", "The dog drops the stick at your feet.");
+    assert_says(&mut g, "look", "You can see a stick");
+}

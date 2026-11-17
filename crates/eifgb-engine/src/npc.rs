@@ -83,6 +83,8 @@ pub enum NpcEvent {
     Fed { npc: EntityId, food: EntityId, room: EntityId, finished: bool },
     /// Reached where it last saw the player, and found nothing.
     Searched { npc: EntityId, room: EntityId },
+    /// Fetching something the player threw: `Grabbed` it, or `Brought` it back.
+    Fetched { npc: EntityId, item: EntityId, room: EntityId, brought: bool },
 }
 
 impl World {
@@ -213,6 +215,69 @@ impl World {
             self.set(h, "_last_seen", key.clone());
         }
         hunters.len()
+    }
+
+    /// Sends every fetching companion after `item`, which the player threw.
+    /// Returns the ones that set off, to be described.
+    pub fn send_fetchers(&mut self, item: EntityId) -> Vec<EntityId> {
+        let key = Value::Str(self.def(item).key.clone());
+        let fetchers: Vec<EntityId> = (0..self.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&id| self.def(id).npc.as_ref().is_some_and(|n| n.fetches && (n.behavior == Behavior::Follower)) || (self.is_tamed(id) && self.def(id).npc.as_ref().is_some_and(|n| n.fetches)))
+            .filter(|&id| self.is_active(id) && self.get(id, "_fetching").is_none())
+            // Only after things it can get to.
+            .filter(|&id| self.distance(id, item).is_some())
+            .collect();
+        for &f in &fetchers {
+            self.set(f, "_fetching", key.clone());
+        }
+        fetchers
+    }
+
+    /// One step of fetching, if it's fetching something: go to it, grab it,
+    /// bring it back to the player and drop it at their feet.
+    fn fetch_step(&mut self, npc: EntityId) -> Option<Option<NpcEvent>> {
+        let Some(Value::Str(key)) = self.get(npc, "_fetching").cloned() else { return None };
+        let Some(item) = self.id(&key) else {
+            self.unset(npc, "_fetching");
+            return None;
+        };
+        let room = self.room_of(npc)?;
+        if self.location(item) == Some(npc) {
+            if self.together(npc, PLAYER) {
+                let here = self.here();
+                self.move_to(item, Some(here)).ok()?;
+                self.unset(npc, "_fetching");
+                return Some(Some(NpcEvent::Fetched { npc, item, room, brought: true }));
+            }
+            let step = self.npc_step_toward(npc, PLAYER);
+            if step.is_none() {
+                // Can't get back to the player: drop it here.
+                let _ = self.move_to(item, Some(room));
+                self.unset(npc, "_fetching");
+            }
+            return Some(step);
+        }
+        // Only things lying loose in a room can be fetched.
+        let lying = self.location(item).filter(|&l| self.def(l).kind == EntityKind::Room);
+        match lying {
+            Some(r) if r == room => {
+                self.move_to(item, Some(npc)).ok()?;
+                Some(Some(NpcEvent::Fetched { npc, item, room, brought: false }))
+            }
+            Some(_) => match self.npc_step_toward(npc, item) {
+                Some(step) => Some(Some(step)),
+                // The way's been cut off: give up.
+                None => {
+                    self.unset(npc, "_fetching");
+                    None
+                }
+            },
+            None => {
+                self.unset(npc, "_fetching");
+                None
+            }
+        }
     }
 
     /// Takes a bite of `food`. It lasts as many bites as its size.
@@ -718,6 +783,9 @@ impl World {
                 let weapon = self.best_weapon(npc);
                 return self.attack(npc, enemy, weapon).into_iter().collect();
             }
+            if let Some(step) = self.fetch_step(npc) {
+                return step.into_iter().collect();
+            }
             if !self.together(npc, PLAYER) {
                 return self.npc_step_toward(npc, PLAYER).into_iter().collect();
             }
@@ -763,6 +831,7 @@ impl World {
             Behavior::Merchant if self.together(npc, PLAYER) => None,
             Behavior::Merchant => self.maybe_wander(npc, n.wander),
             Behavior::Guard => self.maybe_wander(npc, n.wander),
+            Behavior::Follower if self.get(npc, "_fetching").is_some() => self.fetch_step(npc).flatten(),
             Behavior::Follower if self.together(npc, PLAYER) => None,
             Behavior::Follower if in_range(self, PLAYER).is_some() => self.npc_step_toward(npc, PLAYER),
             Behavior::Follower => self.maybe_wander(npc, n.wander),

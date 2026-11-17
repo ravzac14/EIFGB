@@ -16,7 +16,12 @@ pub fn parse(src: &str) -> Result<Pattern, String> {
             if seen.contains(&slot) {
                 return Err(format!("slot '{{{name}}}' appears more than once"));
             }
-            if matches!(tokens.last(), Some(PatternToken::Slot(_))) {
+            // A direction is always a single, known word, so it can sit next
+            // to another slot ("throw {target} {direction}").
+            if let Some(PatternToken::Slot(prev)) = tokens.last()
+                && *prev != Slot::Direction
+                && slot != Slot::Direction
+            {
                 return Err("two slots in a row can't be told apart; put a word between them".into());
             }
             seen.push(slot);

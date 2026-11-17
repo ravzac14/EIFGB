@@ -93,6 +93,12 @@ impl<H: ScriptHost> Game<H> {
                     self.hear(room, "npc.eating_nearby");
                 }
             }
+            NpcEvent::Fetched { npc, item, room, brought } => {
+                if room == here {
+                    let key = if brought { "npc.brings" } else { "npc.grabs" };
+                    self.msg(key, &Ctx::new().entity("npc", npc).entity("target", item));
+                }
+            }
             NpcEvent::Searched { npc, room } => {
                 if room == here {
                     self.msg("npc.searches", &Ctx::new().entity("npc", npc));
@@ -230,6 +236,72 @@ impl<H: ScriptHost> Game<H> {
             self.msg("faction.calmer", &Ctx::new().text("faction", f.replace('_', " ")));
         }
         key == "apologize.accepted"
+    }
+
+    /// THROW X (AT Y / DIRECTION). At something that can be hurt, it's an
+    /// attack with X as the weapon; X then lands in the room. In a
+    /// direction, X lands in the next room that way (over an exit the
+    /// player may not be able to walk through, but not through a closed
+    /// door), making a small noise there. Companions that fetch go after it.
+    pub(crate) fn throw_action(
+        &mut self,
+        t: eifgb_ir::EntityId,
+        at: Option<EntityId>,
+        dir: Option<eifgb_ir::Direction>,
+        ctx: &Ctx,
+    ) -> bool {
+        if self.world.location(t) != Some(PLAYER) {
+            self.msg("throw.not_held", ctx);
+            return false;
+        }
+        if self.world.weight(t) > 3 {
+            self.msg("throw.too_heavy", ctx);
+            return false;
+        }
+        let here = self.world.here();
+        if let Some(y) = at {
+            if y == PLAYER {
+                self.msg("attack.self", ctx);
+                return false;
+            }
+            self.world.unset(t, "worn");
+            let _ = self.world.move_to(t, Some(here));
+            self.msg("throw.at", ctx);
+            let hurtable = !self.world.is_dead(y) && (self.world.health(y).is_some() || self.world.is_invincible(y));
+            match hurtable.then(|| self.world.attack(PLAYER, y, Some(t))).flatten() {
+                Some(event) => self.narrate(&event),
+                None => self.msg("throw.bounces", ctx),
+            }
+        } else if let Some(d) = dir {
+            let exit = self.world.def(here).exits.iter().find(|e| e.direction == d && e.to.is_some() && self.world.exit_visible(e)).cloned();
+            let Some(exit) = exit else {
+                self.no_turn = true;
+                self.msg("throw.no_way", ctx);
+                return false;
+            };
+            if let Some(door) = exit.through
+                && !self.world.is_open(door)
+            {
+                self.msg("throw.door", &ctx.clone().entity("door", door));
+                return false;
+            }
+            let to = exit.to.unwrap_or(here);
+            self.world.unset(t, "worn");
+            let _ = self.world.move_to(t, Some(to));
+            let words = self.grammar.direction_word(d);
+            self.msg("throw.direction", &ctx.clone().text("direction", words));
+            self.world.make_noise(to, 1);
+        } else {
+            self.world.unset(t, "worn");
+            let _ = self.world.move_to(t, Some(here));
+            self.msg("throw.away", ctx);
+        }
+        for f in self.world.send_fetchers(t) {
+            if self.world.together(f, PLAYER) {
+                self.msg("npc.fetches", &Ctx::new().entity("npc", f).entity("target", t));
+            }
+        }
+        true
     }
 
     /// GIVE X TO Y.

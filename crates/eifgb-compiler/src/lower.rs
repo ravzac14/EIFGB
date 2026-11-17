@@ -798,6 +798,7 @@ impl<'a> Lowerer<'a> {
                 ("tame_with", !t.tame_with.is_empty()),
                 ("likes", !t.likes.is_empty()),
                 ("bribe", t.bribe.is_some()),
+                ("fetches", t.fetches.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -879,6 +880,7 @@ impl<'a> Lowerer<'a> {
             tame_with: objects(self, "tame_with", &t.tame_with),
             likes: objects(self, "likes", &t.likes),
             bribe: t.bribe,
+            fetches: t.fetches.unwrap_or(false),
         })
     }
 

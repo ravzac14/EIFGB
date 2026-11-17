@@ -304,6 +304,9 @@ pub struct Thing {
     /// Money that buys it off.
     #[serde(default)]
     pub bribe: Option<u32>,
+    /// Fetches what the player throws (when tamed, or a follower).
+    #[serde(default)]
+    pub fetches: Option<bool>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

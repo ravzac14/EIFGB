@@ -991,7 +991,27 @@ characters:
 
 ### Tricks players can find
 
-Six features reward players who try something clever:
+Seven features reward players who try something clever:
+
+- **Throwing:** THROW (HURL, TOSS, CHUCK) X AT Y attacks from across the
+  room with X's `damage` (or the player's own, for anything that isn't a
+  weapon), and X lands in the room. At something that can't be hurt, it
+  bounces off. THROW X NORTH lands it in the next room, even over an
+  exit the player can't walk through, like a chasm whose `when:` is
+  false (though not through a closed door), and where it lands it makes
+  a small noise that draws hunters next door. THROW X just tosses it
+  aside. Anything weighing more than 3 is too heavy to throw. A tamed
+  companion or follower with `fetches: true` bounds after whatever the
+  player throws, if it can get there, and brings it back:
+
+  ```
+  > throw stick east
+  You throw the stick east, and it lands somewhere out of sight.
+  The dog bounds after the stick.
+  The dog goes east.
+  ...
+  The dog drops the stick at your feet.
+  ```
 
 - **Taming, gifts and bribes:** GIVE (HAND, OFFER, FEED) something to a
   character.
@@ -1175,7 +1195,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE),
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1206,7 +1226,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
-`forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the

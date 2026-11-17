@@ -226,6 +226,19 @@ verbs:
       - "pay {text} to {target}"
       - "bribe {target} with {text}"
       - "bribe {target}"
+  throw:
+    action: throw
+    patterns:
+      - "throw {target} at {tool}"
+      - "hurl {target} at {tool}"
+      - "toss {target} at {tool}"
+      - "chuck {target} at {tool}"
+      - "throw {target} {direction}"
+      - "toss {target} {direction}"
+      - "hurl {target} {direction}"
+      - "throw {target}"
+      - "toss {target}"
+      - "hurl {target}"
   accept:
     action: accept
     patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
@@ -312,7 +325,6 @@ lexicon:
     view: examine
     read: examine
     look over: examine
-    toss: drop
     throw away: drop
     head: go
     run: go
@@ -443,6 +455,17 @@ messages:
   sell.fixed: "${The(args.merchant)} doesn't haggle. It'll pay ${args.price}."
   sell.how_much: "How much? Try something like \"sell ${the(args.target)} for 5\"."
   accept.nothing: "There's no offer on the table."
+  throw.not_held: "You need to be holding ${the(args.target)} first."
+  throw.too_heavy: "${The(args.target)} is too heavy to throw."
+  throw.at: "You throw ${the(args.target)} at ${the(args.tool)}."
+  throw.bounces: "${The(args.target)} bounces off ${the(args.tool)}."
+  throw.away: "You toss ${the(args.target)} aside."
+  throw.direction: "You throw ${the(args.target)} ${args.direction}, and it lands somewhere out of sight."
+  throw.no_way: "There's nowhere to throw anything that way."
+  throw.door: "${The(args.door)} is in the way."
+  npc.fetches: "${The(args.npc)} bounds after ${the(args.target)}."
+  npc.grabs: "${The(args.npc)} grabs ${the(args.target)}."
+  npc.brings: "${The(args.npc)} drops ${the(args.target)} at your feet."
   give.whom: "Give ${the(args.target)} to whom?"
   give.not_held: "You're not holding ${the(args.target)}."
   give.not_person: "${The(args.tool)} can't take it."

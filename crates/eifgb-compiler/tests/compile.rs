@@ -510,3 +510,11 @@ fn haggle_is_a_merchant_percentage() {
     let out = with("characters:\n  p: { name: p, in: hall, haggle: 20 }\n");
     assert!(warnings(&out).iter().any(|w| w.contains("only matters for a merchant")), "{:#?}", warnings(&out));
 }
+
+#[test]
+fn a_direction_can_sit_next_to_another_slot() {
+    let out = with("verbs:\n  roll: { patterns: ['roll {target} {direction}'] }\n");
+    assert!(out.story.is_some(), "{:#?}", out.diagnostics);
+    let out = with("verbs:\n  hand: { patterns: ['hand {tool} {target}'] }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("two slots in a row"), "{:#?}", out.diagnostics);
+}

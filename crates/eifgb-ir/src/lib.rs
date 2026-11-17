@@ -360,6 +360,9 @@ pub struct Npc {
     /// Money that buys it off: it stops attacking the player.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bribe: Option<u32>,
+    /// Tamed or a follower, it fetches what the player throws.
+    #[serde(default)]
+    pub fetches: bool,
 }
 
 fn one_u32() -> u32 {
@@ -840,6 +843,8 @@ pub enum BuiltinAction {
     Give,
     /// Give a character money, to buy it off.
     Bribe,
+    /// Throw something at someone, or in a direction.
+    Throw,
 }
 
 impl BuiltinAction {

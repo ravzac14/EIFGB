@@ -281,6 +281,16 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  steal:
+    action: steal
+    patterns:
+      - "steal {target} from {tool}"
+      - "pickpocket {target} from {tool}"
+      - "pinch {target} from {tool}"
+      - "lift {target} from {tool}"
+      - "steal {target}"
+      - "pickpocket {target}"
+      - "rob {target}"
   light:
     action: light
     patterns:
@@ -485,6 +495,13 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  steal.done: "You slip ${the(args.target)} away from ${the(args.tool)} without being noticed."
+  steal.done_asleep: "You ease ${the(args.target)} away from ${the(args.tool)} without waking them."
+  steal.caught: "${The(args.tool)} catches you reaching for ${the(args.target)}!"
+  steal.nothing: "${The(args.tool)} has nothing worth taking."
+  steal.nobody: "There's nobody there to steal from."
+  steal.not_carrying: "${The(args.tool)} doesn't have ${the(args.target)}."
+  steal.worn: "${The(args.tool)} is wearing ${the(args.target)}. You'd never get it off unnoticed."
   light.done: "You light ${the(args.target)}."
   light.already: "${The(args.target)} is already lit."
   light.cant: "You can't light ${the(args.target)}."

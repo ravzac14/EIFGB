@@ -136,6 +136,33 @@ impl World {
         self.def(id).npc.as_ref().is_some_and(|n| n.pacifist)
     }
 
+    /// Busy with something (eating) this turn: too distracted to notice a thief.
+    fn mark_busy(&mut self, npc: EntityId) {
+        self.set(npc, "_busy", Value::Int(self.state.turn as i64));
+    }
+
+    pub fn is_distracted(&self, npc: EntityId) -> bool {
+        matches!(self.get(npc, "_busy"), Some(Value::Int(t)) if *t as u64 + 1 >= self.state.turn)
+    }
+
+    /// The player is caught stealing from `victim`: as good as an attack,
+    /// without the damage. Returns (let off this time, faction change).
+    pub fn caught_stealing(&mut self, victim: EntityId) -> (bool, Option<AttitudeChange>) {
+        self.provoke(victim, PLAYER)
+    }
+
+    /// Whether `victim` notices the player stealing from it. Not if it's
+    /// asleep, busy eating, or fooled by the player's disguise.
+    pub fn notices_theft(&self, victim: EntityId) -> bool {
+        if self.is_asleep(victim) || self.is_distracted(victim) || !self.can_see(victim, PLAYER) {
+            return false;
+        }
+        // A disguise fools it, unless it already has a grudge against the player.
+        let fooled = !self.is_foe(victim, PLAYER)
+            && self.def(victim).faction.as_deref().is_some_and(|f| f == self.player_side() && self.attitude(f) > 0);
+        !fooled
+    }
+
     /// Asleep: it does nothing and notices nothing until something wakes it.
     pub fn is_asleep(&self, id: EntityId) -> bool {
         self.def(id).kind == EntityKind::Character && self.flag(id, "asleep")
@@ -369,6 +396,7 @@ impl World {
         if self.location(food) != Some(room) {
             return None;
         }
+        self.mark_busy(npc);
         let left = match self.get(food, "_bites") {
             Some(Value::Int(i)) => *i,
             _ => i64::from(self.size(food).max(1)),
@@ -796,6 +824,7 @@ impl World {
         if !self.is_dead(corpse) || self.room_of(corpse) != Some(room) {
             return None;
         }
+        self.mark_busy(npc);
         self.move_to(corpse, None).ok()?;
         Some(NpcEvent::Ate { npc, corpse, room })
     }

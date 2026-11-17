@@ -113,6 +113,11 @@ impl<H: ScriptHost> Game<H> {
             (A::Bury, Some(t)) => self.bury_action(t, ctx),
             (A::Sneak, _) => self.sneak_action(cmd, ctx),
             (A::Peek, t) => self.peek_action(t, cmd.direction, ctx),
+            // PICKPOCKET GOBLIN / ROB GOBLIN: the one named is the victim.
+            (A::Steal, Some(t)) if cmd.tool.is_none() && self.world.def(t).kind == EntityKind::Character => {
+                self.steal_action(None, Some(t), &ctx.clone().entity("tool", t))
+            }
+            (A::Steal, t) => self.steal_action(t, cmd.tool, ctx),
             (A::Light, Some(t)) => self.light(t, true, ctx),
             (A::Extinguish, Some(t)) => self.light(t, false, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
@@ -742,7 +747,15 @@ impl<H: ScriptHost> Game<H> {
 
     // ---------------------------------------------------- taking and dropping
 
-    fn take(&mut self, t: EntityId, from: Option<EntityId>, ctx: &Ctx) -> bool {
+    pub(crate) fn take(&mut self, t: EntityId, from: Option<EntityId>, ctx: &Ctx) -> bool {
+        // Taking from someone alive is stealing.
+        if let Some(f) = from
+            && self.world.def(f).kind == EntityKind::Character
+            && !self.world.is_dead(f)
+            && f != PLAYER
+        {
+            return self.steal_action(Some(t), Some(f), ctx);
+        }
         let w = &self.world;
         let fit = w.fits(t, PLAYER);
         let key = if let Some(f) = from

@@ -23,21 +23,10 @@ Everything from the first list has now been built:
   room, not its description.
 - **Darkness:** `dark` rooms, LIGHT and EXTINGUISH, and seeing only what
   you hold in the dark.
+- **Pickpocketing:** STEAL/PICKPOCKET/ROB, from sleepers, the distracted
+  and the fooled.
 
 ## Stealth and sneaking
-
-### Pickpocketing
-
-TAKE KEY FROM GOBLIN while it's eating bait, asleep, or fooled by your
-disguise. Get caught and it costs the victim's patience and its faction's
-attitude.
-
-- Builds on: bait, disguises, patience, faction attitude, and characters'
-  belongings (out of scope today).
-- Shape: characters' carried things in scope for TAKE … FROM; a chance or
-  rule for being noticed (not distracted, not disguised); a `pickpocket`
-  message set; `guarded: true` on things that can't be lifted.
-- Effort: medium.
 
 ### Eavesdropping
 

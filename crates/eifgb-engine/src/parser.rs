@@ -590,6 +590,15 @@ impl Grammar {
             return Err(NounFail::Missing);
         }
         let mut scope = world.scope();
+        // Stealing (or TAKE … FROM someone): what they're carrying, in plain sight.
+        let victims: Vec<EntityId> = match (action, tool) {
+            (Some(BuiltinAction::Take | BuiltinAction::Steal), Some(c)) if world.def(c).kind == eifgb_ir::EntityKind::Character => vec![c],
+            (Some(BuiltinAction::Steal), None) => scope.iter().copied().filter(|&c| world.def(c).kind == eifgb_ir::EntityKind::Character && c != PLAYER).collect(),
+            _ => Vec::new(),
+        };
+        for v in victims {
+            scope.extend(world.contents(v).into_iter().filter(|&i| !world.is_hidden(i)));
+        }
         // What merchants here are selling can be looked at and bought.
         if matches!(action, Some(BuiltinAction::Buy | BuiltinAction::Examine | BuiltinAction::Offer)) {
             for m in world.merchants_here() {

@@ -995,7 +995,18 @@ characters:
 
 ### Tricks players can find
 
-Thirteen features reward players who try something clever:
+Fourteen features reward players who try something clever:
+
+- **Pickpocketing:** STEAL KEY FROM GUARD (also TAKE … FROM, PICKPOCKET …
+  FROM, LIFT, PINCH), or PICKPOCKET GUARD / ROB GUARD for the most
+  valuable thing it carries. It works if the victim is asleep, busy eating
+  (bait), or fooled by the player's disguise (unless it already has a
+  grudge): "You slip the bead away from the goblin without being
+  noticed." Worn things only come off a sleeper. Otherwise: "The goblin
+  catches you reaching for the bead!" Nothing is taken, and it counts as
+  provoking the victim (patience, foes, and the faction, if anyone saw).
+  A merchant who catches the player won't trade with them until they
+  apologise.
 
 - **Darkness:** a room with `dark: true` can only be seen in by the light
   of a `light_source` that's lit (`lit` or `on`) and in plain sight:
@@ -1294,6 +1305,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
+STEAL … FROM (PICKPOCKET, ROB),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.

@@ -902,6 +902,8 @@ pub enum BuiltinAction {
     Light,
     /// Put out a `light_source`.
     Extinguish,
+    /// Take something a character is carrying, without being caught.
+    Steal,
 }
 
 impl BuiltinAction {

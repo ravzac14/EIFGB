@@ -373,6 +373,93 @@ impl<H: ScriptHost> Game<H> {
         true
     }
 
+    /// STEAL X FROM Y, TAKE X FROM Y (a character), PICKPOCKET Y. It works
+    /// if Y is asleep, busy eating, or fooled by a disguise; otherwise Y
+    /// catches the player, which provokes it like an attack, and a merchant
+    /// stops trading.
+    pub(crate) fn steal_action(&mut self, item: Option<EntityId>, victim: Option<EntityId>, ctx: &Ctx) -> bool {
+        let victim = victim.or_else(|| {
+            item.and_then(|i| self.world.location(i)).filter(|&l| self.world.def(l).kind == EntityKind::Character)
+        });
+        let Some(victim) = victim.filter(|&v| v != PLAYER) else {
+            // Nobody to steal from: it's lying about, so just take it.
+            return match item {
+                Some(i) => self.take(i, None, ctx),
+                None => {
+                    self.msg("steal.nobody", ctx);
+                    false
+                }
+            };
+        };
+        let ctx = ctx.clone().entity("tool", victim);
+        if !self.world.is_active(victim) {
+            self.msg("steal.nobody", &ctx);
+            return false;
+        }
+        let asleep = self.world.is_asleep(victim);
+        // PICKPOCKET Y: the most valuable thing it has that can be lifted.
+        let item = item.or_else(|| {
+            self.world
+                .contents(victim)
+                .into_iter()
+                .filter(|&i| !self.world.is_hidden(i) && (asleep || !self.world.flag(i, "worn")))
+                .max_by_key(|&i| self.world.def(i).price.unwrap_or(0))
+        });
+        let Some(item) = item else {
+            self.msg("steal.nothing", &ctx);
+            return false;
+        };
+        let ctx = ctx.entity("target", item);
+        if self.world.location(item) != Some(victim) {
+            self.msg("steal.not_carrying", &ctx);
+            return false;
+        }
+        if self.world.flag(item, "worn") && !asleep {
+            self.msg("steal.worn", &ctx);
+            return false;
+        }
+        let too_much = match self.world.fits(item, PLAYER) {
+            Fit::Yes => None,
+            Fit::TooBig => Some("take.too_big"),
+            Fit::TooHeavy => Some("take.too_heavy"),
+            Fit::Full => Some("take.full"),
+        };
+        if let Some(k) = too_much {
+            self.msg(k, &ctx);
+            return false;
+        }
+        if self.world.notices_theft(victim) {
+            self.msg("steal.caught", &ctx);
+            if self.world.def(victim).npc.as_ref().is_some_and(|n| n.behavior == Behavior::Merchant) {
+                self.world.set(victim, "_refuses", Value::Bool(true));
+            }
+            let (tolerated, attitude) = self.world.caught_stealing(victim);
+            if let Some(a) = attitude {
+                self.announce_attitude(&a);
+            }
+            if tolerated {
+                self.msg("npc.losing_patience_you", &Ctx::new().entity("target", victim));
+            }
+            return false;
+        }
+        self.world.unset(item, "worn");
+        let _ = self.world.move_to(item, Some(PLAYER));
+        self.world.learn(item);
+        self.msg(if asleep { "steal.done_asleep" } else { "steal.done" }, &ctx);
+        true
+    }
+
+    /// "The goblins are growing wary of you." and the like.
+    fn announce_attitude(&mut self, a: &crate::npc::AttitudeChange) {
+        let words = a.faction.replace('_', " ");
+        let key = match (a.left <= 0, a.disguise.as_deref() == Some(a.faction.as_str())) {
+            (true, true) => "faction.sees_through",
+            (true, false) => "faction.turns",
+            (false, _) => "faction.wary",
+        };
+        self.msg(key, &Ctx::new().text("faction", words));
+    }
+
     /// CALL X Y: names something `nameable`.
     pub(crate) fn rename_action(&mut self, t: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
         if !self.world.def(t).nameable {

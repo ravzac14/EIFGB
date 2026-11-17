@@ -2788,3 +2788,82 @@ fn a_lamp_lights_the_inside_of_whatever_youre_shut_in() {
     // Put it out, and it's dark in there.
     assert_says(&mut g, "put out lantern", "It's pitch dark.");
 }
+
+// ------------------------------------------------------------ pickpocketing
+
+const THIEF: &str = r#"format: eifgb/0.1
+game: { id: t, title: Thief, version: "1", start: square }
+player: { health: 30, money: 0 }
+factions:
+  goblins: { hostile_to: [player], patience: 2 }
+  townsfolk: {}
+rooms:
+  square: { name: Square, exits: { north: barracks, east: shop } }
+  barracks: { name: Barracks, exits: { south: square } }
+  shop: { name: Shop, exits: { west: square } }
+objects:
+  key: { name: brass key, synonyms: [key], in: guard, traits: [portable] }
+  purse: { name: purse, in: guard, traits: [portable], price: 10 }
+  hat: { name: guard's hat, synonyms: [hat], in: guard, traits: [portable, wearable], state: { worn: true } }
+  helmet: { name: goblin helmet, synonyms: [helmet], in: player, traits: [portable, wearable], disguise: goblins }
+  ring: { name: ring, in: peddler, traits: [portable], price: 20 }
+  bead: { name: bead, in: goblin, traits: [portable] }
+  bone: { name: bone, in: goblin, traits: [portable] }
+  pie: { name: pie, in: player, traits: [portable], eaten_by: [goblins], size: 4 }
+characters:
+  guard: { name: guard, in: barracks, faction: townsfolk, health: 20, patience: 1, state: { asleep: true } }
+  goblin: { name: goblin, in: square, faction: goblins, behavior: guard, health: 20, damage: 1 }
+  peddler: { name: peddler, in: shop, behavior: merchant, wander: 0, faction: townsfolk }
+"#;
+
+fn thief(cmds: &[&str]) -> Game<LuaHost> {
+    let mut g = game(compile_str(THIEF).story.unwrap());
+    for c in cmds {
+        say(&mut g, c);
+    }
+    g
+}
+
+#[test]
+fn robbing_a_sleeper() {
+    let mut g = thief(&["sneak north"]);
+    assert_eq!(say(&mut g, "steal key from guard"), "You ease the brass key away from the guard without waking them.");
+    // PICKPOCKET takes the most valuable thing; TAKE … FROM someone is stealing too.
+    assert_says(&mut g, "pickpocket guard", "the purse");
+    assert_says(&mut g, "take hat from guard", "You ease the guard's hat away");
+    assert_eq!(say(&mut g, "rob guard"), "The guard has nothing worth taking.");
+    assert_says(&mut g, "i", "a brass key");
+}
+
+#[test]
+fn getting_caught_and_what_a_disguise_or_bait_does() {
+    let mut g = thief(&[]);
+    assert_says(&mut g, "steal bead from goblin", "The goblin catches you reaching for the bead!");
+    // Once it has a grudge, no disguise fools it.
+    say(&mut g, "wear helmet");
+    assert_says(&mut g, "steal bead from goblin", "catches you");
+    // A fresh goblin is fooled by the helmet.
+    let mut g = thief(&["wear helmet"]);
+    assert_says(&mut g, "steal bead from goblin", "You slip the bead away from the goblin without being noticed.");
+    // And one busy eating doesn't notice either.
+    let mut g = thief(&["drop pie"]);
+    assert_says(&mut g, "steal bone from goblin", "without being noticed");
+}
+
+#[test]
+fn awake_and_wearing_it_is_too_much() {
+    let src = THIEF.replace("health: 20, patience: 1, state: { asleep: true } }", "health: 20, patience: 1 }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "n");
+    assert_says(&mut g, "steal hat from guard", "The guard is wearing the guard's hat.");
+}
+
+#[test]
+fn a_merchant_who_catches_you_stops_trading() {
+    let mut g = thief(&["e"]);
+    let out = say(&mut g, "steal ring from peddler");
+    assert!(out.contains("The peddler catches you reaching for the ring!") && out.contains("The townsfolk are growing wary of you."), "{out}");
+    assert_says(&mut g, "buy ring", "won't trade with you any more");
+    say(&mut g, "apologize to peddler");
+    assert_says(&mut g, "wares", "The peddler has for sale");
+}

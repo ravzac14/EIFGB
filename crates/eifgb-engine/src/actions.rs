@@ -584,6 +584,8 @@ impl<H: ScriptHost> Game<H> {
             Some("take.fixed")
         } else if w.is_within(PLAYER, t) {
             Some("enter.held")
+        } else if w.def(PLAYER).capacity == Some(0) {
+            Some("take.cant_carry")
         } else if fit == Fit::TooBig {
             Some("take.too_big")
         } else if fit == Fit::Full {

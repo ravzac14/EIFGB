@@ -95,7 +95,7 @@ impl<'a> Lowerer<'a> {
             exits: vec![],
             unlocks_with: None,
             talk: None,
-            capacity: s.player.capacity,
+            capacity: s.player.capacity.and_then(|c| c.limit()),
             size: s.player.size.unwrap_or(1),
             revealed_by: vec![],
             handlers: vec![],

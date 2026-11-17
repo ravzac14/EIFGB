@@ -966,6 +966,19 @@ fn sizes_decide_what_fits() {
 }
 
 #[test]
+fn a_zero_capacity_carries_nothing_and_none_carries_anything() {
+    let things = "objects:\n  pebble: { name: pebble, in: hall, traits: [portable] }\n  boulder: { name: boulder, in: hall, traits: [portable], size: 9 }\n";
+    let mut g = small(&format!("player: {{ capacity: 0 }}\n{things}"));
+    assert_says(&mut g, "take pebble", "You can't carry anything.");
+    assert_says(&mut g, "take all", "You can't carry anything.");
+    for word in ["none", "None", "~"] {
+        let mut g = small(&format!("player: {{ capacity: {word} }}\n{things}"));
+        assert_says(&mut g, "take boulder", "Taken.");
+        assert_says(&mut g, "take pebble", "Taken.");
+    }
+}
+
+#[test]
 fn custom_verbs_check_reach_too() {
     let src = format!(
         "{CONTAINERS}  label: {{ name: label, in: case, traits: [scenery] }}\nverbs:\n  polish: {{ patterns: ['polish {{target}}'], default: \"It gleams.\" }}\n  read: {{ patterns: ['read {{target}}'], reach: false }}\n"

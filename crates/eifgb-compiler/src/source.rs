@@ -93,10 +93,61 @@ fn yes() -> bool {
 pub struct Player {
     #[serde(default)]
     pub description: Option<String>,
+    /// How much the player can carry: a number (0 means nothing at all),
+    /// or `none` (the default) for no limit.
     #[serde(default)]
-    pub capacity: Option<u32>,
+    pub capacity: Option<Capacity>,
     #[serde(default)]
     pub size: Option<u32>,
+}
+
+/// A carrying capacity: a whole number, or `none` (or null) for no limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Capacity {
+    Limit(u32),
+    Unlimited,
+}
+
+impl Capacity {
+    pub fn limit(self) -> Option<u32> {
+        match self {
+            Capacity::Limit(n) => Some(n),
+            Capacity::Unlimited => None,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Capacity {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::{Error, Unexpected, Visitor};
+        struct V;
+        impl Visitor<'_> for V {
+            type Value = Capacity;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a whole number, or `none` for no limit")
+            }
+            fn visit_u64<E: Error>(self, v: u64) -> Result<Capacity, E> {
+                u32::try_from(v).map(Capacity::Limit).map_err(|_| E::custom("capacity is too large"))
+            }
+            fn visit_i64<E: Error>(self, v: i64) -> Result<Capacity, E> {
+                match u64::try_from(v) {
+                    Ok(v) => self.visit_u64(v),
+                    Err(_) => Err(E::custom("capacity can't be negative; use 0 to carry nothing, or `none` for no limit")),
+                }
+            }
+            fn visit_str<E: Error>(self, v: &str) -> Result<Capacity, E> {
+                if v.eq_ignore_ascii_case("none") {
+                    Ok(Capacity::Unlimited)
+                } else {
+                    Err(E::invalid_value(Unexpected::Str(v), &self))
+                }
+            }
+            fn visit_unit<E: Error>(self) -> Result<Capacity, E> {
+                Ok(Capacity::Unlimited)
+            }
+        }
+        d.deserialize_any(V)
+    }
 }
 
 #[derive(Debug, Deserialize)]

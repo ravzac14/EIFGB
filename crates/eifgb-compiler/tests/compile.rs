@@ -412,3 +412,19 @@ fn state_fields_cannot_shadow_builtin_fields_or_methods() {
 fn script_paths_cannot_escape_the_project() {
     assert_error(&with("scripts: ['../../etc/passwd']\n"), "must not contain '..'");
 }
+
+#[test]
+fn player_capacity_is_a_number_or_none() {
+    for ok in ["0", "5", "none", "~"] {
+        let out = with(&format!("player: {{ capacity: {ok} }}\n"));
+        assert!(out.story.is_some(), "capacity {ok}: {:#?}", out.diagnostics);
+    }
+    let out = with("player: { capacity: lots }\n");
+    assert!(out.story.is_none());
+    assert!(format!("{:?}", out.diagnostics).contains("a whole number, or `none` for no limit"), "{:#?}", out.diagnostics);
+    let out = with("player: { capacity: -1 }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("can't be negative"), "{:#?}", out.diagnostics);
+    // Starting with things in hand that a capacity of 0 can't hold is worth a warning.
+    let out = with("player: { capacity: 0 }\nobjects:\n  coin: { name: coin, in: player, traits: [portable] }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("more than its capacity of 0")), "{:#?}", warnings(&out));
+}

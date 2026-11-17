@@ -347,6 +347,7 @@ messages:
   take.person: "${The(args.target)} wouldn't care for that."
   take.self: "You can't take yourself."
   take.full: "You're carrying too much already."
+  take.cant_carry: "You can't carry anything."
   take.too_big: "${The(args.target)} is too big to carry."
   take.not_in: "${The(args.target)} isn't in ${the(args.tool)}."
   take.not_on: "${The(args.target)} isn't on ${the(args.tool)}."

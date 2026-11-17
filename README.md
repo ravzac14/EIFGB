@@ -638,8 +638,23 @@ You're carrying a cloth bag (open) (containing a coin) and a small box (containi
 container, supporter or the player can have a `capacity`, which limits the
 total size of what's directly in or on it (or carried). Without a
 `capacity`, nothing bigger than the holder itself fits, so a piano never
-goes into a jar. The player can carry anything unless given a capacity
-with `player: { capacity: 10 }`.
+goes into a jar.
+
+**Carrying capacity.** The player's own `capacity` limits what they can
+carry, counting the size of each thing held (not what's inside it):
+
+```yaml
+player:
+  capacity: 10     # total size they can carry
+```
+
+| `capacity` | The player can carry |
+|---|---|
+| left out, `none` or `~` | anything (the default) |
+| `0` | nothing at all: TAKE says "You can't carry anything." |
+| a number | things up to that total size. Too much gives "You're carrying too much already.", and one thing bigger than the whole capacity gives "The boulder is too big to carry." |
+
+`check` warns if the player starts out carrying more than their capacity.
 
 ```
 > put piano in jar
@@ -740,7 +755,9 @@ end-of-turn event.
 `lockable`, `door`, `wearable`, `edible`, `light_source`, `enterable`,
 `transparent`. `open` is shorthand for `state: { open: true }`. Things can
 also have a `size` (default 1) and a `capacity`; see
-[Containers and supporters](#containers-and-supporters).
+[Containers and supporters](#containers-and-supporters). The player's
+carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
+(the default) carries anything.
 
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including

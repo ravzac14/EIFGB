@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -195,7 +195,7 @@ impl<'a> Lowerer<'a> {
                 start: start.unwrap_or(PLAYER),
                 max_score: s.game.max_score,
                 ai_fallback: s.game.ai_fallback,
-                settings: Settings { describe_state: s.settings.describe_state },
+                settings: Settings { describe_state: s.settings.describe_state, voice: s.player.voice.unwrap_or(2) },
             },
             intro,
             vars: s.vars.into_iter().collect(),
@@ -1131,8 +1131,15 @@ impl<'a> Lowerer<'a> {
                 }
                 found
             });
-            if t.say.is_none() && t.run.is_none() && t.end.is_none() {
-                self.d.warn(&path, "this timer does nothing; give it 'say', 'do' or 'end'");
+            let noise = t.noise.as_ref().map(|n| {
+                if n.loudness == 0 {
+                    self.d.error(format!("{path}.noise.loudness"), "a noise nobody can hear does nothing; use 1 or more");
+                }
+                let at = n.at.as_deref().and_then(|a| self.entity_ref(a, &format!("{path}.noise.at")));
+                Noise { at, loudness: n.loudness }
+            });
+            if t.say.is_none() && t.run.is_none() && t.end.is_none() && noise.is_none() {
+                self.d.warn(&path, "this timer does nothing; give it 'say', 'do', 'end' or 'noise'");
             }
             out.push(Timer {
                 key: key.clone(),
@@ -1144,6 +1151,7 @@ impl<'a> Lowerer<'a> {
                 say: self.text_opt(t.say.as_deref(), &format!("{path}.say")),
                 run: t.run.as_deref().map(|r| self.code(r, &format!("{path}.do"))),
                 end,
+                noise,
             });
         }
         out

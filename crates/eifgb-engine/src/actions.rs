@@ -104,6 +104,12 @@ impl<H: ScriptHost> Game<H> {
             (A::Sell, Some(t)) => self.sell(t, cmd.tool, ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),
+            (A::Shout, _) => {
+                self.msg("shout.done", ctx);
+                let voice = self.world.story().meta.settings.voice;
+                self.world.make_noise(PLAYER, voice);
+                true
+            }
             _ => {
                 self.msg("action.nothing", ctx);
                 false

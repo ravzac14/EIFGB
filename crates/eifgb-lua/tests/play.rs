@@ -1879,3 +1879,93 @@ characters:
     say(&mut g, "hit knight with sword");
     assert!(!say(&mut g, "x knight").contains("wounded"));
 }
+
+// ------------------------------------------------------------------ noise
+
+const TOWN: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: START }
+player: { health: 30 }
+rooms:
+  lair: { name: Lair, exits: { east: tunnel } }
+  tunnel: { name: Tunnel, exits: { west: lair, east: square } }
+  square: { name: Square, exits: { west: tunnel, east: belfry, south: shop } }
+  belfry: { name: Belfry, exits: { west: square } }
+  shop: { name: Shop, exits: { north: square } }
+objects:
+  pot: { name: pot, in: shop, traits: [portable], on: { bang: 'self:make_noise(3); say(\"BONG.\")' } }
+characters:
+  ghoul: { name: ghoul, in: lair, behavior: hunter, range: 0, wander: 0, health: 30 }
+verbs:
+  bang: { patterns: ['bang {target}'] }
+";
+
+fn town(start: &str, extra: &str) -> Game<LuaHost> {
+    let out = compile_str(&format!("{}{extra}", TOWN.replace("START", start)));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+#[test]
+fn shouting_draws_hunters_within_earshot() {
+    // The square is two rooms from the lair: in earshot of a shout (voice 2).
+    let mut g = town("square", "");
+    assert_says(&mut g, "shout", "You shout at the top of your lungs.");
+    assert_says(&mut g, "z", "The ghoul arrives.");
+    assert_says(&mut g, "z", "The ghoul attacks you.");
+    // The belfry is three rooms away: out of earshot.
+    let mut g = town("belfry", "");
+    say(&mut g, "yell");
+    for _ in 0..4 {
+        assert!(!say(&mut g, "z").contains("ghoul"));
+    }
+}
+
+#[test]
+fn a_louder_voice_carries_further() {
+    let src = TOWN.replace("START", "belfry").replace("player: { health: 30 }", "player: { health: 30, voice: 3 }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "shout");
+    say(&mut g, "z");
+    assert_says(&mut g, "z", "The ghoul arrives.");
+}
+
+#[test]
+fn a_timer_can_make_a_noise_somewhere() {
+    // The bell rings in the belfry while the player waits in the shop.
+    let mut g = town("shop", "timers:\n  bell: { after: 1, say: A bell tolls in the belfry., noise: { at: belfry, loudness: 4 } }\n");
+    assert_says(&mut g, "z", "A bell tolls in the belfry.");
+    // It goes to the belfry, searches, and gives up. The player then walks in.
+    for _ in 0..4 {
+        say(&mut g, "z");
+    }
+    let out = say(&mut g, "n");
+    assert!(out.contains("Square"), "{out}");
+    let out = say(&mut g, "e");
+    assert!(out.contains("You can see a ghoul here."), "{out}");
+}
+
+#[test]
+fn a_noise_follows_the_thing_that_makes_it() {
+    // An alarm clock in the player's pocket: the noise is wherever they are.
+    let src = format!(
+        "{}timers:\n  alarm: {{ after: 1, say: Your alarm clock goes off!, noise: {{ at: clock, loudness: 2 }} }}\n",
+        TOWN.replace("START", "square").replace("  pot:", "  clock: { name: alarm clock, in: player, traits: [portable] }\n  pot:")
+    );
+    let mut g = game(compile_str(&src).story.unwrap());
+    // Timers go off at the end of a turn, after characters have moved, so
+    // it sets off one turn later than a shout would.
+    assert_says(&mut g, "z", "Your alarm clock goes off!");
+    say(&mut g, "z");
+    assert_says(&mut g, "z", "The ghoul arrives.");
+}
+
+#[test]
+fn scripts_can_make_noise() {
+    let mut g = town("shop", "");
+    assert_says(&mut g, "bang pot", "BONG.");
+    // Three rooms to the shop, one a turn starting with this one: it comes
+    // all the way, and finds the player.
+    say(&mut g, "z");
+    assert_says(&mut g, "z", "The ghoul arrives.");
+    assert_says(&mut g, "z", "The ghoul attacks you.");
+}

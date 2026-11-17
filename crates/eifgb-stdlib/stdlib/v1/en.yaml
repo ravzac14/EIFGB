@@ -207,6 +207,9 @@ verbs:
   wares:
     action: wares
     patterns: ["wares", "list wares", "browse", "shop", "trade", "trade with {target}", "browse {target}"]
+  shout:
+    action: shout
+    patterns: ["shout", "shout {text}", "yell", "yell {text}", "scream", "holler", "make noise", "make a noise", "call out"]
   health:
     action: health
     patterns: ["health", "diagnose", "hp", "status"]
@@ -365,6 +368,7 @@ messages:
   attack.done: "You hit ${the(args.target)}${if args.weapon} with ${the(args.weapon)}${end}."
   attack.not_weapon: "${The(args.tool)} isn't much of a weapon."
   attack.not_held: "You need to be holding ${the(args.tool)} first."
+  shout.done: "You shout at the top of your lungs."
   health.full: "You're in perfect health."
   health.hurt: "You're hurt: ${args.health} out of ${args.max}."
   health.none: "You feel fine."

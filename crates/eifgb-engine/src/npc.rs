@@ -149,6 +149,25 @@ impl World {
             .collect()
     }
 
+    /// A noise in `room` (or the room a thing is in): hunters that can reach
+    /// it within `loudness` rooms come to investigate (it becomes where
+    /// they "last saw" the player), whatever their `range`. Returns how
+    /// many were drawn.
+    pub fn make_noise(&mut self, at: EntityId, loudness: u32) -> usize {
+        let Some(room) = self.room_of(at) else { return 0 };
+        let key = Value::Str(self.def(room).key.clone());
+        let hunters: Vec<EntityId> = (0..self.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&id| self.def(id).npc.as_ref().is_some_and(|n| n.behavior == Behavior::Hunter))
+            .filter(|&id| self.is_active(id))
+            .filter(|&id| self.distance(id, room).is_some_and(|d| d <= loudness))
+            .collect();
+        for &h in &hunters {
+            self.set(h, "_last_seen", key.clone());
+        }
+        hunters.len()
+    }
+
     /// Takes a bite of `food`. It lasts as many bites as its size.
     pub fn npc_feed(&mut self, npc: EntityId, food: EntityId) -> Option<NpcEvent> {
         let room = self.room_of(npc)?;

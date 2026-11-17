@@ -656,8 +656,12 @@ tests too.
   crossroads.
 - **Bargaining:** a merchant who only trades with players who've killed
   the goblin chief. Check `world.chief.dead` in a `before_buy` handler.
+- **Make some noise:** give the hunters `range: 0`, so they never notice
+  the player on their own, and have the player SHOUT from inside the
+  closed barrel to bring both packs to the crossroads. Or add a shrine
+  bell that rings every 15 actions, with `noise: { at: shrine, loudness: 3 }`.
 - **More tricks:** [IDEAS.md](IDEAS.md) lists features we'd like to add
-  next, such as making noise to draw hunters, taming, and throwing.
+  next, such as taming, haggling and throwing.
 - **Revenge:** a `defeated` handler on the young wolf that sets
   `vars.alpha_angry`, and an alpha `act` that ignores its wounds when
   it's angry.

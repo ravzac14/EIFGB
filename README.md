@@ -790,6 +790,7 @@ timers:
 | `running` | Whether it counts from the start of the game. Defaults to `true`, or `false` if it has `started_by`. |
 | `when` | A Lua condition checked when it's due. If false, this firing is skipped. |
 | `say`, `do`, `end` | What happens: print text, run Lua, end the game. Any combination. |
+| `noise: { at, loudness }` | A noise that hunters within `loudness` rooms come to investigate. `at` is a room, or a thing (the noise is wherever it is); without it, wherever the player is. See [Tricks players can find](#tricks-players-can-find). |
 
 A timer started by an action counts the actions *after* that one. With
 `after: 3`, lighting the fuse and then waiting three times gives the
@@ -980,7 +981,25 @@ characters:
 
 ### Tricks players can find
 
-Four features reward players who try something clever:
+Five features reward players who try something clever:
+
+- **Making noise:** SHOUT (or YELL, SCREAM, MAKE NOISE) draws hunters
+  that can reach the player within 2 rooms (`player: { voice: 3 }`
+  carries further). They come to investigate whatever their `range`,
+  search, and give up if they find nobody, so a player can shout from
+  inside the barrel and let two packs meet outside. A timer can make a
+  noise too, like a bell that rings every few actions:
+
+  ```yaml
+  timers:
+    bell:
+      every: 10
+      say: The temple bell tolls.
+      noise: { at: belfry, loudness: 3 }
+  ```
+
+  In Lua, `make_noise(world.belfry, 3)` or `self:make_noise(3)` (for
+  BANG POT or RING BELL).
 
 - **Hiding:** a player shut inside something they can't see out of (a
   closed barrel, a wardrobe) can't be seen. Hunters go to where they last
@@ -1098,7 +1117,7 @@ In-game commands that every game understands include LOOK, EXAMINE (X),
 TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
-ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, HEALTH (DIAGNOSE),
+ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, HEALTH (DIAGNOSE), SHOUT (YELL),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1132,7 +1151,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
-`damage` and `money`. Events: `defeated` on a character, `died` at the
+`damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 
 **Settings:** `describe_state` (default `true`) describes state

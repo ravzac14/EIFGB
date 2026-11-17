@@ -2,19 +2,7 @@
 
 Things a creative player might try, that we'd like the engine to support
 one day. Each builds on something that already exists. Built so far from
-the same list: disguises, bait, corpse stories and hiding.
-
-## Making noise
-
-SHOUT, BANG POT, or ring a bell, and hunters within earshot come running
-to the noise. Players could pull packs together wherever they choose,
-instead of only where the author planned.
-
-- Builds on: hearing fights and feeding in neighbouring rooms, hunters' `range`.
-- Shape: a `noise` action (or `makes_noise: N` on objects/verbs) that sets
-  a "last heard" room on hunters within N rooms, reusing the hiding
-  feature's "last seen" search.
-- Effort: small.
+the same list: disguises, bait, corpse stories, hiding and making noise.
 
 ## Haggling, with patience
 

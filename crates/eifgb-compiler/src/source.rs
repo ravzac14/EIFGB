@@ -110,6 +110,9 @@ pub struct Player {
     /// Starting money, for buying from merchants.
     #[serde(default)]
     pub money: Option<u32>,
+    /// How many rooms away SHOUT can be heard. Defaults to 2.
+    #[serde(default)]
+    pub voice: Option<u32>,
 }
 
 /// A carrying capacity: a whole number, or `none` (or null) for no limit.
@@ -408,6 +411,19 @@ pub struct Timer {
     /// Ends the game with this ending.
     #[serde(default)]
     pub end: Option<String>,
+    /// A noise hunters come to investigate.
+    #[serde(default)]
+    pub noise: Option<Noise>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Noise {
+    /// A room or thing. Defaults to wherever the player is.
+    #[serde(default)]
+    pub at: Option<String>,
+    /// How many rooms away it carries.
+    pub loudness: u32,
 }
 
 #[derive(Debug, Deserialize)]

@@ -133,6 +133,19 @@ pub struct Timer {
     pub run: Option<Code>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end: Option<EndingId>,
+    /// A noise that hunters within earshot come to investigate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub noise: Option<Noise>,
+}
+
+/// A noise: where it is, and how many rooms away it can be heard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Noise {
+    /// A room, or a thing whose room it is when the noise happens. None
+    /// means wherever the player is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<EntityId>,
+    pub loudness: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -202,11 +215,14 @@ pub struct Settings {
     /// Describe built-in states (open, closed, locked, worn) automatically
     /// when examining, in room descriptions and in lists of things.
     pub describe_state: bool,
+    /// How many rooms away the player's SHOUT carries (`player.voice`).
+    #[serde(default = "two")]
+    pub voice: u32,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { describe_state: true }
+        Settings { describe_state: true, voice: 2 }
     }
 }
 
@@ -791,6 +807,8 @@ pub enum BuiltinAction {
     Wares,
     /// Say how healthy the player is.
     Health,
+    /// Make a noise that hunters within earshot come to investigate.
+    Shout,
 }
 
 impl BuiltinAction {

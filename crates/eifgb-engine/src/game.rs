@@ -693,6 +693,9 @@ impl<H: ScriptHost> Game<H> {
             if let Some(r) = &t.run {
                 self.run(r, &Ctx::new());
             }
+            if let Some(n) = t.noise {
+                self.world.make_noise(n.at.unwrap_or(PLAYER), n.loudness);
+            }
             if let Some(e) = t.end {
                 let key = self.world.story().endings[e.index()].key.clone();
                 self.end_requested.get_or_insert(key);

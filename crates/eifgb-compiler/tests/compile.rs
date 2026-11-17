@@ -491,3 +491,14 @@ fn pacifists_with_patience_are_warned_about() {
     let out = with("objects:\n  rock: { name: rock, in: hall, invincible: true }\n");
     assert!(format!("{:?}", out.diagnostics).contains("only characters can have 'invincible'"), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn timer_noises_are_checked() {
+    let out = with("timers:\n  bell: { every: 5, noise: { at: belfy, loudness: 2 } }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("belfy"), "{:#?}", out.diagnostics);
+    let out = with("timers:\n  bell: { every: 5, noise: { loudness: 0 } }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("a noise nobody can hear"), "{:#?}", out.diagnostics);
+    // A noise is enough for a timer to be doing something.
+    let out = with("timers:\n  bell: { every: 5, noise: { at: hall, loudness: 2 } }\n");
+    assert!(!warnings(&out).iter().any(|w| w.contains("does nothing")), "{:#?}", warnings(&out));
+}

@@ -573,6 +573,14 @@ impl ScriptHost for LuaHost {
                     scope.create_function(move |_, (a, b): (u32, u32)| Ok(world.borrow().is_hostile(check(a)?, check(b)?)))?,
                 )?;
                 h.set(
+                    "make_noise",
+                    scope.create_function(move |_, (at, loudness): (u32, i64)| {
+                        let at = check(at)?;
+                        let loudness = u32::try_from(loudness).map_err(|_| rt("make_noise: loudness can't be negative"))?;
+                        Ok(world.borrow_mut().make_noise(at, loudness) as i64)
+                    })?,
+                )?;
+                h.set(
                     "together",
                     scope.create_function(move |_, (a, b): (u32, u32)| Ok(world.borrow().together(check(a)?, check(b)?)))?,
                 )?;

@@ -101,6 +101,12 @@ function Entity:behave() return H.npc_behave(need_entity(self, "the character"))
 function Entity:distance_to(target)
   return H.distance(need_entity(self, "the character"), need_entity(target, "distance_to's target"))
 end
+-- A noise where this is: hunters within `loudness` rooms come to look.
+function Entity:make_noise(loudness)
+  if type(loudness) ~= "number" then error("make_noise needs a loudness: how many rooms away it carries", 2) end
+  return H.make_noise(need_entity(self, "the thing"), loudness)
+end
+
 -- Eats a corpse in the same room; it's gone for good.
 function Entity:eat(corpse)
   return H.npc_eat(need_entity(self, "the character"), need_entity(corpse, "eat's corpse"))
@@ -184,6 +190,13 @@ function env.start_timer(key) H.start_timer(key) end
 function env.stop_timer(key) H.stop_timer(key) end
 -- Actions until the timer is next due, or nil when it isn't running.
 function env.timer_left(key) return H.timer_left(key) end
+
+-- A noise at a room or thing: hunters within `loudness` rooms come to
+-- investigate. Returns how many were drawn.
+function env.make_noise(place, loudness)
+  if type(loudness) ~= "number" then error("make_noise needs a loudness: how many rooms away it carries", 2) end
+  return H.make_noise(need_entity(place, "make_noise's place"), loudness)
+end
 
 function env.random(a, b)
   if b == nil then a, b = 1, a end

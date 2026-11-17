@@ -164,6 +164,8 @@ characters:
       A grey-bearded man in an oilskin coat. Rain runs straight through him.
     talk: keeper_talk                       # "talk to keeper" opens this choice graph
     behavior: conversationalist             # stays put, so he's always there to talk to
+    pacifist: true                          # never fights (already the default for a conversationalist)
+    invincible: true                        # the story needs him: attacks can't hurt him
 
 # ---------------------------------------------------------------- verbs
 # Custom verbs and their grammar. {target} is the direct object, {tool}

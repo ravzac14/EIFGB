@@ -483,3 +483,11 @@ fn pacifist_hunters_are_warned_about() {
     let out = with("player: { health: 5 }\ncharacters:\n  wolf: { name: wolf, in: hall, behavior: hunter, pacifist: true }\n");
     assert!(warnings(&out).iter().any(|w| w.contains("'pacifist' has no effect")), "{:#?}", warnings(&out));
 }
+
+#[test]
+fn pacifists_with_patience_are_warned_about() {
+    let out = with("characters:\n  monk: { name: monk, in: hall, pacifist: true, patience: 3 }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("has no effect on a pacifist")), "{:#?}", warnings(&out));
+    let out = with("objects:\n  rock: { name: rock, in: hall, invincible: true }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only characters can have 'invincible'"), "{:#?}", out.diagnostics);
+}

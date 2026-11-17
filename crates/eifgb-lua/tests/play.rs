@@ -1615,7 +1615,7 @@ rooms:
   yard: { name: Yard, exits: { south: hall } }
 characters:
   bear: { name: bear, in: hall, behavior: defender, health: 10, damage: 3 }
-  trader: { name: trader, in: hall, behavior: merchant, wander: 0, patience: 0, health: 6, damage: 1 }
+  trader: { name: trader, in: hall, behavior: merchant, wander: 0, pacifist: false, patience: 0, health: 6, damage: 1 }
   saint: { name: saint, in: hall, health: 9, fights_back: false }
   monk: { name: monk, in: hall, health: 4, on: { pray: 'self.foes = nil; say(\"The monk forgives you.\")' } }
 verbs:
@@ -1633,7 +1633,8 @@ fn defenders_fight_back_at_once() {
     say(&mut g, "n");
     assert_eq!(say(&mut g, "z"), "Time passes.");
     assert_says(&mut g, "s", "The bear attacks you.");
-    // patience: 0 makes anyone fight back at once.
+    // patience: 0 makes anyone fight back at once, even a merchant who
+    // isn't a pacifist.
     assert_says(&mut g, "hit trader", "The trader attacks you.");
 }
 
@@ -1837,20 +1838,44 @@ fn a_neutral_faction_turns_on_a_player_who_provokes_enough_of_it() {
 }
 
 #[test]
-fn pacifists_stay_out_of_faction_fights_but_still_defend_themselves() {
+fn pacifists_never_fight_but_their_faction_remembers() {
     let src = VILLAGE.replace(
         "  miller:",
-        "  trader: { name: trader, in: green, faction: villagers, behavior: merchant, wander: 0, health: 9 }\n  elder: { name: elder, in: green, faction: villagers, health: 9, pacifist: true }\n  miller:",
+        "  trader: { name: trader, in: green, faction: villagers, behavior: merchant, wander: 0, health: 30 }\n  elder: { name: elder, in: green, faction: villagers, health: 9, pacifist: true }\n  miller:",
     );
     let mut g = game(compile_str(&src).story.unwrap());
-    say(&mut g, "hit baker");
-    let out = say(&mut g, "hit smith");
+    // Hurting a pacifist angers its faction, though it won't fight itself.
+    let out = say(&mut g, "hit trader");
+    assert!(out.contains("The villagers are growing wary of you.") && !out.contains("trader attacks"), "{out}");
+    let out = say(&mut g, "hit baker");
     assert!(out.contains("The villagers turn against you.") && out.contains("The miller attacks you."), "{out}");
-    // A merchant, and anyone marked pacifist, keeps out of it.
-    assert!(!out.contains("trader attacks") && !out.contains("elder attacks"), "{out}");
-    assert!(!say(&mut g, "z").contains("trader attacks"));
-    // But a pacifist still has its own patience.
-    say(&mut g, "hit trader");
-    say(&mut g, "hit trader");
-    assert_says(&mut g, "hit trader", "The trader attacks you.");
+    // A merchant, and anyone marked pacifist, keeps out of it, however often hit.
+    for _ in 0..4 {
+        let out = say(&mut g, "hit trader");
+        assert!(!out.contains("trader attacks") && !out.contains("elder attacks"), "{out}");
+    }
+}
+
+#[test]
+fn invincible_characters_shrug_off_any_blow() {
+    let src = "\
+format: eifgb/0.1
+game: { id: i, title: I, version: '1', start: hall }
+player: { health: 30 }
+rooms:
+  hall: { name: Hall }
+objects:
+  sword: { name: sword, in: player, traits: [portable], damage: 50 }
+characters:
+  oracle: { name: oracle, in: hall, invincible: true, pacifist: true }
+  knight: { name: knight, in: hall, invincible: true, health: 10, patience: 0 }
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    // Even without health, it can be struck, and isn't hurt.
+    assert_eq!(say(&mut g, "hit oracle with sword"), "You hit the oracle with the sword.\nThe oracle shrugs off the blow.");
+    // With health, it doesn't go down, and can still lose patience.
+    let out = say(&mut g, "hit knight with sword");
+    assert!(out.contains("The knight shrugs off the blow.") && out.contains("The knight attacks you."), "{out}");
+    say(&mut g, "hit knight with sword");
+    assert!(!say(&mut g, "x knight").contains("wounded"));
 }

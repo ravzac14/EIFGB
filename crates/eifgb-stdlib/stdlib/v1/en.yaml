@@ -357,6 +357,7 @@ messages:
   npc.finishes: "${The(args.npc)} finishes off ${the(args.target)}."
   npc.searches: "${The(args.npc)} searches all around, but finds nothing."
   attack.dead: "${The(args.target)} is already dead."
+  attack.invincible: "${The(args.target)} shrugs off the blow."
   talk.dead: "${The(args.target)} is beyond conversation now."
   # fighting
   attack.pointless: "Violence isn't the answer here."

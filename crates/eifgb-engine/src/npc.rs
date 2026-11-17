@@ -83,6 +83,15 @@ impl World {
             && self.health(id).is_none_or(|h| h > 0)
     }
 
+    /// Can't be hurt (`invincible`).
+    pub fn is_invincible(&self, id: EntityId) -> bool {
+        self.def(id).npc.as_ref().is_some_and(|n| n.invincible)
+    }
+
+    fn is_pacifist(&self, id: EntityId) -> bool {
+        self.def(id).npc.as_ref().is_some_and(|n| n.pacifist)
+    }
+
     /// A defeated character's body, still lying where it fell.
     pub fn is_dead(&self, id: EntityId) -> bool {
         self.def(id).kind == EntityKind::Character && self.flag(id, "dead")
@@ -165,7 +174,19 @@ impl World {
     /// one of its foes. Returns whether it was let go this time.
     /// A member newly turned against the player also sours its faction.
     fn provoke(&mut self, target: EntityId, attacker: EntityId) -> (bool, Option<AttitudeChange>) {
-        if target == attacker || !self.def(target).npc.as_ref().is_some_and(|n| n.fights_back) {
+        if target == attacker {
+            return (false, None);
+        }
+        // A pacifist won't fight, but it remembers, and so does its faction.
+        if self.is_pacifist(target) {
+            let new_foe = self.add_foe(target, attacker);
+            let change = match (new_foe && attacker == PLAYER, self.def(target).faction.clone()) {
+                (true, Some(f)) => self.sour(&f),
+                _ => None,
+            };
+            return (false, change);
+        }
+        if !self.def(target).npc.as_ref().is_some_and(|n| n.fights_back) {
             return (false, None);
         }
         let patience = match self.get(target, "patience") {
@@ -252,7 +273,7 @@ impl World {
 
     /// Whether `a` holds a grudge against `b` and fights back.
     pub fn is_foe(&self, a: EntityId, b: EntityId) -> bool {
-        let fights_back = self.def(a).npc.as_ref().is_some_and(|n| n.fights_back);
+        let fights_back = self.def(a).npc.as_ref().is_some_and(|n| n.fights_back && !n.pacifist);
         let key = &self.def(b).key;
         fights_back
             && matches!(self.get(a, "foes"), Some(Value::List(l)) if l.iter().any(|v| matches!(v, Value::Str(s) if s == key)))
@@ -404,6 +425,10 @@ impl World {
     /// `attacker` hits `target`, which must be able to be hurt. The damage
     /// is the weapon's, or else the attacker's own, or else 1.
     pub fn attack(&mut self, attacker: EntityId, target: EntityId, weapon: Option<EntityId>) -> Option<NpcEvent> {
+        if self.is_invincible(target) {
+            let (tolerated, attitude) = self.provoke(target, attacker);
+            return Some(NpcEvent::Attacked { attacker, target, weapon, damage: 0, tolerated, attitude });
+        }
         let health = self.health(target)?;
         let damage = weapon
             .and_then(|w| self.def(w).damage)

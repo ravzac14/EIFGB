@@ -320,10 +320,13 @@ pub struct Npc {
     /// remaining patience is the `patience` state field.
     #[serde(default)]
     pub patience: u32,
-    /// Never joins its faction in attacking the player. It still defends
-    /// itself once its own patience runs out.
+    /// Never fights: not with its faction, and not back. Attacks on it
+    /// still count against the attacker with its faction.
     #[serde(default)]
     pub pacifist: bool,
+    /// Can't be hurt: attacks do no damage. For characters the story needs.
+    #[serde(default)]
+    pub invincible: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

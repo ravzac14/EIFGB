@@ -61,6 +61,9 @@ impl<H: ScriptHost> Game<H> {
                 } else if attacker == PLAYER {
                     self.world.learn(target);
                     self.msg("attack.done", &ctx);
+                    if self.world.is_invincible(target) {
+                        self.msg("attack.invincible", &ctx);
+                    }
                 } else if self.world.room_of(attacker) == Some(here) {
                     self.msg("npc.attacks", &ctx);
                 } else if let Some(room) = self.world.room_of(attacker) {
@@ -239,7 +242,7 @@ impl<H: ScriptHost> Game<H> {
             self.msg("attack.dead", ctx);
             return false;
         }
-        if self.world.health(t).is_none() {
+        if self.world.health(t).is_none() && !self.world.is_invincible(t) {
             self.msg("attack.pointless", ctx);
             return false;
         }

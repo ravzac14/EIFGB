@@ -888,7 +888,8 @@ You're hurt: 12 out of 30.
   something without health still gets "Violence isn't the answer here."
 - **Enemies** (hunters and guards) hit back with their best weapon, or
   their own `damage`.
-- **Self-defense and patience:** everyone fights back eventually. A
+- **Self-defense and patience:** everyone except pacifists (below) fights
+  back eventually. A
   character's `patience` is how many attacks it puts up with first:
   none for hunters, guards and defenders, and 2 for everyone else. Until
   it runs out, the player gets a warning:
@@ -964,12 +965,16 @@ characters:
   player on sight, whatever its behaviour: "The villagers turn against
   you.", or in disguise, "The goblins see through your disguise!" It
   doesn't recover, and putting the disguise back on doesn't help.
-- **Pacifists** never join their faction in attacking the player.
+- **Pacifists** never fight: not with their faction, and not back.
   Merchants and conversationalists are pacifists by default, so the
   village shopkeeper doesn't pick up a cleaver when the village turns on
   you. Mark anyone else with `pacifist: true`, or set `pacifist: false`
-  for a merchant who joins in. Pacifists still defend themselves once
-  their own patience runs out.
+  for a merchant who fights. Hurting a pacifist still counts with its
+  faction: "The villagers are growing wary of you."
+- **Invincible** characters (`invincible: true`) can't be hurt: "The
+  oracle shrugs off the blow." Use it for characters the story can't do
+  without. They can still lose patience and fight back, unless they're
+  also pacifists.
 - **Scavengers:** a faction with `eats_corpses` eats bodies in its room
   when there's no one to fight, and hunters go looking for them.
 
@@ -1123,7 +1128,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 **Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
-`faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
+`kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage` and `money`. Events: `defeated` on a character, `died` at the

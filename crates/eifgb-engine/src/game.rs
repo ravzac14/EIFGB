@@ -514,7 +514,7 @@ impl<H: ScriptHost> Game<H> {
         let reveals = target.map(|t| self.world.reveals(&verb.key, t)).unwrap_or_default();
         // Hitting something that can't be hurt has nothing else to say either.
         let pointless_attack = verb.action == VerbAction::Builtin(BuiltinAction::Attack)
-            && target.is_some_and(|t| self.world.health(t).is_none());
+            && target.is_some_and(|t| self.world.health(t).is_none() && !self.world.is_invincible(t));
         let quiet = !reveals.is_empty()
             && (pointless_attack || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search)));
 

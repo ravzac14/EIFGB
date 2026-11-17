@@ -3266,10 +3266,9 @@ fn a_fire_lights_a_dark_room_and_can_be_put_out() {
     let mut g = blaze(&["light torch", "n", "set crate alight", "put out torch"]);
     // The burning crate lights the room, even with the torch out.
     assert_says(&mut g, "look", "a crate (burning)");
+    // Too big to smother by hand.
     let mut g = blaze(&["light torch", "n", "set crate alight"]);
-    // Put out; but the tent it set alight is still burning, and it catches again.
-    let out = say(&mut g, "put out crate");
-    assert!(out.starts_with("You put out the crate.") && out.contains("The fire spreads to the crate."), "{out}");
+    assert_says(&mut g, "put out crate", "The crate is burning too fiercely to put out with your bare hands.");
 }
 
 #[test]
@@ -3292,4 +3291,65 @@ fn something_flammable_but_tough_just_burns_out() {
     say(&mut g, "z");
     say(&mut g, "z");
     assert_says(&mut g, "look", "You can see a crate here.");
+}
+
+// --------------------------------------------------------------- more fire
+
+const BLAZE: &str = r#"format: eifgb/0.1
+game: { id: b, title: Blaze, version: "1", start: hall }
+player: { health: 30 }
+rooms:
+  hall: { name: Hall, exits: { east: store, north: { to: shed, through: door } } }
+  store: { name: Storeroom, exits: { west: hall } }
+  shed: { name: Shed }
+objects:
+  torch: { name: torch, in: player, traits: [portable, light_source], state: { lit: true } }
+  bucket: { name: bucket of water, synonyms: [bucket, water], in: player, traits: [portable], douses: true }
+  sand: { name: handful of sand, synonyms: [sand], in: player, traits: [portable], douses: true }
+  door: { name: shed door, synonyms: [door], in: hall, traits: [door, openable, scenery] }
+  hay: { name: hay bale, synonyms: [hay, bale], in: hall, traits: [flammable, destructible] }
+  crates: { name: crates, in: store, traits: [scenery, flammable, destructible] }
+  straw: { name: straw, in: shed, traits: [flammable, destructible] }
+characters:
+  goblin: { name: goblin, in: store, health: 2 }
+"#;
+
+#[test]
+fn fire_leaps_through_open_ways_but_not_shut_doors() {
+    let mut g = game(compile_str(BLAZE).story.unwrap());
+    let out = say(&mut g, "burn hay");
+    assert!(out.contains("The flames leap east, into the next room."), "{out}");
+    assert_says(&mut g, "peek east", "Flames are raging in there.");
+    // The shed door is shut: the straw never catches.
+    for _ in 0..4 {
+        say(&mut g, "z");
+    }
+    say(&mut g, "open door");
+    say(&mut g, "n");
+    assert_says(&mut g, "look", "straw here.");
+}
+
+#[test]
+fn fire_scorches_and_kills_and_the_body_says_so() {
+    let mut g = game(compile_str(BLAZE).story.unwrap());
+    assert_says(&mut g, "burn hay", "The flames scorch you!");
+    say(&mut g, "z");
+    say(&mut g, "z");
+    assert_says(&mut g, "z", "Smoke drifts in from the east.");
+    say(&mut g, "e");
+    assert_says(&mut g, "x goblin", "The goblin has been burnt to death.");
+}
+
+#[test]
+fn water_and_sand_put_fires_out_and_are_used_up() {
+    // Without the storeroom to re-light it.
+    let src = BLAZE.replace("east: store, ", "");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "burn hay");
+    assert_says(&mut g, "put out hay", "too fiercely to put out with your bare hands");
+    assert_eq!(say(&mut g, "pour bucket on hay"), "You throw the bucket of water over the hay bale, and the fire hisses out.");
+    assert!(!say(&mut g, "i").contains("bucket"));
+    say(&mut g, "burn hay");
+    assert_says(&mut g, "throw sand at hay", "the fire hisses out");
+    assert_says(&mut g, "pour torch on hay", "won't put out a fire");
 }

@@ -122,6 +122,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
             (A::Brandish, Some(t)) => self.brandish_action(t, cmd.tool, ctx),
             (A::Burn, Some(t)) => self.burn_action(t, cmd.tool, ctx),
+            (A::Douse, Some(t)) => self.douse(t, cmd.tool, ctx),
             (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
             (A::SetTrap, Some(t)) => self.set_trap(t, ctx),
             (A::DisarmTrap, Some(t)) => self.disarm_trap(t, ctx),
@@ -533,7 +534,7 @@ impl<H: ScriptHost> Game<H> {
         }
         if w.is_dead(id) {
             notes.push(StateNote::Builtin("dead"));
-            if w.get(id, "killed_by").is_some() {
+            if w.get(id, "killed_by").is_some() || w.flag(id, "_burnt") {
                 notes.push(StateNote::Builtin("killed"));
             }
         }
@@ -759,14 +760,7 @@ impl<H: ScriptHost> Game<H> {
                 // LIGHT X has no "with": any burning thing in hand will do.
                 return self.burn_action(t, None, ctx);
             }
-            if self.world.flag(t, "burning") {
-                self.world.set(t, "burning", Value::Bool(false));
-                self.world.unset(t, "_fire");
-                self.msg("extinguish.done", ctx);
-                return true;
-            }
-            self.msg("extinguish.not_lit", ctx);
-            return false;
+            return self.douse(t, None, ctx);
         }
         if !self.world.has(t, Trait::LightSource) {
             self.msg(if on { "light.cant" } else { "extinguish.cant" }, ctx);

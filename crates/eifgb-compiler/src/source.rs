@@ -355,6 +355,9 @@ pub struct Thing {
     /// Objects: a trap. `{ holds: 3 }`: turns it holds what it catches.
     #[serde(default)]
     pub trap: Option<Trap>,
+    /// Objects: puts out fires (water, sand), used up doing it.
+    #[serde(default)]
+    pub douses: bool,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

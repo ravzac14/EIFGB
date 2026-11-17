@@ -448,6 +448,9 @@ impl<H: ScriptHost> Game<H> {
             Some(Value::Str(k)) => w.id(k),
             _ => None,
         };
+        if self.world.flag(id, "_burnt") {
+            return Some(self.msg_str("state.killed_burnt", &Ctx::new().entity("target", id)));
+        }
         let killer = key(&self.world, "killed_by")?;
         let weapon = key(&self.world, "killed_with");
         let how = weapon
@@ -499,6 +502,13 @@ impl<H: ScriptHost> Game<H> {
             return false;
         }
         let here = self.world.here();
+        // Water or sand thrown at a fire puts it out.
+        if let Some(y) = at
+            && self.world.def(t).douses
+            && self.world.on_fire(y)
+        {
+            return self.douse(y, Some(t), &ctx.clone().entity("target", y).entity("tool", t));
+        }
         if let Some(y) = at {
             if y == PLAYER {
                 self.msg("attack.self", ctx);

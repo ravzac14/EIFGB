@@ -1007,7 +1007,21 @@ Nineteen features reward players who try something clever:
   After three turns it burns out: a `destructible` thing burns away to
   ash, spilling what was in it ("Out of what's left of the tent falls a
   key."); anything else is just left. Burning things are plain to see:
-  "The tent is burning.", "a crate (burning)". PUT OUT works on them too.
+  "The tent is burning.", "a crate (burning)".
+
+  With nothing left to catch in its room, a fire leaps through an open
+  way (not a shut door) into the next: "The flames leap east, into the
+  next room." Everyone in a burning room is scorched each turn ("The
+  flames scorch you!"), sleepers wake, and a character killed by a fire
+  the player started counts as the player's kill: "The goblin has been
+  burnt to death." Smoke drifts into neighbouring rooms ("Smoke drifts in
+  from the east."), and peeking shows "Flames are raging in there."
+
+  PUT OUT smothers a small (portable) fire by hand; anything bigger is
+  "burning too fiercely to put out with your bare hands". Objects with
+  `douses: true` (a bucket of water, a handful of sand) put any fire out,
+  and are used up: POUR BUCKET ON HAY, THROW SAND AT HAY, EXTINGUISH HAY
+  WITH BUCKET.
 - **Smashing:** HIT, SMASH or BREAK something `destructible` (with no
   health) and it's destroyed, spilling its contents: "You smash the barrel
   to pieces."
@@ -1394,7 +1408,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING), SET / DISARM (traps), BURN (SET … ALIGHT), SMASH,
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING), SET / DISARM (traps), BURN (SET … ALIGHT), SMASH, POUR … ON (DOUSE … WITH),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1430,7 +1444,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`, `morale`, `fears`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience`, `prints`, `sees_in_dark`, `morale`, `fears` and `calls`; objects
-can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls`, `trap` and (worn) `sees_in_dark`; the player can have `health`,
+can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls`, `trap`, `douses` and (worn) `sees_in_dark`; the player can have `health`,
 `damage`, `money`, `voice` and `sees_in_dark`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 

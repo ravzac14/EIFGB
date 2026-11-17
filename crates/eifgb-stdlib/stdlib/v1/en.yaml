@@ -319,6 +319,16 @@ verbs:
       - "set fire to {target}"
       - "set light to {target}"
       - "torch {target}"
+  douse:
+    action: douse
+    patterns:
+      - "pour {tool} on {target}"
+      - "pour {tool} over {target}"
+      - "tip {tool} over {target}"
+      - "douse {target} with {tool}"
+      - "extinguish {target} with {tool}"
+      - "put out {target} with {tool}"
+      - "smother {target} with {tool}"
   brandish:
     action: brandish
     patterns:
@@ -586,6 +596,14 @@ messages:
   burn.already: "${The(args.target)} is already burning."
   burn.no_flame: "You've nothing burning to light it with."
   fire.spreads: "The fire spreads to ${the(args.target)}."
+  fire.spreads_away: "The flames leap ${args.direction}, into the next room."
+  fire.spreads_in: "Flames leap in and catch ${the(args.target)}!"
+  fire.smoke: "Smoke drifts in ${args.from}."
+  fire.scorches_you: "The flames scorch you!"
+  fire.scorches: "${The(args.npc)} is scorched by the flames."
+  fire.too_big: "${The(args.target)} is burning too fiercely to put out with your bare hands."
+  douse.done: "You throw ${the(args.tool)} over ${the(args.target)}, and the fire hisses out."
+  douse.cant: "${The(args.tool)} won't put out a fire."
   fire.burnt_up: "${The(args.target)} burns away to ash."
   fire.burns_out: "The fire on ${the(args.target)} burns out."
   smash.done: "You smash ${the(args.target)} to pieces."
@@ -672,6 +690,7 @@ messages:
   peek.some: "There are a few things lying about."
   peek.lots: "It's full of things."
   peek.lit: "A light is burning in there."
+  peek.fire: "Flames are raging in there."
   npc.discovers: "${The(args.npc)} finds the body of ${the(args.target)}, and raises the alarm!"
   npc.alarm_nearby: "You hear a cry of alarm somewhere ${args.direction}."
   npc.fight_nearby: "You hear snarls and the clash of a fight somewhere ${args.direction}."
@@ -811,6 +830,7 @@ messages:
   state.killed_how: "${The(args.target)} has been ${args.how}."
   state.killed_by: "${The(args.target)} was killed by ${the(args.by)}."
   state.killed_by_you: "You killed ${the(args.target)}."
+  state.killed_burnt: "${The(args.target)} has been burnt to death."
   state.badly_wounded: "${The(args.target)} is badly wounded."
   state.heavy: "It's too heavy to lift with everything in it."
   state.blocked: "It's blocked."

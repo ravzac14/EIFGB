@@ -354,6 +354,9 @@ pub struct Entity {
     /// Objects: a trap, which holds whoever walks into it while armed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trap: Option<TrapSpec>,
+    /// Objects: puts out a fire (water, sand), and is used up doing it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub douses: bool,
 }
 
 /// How a trap works. Its damage, if any, is the object's `damage`.
@@ -978,6 +981,8 @@ pub enum BuiltinAction {
     Brandish,
     /// Set something flammable alight.
     Burn,
+    /// Put a fire out with water, sand…
+    Douse,
     /// Blow, sound, play or ring something that `calls`.
     Sound,
     /// Mimic a creature's call: HOWL, IMITATE A WOLF.

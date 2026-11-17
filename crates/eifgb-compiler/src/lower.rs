@@ -122,6 +122,7 @@ impl<'a> Lowerer<'a> {
             night_vision: false,
             calls: None,
             trap: None,
+            douses: false,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -589,6 +590,7 @@ impl<'a> Lowerer<'a> {
             night_vision: false,
             calls: None,
             trap: None,
+            douses: false,
         }
     }
 
@@ -848,6 +850,7 @@ impl<'a> Lowerer<'a> {
             night_vision: kind == EntityKind::Object && t.sees_in_dark == Some(true),
             calls: t.calls.as_ref().map(|n| Noise { at: None, loudness: n.loudness, faction: n.faction.clone() }),
             trap: t.trap.as_ref().filter(|_| kind == EntityKind::Object).map(|tr| TrapSpec { holds: tr.holds }),
+            douses: t.douses && kind == EntityKind::Object,
         }
     }
 

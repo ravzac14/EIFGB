@@ -104,7 +104,9 @@ impl<H: ScriptHost> Game<H> {
             if let Some(k) = stuff {
                 sentences.push(self.msg_str(k, &Ctx::new()));
             }
-            if lit {
+            if self.world.fire_in(room).is_some() {
+                sentences.push(self.msg_str("peek.fire", &Ctx::new()));
+            } else if lit {
                 sentences.push(self.msg_str("peek.lit", &Ctx::new()));
             }
         }

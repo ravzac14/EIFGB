@@ -16,8 +16,9 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// `blocked` is built in on doors only (see [`World::door_blocked`]).
 ///
 /// [`World::door_blocked`]: crate::World::door_blocked
-const BUILTIN_STATE: &[&str] =
-    &["open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with"];
+const BUILTIN_STATE: &[&str] = &[
+    "open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with", "asleep",
+];
 
 /// One thing the automatic state descriptions can say.
 #[derive(Debug, Clone, PartialEq)]
@@ -109,6 +110,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
             (A::Tracks, _) => self.tracks_action(),
             (A::Bury, Some(t)) => self.bury_action(t, ctx),
+            (A::Sneak, _) => self.sneak_action(cmd, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),
@@ -295,7 +297,7 @@ impl<H: ScriptHost> Game<H> {
 
     // ----------------------------------------------------------- movement
 
-    fn go(&mut self, cmd: &Command, ctx: &Ctx) -> bool {
+    pub(crate) fn go(&mut self, cmd: &Command, ctx: &Ctx) -> bool {
         let here = self.world.here();
         let Some(dir) = cmd.direction else {
             self.msg("go.no_exit", ctx);
@@ -458,6 +460,11 @@ impl<H: ScriptHost> Game<H> {
             self.world.unset(door, "hidden");
         }
         self.look();
+        // Walking in normally wakes anyone asleep there (after they're seen
+        // asleep, so the player knows what they did).
+        if !self.sneaking {
+            self.world.wake_room(to);
+        }
         self.room_event(to, "enter");
         true
     }
@@ -486,6 +493,9 @@ impl<H: ScriptHost> Game<H> {
         }
         if w.flag(id, "worn") {
             notes.push(StateNote::Builtin("worn"));
+        }
+        if w.is_asleep(id) && !w.is_dead(id) {
+            notes.push(StateNote::Builtin("asleep"));
         }
         if w.is_dead(id) {
             notes.push(StateNote::Builtin("dead"));
@@ -559,8 +569,8 @@ impl<H: ScriptHost> Game<H> {
     /// that are "on" get a tag; the rest would just be noise in a list.
     /// Tags only appear once the player has examined or handled the thing.
     pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
-        // Death is plain to see.
-        if !self.world.known(id) && !self.world.is_dead(id) {
+        // Death, and sleep, are plain to see.
+        if !self.world.known(id) && !self.world.is_dead(id) && !self.world.is_asleep(id) {
             return Vec::new();
         }
         self.state_notes(id)
@@ -621,6 +631,7 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("empty" | "heavy") => false,
             StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
             StateNote::Builtin("dead") => self.mentions(text, id, &["dead"], is_own),
+            StateNote::Builtin("asleep") => self.mentions(text, id, &["asleep"], is_own),
             StateNote::Builtin("killed") => self.mentions(text, id, &["killed_by", "killed_with"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
@@ -1043,6 +1054,10 @@ impl<H: ScriptHost> Game<H> {
         }
         if self.world.is_dead(t) {
             self.msg("talk.dead", ctx);
+            return false;
+        }
+        if self.world.is_asleep(t) {
+            self.msg("talk.asleep", ctx);
             return false;
         }
         match self.world.def(t).talk {

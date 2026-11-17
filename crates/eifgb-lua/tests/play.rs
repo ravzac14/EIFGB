@@ -2543,3 +2543,71 @@ fn a_kill_seen_happening_isnt_found_again() {
     let out = say(&mut g, "hit miller");
     assert!(out.contains("The villagers turn against you.") && !out.contains("finds the body"), "{out}");
 }
+
+// ----------------------------------------------------------------- stealth
+
+const STEALTH: &str = r#"format: eifgb/0.1
+game: { id: s, title: Stealth, version: "1", start: corridor }
+player: { health: 30, damage: 3 }
+rooms:
+  corridor: { name: Corridor, exits: { north: guardroom } }
+  guardroom: { name: Guard Room, exits: { south: corridor, north: vault } }
+  vault: { name: Vault, exits: { south: guardroom } }
+objects:
+  gold: { name: gold bar, synonyms: [gold, bar], in: vault, traits: [portable] }
+characters:
+  guard: { name: guard, in: guardroom, behavior: guard, health: 10, damage: 3, state: { asleep: true } }
+"#;
+
+#[test]
+fn sneaking_past_a_sleeping_guard() {
+    let mut g = game(compile_str(STEALTH).story.unwrap());
+    assert_says(&mut g, "sneak north", "You can see a guard (asleep) here.");
+    assert_eq!(say(&mut g, "x guard"), "The guard is asleep.");
+    assert_eq!(say(&mut g, "talk to guard"), "The guard is fast asleep.");
+    say(&mut g, "tiptoe north");
+    say(&mut g, "take gold");
+    let out = say(&mut g, "creep south");
+    assert!(out.contains("a guard (asleep)") && !out.contains("wakes"), "{out}");
+}
+
+#[test]
+fn walking_in_loudly_wakes_a_sleeper() {
+    let mut g = game(compile_str(STEALTH).story.unwrap());
+    let out = say(&mut g, "n");
+    assert!(out.contains("a guard (asleep)") && out.contains("The guard wakes with a start!") && out.contains("The guard attacks you."), "{out}");
+}
+
+#[test]
+fn a_sneak_attack_does_double_damage_and_wakes_them() {
+    let mut g = game(compile_str(STEALTH).story.unwrap());
+    say(&mut g, "sneak north");
+    assert_eq!(
+        say(&mut g, "hit guard"),
+        "You catch the guard asleep!
+You hit the guard.
+The guard wakes with a start!
+The guard attacks you."
+    );
+    // Damage 3, doubled: 6 of its 10 health gone, so it's badly wounded.
+    assert_says(&mut g, "x guard", "The guard is badly wounded.");
+}
+
+#[test]
+fn noise_wakes_sleepers_within_earshot() {
+    let mut g = game(compile_str(STEALTH).story.unwrap());
+    say(&mut g, "shout");
+    let out = say(&mut g, "sneak north");
+    assert!(out.contains("You can see a guard here.") && out.contains("The guard attacks you."), "{out}");
+}
+
+#[test]
+fn a_timer_can_put_a_guard_to_sleep() {
+    let src = STEALTH.replace("state: { asleep: true } }", "}") + "timers:
+  night: { after: 2, do: world.guard.asleep = true, say: The guard yawns and nods off. }
+";
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "z");
+    assert_says(&mut g, "z", "The guard yawns and nods off.");
+    assert_says(&mut g, "sneak north", "a guard (asleep)");
+}

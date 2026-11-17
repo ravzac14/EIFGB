@@ -281,6 +281,9 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  sneak:
+    action: sneak
+    patterns: ["sneak {direction}", "creep {direction}", "tiptoe {direction}", "sneak to {direction}", "sneak to the {direction}"]
   bury:
     action: bury
     patterns: ["bury {target}", "dig a grave for {target}"]
@@ -458,6 +461,7 @@ messages:
   npc.losing_patience: "${The(args.target)} is losing patience with ${the(args.npc)}."
   npc.drops: "${The(args.target)} drops ${args.list}."
   npc.eats: "${The(args.npc)} devours what's left of ${the(args.target)}."
+  npc.wakes: "${The(args.npc)} wakes with a start!"
   npc.discovers: "${The(args.npc)} finds the body of ${the(args.target)}, and raises the alarm!"
   npc.alarm_nearby: "You hear a cry of alarm somewhere ${args.direction}."
   npc.fight_nearby: "You hear snarls and the clash of a fight somewhere ${args.direction}."
@@ -466,6 +470,8 @@ messages:
   npc.finishes: "${The(args.npc)} finishes off ${the(args.target)}."
   npc.searches: "${The(args.npc)} searches all around, but finds nothing."
   attack.dead: "${The(args.target)} is already dead."
+  attack.sneak: "You catch ${the(args.target)} asleep!"
+  talk.asleep: "${The(args.target)} is fast asleep."
   attack.invincible: "${The(args.target)} shrugs off the blow."
   talk.dead: "${The(args.target)} is beyond conversation now."
   # fighting
@@ -589,6 +595,7 @@ messages:
   state.empty: "It's empty."
   state.wounded: "${The(args.target)} is wounded."
   state.dead: "${The(args.target)} is dead."
+  state.asleep: "${The(args.target)} is asleep."
   state.killed_how: "${The(args.target)} has been ${args.how}."
   state.killed_by: "${The(args.target)} was killed by ${the(args.by)}."
   state.killed_by_you: "You killed ${the(args.target)}."
@@ -604,6 +611,7 @@ messages:
   state.here.empty: "${The(args.target)} is empty."
   state.here.wounded: "${The(args.target)} is wounded."
   state.here.dead: "${The(args.target)} is dead."
+  state.here.asleep: "${The(args.target)} is asleep."
   state.here.badly_wounded: "${The(args.target)} is badly wounded."
   state.here.heavy: "${The(args.target)} is too heavy to lift with everything in it."
   state.tag.open: "open"
@@ -615,6 +623,7 @@ messages:
   state.tag.empty: "empty"
   state.tag.wounded: "wounded"
   state.tag.dead: "dead"
+  state.tag.asleep: "asleep"
   state.tag.badly_wounded: "badly wounded"
   state.tag.heavy: "heavy"
   # an author's own state fields, e.g. `fueled: true` or `channel: 16`

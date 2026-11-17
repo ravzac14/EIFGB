@@ -136,6 +136,32 @@ impl World {
         self.def(id).npc.as_ref().is_some_and(|n| n.pacifist)
     }
 
+    /// Asleep: it does nothing and notices nothing until something wakes it.
+    pub fn is_asleep(&self, id: EntityId) -> bool {
+        self.def(id).kind == EntityKind::Character && self.flag(id, "asleep")
+    }
+
+    /// Wakes `id` if it's asleep, and remembers it so the turn loop can say so.
+    pub fn wake(&mut self, id: EntityId) -> bool {
+        if !self.is_asleep(id) {
+            return false;
+        }
+        self.unset(id, "asleep");
+        self.woken.push(id);
+        true
+    }
+
+    /// Wakes every sleeper in `room`: someone came in loudly, or a fight broke out.
+    pub fn wake_room(&mut self, room: EntityId) {
+        let sleepers: Vec<EntityId> = (0..self.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&c| self.is_asleep(c) && self.room_of(c) == Some(room))
+            .collect();
+        for c in sleepers {
+            self.wake(c);
+        }
+    }
+
     /// A defeated character's body, still lying where it fell.
     pub fn is_dead(&self, id: EntityId) -> bool {
         self.def(id).kind == EntityKind::Character && self.flag(id, "dead")
@@ -216,6 +242,14 @@ impl World {
             .collect();
         for &h in &hunters {
             self.set(h, "_last_seen", key.clone());
+        }
+        // It wakes anyone asleep within earshot, too.
+        let sleepers: Vec<EntityId> = (0..self.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&c| self.is_asleep(c) && self.distance(c, room).is_some_and(|d| d <= loudness))
+            .collect();
+        for c in sleepers {
+            self.wake(c);
         }
         hunters.len()
     }
@@ -706,6 +740,7 @@ impl World {
             .filter(|&id| {
                 self.def(id).npc.as_ref().is_some_and(|n| n.behavior == Behavior::Merchant)
                     && self.is_active(id)
+                    && !self.is_asleep(id)
                     && self.room_of(id) == Some(here)
             })
             .collect()
@@ -809,10 +844,19 @@ impl World {
             return Some(NpcEvent::Attacked { attacker, target, weapon, damage: 0, tolerated, attitude });
         }
         let health = self.health(target)?;
-        let damage = weapon
+        let base = weapon
             .and_then(|w| self.def(w).damage)
             .or(self.def(attacker).damage)
             .unwrap_or(1);
+        // Caught asleep: double damage, and the fight wakes the room.
+        let asleep = self.is_asleep(target);
+        let damage = if asleep { base * 2 } else { base };
+        if asleep {
+            self.set(target, "_caught_asleep", Value::Bool(true));
+        }
+        if let Some(room) = self.room_of(target) {
+            self.wake_room(room);
+        }
         self.set(target, "health", Value::Int((health - i64::from(damage)).max(0)));
         // The killing blow is remembered, so the body can tell the story.
         if health > 0 && health - i64::from(damage) <= 0 && target != PLAYER {

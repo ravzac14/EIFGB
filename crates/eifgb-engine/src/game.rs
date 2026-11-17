@@ -89,6 +89,8 @@ pub struct Game<H: ScriptHost> {
     last: Option<Vec<String>>,
     /// Set by an action that only asked a question, so the turn doesn't count.
     pub(crate) no_turn: bool,
+    /// Set while the player SNEAKs, so arriving doesn't wake anyone.
+    pub(crate) sneaking: bool,
     /// The turn the player last heard a fight next door, so it's said once per turn.
     pub(crate) heard_nearby: Option<u64>,
     pub(crate) out: Output,
@@ -112,6 +114,7 @@ impl<H: ScriptHost> Game<H> {
             last: None,
             no_turn: false,
             heard_nearby: None,
+            sneaking: false,
             out: Output::default(),
             end_requested: None,
             in_action: false,
@@ -616,6 +619,7 @@ impl<H: ScriptHost> Game<H> {
         self.world.state.turn += 1;
         // Someone the player just beat doesn't get to strike back.
         self.check_defeats();
+        self.report_woken();
         if self.end_requested.is_some() {
             return;
         }
@@ -630,6 +634,7 @@ impl<H: ScriptHost> Game<H> {
         self.room_event(here, "turn");
         self.fire_timers();
         self.check_defeats();
+        self.report_woken();
     }
 
     // ------------------------------------------------------------ timers

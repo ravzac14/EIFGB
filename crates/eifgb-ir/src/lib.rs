@@ -880,6 +880,8 @@ pub enum BuiltinAction {
     FollowTracks,
     /// Bury something (a body, usually) in soft ground.
     Bury,
+    /// Move quietly, without waking sleepers.
+    Sneak,
 }
 
 impl BuiltinAction {

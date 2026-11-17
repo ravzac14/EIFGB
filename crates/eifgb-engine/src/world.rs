@@ -39,12 +39,14 @@ pub struct World {
     story: Story,
     pub state: GameState,
     undo: VecDeque<GameState>,
+    /// Characters woken since the turn loop last looked, so it can say so.
+    pub(crate) woken: Vec<EntityId>,
 }
 
 impl World {
     pub fn new(story: Story, seed: u64) -> Self {
         let state = GameState::new(&story, seed);
-        World { story, state, undo: VecDeque::new() }
+        World { story, state, undo: VecDeque::new(), woken: Vec::new() }
     }
 
     pub fn story(&self) -> &Story {

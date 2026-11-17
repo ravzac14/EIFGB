@@ -21,7 +21,9 @@ impl<H: ScriptHost> Game<H> {
             if self.end_requested.is_some() {
                 return;
             }
-            if !self.world.is_active(npc) {
+            // Woken by something earlier this turn: say so before it acts.
+            self.report_woken();
+            if !self.world.is_active(npc) || self.world.is_asleep(npc) {
                 continue;
             }
             // A body of its own, left in plain sight: raising the alarm is
@@ -43,6 +45,25 @@ impl<H: ScriptHost> Game<H> {
             }
             self.check_defeats();
         }
+    }
+
+    /// "The guard wakes with a start!" for anyone woken where the player is.
+    pub(crate) fn report_woken(&mut self) {
+        let here = self.world.here();
+        for id in std::mem::take(&mut self.world.woken) {
+            self.world.unset(id, "_caught_asleep");
+            if self.world.room_of(id) == Some(here) && self.world.is_active(id) {
+                self.msg("npc.wakes", &Ctx::new().entity("npc", id));
+            }
+        }
+    }
+
+    /// SNEAK NORTH: moves like GO, but without waking anyone where it arrives.
+    pub(crate) fn sneak_action(&mut self, cmd: &crate::parser::Command, ctx: &Ctx) -> bool {
+        self.sneaking = true;
+        let moved = self.go(cmd, ctx);
+        self.sneaking = false;
+        moved
     }
 
     /// Describes what a character did, if the player is there to see it.
@@ -67,6 +88,10 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("npc.attacks_you", &ctx);
                 } else if attacker == PLAYER {
                     self.world.learn(target);
+                    if self.world.flag(target, "_caught_asleep") {
+                        self.world.unset(target, "_caught_asleep");
+                        self.msg("attack.sneak", &ctx);
+                    }
                     self.msg("attack.done", &ctx);
                     if self.world.is_invincible(target) {
                         self.msg("attack.invincible", &ctx);

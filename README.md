@@ -995,7 +995,25 @@ characters:
 
 ### Tricks players can find
 
-Ten features reward players who try something clever:
+Eleven features reward players who try something clever:
+
+- **Sleep and sneaking:** a character with `asleep: true` in its state (or
+  put to sleep by a timer or script: `world.guard.asleep = true`) does
+  nothing and notices nothing: no attacks, no hunting, no finding bodies,
+  no trading or talking ("The guard is fast asleep."). It's tagged
+  "(asleep)". It wakes when the player walks in normally, when a noise
+  reaches it, or when a fight breaks out in its room: "The guard wakes
+  with a start!" SNEAK NORTH (or CREEP, TIPTOE) moves without waking
+  anyone. Hitting a sleeper is a sneak attack, for double damage: "You
+  catch the guard asleep!"
+
+  ```yaml
+  timers:
+    night:
+      after: 20
+      say: The guard yawns and nods off.
+      do: world.guard.asleep = true
+  ```
 
 - **Hiding bodies:** a silent kill stays secret only until someone finds
   the body. A faction member that comes across the body of one of its
@@ -1235,7 +1253,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN,
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 

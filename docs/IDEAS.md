@@ -18,6 +18,7 @@ Everything from the first list has now been built:
   trackers (from the second list).
 - **Witnesses:** a faction only sours when a member sees it.
 - **Hiding bodies:** found bodies raise the alarm; carry, hide or BURY them.
+- **Sleep and sneaking:** `asleep`, waking, SNEAK, and sneak attacks.
 
 Add new ideas below, each with what it builds on, its shape, and a rough
 effort.
@@ -48,17 +49,6 @@ get.
   on their turn when two or more are together and the player is hidden
   (or not seen), shown as overheard.
 - Effort: small.
-
-### Sleep and sneaking
-
-Guards sleep on a timer. SNEAK past a sleeping guard; noise or a fight
-nearby wakes them.
-
-- Builds on: timers, noise, guards, hiding.
-- Shape: `asleep` state (a "sleeping" tag); sleeping characters don't act
-  or see; `sleeps:` schedule via timers; noise within N rooms wakes them;
-  SNEAK moves without waking.
-- Effort: medium.
 
 ## Manipulating creatures
 

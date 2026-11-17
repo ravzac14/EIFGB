@@ -208,7 +208,8 @@ objects:
 - You don't need to describe whether the door is open, closed or locked.
   The game adds that itself: `x door` gives "A sturdy wooden door. It's
   locked.", and the kitchen mentions "The pantry door is locked." Things
-  that are listed get a tag instead, like "a wooden box (open)". The same
+  that are listed get a tag instead, like "a wooden box (open)", once the
+  player has examined or handled them. The same
   goes for states you invent: give the apple `state: { ripe: true }` and
   `x apple` adds "It's ripe." [States and descriptions](#states-and-descriptions)
   has the details.
@@ -337,8 +338,8 @@ endings:
 ```
 
 - **`steaming`** is a state you made up. The game describes it for you:
-  the kitchen lists "an apple pie (steaming)", and `x pie` says "It's
-  steaming."
+  `x pie` says "It's steaming.", and from then on the kitchen lists "an
+  apple pie (steaming)".
 - **`before_take`** and **`before_eat`** run before the built-in verbs.
   Returning `block(...)` stops the verb and prints the message instead.
   Once `steaming` is false they return nothing, so taking and eating work
@@ -494,12 +495,46 @@ State is mentioned in three places:
 | Where | What's added | Example |
 |---|---|---|
 | Examining a thing | Every state, after its description | "It isn't lit. Its oil is 3." |
-| Lists (room contents, inventory, inside containers) | Tags for states that are "on" | "a brass lantern (lit)", "an iron gate (locked)" |
+| Lists (room contents, inventory, inside containers) | Tags for states that are "on", once the player knows them | "a brass lantern (lit)", "an iron gate (locked)", "a small box (empty)" |
 | Room descriptions | A sentence for things that aren't listed (scenery), for "on" states | "The cupboard is closed." |
 
 Lists and rooms leave out "off" states and numbers, because "a lantern
 (not lit, oil: 3)" in every list would be clutter. Examine the thing to
 see everything.
+
+**Tags show what the player has found out.** A thing gets tags in lists
+only after the player has examined, searched or looked in it, or handled
+it themselves: opened, closed, locked, unlocked, worn, taken off, emptied,
+walked through (doors), put something in or on it, or taken something
+from it. Things the player starts out carrying count as known. After
+that, tags always show the current state.
+
+```
+Dining Room
+A simple dining room in a log cabin. At the table there's a single chair.
+On the simple, wooden table you can see a small box.
+
+> x small box
+It's empty.
+
+> look
+
+Dining Room
+A simple dining room in a log cabin. At the table there's a single chair.
+On the simple, wooden table you can see a small box (empty).
+```
+
+Two tags come from what's inside rather than from state:
+
+- **`empty`**: a container the player can see into, with nothing visible
+  in it. Hidden things don't count, so a box with a secret compartment
+  looks empty.
+- **`heavy`**: something the player could carry on its own, but not with
+  everything in it (see [Containers and supporters](#containers-and-supporters)).
+  It only applies when the player has a carrying capacity.
+
+Examining says the same things as sentences: "It's empty." and "It's too
+heavy to lift with everything in it."
 
 ### How your own states are worded
 
@@ -561,7 +596,8 @@ It's standing open.
 | Message | Used for | Default |
 |---|---|---|
 | `state.open`, `state.closed`, `state.locked`, `state.worn` | Examining | "It's open." … "You're wearing it." |
-| `state.tag.open`, `.closed`, `.locked`, `.worn` | Lists | "open" … "worn" |
+| `state.empty`, `state.heavy` | Examining | "It's empty." / "It's too heavy to lift with everything in it." |
+| `state.tag.open`, `.closed`, `.locked`, `.worn`, `.empty`, `.heavy` | Lists | "open" … "heavy" |
 | `state.here.open`, `.closed`, `.locked` | Room descriptions | "${The(args.target)} is open." … |
 | `state.custom.on`, `state.custom.off` | Examining your true/false fields | "It's ${args.state}." / "It isn't ${args.state}." |
 | `state.custom.value` | Examining your number and text fields | "Its ${args.state} is ${args.value}." |
@@ -614,14 +650,16 @@ What players can do and see:
 ```
 > look
 ...
-On the table you can see a cloth bag (closed) and a small box.
+On the table you can see a cloth bag and a small box.
 In the small box you can see a ring.
 
 > take coin from jar
 The coin isn't in the glass jar.
 
 > i
-You're carrying a cloth bag (open, containing a coin) and a small box (containing a ring).
+You're carrying a cloth bag (open) and a small box.
+In the cloth bag is a coin.
+In the small box is a ring.
 
 > put all in bag
 > empty bag                  (onto the floor)
@@ -630,7 +668,8 @@ You're carrying a cloth bag (open, containing a coin) and a small box (containin
 ```
 
 - **LOOK and EXAMINE** describe contents as deep as the player can see.
-  The inventory shows what's inside carried containers.
+  The inventory lists what's carried, then a sentence for what's inside
+  each carried container.
 - **Getting in or on something** shows in the room title: "Hall (in the
   wardrobe)", "Hall (on the bed)".
   - Closing an `enterable` container from inside shuts the player in, and
@@ -638,14 +677,20 @@ You're carrying a cloth bag (open, containing a coin) and a small box (containin
   - Walking away, or climbing into something else, gets out first: "(first
     getting off the bed)". OUT gets out too.
 
-**Size and capacity.** Every thing has a `size`, 1 by default. A
-container, supporter or the player can have a `capacity`, which limits the
-total size of what's directly in or on it (or carried). Without a
-`capacity`, nothing bigger than the holder itself fits, so a piano never
-goes into a jar.
+**Size, weight and capacity.** Every thing has a `size`, 1 by default.
+Its **weight** is its size plus the weight of everything in or on it, so
+a size-2 crate holding a size-2 brick weighs 4. A container, supporter or
+the player can have a `capacity`, which limits the total weight of what's
+directly in or on it (or carried). Without a `capacity`, nothing bigger
+than the holder itself fits, so a piano never goes into a jar.
 
-**Carrying capacity.** The player's own `capacity` limits what they can
-carry, counting the size of each thing held (not what's inside it):
+When something is small enough but too heavy because of what's in it,
+TAKE says "The crate is too heavy to lift with everything in it." Once the
+player has looked at it, lists tag it "(heavy)". Taking things out makes
+it lighter.
+
+**Carrying capacity.** The player's own `capacity` limits the total weight
+they can carry, including what's inside the things they hold:
 
 ```yaml
 player:
@@ -656,7 +701,7 @@ player:
 |---|---|
 | left out, `none` or `~` | anything (the default) |
 | `0` | nothing at all: TAKE says "You can't carry anything." |
-| a number | things up to that total size. Too much gives "You're carrying too much already.", and one thing bigger than the whole capacity gives "The boulder is too big to carry." |
+| a number | things up to that total weight. Too much gives "You're carrying too much already.", and one thing bigger than the whole capacity gives "The boulder is too big to carry." |
 
 `check` warns if the player starts out carrying more than their capacity.
 

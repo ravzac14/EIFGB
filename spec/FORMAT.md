@@ -55,7 +55,7 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
 - **Containers and supporters.** These are the `container` and `supporter` traits, with `in:` placing things inside or on top:
   - **Visibility:** a closed container hides its contents, unless it's `transparent`, in which case they're visible but out of reach: "You can't reach the jewel: the glass case is closed." `[reach.closed]`
   - **Reach:** every verb carries a `reach` flag in the IR. When it's set, a target or tool out of reach stops the command before any handler runs. The built-in verbs that touch things need reach (TAKE, OPEN, PUT, EAT…); EXAMINE, SEARCH, LOOK and TALK don't. Author verbs and the stdlib's try-it verbs need it by default. LISTEN doesn't (`reach: false` in the stdlib), and authors opt out per verb with `reach: false`. A container without `openable` is always open. Characters' belongings are never in scope.
-  - **Descriptions:** LOOK, EXAMINE and SEARCH describe contents as deep as the player can see. The inventory nests them, with contents as one more tag after the state tags: "a cloth bag (open, containing a coin)", "a tray (with a cup on it)" `[list.containing, list.supporting]`.
+  - **Descriptions:** LOOK, EXAMINE and SEARCH describe contents as deep as the player can see. The inventory lists carried things, then one sentence per carried thing the player can see into, recursively: "In the cloth bag is a coin." `[inventory.in, inventory.on]` (with `args.count` for is/are).
   - **TAKE X FROM Y** checks that X is in or on Y, at any depth: "The coin isn't in the glass jar." `[take.not_in, take.not_on]`.
   - **ALL with a second object:** TAKE ALL FROM Y means what's in Y. PUT ALL IN/ON Y means what you carry, except Y itself, anything containing Y, and worn things.
   - **EMPTY X** tips X's portable contents where X is, or where the player is if they're holding X. EMPTY X INTO/ONTO Y moves them to Y, as far as they fit.
@@ -63,7 +63,7 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
     - The room title becomes "Hall (in the wardrobe)".
     - A closed opaque container the player is in becomes their view: "You're shut inside the wardrobe." They can't see or reach out.
     - Moving away, or climbing into something else, gets out first, opening the container if needed.
-  - **Size:** `size` (default 1) and `capacity`. With a capacity, the total size of what's directly in or on the holder can't go over it. The player's capacity counts what they carry: `player.capacity` is a whole number, where `0` means they can't carry anything (`take.cant_carry`), or `none`/null/omitted for no limit (the default). Without a capacity, a thing can't go in or on something smaller than itself, but the player can carry anything. Replies are "too big for" `[put.too_big, take.too_big]` and "no more room" `[put.full, take.full]`. The compiler warns when a holder starts out over capacity.
+  - **Size and weight:** `size` (default 1) and `capacity`. A thing's weight is its size plus the weight of everything in or on it. With a capacity, the total weight of what's directly in or on the holder can't go over it; a thing whose size fits but whose weight doesn't gets "too heavy … with everything in it" `[take.too_heavy, put.too_heavy]`. The player's capacity counts what they carry: `player.capacity` is a whole number, where `0` means they can't carry anything (`take.cant_carry`), or `none`/null/omitted for no limit (the default). Without a capacity, a thing can't go in or on something smaller than itself, but the player can carry anything. Replies are "too big for" `[put.too_big, take.too_big]` and "no more room" `[put.full, take.full]`. The compiler warns when a holder starts out over capacity.
 - **Hidden things** (`state: { hidden: true }`) can't be seen or referred to. Things the player carries are the exception. `revealed_by` reveals one without a script:
   - **The rule** is `"<verb> <object>"` (`search mat`, `open desk`, `kick rug`), or a list of rules where any one will do. Any phrasing of the verb counts.
   - **Action categories:** a rule can name a stdlib category instead of a verb: `"(physical action) rug"`. Case and spaces/underscores in the name don't matter. Categories are expanded into verb keys at compile time and stored in the IR with the category name. That pins them to the game's stdlib version, so a later stdlib that adds a verb to `(physical action)` doesn't change an existing game. v1 has:
@@ -95,10 +95,13 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   |---|---|---|---|
   | open / closed / locked | "It's locked." | "an iron gate (locked)" | "The pantry door is locked." |
   | `worn` | "You're wearing it." | "a scarf (worn)" | *(none)* |
+  | empty (a container the player can see into, with nothing visible in it) | "It's empty." | "a small box (empty)" | "The cupboard is empty." |
+  | heavy (portable, size within the player's capacity, weight over it) | "It's too heavy to lift with everything in it." | "a crate (heavy)" | same as examining, with the name |
   | `fueled: true` | "It's fueled." | "a lamp (fueled)" | "The great lamp is fueled." |
   | `fueled: false` | "It isn't fueled." | *(none)* | *(none)* |
   | `channel: 16`, `color: red` | "Its channel is 16." | *(none)* | *(none)* |
 
+  - **Known things only:** list tags, and the derived `empty` and `heavy` notes everywhere, appear only for things in `GameState.known`. A thing becomes known when the player EXAMINEs, SEARCHes or LOOKs IN it; OPENs, CLOSEs, LOCKs, UNLOCKs, WEARs, TAKEs OFF or EMPTYs it; tries to go through it (doors); or names it as the second object of PUT IN/ON, TAKE FROM or EMPTY INTO. Things that start in the player's inventory are known. Examine sentences and room-description sentences for built-in and author states don't depend on it.
   - **Field names become words:** `_` turns into a space, and a leading `is_` on a true/false field is dropped, so `is_lit` reads "It's lit." Adjectives make the best names: `lit`, `broken`, `fueled`.
   - **Private fields:** a field whose name starts with `_` (`_visits`) is never described. Use that for bookkeeping.
   - **Not described:** lists and tables, and `hidden`.

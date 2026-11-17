@@ -48,6 +48,17 @@ fn visit_text_code(text: &Text, f: &mut dyn FnMut(&str)) {
 impl<H: ScriptHost> Game<H> {
     pub(crate) fn builtin(&mut self, a: BuiltinAction, target: Option<EntityId>, cmd: &Command, ctx: &Ctx) -> bool {
         use BuiltinAction as A;
+        // Looking at or handling something tells the player its state, so
+        // from now on lists tag it: "a small box (empty)".
+        if matches!(
+            a,
+            A::Examine | A::Search | A::Open | A::Close | A::Lock | A::Unlock | A::Wear | A::TakeOff | A::PutIn | A::PutOn | A::Empty
+        ) || (a == A::Take && cmd.tool.is_some())
+        {
+            for id in target.into_iter().chain(cmd.tool) {
+                self.world.learn(id);
+            }
+        }
         match (a, target) {
             (A::Look, _) => {
                 self.look();
@@ -218,30 +229,33 @@ impl<H: ScriptHost> Game<H> {
         let items = self.world.inventory();
         if items.is_empty() {
             self.msg("inventory.empty", &Ctx::new());
-        } else {
-            let list = self.list_tree(&items, 0);
-            self.msg("inventory.list", &Ctx::new().text("list", list));
+            return true;
+        }
+        let list = self.list_a(&items);
+        self.msg("inventory.list", &Ctx::new().text("list", list));
+        for item in items {
+            self.inventory_contents(item, 0);
         }
         true
     }
 
-    /// Like `list_a`, but with what's in or on each item you can see into:
-    /// "a cloth bag (open, containing a pebble and a coin)". What's inside
-    /// is one more tag, so it shares the brackets with the state tags.
-    fn list_tree(&mut self, ids: &[EntityId], depth: usize) -> String {
-        let lang = self.grammar.lang();
-        let mut names = Vec::new();
-        for &id in ids {
-            let mut tags = self.state_tag_texts(id);
-            let inside = if depth < 8 && self.world.shows_contents(id) { self.listable(id) } else { Vec::new() };
-            if !inside.is_empty() {
-                let list = self.list_tree(&inside, depth + 1);
-                let key = if self.world.has(id, Trait::Supporter) { "list.supporting" } else { "list.containing" };
-                tags.push(self.msg_str(key, &Ctx::new().text("list", list)));
-            }
-            names.push((lang.tagged)(&self.a(id), &tags));
+    /// "In the backpack are a box of matches and a bag of marshmallows."
+    /// for each carried thing the player can see into, then for what's in that.
+    fn inventory_contents(&mut self, holder: EntityId, depth: usize) {
+        if depth > 8 || !self.world.shows_contents(holder) {
+            return;
         }
-        (lang.list_and)(&names)
+        let items = self.listable(holder);
+        if items.is_empty() {
+            return;
+        }
+        let key = if self.world.has(holder, Trait::Supporter) { "inventory.on" } else { "inventory.in" };
+        let list = self.list_a(&items);
+        let ctx = Ctx::new().entity("target", holder).text("list", list).value("count", Value::Int(items.len() as i64));
+        self.msg(key, &ctx);
+        for item in items {
+            self.inventory_contents(item, depth + 1);
+        }
     }
 
     // ----------------------------------------------------------- movement
@@ -381,6 +395,10 @@ impl<H: ScriptHost> Game<H> {
             self.msg(key, &Ctx::new().entity("target", door));
             return false;
         }
+        // Trying a door tells the player whether it's locked or open.
+        if let Some(door) = exit.through {
+            self.world.learn(door);
+        }
         if let Some(door) = exit.through
             && !self.world.is_open(door)
         {
@@ -433,6 +451,23 @@ impl<H: ScriptHost> Game<H> {
         if w.flag(id, "worn") {
             notes.push(StateNote::Builtin("worn"));
         }
+        // What the player has found out by looking: only for things they know.
+        if w.known(id) && w.def(id).kind == EntityKind::Object {
+            if w.has(id, Trait::Container)
+                && w.shows_contents(id)
+                && w.contents(id).iter().all(|&c| w.is_hidden(c) || c == PLAYER)
+            {
+                notes.push(StateNote::Builtin("empty"));
+            }
+            if let Some(cap) = w.capacity(PLAYER)
+                && w.has(id, Trait::Portable)
+                && !w.is_within(id, PLAYER)
+                && w.size(id) <= cap
+                && w.weight(id) > cap
+            {
+                notes.push(StateNote::Builtin("heavy"));
+            }
+        }
         let is_door = w.has(id, Trait::Door);
         if is_door {
             match w.door_blocked(id, w.here()) {
@@ -469,9 +504,13 @@ impl<H: ScriptHost> Game<H> {
         notes
     }
 
-    /// Short tags for lists: "(locked)", "(worn)", "(fueled)". Only states
+    /// Short tags for lists: "(locked)", "(worn)", "(empty)". Only states
     /// that are "on" get a tag; the rest would just be noise in a list.
+    /// Tags only appear once the player has examined or handled the thing.
     pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
+        if !self.world.known(id) {
+            return Vec::new();
+        }
         self.state_notes(id)
             .into_iter()
             .filter_map(|n| match n {
@@ -515,6 +554,7 @@ impl<H: ScriptHost> Game<H> {
         match note {
             StateNote::Builtin("worn") => self.mentions(text, id, &["worn"], is_own),
             StateNote::Builtin("blocked" | "blocked_here") => self.mentions(text, id, &["blocked"], is_own),
+            StateNote::Builtin("empty" | "heavy") => false,
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
         }
@@ -588,6 +628,8 @@ impl<H: ScriptHost> Game<H> {
             Some("take.cant_carry")
         } else if fit == Fit::TooBig {
             Some("take.too_big")
+        } else if fit == Fit::TooHeavy {
+            Some("take.too_heavy")
         } else if fit == Fit::Full {
             Some("take.full")
         } else {
@@ -633,6 +675,8 @@ impl<H: ScriptHost> Game<H> {
             Some("put.closed")
         } else if w.fits(t, dest) == Fit::TooBig {
             Some("put.too_big")
+        } else if w.fits(t, dest) == Fit::TooHeavy {
+            Some("put.too_heavy")
         } else if w.fits(t, dest) == Fit::Full {
             Some("put.full")
         } else {

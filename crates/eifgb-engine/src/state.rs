@@ -1,7 +1,7 @@
 //! The mutable game state, and save files.
 
 use crate::rng::Rng;
-use eifgb_ir::{ChoiceId, EndingId, EntityId, Story, Value, IR_VERSION};
+use eifgb_ir::{ChoiceId, EndingId, EntityId, Story, Value, IR_VERSION, PLAYER};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,6 +25,10 @@ pub struct GameState {
     /// Running timers: key → the turn number when it's next due.
     #[serde(default)]
     pub timers: BTreeMap<String, u64>,
+    /// Things the player has examined or handled. Only these get state
+    /// tags in lists: "a small box (empty)".
+    #[serde(default)]
+    pub known: BTreeSet<EntityId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -67,6 +71,8 @@ impl GameState {
                 .filter(|t| t.running)
                 .map(|t| (t.key.clone(), u64::from(t.schedule.actions())))
                 .collect(),
+            // The player knows what they start out holding.
+            known: story.entities.iter().enumerate().filter(|(_, e)| e.location == Some(PLAYER)).map(|(i, _)| EntityId(i as u32)).collect(),
         }
     }
 }

@@ -18,7 +18,7 @@ vars:
   wood: 0
 
 player:
-  capacity: 2
+  capacity: 3
 
 rooms:
   campsite:
@@ -48,7 +48,7 @@ objects:
       after_wear: |
         player.capacity = 6
         say("With the pack on your back, your hands are free.")
-      after_take_off: player.capacity = 2
+      after_take_off: player.capacity = 3
 
   matches:
     name: box of matches

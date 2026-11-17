@@ -347,17 +347,19 @@ const BOX_AND_SCARF: &str = "objects:\n  box: { name: wooden box, in: hall, trai
 fn states_are_described_when_examining_listing_and_looking() {
     let mut g = small(BOX_AND_SCARF);
     let out = say(&mut g, "look");
-    assert!(out.contains("You can see a wooden box (locked), a key and a scarf here."), "{out}");
+    // Nothing's been looked at yet, so nothing is tagged.
+    assert!(out.contains("You can see a wooden box, a key and a scarf here."), "{out}");
     // The hatch is scenery, so it isn't listed, but its state is still mentioned.
     assert!(out.contains("The hatch is closed."), "{out}");
 
     assert_says(&mut g, "x box", "It's locked.");
+    assert_says(&mut g, "look", "You can see a wooden box (locked), a key and a scarf here.");
     say(&mut g, "take key");
     say(&mut g, "unlock box");
     assert_says(&mut g, "x box", "It's closed.");
     say(&mut g, "open box");
     assert_says(&mut g, "x box", "It's open.");
-    assert_says(&mut g, "look", "a wooden box (open)");
+    assert_says(&mut g, "look", "a wooden box (open, empty)");
 
     say(&mut g, "take scarf");
     say(&mut g, "wear scarf");
@@ -683,7 +685,7 @@ fn other_actions_reveal_after_their_usual_reply() {
     let out = say(&mut g, "open desk");
     assert_eq!(out, "You open the desk. You find a note.");
     let out = say(&mut g, "x painting");
-    assert_eq!(out, "A gloomy oil painting. You find a sliding panel (closed).");
+    assert_eq!(out, "A gloomy oil painting. You find a sliding panel.");
 }
 
 #[test]
@@ -791,7 +793,7 @@ fn a_door_hidden_from_one_side_is_plain_from_the_other() {
 
     let mut g = bookcase("den");
     let out = say(&mut g, "look");
-    assert!(out.contains("bookcase door (closed)") && out.contains("Exits: south."), "{out}");
+    assert!(out.contains("You can see a bookcase door here.") && out.contains("Exits: south."), "{out}");
     // Coming through from the plain side reveals it on the hidden side too.
     let out = say(&mut g, "s");
     assert!(out.contains("Library") && out.contains("Exits: north."), "{out}");
@@ -801,7 +803,7 @@ fn a_door_hidden_from_one_side_is_plain_from_the_other() {
 #[test]
 fn revealing_a_one_sided_secret_door() {
     let mut g = bookcase("library");
-    assert_eq!(say(&mut g, "pull books"), "You find a bookcase door (closed).");
+    assert_eq!(say(&mut g, "pull books"), "You find a bookcase door.");
     assert_says(&mut g, "n", "Secret Den");
 }
 
@@ -878,17 +880,72 @@ fn inventory_shows_what_is_in_carried_containers() {
     say(&mut g, "take box");
     assert_eq!(
         say(&mut g, "i"),
-        "You're carrying a cloth bag (open, containing a coin) and a small box (containing a ring)."
+        "You're carrying a cloth bag (open) and a small box.\nIn the cloth bag is a coin.\nIn the small box is a ring."
     );
     say(&mut g, "close bag");
-    assert_says(&mut g, "i", "a cloth bag (closed) and a small box (containing a ring)");
+    assert_eq!(say(&mut g, "i"), "You're carrying a cloth bag (closed) and a small box.\nIn the small box is a ring.");
+    say(&mut g, "take ring");
+    say(&mut g, "x box");
+    assert_says(&mut g, "i", "You're carrying a cloth bag (closed), a small box (empty) and a ring.");
+}
+
+const DINING: &str = "\
+format: eifgb/0.1
+game: { id: d, title: D, version: '1', start: dining }
+rooms:
+  dining: { name: Dining Room, description: A simple dining room in a log cabin. }
+objects:
+  table: { name: simple wooden table, synonyms: [table], in: dining, traits: [supporter, scenery] }
+  box: { name: small box, synonyms: [box], in: table, traits: [portable, container, openable], state: { open: true } }
+  key: { name: key, in: box, traits: [portable], state: { hidden: true } }
+";
+
+#[test]
+fn a_container_is_tagged_empty_once_examined() {
+    let mut g = game(compile_str(DINING).story.unwrap());
+    let out = say(&mut g, "look");
+    assert!(out.contains("On the simple wooden table you can see a small box."), "{out}");
+    // Hidden things don't count: as far as the player can tell, it's empty.
+    assert_eq!(say(&mut g, "x box"), "It's open. It's empty.");
+    assert_says(&mut g, "look", "On the simple wooden table you can see a small box (open, empty).");
+    // Tags follow the state as it is now.
+    say(&mut g, "close box");
+    assert_says(&mut g, "look", "a small box (closed).");
+}
+
+const CRATE: &str = "\
+player: { capacity: 4 }
+objects:
+  crate: { name: crate, in: hall, traits: [portable, container, open], size: 2 }
+  brick: { name: brick, in: crate, traits: [portable], size: 2 }
+  feather: { name: feather, in: crate, traits: [portable] }
+  sack: { name: sack, in: hall, traits: [portable, container, open] }
+  apple: { name: apple, in: sack, traits: [portable] }
+";
+
+#[test]
+fn contents_add_weight() {
+    let mut g = small(CRATE);
+    // 2 + 2 + 1 = 5, over the capacity of 4, though the crate alone is size 2.
+    assert_says(&mut g, "take crate", "The crate is too heavy to lift with everything in it.");
+    assert_says(&mut g, "look", "You can see a crate and a sack here.");
+    assert_says(&mut g, "x crate", "It's too heavy to lift with everything in it.");
+    assert_says(&mut g, "look", "a crate (heavy)");
+    say(&mut g, "take feather");
+    say(&mut g, "take sack");
+    // Carried: feather 1 + sack with apple 2 = 3; the crate with its brick weighs 4.
+    assert_says(&mut g, "take crate", "You're carrying too much already.");
+    say(&mut g, "drop feather");
+    say(&mut g, "drop sack");
+    assert_says(&mut g, "take crate", "Taken.");
+    assert_says(&mut g, "i", "In the crate is a brick.");
 }
 
 #[test]
 fn look_describes_nested_contents() {
     let mut g = containers();
     let out = say(&mut g, "look");
-    assert!(out.contains("On the table you can see a cloth bag (closed) and a small box."), "{out}");
+    assert!(out.contains("On the table you can see a cloth bag and a small box."), "{out}");
     assert!(out.contains("In the small box you can see a ring."), "{out}");
 }
 

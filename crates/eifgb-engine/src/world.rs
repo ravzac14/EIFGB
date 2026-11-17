@@ -14,6 +14,8 @@ pub enum Fit {
     Yes,
     /// It's bigger than the holder's whole capacity.
     TooBig,
+    /// It's small enough, but what's inside it takes it over the capacity.
+    TooHeavy,
     /// It would fit in an empty holder, but not with what's there now.
     Full,
 }
@@ -206,28 +208,57 @@ impl World {
         self.state.entities[id.index()].capacity = capacity;
     }
 
-    /// Total size of what's directly in or on `holder`.
+    /// A thing's size plus the weight of everything in or on it: what it
+    /// counts as when carried or put somewhere.
+    pub fn weight(&self, id: EntityId) -> u32 {
+        self.weight_depth(id, 0)
+    }
+
+    fn weight_depth(&self, id: EntityId, depth: usize) -> u32 {
+        let inside: u32 = if depth < 16 {
+            self.contents(id).iter().map(|c| self.weight_depth(*c, depth + 1)).sum()
+        } else {
+            0
+        };
+        self.size(id).saturating_add(inside)
+    }
+
+    /// Total weight of what's directly in or on `holder`.
     pub fn load(&self, holder: EntityId) -> u32 {
-        self.contents(holder).iter().map(|c| self.size(*c)).sum()
+        self.contents(holder).iter().map(|c| self.weight(*c)).sum()
     }
 
     /// Whether `item` would fit in or on `holder`. With a `capacity`, the
-    /// total size of what's there can't go over it. Without one, nothing
-    /// bigger than the holder itself fits (no piano in a jar), except that
-    /// the player can carry anything.
+    /// total weight of what's there can't go over it, where a thing's
+    /// weight includes everything inside it. Without one, nothing bigger
+    /// than the holder itself fits (no piano in a jar), except that the
+    /// player can carry anything.
     pub fn fits(&self, item: EntityId, holder: EntityId) -> Fit {
         let size = self.size(item);
         let Some(cap) = self.capacity(holder) else {
             let bigger = holder != PLAYER && self.def(holder).kind == EntityKind::Object && size > self.size(holder);
             return if bigger { Fit::TooBig } else { Fit::Yes };
         };
+        let weight = self.weight(item);
         if size > cap {
             Fit::TooBig
-        } else if self.load(holder) + size > cap {
+        } else if weight > cap {
+            Fit::TooHeavy
+        } else if self.load(holder).saturating_add(weight) > cap {
             Fit::Full
         } else {
             Fit::Yes
         }
+    }
+
+    /// Whether the player has examined or handled `id`, so that its
+    /// state tags are shown in lists.
+    pub fn known(&self, id: EntityId) -> bool {
+        self.state.known.contains(&id)
+    }
+
+    pub fn learn(&mut self, id: EntityId) {
+        self.state.known.insert(id);
     }
 
     // --------------------------------------------------------------- scope

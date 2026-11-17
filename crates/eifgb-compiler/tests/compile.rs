@@ -321,7 +321,7 @@ fn container_traits_are_checked() {
     let out = with("objects:\n  pane: { name: pane, in: hall, traits: [transparent] }\n");
     assert!(warnings(&out).iter().any(|w| w.contains("'transparent' only matters on a 'container'")), "{:#?}", warnings(&out));
     let out = with("objects:\n  cup: { name: cup, in: hall, traits: [container], capacity: 1 }\n  a: { name: a, in: cup }\n  b: { name: b, in: cup, size: 2 }\n");
-    assert!(warnings(&out).iter().any(|w| w.contains("total size 3, more than its capacity of 1")), "{:#?}", warnings(&out));
+    assert!(warnings(&out).iter().any(|w| w.contains("total weight 3, more than its capacity of 1")), "{:#?}", warnings(&out));
 }
 
 #[test]

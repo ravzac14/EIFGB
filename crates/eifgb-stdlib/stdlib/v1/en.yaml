@@ -310,6 +310,8 @@ messages:
   # inventory
   inventory.empty: "You're empty-handed."
   inventory.list: "You're carrying ${args.list}."
+  inventory.in: "In ${the(args.target)} ${if args.count == 1}is${else}are${end} ${args.list}."
+  inventory.on: "On ${the(args.target)} ${if args.count == 1}is${else}are${end} ${args.list}."
   # movement
   go.no_exit: "You can't go that way."
   go.door_closed: "${The(args.door)} is closed."
@@ -321,6 +323,8 @@ messages:
   state.closed: "It's closed."
   state.locked: "It's locked."
   state.worn: "You're wearing it."
+  state.empty: "It's empty."
+  state.heavy: "It's too heavy to lift with everything in it."
   state.blocked: "It's blocked."
   state.blocked_here: "It's blocked from this side."
   state.here.open: "${The(args.target)} is open."
@@ -328,12 +332,16 @@ messages:
   state.here.locked: "${The(args.target)} is locked."
   state.here.blocked: "${The(args.target)} is blocked."
   state.here.blocked_here: "${The(args.target)} is blocked from this side."
+  state.here.empty: "${The(args.target)} is empty."
+  state.here.heavy: "${The(args.target)} is too heavy to lift with everything in it."
   state.tag.open: "open"
   state.tag.closed: "closed"
   state.tag.locked: "locked"
   state.tag.worn: "worn"
   state.tag.blocked: "blocked"
   state.tag.blocked_here: "blocked from this side"
+  state.tag.empty: "empty"
+  state.tag.heavy: "heavy"
   # an author's own state fields, e.g. `fueled: true` or `channel: 16`
   state.custom.on: "It's ${args.state}."
   state.custom.off: "It isn't ${args.state}."
@@ -349,6 +357,7 @@ messages:
   take.full: "You're carrying too much already."
   take.cant_carry: "You can't carry anything."
   take.too_big: "${The(args.target)} is too big to carry."
+  take.too_heavy: "${The(args.target)} is too heavy to lift with everything in it."
   take.not_in: "${The(args.target)} isn't in ${the(args.tool)}."
   take.not_on: "${The(args.target)} isn't on ${the(args.tool)}."
   drop.done: "Dropped."
@@ -362,10 +371,8 @@ messages:
   put.into_self: "You can't put something inside itself."
   put.full: "There's no more room in ${the(args.tool)}."
   put.too_big: "${The(args.target)} is too big for ${the(args.tool)}."
+  put.too_heavy: "${The(args.target)} is too heavy for ${the(args.tool)} with everything in it."
   # carried containers in lists
-  # Tags in inventory lists, joined with any state tags: "a bag (open, containing a coin)".
-  list.containing: "containing ${args.list}"
-  list.supporting: "with ${args.list} on it"
   # emptying
   empty.done: "You tip ${args.list} out of ${the(args.target)}."
   empty.into: "You tip ${args.list} from ${the(args.target)} into ${the(args.tool)}."

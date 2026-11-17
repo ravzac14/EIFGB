@@ -787,13 +787,28 @@ impl<'a> Lowerer<'a> {
         }
 
         // Things that start out overfilling their holder.
-        for holder in entities {
+        // A thing's weight is its size plus everything in or on it.
+        fn weight(entities: &[Entity], i: usize, depth: usize) -> u32 {
+            let inside: u32 = if depth < 16 {
+                (0..entities.len())
+                    .filter(|&c| entities[c].location.is_some_and(|l| l.index() == i))
+                    .map(|c| weight(entities, c, depth + 1))
+                    .sum()
+            } else {
+                0
+            };
+            entities[i].size.saturating_add(inside)
+        }
+        for (h, holder) in entities.iter().enumerate() {
             let Some(cap) = holder.capacity else { continue };
-            let load: u32 = entities.iter().filter(|e| e.location.is_some_and(|l| entities[l.index()].key == holder.key)).map(|e| e.size).sum();
+            let load: u32 = (0..entities.len())
+                .filter(|&c| entities[c].location.is_some_and(|l| l.index() == h))
+                .map(|c| weight(entities, c, 0))
+                .sum();
             if load > cap {
                 self.d.warn(
                     format!("{}.capacity", path_of(holder)),
-                    format!("starts holding things of total size {load}, more than its capacity of {cap}"),
+                    format!("starts holding things of total weight {load}, more than its capacity of {cap}"),
                 );
             }
         }

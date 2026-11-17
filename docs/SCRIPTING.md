@@ -63,7 +63,7 @@ game:
     you'd better get moving.
 
 player:
-  capacity: 2
+  capacity: 3
 
 rooms:
   campsite:
@@ -111,9 +111,11 @@ objects:
     description: Small, green and slightly lopsided.
 ```
 
-`player: { capacity: 2 }` means the player can carry things with a total
-size of 2. Every thing is size 1 unless it says otherwise. Things inside
-a carried container don't count, only the container itself.
+`player: { capacity: 3 }` means the player can carry a total weight of 3.
+Every thing is size 1 unless it says otherwise, and a thing's weight is
+its size plus everything inside it. So the backpack, holding the matches
+and marshmallows, weighs 3: the player can pick it up, but then their
+hands are full.
 
 ```
 Campsite
@@ -126,7 +128,7 @@ Exits: north.
 
 ## Step 2: a backpack that frees your hands
 
-Carrying the pack in your arms takes up half your capacity. Wearing it
+Carrying the pack in your arms takes up all of your capacity. Wearing it
 should free your hands. Add an `on:` section to the backpack:
 
 ```yaml
@@ -140,7 +142,7 @@ should free your hands. Add an `on:` section to the backpack:
       after_wear: |
         player.capacity = 6
         say("With the pack on your back, your hands are free.")
-      after_take_off: player.capacity = 2
+      after_take_off: player.capacity = 3
 ```
 
 Every verb has three moments you can hook into, named after the verb's ID
@@ -207,7 +209,7 @@ gather." without any code from you.
 
 The firewood has no `in:`, so it starts **off-stage**: it exists, but
 it's nowhere in the world until a script moves it somewhere. Its `size: 2`
-means it fills the player's arms unless the pack is worn.
+plus the pack's weight of 3 is too much to carry, unless the pack is worn.
 
 **A story-wide count.** How much wood the player has is stored in `vars`,
 declared at the top level:

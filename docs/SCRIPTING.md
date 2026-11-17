@@ -18,6 +18,7 @@ marshmallows. Along the way you'll use:
 - timers started, restarted and read from scripts
 - `random()` and `here`
 - several endings
+- a character to talk to, with a conversation menu
 
 The finished game is in
 [`spec/examples/campfire/`](../spec/examples/campfire/game.yaml). It
@@ -571,6 +572,121 @@ stars come out one by one.
 `--seed` fixes the random numbers, so the owl says the same things on
 every run.
 
+## Step 8: a ranger to talk to
+
+Players like someone to ask for help. Add a ranger station east of the
+campsite, with a ranger who stays put so she's always there to talk to.
+
+Give the campsite an exit east, and mention it:
+
+```yaml
+  campsite:
+    name: Campsite
+    description: |
+      A flat clearing beside your tent. In the middle is a ring of
+      blackened stones: the fire pit. A trail leads north into the woods,
+      and a lit window glows to the east.
+    exits:
+      north: woods
+      east: station
+
+  station:
+    name: Ranger Station
+    description: |
+      A snug wooden hut, warm from a stove in the corner. Maps of the park
+      cover the walls. The campsite is back to the west.
+    exits:
+      west: campsite
+```
+
+Characters go in their own section:
+
+```yaml
+characters:
+  ranger:
+    name: park ranger
+    synonyms: [ranger, woman]
+    in: station
+    behavior: conversationalist
+    talk: ranger_talk
+    description: A ranger in a wide-brimmed hat, leaning on the counter.
+```
+
+- **`behavior: conversationalist`** means she never moves. Other
+  behaviours make characters wander, trade or hunt the player; see
+  [Characters](../README.md#characters-npcs-and-enemies). A character with
+  `talk` is a conversationalist even if you leave this out, but saying so
+  makes the file easier to read.
+- **`talk: ranger_talk`** names the conversation that TALK TO RANGER opens.
+
+A conversation is a **choice graph**: nodes with text, and numbered
+options that lead to other nodes. Add a `choices` section:
+
+```yaml
+choices:
+  ranger_talk:
+    start: hello
+    nodes:
+      hello:
+        text: '"Evening," says the ranger. "Planning a fire?"'
+        goto: menu
+      menu:
+        text: '"What can I help you with?"'
+        options:
+          - text: "Ask how to build a good fire"
+            goto: fire
+          - text: "Ask about the noises in the woods"
+            say: '"Owls, mostly. They won''t bother you."'
+            goto: menu
+          - text: "Tell her the fire is going"
+            when: world.fire_pit.burning
+            say: '"Nicely done. Keep feeding it and it''ll last the night."'
+            goto: menu
+          - text: "Say goodnight"
+            say: '"Goodnight. Mind the embers."'
+            end: true
+      fire:
+        text: |
+          "Two armfuls of dry branches to get it going, from the woods up
+          north. Then add more before it dies down."
+        goto: menu
+```
+
+- **`start`** is the first node. A node shows its `text`, then either
+  offers its `options` or moves straight on with `goto`. Here `hello` is
+  said once, and `menu` is where the conversation returns to.
+- **`say`** on an option is the reply to picking it; **`goto`** is where
+  to go next; **`end: true`** closes the conversation.
+- **`when`** is a Lua condition. "Tell her the fire is going" only
+  appears once the fire is lit.
+- Options and nodes can also have **`do:`**, Lua that runs when they're
+  picked or reached, to change `vars`, give the player something, or
+  score points.
+
+```
+> talk to ranger
+"Evening," says the ranger. "Planning a fire?"
+"What can I help you with?"
+  1. Ask how to build a good fire
+  2. Ask about the noises in the woods
+  3. Say goodnight
+
+> 1
+"Two armfuls of dry branches to get it going, from the woods up north. Then
+add more before it dies down."
+"What can I help you with?"
+  1. Ask how to build a good fire
+  2. Ask about the noises in the woods
+  3. Say goodnight
+
+> 3
+"Goodnight. Mind the embers."
+```
+
+While a conversation is open, the player picks by number. Talking to
+someone takes a turn, but picking options doesn't, so a chat with the
+ranger costs only one action before nightfall.
+
 ## When a script goes wrong
 
 **`check` catches what it can before you play.** Timer, ending and choice
@@ -614,10 +730,11 @@ and shows any errors straight away.
 
 ## Where to go next
 
+- [The advanced tutorial](ADVANCED.md) builds a fight between rival
+  factions of monsters, all of whom want the player dead.
 - [`spec/examples/lighthouse/`](../spec/examples/lighthouse/game.yaml)
-  uses menus and conversations (`choices`, `open_choice`, `talk:`), a
-  `parse_failed` handler for commands the game didn't understand, and
-  more timers.
+  uses a menu puzzle (`open_choice`), a `parse_failed` handler for
+  commands the game didn't understand, and more timers.
 - The [README cheat sheet](../README.md#cheat-sheet) lists every Lua
   function and field.
 - [`spec/FORMAT.md`](../spec/FORMAT.md) is the full reference, including

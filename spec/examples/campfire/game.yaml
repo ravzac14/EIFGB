@@ -25,9 +25,19 @@ rooms:
     name: Campsite
     description: |
       A flat clearing beside your tent. In the middle is a ring of
-      blackened stones: the fire pit. A trail leads north into the woods.
+      blackened stones: the fire pit. A trail leads north into the woods,
+      and a lit window glows to the east.
     exits:
       north: woods
+      east: station
+
+  station:
+    name: Ranger Station
+    description: |
+      A snug wooden hut, warm from a stove in the corner. Maps of the park
+      cover the walls. The campsite is back to the west.
+    exits:
+      west: campsite
 
   woods:
     name: Pine Woods
@@ -135,6 +145,43 @@ objects:
         stop_timer("fire_burns")
         start_timer("fire_burns")
         say("You add the wood, and the fire roars back up.")
+
+characters:
+  ranger:
+    name: park ranger
+    synonyms: [ranger, woman]
+    in: station
+    behavior: conversationalist
+    talk: ranger_talk
+    description: A ranger in a wide-brimmed hat, leaning on the counter.
+
+choices:
+  ranger_talk:
+    start: hello
+    nodes:
+      hello:
+        text: '"Evening," says the ranger. "Planning a fire?"'
+        goto: menu
+      menu:
+        text: '"What can I help you with?"'
+        options:
+          - text: "Ask how to build a good fire"
+            goto: fire
+          - text: "Ask about the noises in the woods"
+            say: '"Owls, mostly. They won''t bother you."'
+            goto: menu
+          - text: "Tell her the fire is going"
+            when: world.fire_pit.burning
+            say: '"Nicely done. Keep feeding it and it''ll last the night."'
+            goto: menu
+          - text: "Say goodnight"
+            say: '"Goodnight. Mind the embers."'
+            end: true
+      fire:
+        text: |
+          "Two armfuls of dry branches to get it going, from the woods up
+          north. Then add more before it dies down."
+        goto: menu
 
 verbs:
   gather:

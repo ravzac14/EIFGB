@@ -718,8 +718,8 @@ impl<H: ScriptHost> Game<H> {
             if let Some(r) = &t.run {
                 self.run(r, &Ctx::new());
             }
-            if let Some(n) = t.noise {
-                self.world.make_noise(n.at.unwrap_or(PLAYER), n.loudness);
+            if let Some(n) = &t.noise {
+                self.world.make_call(n.at.unwrap_or(PLAYER), n.loudness, n.faction.as_deref());
             }
             if let Some(e) = t.end {
                 let key = self.world.story().endings[e.index()].key.clone();

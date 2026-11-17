@@ -261,11 +261,18 @@ impl World {
     /// they "last saw" the player), whatever their `range`. Returns how
     /// many were drawn.
     pub fn make_noise(&mut self, at: EntityId, loudness: u32) -> usize {
+        self.make_call(at, loudness, None)
+    }
+
+    /// A noise that only `faction`'s hunters answer (a howl, a goblin
+    /// horn), or everyone's with None. It wakes any sleeper in earshot.
+    pub fn make_call(&mut self, at: EntityId, loudness: u32, faction: Option<&str>) -> usize {
         let Some(room) = self.room_of(at) else { return 0 };
         let key = Value::Str(self.def(room).key.clone());
         let hunters: Vec<EntityId> = (0..self.story().entities.len() as u32)
             .map(EntityId)
             .filter(|&id| self.def(id).npc.as_ref().is_some_and(|n| n.behavior == Behavior::Hunter))
+            .filter(|&id| faction.is_none_or(|f| self.def(id).faction.as_deref() == Some(f)))
             .filter(|&id| self.is_active(id))
             .filter(|&id| self.distance(id, room).is_some_and(|d| d <= loudness))
             .collect();

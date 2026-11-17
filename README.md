@@ -790,7 +790,7 @@ timers:
 | `running` | Whether it counts from the start of the game. Defaults to `true`, or `false` if it has `started_by`. |
 | `when` | A Lua condition checked when it's due. If false, this firing is skipped. |
 | `say`, `do`, `end` | What happens: print text, run Lua, end the game. Any combination. |
-| `noise: { at, loudness }` | A noise that hunters within `loudness` rooms come to investigate. `at` is a room, or a thing (the noise is wherever it is); without it, wherever the player is. See [Tricks players can find](#tricks-players-can-find). |
+| `noise: { at, loudness, faction }` | A noise that hunters within `loudness` rooms (of `faction` only, if given) come to investigate. `at` is a room, or a thing (the noise is wherever it is); without it, wherever the player is. See [Tricks players can find](#tricks-players-can-find). |
 
 A timer started by an action counts the actions *after* that one. With
 `after: 3`, lighting the fuse and then waiting three times gives the
@@ -1209,6 +1209,16 @@ Seventeen features reward players who try something clever:
   In Lua, `make_noise(world.belfry, 3)` or `self:make_noise(3)` (for
   BANG POT or RING BELL).
 
+  **Mimicry:** a noise can call just one faction. Give a faction
+  `calls: [howl]`, and HOWL (or IMITATE A WOLF, MIMIC A GOBLIN: a
+  faction's name or its members' names work too) draws only its hunters,
+  as far as the player's voice carries: "You let out a convincing howl."
+  Built in: howl, bark, growl, roar, hoot, screech, squawk, caw, grunt and
+  bleat. An object with `calls: { faction: goblins, loudness: 2 }` does
+  the same when the player BLOWs, SOUNDs, PLAYs, RINGs or TOOTs it. A
+  timer's `noise` and Lua's `make_noise(place, loudness, faction)` take a
+  `faction` too. Any noise still wakes everyone asleep in earshot.
+
 - **Hiding:** a player shut inside something they can't see out of (a
   closed barrel, a wardrobe) can't be seen. Hunters go to where they last
   saw the player, search ("The young wolf searches all around, but finds
@@ -1356,7 +1366,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO),
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1391,8 +1401,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
 `nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`, `morale`, `fears`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
-`patience`, `prints`, `sees_in_dark`, `morale` and `fears`; objects
-can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable` and (worn) `sees_in_dark`; the player can have `health`,
+`patience`, `prints`, `sees_in_dark`, `morale`, `fears` and `calls`; objects
+can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls` and (worn) `sees_in_dark`; the player can have `health`,
 `damage`, `money`, `voice` and `sees_in_dark`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 

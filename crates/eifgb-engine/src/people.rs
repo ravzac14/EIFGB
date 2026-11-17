@@ -717,6 +717,51 @@ impl<H: ScriptHost> Game<H> {
         self.grammar.direction_of(w)
     }
 
+    /// BLOW HORN / SOUND / PLAY / RING: something that `calls` makes its
+    /// noise, wherever it is, answered by its faction's hunters (or all).
+    pub(crate) fn sound_action(&mut self, t: EntityId, cmd: &crate::parser::Command, ctx: &Ctx) -> bool {
+        let Some(call) = self.world.def(t).calls.clone() else {
+            self.msg("sound.cant", ctx);
+            return false;
+        };
+        let verb = cmd.words.first().cloned().unwrap_or_else(|| "sound".into());
+        self.msg("sound.done", &ctx.clone().text("verb", verb));
+        self.world.make_call(t, call.loudness, call.faction.as_deref());
+        true
+    }
+
+    /// HOWL, BARK, IMITATE A WOLF: a call that only the faction whose
+    /// `calls` (or name, or members' names) it matches answers, carrying as
+    /// far as the player's voice. No match: just a strange noise.
+    pub(crate) fn mimic_action(&mut self, cmd: &crate::parser::Command, ctx: &Ctx) -> bool {
+        let words: Vec<String> = match &cmd.text {
+            Some(t) => t.split_whitespace().map(str::to_lowercase).filter(|w| !matches!(w.as_str(), "a" | "an" | "the" | "like" | "call")).collect(),
+            None => cmd.words.first().cloned().into_iter().collect(),
+        };
+        let singular = |w: &str| w.trim_end_matches('s').to_string();
+        let story = self.world.story();
+        let faction = story.factions.iter().find(|f| {
+            words.iter().any(|w| {
+                f.calls.iter().any(|c| c == w)
+                    || singular(&f.key) == singular(w)
+                    || story.entities.iter().any(|e| {
+                        e.faction.as_deref() == Some(f.key.as_str()) && e.vocab.nouns.iter().any(|n| singular(n) == singular(w))
+                    })
+            })
+        });
+        let faction = faction.map(|f| f.key.clone());
+        let voice = self.world.story().meta.settings.voice;
+        // Shown as the player put it: "an impression of a goblin".
+        let what = cmd.text.clone().unwrap_or_else(|| words.join(" "));
+        match &faction {
+            Some(_) if cmd.text.is_some() => self.msg("mimic.impression", &ctx.clone().text("what", what)),
+            Some(_) => self.msg("mimic.call", &ctx.clone().text("sound", what)),
+            None => self.msg("mimic.strange", ctx),
+        }
+        self.world.make_call(PLAYER, voice, faction.as_deref());
+        true
+    }
+
     /// BRANDISH TORCH (AT WOLF): whoever here fears it, and can see it,
     /// panics and runs.
     pub(crate) fn brandish_action(&mut self, t: EntityId, at: Option<EntityId>, ctx: &Ctx) -> bool {

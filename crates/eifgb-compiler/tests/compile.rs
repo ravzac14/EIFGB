@@ -552,3 +552,11 @@ fn fears_and_morale_are_checked() {
     let out = with("factions:\n  f: { fears: [fire], morale: 40 }\n");
     assert!(out.story.is_some(), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn calls_name_real_factions() {
+    let out = with("factions:\n  goblins: {}\nobjects:\n  horn: { name: horn, in: hall, calls: { faction: goblns, loudness: 2 } }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'goblns'"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  goblins: {}\ntimers:\n  t: { after: 1, noise: { loudness: 2, faction: wolfs } }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'wolfs'"), "{:#?}", out.diagnostics);
+}

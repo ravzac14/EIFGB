@@ -281,6 +281,27 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  sound:
+    action: sound
+    patterns: ["blow {target}", "sound {target}", "play {target}", "ring {target}", "toot {target}"]
+  mimic:
+    action: mimic
+    reach: false
+    patterns:
+      - "imitate {text}"
+      - "mimic {text}"
+      - "impersonate {text}"
+      - "call like {text}"
+      - "howl"
+      - "bark"
+      - "growl"
+      - "roar"
+      - "hoot"
+      - "screech"
+      - "squawk"
+      - "caw"
+      - "grunt"
+      - "bleat"
   brandish:
     action: brandish
     patterns:
@@ -526,6 +547,11 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  sound.done: "You ${args.verb} ${the(args.target)}."
+  sound.cant: "You can't get a sound out of ${the(args.target)}."
+  mimic.call: "You let out a convincing ${args.sound}."
+  mimic.impression: "You do your best impression of ${args.what}."
+  mimic.strange: "You make a strange noise."
   brandish.done: "You brandish ${the(args.target)}."
   brandish.nothing: "Nobody seems impressed."
   npc.afraid: "${The(args.npc)} shrinks back in fear!"

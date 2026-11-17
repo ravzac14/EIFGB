@@ -110,6 +110,9 @@ pub struct Faction {
     /// What members fear: object keys, or `fire`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fears: Vec<String>,
+    /// The sounds members answer when the player mimics them ("howl").
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub calls: Vec<String>,
     /// The faction's starting attitude toward a side it isn't hostile to,
     /// including a player disguised as one of its own: how many of its
     /// members the player can turn into foes before the whole faction
@@ -151,13 +154,16 @@ pub struct Timer {
 }
 
 /// A noise: where it is, and how many rooms away it can be heard.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Noise {
     /// A room, or a thing whose room it is when the noise happens. None
     /// means wherever the player is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<EntityId>,
     pub loudness: u32,
+    /// Only this faction's hunters answer it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -341,6 +347,10 @@ pub struct Entity {
     /// Objects: worn by the player, lets them see in the dark.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub night_vision: bool,
+    /// Objects: the noise it makes when blown, sounded, played or rung
+    /// (`at` is unused: it's wherever the object is).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calls: Option<Noise>,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -944,6 +954,10 @@ pub enum BuiltinAction {
     Order,
     /// Wave something about, to frighten whoever fears it.
     Brandish,
+    /// Blow, sound, play or ring something that `calls`.
+    Sound,
+    /// Mimic a creature's call: HOWL, IMITATE A WOLF.
+    Mimic,
 }
 
 impl BuiltinAction {

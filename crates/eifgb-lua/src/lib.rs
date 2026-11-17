@@ -575,10 +575,10 @@ impl ScriptHost for LuaHost {
                 )?;
                 h.set(
                     "make_noise",
-                    scope.create_function(move |_, (at, loudness): (u32, i64)| {
+                    scope.create_function(move |_, (at, loudness, faction): (u32, i64, Option<String>)| {
                         let at = check(at)?;
                         let loudness = u32::try_from(loudness).map_err(|_| rt("make_noise: loudness can't be negative"))?;
-                        Ok(world.borrow_mut().make_noise(at, loudness) as i64)
+                        Ok(world.borrow_mut().make_call(at, loudness, faction.as_deref()) as i64)
                     })?,
                 )?;
                 h.set(

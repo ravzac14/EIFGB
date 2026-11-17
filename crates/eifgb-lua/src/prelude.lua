@@ -102,9 +102,9 @@ function Entity:distance_to(target)
   return H.distance(need_entity(self, "the character"), need_entity(target, "distance_to's target"))
 end
 -- A noise where this is: hunters within `loudness` rooms come to look.
-function Entity:make_noise(loudness)
+function Entity:make_noise(loudness, faction)
   if type(loudness) ~= "number" then error("make_noise needs a loudness: how many rooms away it carries", 2) end
-  return H.make_noise(need_entity(self, "the thing"), loudness)
+  return H.make_noise(need_entity(self, "the thing"), loudness, faction)
 end
 
 -- Gives a `nameable` thing a name, as CALL X NAME does. Returns the
@@ -200,9 +200,9 @@ function env.timer_left(key) return H.timer_left(key) end
 
 -- A noise at a room or thing: hunters within `loudness` rooms come to
 -- investigate. Returns how many were drawn.
-function env.make_noise(place, loudness)
+function env.make_noise(place, loudness, faction)
   if type(loudness) ~= "number" then error("make_noise needs a loudness: how many rooms away it carries", 2) end
-  return H.make_noise(need_entity(place, "make_noise's place"), loudness)
+  return H.make_noise(need_entity(place, "make_noise's place"), loudness, faction)
 end
 
 function env.random(a, b)

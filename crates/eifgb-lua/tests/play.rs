@@ -3083,3 +3083,60 @@ fn a_scared_companion_wont_attack() {
     let mut g = game(compile_str(&src).unwrap_or_else_story());
     assert_says(&mut g, "tell rat to attack the wolf", "The rat is too scared.");
 }
+
+// ----------------------------------------------------------------- mimicry
+
+const MIMIC: &str = r#"format: eifgb/0.1
+game: { id: m, title: Mimic, version: "1", start: crossroads }
+player: { health: 30 }
+factions:
+  wolves: { calls: [howl] }
+  goblins: {}
+rooms:
+  crossroads: { name: Crossroads, exits: { east: den, west: camp } }
+  den: { name: Den, exits: { west: crossroads } }
+  camp: { name: Camp, exits: { east: crossroads } }
+objects:
+  horn: { name: goblin horn, synonyms: [horn], in: player, traits: [portable], calls: { faction: goblins, loudness: 2 } }
+  rock: { name: rock, in: player, traits: [portable] }
+characters:
+  wolf: { name: grey wolf, synonyms: [wolf], in: den, faction: wolves, behavior: hunter, range: 0, wander: 0 }
+  goblin: { name: goblin, in: camp, faction: goblins, behavior: hunter, range: 0, wander: 0 }
+"#;
+
+#[test]
+fn a_howl_draws_only_wolves() {
+    let mut g = game(compile_str(MIMIC).story.unwrap());
+    let out = say(&mut g, "howl");
+    assert!(out.starts_with("You let out a convincing howl.") && out.contains("The grey wolf arrives.") && !out.contains("goblin"), "{out}");
+}
+
+#[test]
+fn a_goblin_horn_draws_only_goblins() {
+    let mut g = game(compile_str(MIMIC).story.unwrap());
+    let out = say(&mut g, "blow horn");
+    assert!(out.starts_with("You blow the goblin horn.") && out.contains("The goblin arrives.") && !out.contains("wolf"), "{out}");
+    assert_says(&mut g, "play rock", "You can't get a sound out of the rock.");
+}
+
+#[test]
+fn imitating_by_name_and_strange_noises() {
+    let mut g = game(compile_str(MIMIC).story.unwrap());
+    let out = say(&mut g, "imitate a goblin");
+    assert!(out.starts_with("You do your best impression of a goblin.") && !out.contains("wolf"), "{out}");
+    // Matches no faction: a plain noise, answered by anyone.
+    let mut g = game(compile_str(MIMIC).story.unwrap());
+    let out = say(&mut g, "mimic a seagull");
+    assert!(out.starts_with("You make a strange noise.") && out.contains("wolf") && out.contains("goblin"), "{out}");
+}
+
+#[test]
+fn a_timer_can_call_one_faction() {
+    let src = MIMIC.replace("player: { health: 30 }", "player: { health: 30 }
+timers:
+  horn: { after: 1, say: A horn sounds., noise: { at: crossroads, loudness: 2, faction: wolves } }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "z");
+    let out = say(&mut g, "z");
+    assert!(out.contains("The grey wolf arrives.") && !out.contains("goblin"), "{out}");
+}

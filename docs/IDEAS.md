@@ -28,18 +28,9 @@ Everything from the first list has now been built:
 - **Eavesdropping:** `chatter`, loud lines through walls, LISTEN AT THE DOOR.
 - **Giving orders:** TELL REX TO ATTACK/STAY/FOLLOW/GO/FETCH/DROP, and "REX, …".
 - **Fear and morale:** `morale`, `fears`, BRANDISH, fleeing and cornering.
+- **Mimicry:** faction `calls`, HOWL/IMITATE, horns that call one faction.
 
 ## Manipulating creatures
-
-### Mimicry
-
-HOWL draws only wolves; BLOW GOBLIN HORN draws only goblins. A noise only
-one faction answers.
-
-- Builds on: noise, factions.
-- Shape: noises with an optional `faction:` (timers, `make_noise`, and a
-  `calls: wolves` field on objects or verbs).
-- Effort: small.
 
 ### Traps
 

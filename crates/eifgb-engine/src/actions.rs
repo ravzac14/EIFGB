@@ -121,6 +121,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Eavesdrop, t) => self.eavesdrop_action(t, cmd.direction, ctx),
             (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
             (A::Brandish, Some(t)) => self.brandish_action(t, cmd.tool, ctx),
+            (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
+            (A::Mimic, _) => self.mimic_action(cmd, ctx),
             (A::Light, Some(t)) => self.light(t, true, ctx),
             (A::Extinguish, Some(t)) => self.light(t, false, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),

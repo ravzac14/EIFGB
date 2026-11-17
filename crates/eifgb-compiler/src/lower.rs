@@ -120,6 +120,7 @@ impl<'a> Lowerer<'a> {
             diggable: false,
             dark: false,
             night_vision: false,
+            calls: None,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -159,6 +160,9 @@ impl<'a> Lowerer<'a> {
             };
             if let Some(f) = &e.disguise {
                 faction_ref("disguise", f);
+            }
+            if let Some(f) = e.calls.as_ref().and_then(|c| c.faction.as_ref()) {
+                faction_ref("calls.faction", f);
             }
             for f in &e.eaten_by {
                 faction_ref("eaten_by", f);
@@ -207,6 +211,14 @@ impl<'a> Lowerer<'a> {
             }
         }
         let timers = self.lower_timers(&s.timers, &endings);
+        for t in &timers {
+            if let Some(f) = t.noise.as_ref().and_then(|n| n.faction.as_ref())
+                && !factions.iter().any(|x| &x.key == f)
+            {
+                let hint = did_you_mean(f, factions.iter().map(|x| x.key.as_str()));
+                self.d.error(format!("timers.{}.noise.faction", t.key), format!("unknown faction '{f}'{hint}"));
+            }
+        }
         let scripts = self.load_scripts(&s.scripts);
 
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
@@ -574,6 +586,7 @@ impl<'a> Lowerer<'a> {
             diggable: r.diggable,
             dark: r.dark,
             night_vision: false,
+            calls: None,
         }
     }
 
@@ -827,6 +840,7 @@ impl<'a> Lowerer<'a> {
             diggable: false,
             dark: false,
             night_vision: kind == EntityKind::Object && t.sees_in_dark == Some(true),
+            calls: t.calls.as_ref().map(|n| Noise { at: None, loudness: n.loudness, faction: n.faction.clone() }),
         }
     }
 
@@ -1231,7 +1245,7 @@ impl<'a> Lowerer<'a> {
                     self.d.error(format!("{path}.noise.loudness"), "a noise nobody can hear does nothing; use 1 or more");
                 }
                 let at = n.at.as_deref().and_then(|a| self.entity_ref(a, &format!("{path}.noise.at")));
-                Noise { at, loudness: n.loudness }
+                Noise { at, loudness: n.loudness, faction: n.faction.clone() }
             });
             if t.say.is_none() && t.run.is_none() && t.end.is_none() && noise.is_none() {
                 self.d.warn(&path, "this timer does nothing; give it 'say', 'do', 'end' or 'noise'");
@@ -1348,6 +1362,7 @@ impl<'a> Lowerer<'a> {
                 sees_in_dark: f.sees_in_dark,
                 morale: f.morale,
                 fears: f.fears.clone(),
+                calls: f.calls.iter().map(|c| c.to_lowercase()).collect(),
                 patience: f.patience.unwrap_or(2),
             });
         }

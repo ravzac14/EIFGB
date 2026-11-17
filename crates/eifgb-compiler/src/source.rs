@@ -349,6 +349,9 @@ pub struct Thing {
     /// Things it fears: object IDs, or `fire`.
     #[serde(default)]
     pub fears: Vec<String>,
+    /// Objects: the noise it makes when blown, sounded, played or rung.
+    #[serde(default)]
+    pub calls: Option<Noise>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,
@@ -469,6 +472,9 @@ pub struct Faction {
     /// What members fear: object IDs, or `fire`.
     #[serde(default)]
     pub fears: Vec<String>,
+    /// Sounds members answer when the player mimics them: [howl].
+    #[serde(default)]
+    pub calls: Vec<String>,
     /// How many members the player can provoke before the faction turns
     /// on them (as themselves, or in its disguise). Defaults to 2.
     #[serde(default)]
@@ -516,6 +522,9 @@ pub struct Noise {
     pub at: Option<String>,
     /// How many rooms away it carries.
     pub loudness: u32,
+    /// Only this faction's hunters answer it.
+    #[serde(default)]
+    pub faction: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

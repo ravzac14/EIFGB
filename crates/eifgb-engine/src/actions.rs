@@ -111,6 +111,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Tracks, _) => self.tracks_action(),
             (A::Bury, Some(t)) => self.bury_action(t, ctx),
             (A::Sneak, _) => self.sneak_action(cmd, ctx),
+            (A::Peek, t) => self.peek_action(t, cmd.direction, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),

@@ -326,6 +326,9 @@ pub struct Entity {
     /// Rooms: soft ground, where things can be buried.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub diggable: bool,
+    /// Rooms: unlit, so peeking in shows nothing unless a light is burning.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dark: bool,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -882,6 +885,8 @@ pub enum BuiltinAction {
     Bury,
     /// Move quietly, without waking sleepers.
     Sneak,
+    /// Get an impression of the next room, through a door or a way out.
+    Peek,
 }
 
 impl BuiltinAction {

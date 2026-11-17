@@ -281,6 +281,19 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  peek:
+    action: peek
+    reach: false
+    patterns:
+      - "peek {direction}"
+      - "peer {direction}"
+      - "look {direction}"
+      - "peek through {target}"
+      - "peer through {target}"
+      - "look through {target}"
+      - "peek into {target}"
+      - "peek through the keyhole of {target}"
+      - "look through the keyhole of {target}"
   sneak:
     action: sneak
     patterns: ["sneak {direction}", "creep {direction}", "tiptoe {direction}", "sneak to {direction}", "sneak to the {direction}"]
@@ -462,6 +475,24 @@ messages:
   npc.drops: "${The(args.target)} drops ${args.list}."
   npc.eats: "${The(args.npc)} devours what's left of ${the(args.target)}."
   npc.wakes: "${The(args.npc)} wakes with a start!"
+  peek.through: "You peer through ${the(args.door)}${if args.place} into the ${args.place}${end}."
+  peek.direction: "You peer ${args.direction}${if args.place}, into the ${args.place}${end}."
+  peek.no_way: "There's nothing to peek through that way."
+  peek.not_door: "You can't see through ${the(args.target)}."
+  peek.dark: "It's too dark to make anything out."
+  peek.empty: "It looks empty."
+  peek.one: "Someone is in there."
+  peek.two: "Two figures are in there."
+  peek.several: "Several figures are in there."
+  peek.asleep_one: "They seem to be asleep."
+  peek.asleep_all: "They all seem to be asleep."
+  peek.asleep_some: "Some of them seem to be asleep."
+  peek.asleep_one_of_two: "One of them seems to be asleep."
+  peek.bodies: "Something lies very still on the floor."
+  peek.few: "There's something lying about."
+  peek.some: "There are a few things lying about."
+  peek.lots: "It's full of things."
+  peek.lit: "A light is burning in there."
   npc.discovers: "${The(args.npc)} finds the body of ${the(args.target)}, and raises the alarm!"
   npc.alarm_nearby: "You hear a cry of alarm somewhere ${args.direction}."
   npc.fight_nearby: "You hear snarls and the clash of a fight somewhere ${args.direction}."

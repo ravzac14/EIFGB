@@ -19,6 +19,18 @@ Everything from the first list has now been built:
 - **Witnesses:** a faction only sours when a member sees it.
 - **Hiding bodies:** found bodies raise the alarm; carry, hide or BURY them.
 - **Sleep and sneaking:** `asleep`, waking, SNEAK, and sneak attacks.
+- **Peeking:** PEEK THROUGH a door or PEEK NORTH: an impression of the next
+  room, not its description.
+
+## Darkness (follow-up to peeking)
+
+Rooms with `dark: true` are only dark for peeking so far. Full darkness:
+in a dark room without a lit light source, LOOK says "It's pitch dark",
+nothing can be seen or examined, and moving risks stumbling; carried
+lamps light the way.
+
+- Builds on: `dark`, `light_source`, scope.
+- Effort: medium.
 
 Add new ideas below, each with what it builds on, its shape, and a rough
 effort.

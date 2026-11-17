@@ -177,6 +177,9 @@ pub struct Room {
     /// Soft ground: BURY works here.
     #[serde(default)]
     pub diggable: bool,
+    /// Unlit: peeking in shows nothing unless something is burning.
+    #[serde(default)]
+    pub dark: bool,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]

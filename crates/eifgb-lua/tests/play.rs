@@ -2611,3 +2611,49 @@ fn a_timer_can_put_a_guard_to_sleep() {
     assert_says(&mut g, "z", "The guard yawns and nods off.");
     assert_says(&mut g, "sneak north", "a guard (asleep)");
 }
+
+// ----------------------------------------------------------------- peeking
+
+const PEEKING: &str = r#"format: eifgb/0.1
+game: { id: p, title: Peeking, version: "1", start: corridor }
+player: { health: 30 }
+rooms:
+  corridor: { name: Corridor, exits: { north: { to: guardroom, through: door }, down: cellar, west: closet } }
+  guardroom: { name: Guard Room, description: A secret description you shouldn't see., exits: { south: corridor, north: vault } }
+  vault: { name: Vault, exits: { south: guardroom } }
+  cellar: { name: Cellar, dark: true, exits: { up: corridor } }
+  closet: { name: Closet, exits: { east: corridor } }
+objects:
+  door: { name: oak door, synonyms: [door], in: corridor, traits: [door, openable, scenery] }
+  lamp: { name: lamp, in: vault, traits: [portable, light_source], state: { lit: true } }
+  coins: { name: coins, in: vault, traits: [portable] }
+  cup: { name: cup, in: vault, traits: [portable] }
+  plate: { name: plate, in: vault, traits: [portable] }
+characters:
+  guard: { name: guard, in: guardroom, behavior: guard, health: 10, damage: 3, state: { asleep: true } }
+  cook: { name: cook, in: guardroom, health: 5 }
+"#;
+
+#[test]
+fn peeking_gives_an_impression_not_the_description() {
+    let mut g = game(compile_str(PEEKING).story.unwrap());
+    let out = say(&mut g, "peek through the door");
+    assert_eq!(out, "You peer through the oak door. Two figures are in there. One of them seems to be asleep.");
+    assert!(!out.contains("secret"));
+    // LOOK NORTH is a peek too, and nobody wakes.
+    assert_says(&mut g, "look north", "One of them seems to be asleep.");
+    assert_eq!(say(&mut g, "peek down"), "You peer down. It's too dark to make anything out.");
+    assert_eq!(say(&mut g, "peek west"), "You peer west. It looks empty.");
+    // No way through: no turn taken.
+    assert_eq!(say(&mut g, "peek east"), "There's nothing to peek through that way.");
+}
+
+#[test]
+fn peeking_into_a_lit_room_full_of_things_and_somewhere_youve_been() {
+    let mut g = game(compile_str(PEEKING).story.unwrap());
+    say(&mut g, "sneak north");
+    assert_eq!(say(&mut g, "peek north"), "You peer north. There are a few things lying about. A light is burning in there.");
+    // Somewhere the player has been is named.
+    assert_says(&mut g, "peek south", "You peer through the oak door into the Corridor.");
+    assert_says(&mut g, "look through the guard", "You can't see through the guard.");
+}

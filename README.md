@@ -995,7 +995,25 @@ characters:
 
 ### Tricks players can find
 
-Eleven features reward players who try something clever:
+Twelve features reward players who try something clever:
+
+- **Peeking:** PEEK THROUGH THE DOOR, PEEK NORTH, PEER NORTH or LOOK
+  NORTH gives an impression of the next room without going in or being
+  noticed: never its description, just whether anyone's there (and
+  asleep), a body, how much is lying about, and whether a light is
+  burning. The room's name is given only if the player has been there.
+
+  ```
+  > peek through the door
+  You peer through the oak door. Two figures are in there. One of them seems to
+  be asleep.
+
+  > peek down
+  You peer down. It's too dark to make anything out.
+  ```
+
+  A room with `dark: true` shows nothing unless something in it is a
+  `light_source` that's `lit` (or `on`). (That's all `dark` does for now.)
 
 - **Sleep and sneaking:** a character with `asleep: true` in its state (or
   put to sleep by a timer or script: `world.guard.asleep = true`) does
@@ -1253,7 +1271,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE),
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1285,8 +1303,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`, `prints`, `leaves_tracks`, `tracker`; rooms can be `trackless` or
-`diggable`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
+`nameable`, `prints`, `leaves_tracks`, `tracker`; rooms can be `trackless`,
+`diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience` and `prints`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by` and `nameable`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the

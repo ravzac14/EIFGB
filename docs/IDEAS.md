@@ -2,19 +2,8 @@
 
 Things a creative player might try, that we'd like the engine to support
 one day. Each builds on something that already exists. Built so far from
-the same list: disguises, bait, corpse stories, hiding, making noise and apologies (calming
-down, by asking).
-
-## Haggling, with patience
-
-OFFER 5 COINS FOR LAMP. The merchant counters; each lowball offer costs
-patience, and pushed too far they refuse to trade with you at all.
-
-- Builds on: merchants, `price`, `buys_at`, `patience`.
-- Shape: OFFER/HAGGLE verbs; a merchant `haggle` percentage (how far
-  they'll come down); a refusal state when patience hits 0, separate from
-  becoming hostile.
-- Effort: medium.
+the same list: disguises, bait, corpse stories, hiding, making noise, apologies (calming
+down, by asking) and haggling.
 
 ## Taming and gifts
 

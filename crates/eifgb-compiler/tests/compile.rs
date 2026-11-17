@@ -502,3 +502,11 @@ fn timer_noises_are_checked() {
     let out = with("timers:\n  bell: { every: 5, noise: { at: hall, loudness: 2 } }\n");
     assert!(!warnings(&out).iter().any(|w| w.contains("does nothing")), "{:#?}", warnings(&out));
 }
+
+#[test]
+fn haggle_is_a_merchant_percentage() {
+    let out = with("characters:\n  p: { name: p, in: hall, behavior: merchant, haggle: 120 }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("percentage"), "{:#?}", out.diagnostics);
+    let out = with("characters:\n  p: { name: p, in: hall, haggle: 20 }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("only matters for a merchant")), "{:#?}", warnings(&out));
+}

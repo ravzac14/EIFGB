@@ -794,6 +794,7 @@ impl<'a> Lowerer<'a> {
                 ("pacifist", t.pacifist.is_some()),
                 ("invincible", t.invincible.is_some()),
                 ("forgiveness", t.forgiveness.is_some()),
+                ("haggle", t.haggle.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -819,7 +820,7 @@ impl<'a> Lowerer<'a> {
         if behavior == Behavior::Conversationalist && !talks {
             self.d.warn(format!("{path}.behavior"), "a conversationalist needs 'talk' to have anything to say");
         }
-        for (field, val) in [("wander", t.wander), ("buys_at", t.buys_at)] {
+        for (field, val) in [("wander", t.wander), ("buys_at", t.buys_at), ("haggle", t.haggle)] {
             if let Some(v) = val
                 && v > 100
             {
@@ -840,8 +841,10 @@ impl<'a> Lowerer<'a> {
         if t.patience.is_some() && t.fights_back == Some(false) {
             self.d.warn(format!("{path}.patience"), "has no effect with 'fights_back: false'");
         }
-        if t.buys_at.is_some() && behavior != Behavior::Merchant {
-            self.d.warn(format!("{path}.buys_at"), "only matters for a merchant");
+        for (field, set) in [("buys_at", t.buys_at.is_some()), ("haggle", t.haggle.is_some())] {
+            if set && behavior != Behavior::Merchant {
+                self.d.warn(format!("{path}.{field}"), "only matters for a merchant");
+            }
         }
         let area = t
             .area
@@ -863,6 +866,7 @@ impl<'a> Lowerer<'a> {
             pacifist,
             invincible: t.invincible.unwrap_or(false),
             forgiveness: t.forgiveness.unwrap_or(1),
+            haggle: t.haggle.unwrap_or(if behavior == Behavior::Merchant { 25 } else { 0 }),
         })
     }
 

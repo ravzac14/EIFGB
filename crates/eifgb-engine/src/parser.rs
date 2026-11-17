@@ -585,7 +585,7 @@ impl Grammar {
         }
         let mut scope = world.scope();
         // What merchants here are selling can be looked at and bought.
-        if matches!(action, Some(BuiltinAction::Buy | BuiltinAction::Examine)) {
+        if matches!(action, Some(BuiltinAction::Buy | BuiltinAction::Examine | BuiltinAction::Offer)) {
             for m in world.merchants_here() {
                 scope.extend(world.contents(m).into_iter().filter(|&i| world.def(i).price.is_some()));
             }

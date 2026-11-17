@@ -210,6 +210,8 @@ counts for timers, in declaration order, before `turn` handlers and timers.
 - **WARES** (browse, shop, trade (with X)): "X has for sale: a lamp (8 coins) …" `[wares.list, wares.item, wares.empty]`. Takes a turn.
 - **BUY X (FROM Y):** X must be priced and carried by a merchant in the room; the merchants' priced goods are in scope for BUY and EXAMINE. Checks money `[buy.too_poor]` and carrying capacity (take messages). `[buy.done]`
 - **SELL X (TO Y):** X must be held directly. The offer is `price × buys_at / 100` (`buys_at` default 50, 0–100); 0 → `[sell.worthless]`. A merchant with `money` can't pay more than they have `[sell.merchant_poor]`. Without TO, the first merchant here. `[sell.done]`
+- **OFFER N FOR X** (verb `offer`: offer/bid {text} for {target}; haggle/bargain for {target}; `reach: false`; X in scope as for BUY): the first number in the text is the offer; none → `[offer.how_much]`. More than the player has → `[offer.cant_afford]`. At or above the price, it's a BUY at the price. Otherwise, with the merchant's `haggle` (percent, 0–100, default 25 for merchants) at 0 → `[offer.fixed]`; at or above the floor `ceil(price × (100 − haggle) / 100)` → bought at the offer `[offer.accepted]`; below it, if the merchant has `patience` left, it drops by 1 and the merchant counters with `max(floor, ceil((offer + price) / 2))` `[offer.counter]`; with none left, the merchant refuses to trade (`_refuses`) `[offer.insulted]`.
+- **Refusing to trade:** a merchant with `_refuses` answers BUY, SELL, OFFER and WARES with `[trade.refused]`. An accepted apology clears it (and restores patience).
 - **Money text:** `money.amount` ("8 coins", "1 coin"). INVENTORY ends with "You have 12 coins." `[money.have]` when the player has money.
 
 ## Choices

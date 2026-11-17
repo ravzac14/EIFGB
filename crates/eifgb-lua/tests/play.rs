@@ -2024,3 +2024,52 @@ fn forgiveness_can_be_set_per_character() {
     say(&mut g, "hit miller");
     assert_says(&mut g, "apologize to miller", "The miller has heard enough of your apologies.");
 }
+
+// ---------------------------------------------------------------- haggling
+
+const SHOP: &str = "\
+format: eifgb/0.1
+game: { id: s, title: S, version: '1', start: shop }
+player: { money: 20 }
+rooms:
+  shop: { name: Shop }
+objects:
+  lamp: { name: brass lamp, synonyms: [lamp], in: peddler, traits: [portable], price: 8 }
+  rope: { name: rope, in: peddler, traits: [portable], price: 12 }
+  map: { name: map, in: peddler, traits: [portable], price: 4 }
+characters:
+  peddler: { name: peddler, in: shop, behavior: merchant, wander: 0 }
+";
+
+#[test]
+fn haggling_down_to_the_floor() {
+    let mut g = game(compile_str(SHOP).story.unwrap());
+    assert_eq!(say(&mut g, "haggle for lamp"), "How much? Try something like \"offer 5 for the brass lamp\".");
+    // haggle defaults to 25% for merchants: the floor on 8 is 6.
+    assert_eq!(say(&mut g, "offer 2 for the lamp"), "\"6 coins, and not a coin less,\" says the peddler.");
+    assert_eq!(say(&mut g, "offer 6 coins for the lamp"), "The peddler grumbles, but sells you the brass lamp for 6 coins.");
+    assert_says(&mut g, "i", "You have 14 coins.");
+    // Offering the asking price or more is just buying.
+    assert_eq!(say(&mut g, "offer 10 for the map"), "You buy the map from the peddler for 4 coins.");
+    assert_eq!(say(&mut g, "offer 50 for the rope"), "You only have 10 coins.");
+}
+
+#[test]
+fn too_many_lowball_offers_and_they_stop_trading_until_you_apologise() {
+    let mut g = game(compile_str(SHOP).story.unwrap());
+    say(&mut g, "offer 1 for the rope");
+    say(&mut g, "offer 1 for the rope");
+    assert_eq!(say(&mut g, "offer 1 for the rope"), "The peddler looks insulted, and won't trade with you any more.");
+    for cmd in ["buy map", "wares", "offer 9 for the rope"] {
+        assert_eq!(say(&mut g, cmd), "The peddler won't trade with you any more.", "{cmd}");
+    }
+    assert_eq!(say(&mut g, "apologize to the peddler"), "The peddler accepts your apology.");
+    assert_says(&mut g, "offer 9 for the rope", "sells you the rope for 9 coins");
+}
+
+#[test]
+fn fixed_prices() {
+    let src = SHOP.replace("behavior: merchant, wander: 0", "behavior: merchant, wander: 0, haggle: 0");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_eq!(say(&mut g, "offer 7 for the lamp"), "The peddler doesn't haggle. It's 8 coins.");
+}

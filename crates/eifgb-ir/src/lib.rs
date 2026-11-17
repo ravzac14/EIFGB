@@ -346,6 +346,10 @@ pub struct Npc {
     /// How many apologies it accepts over the whole game.
     #[serde(default = "one_u32")]
     pub forgiveness: u32,
+    /// How far below its prices a merchant will go when haggling, in
+    /// percent. 0 means fixed prices.
+    #[serde(default)]
+    pub haggle: u32,
 }
 
 fn one_u32() -> u32 {
@@ -818,6 +822,8 @@ pub enum BuiltinAction {
     Shout,
     /// Apologise to a character, to win back its patience and its faction's.
     Apologize,
+    /// Offer a merchant a price for something.
+    Offer,
 }
 
 impl BuiltinAction {

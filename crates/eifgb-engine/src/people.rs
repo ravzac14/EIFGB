@@ -297,39 +297,58 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
-    pub(crate) fn buy(&mut self, t: EntityId, merchant: Option<EntityId>, ctx: &Ctx) -> bool {
+    /// The merchant here selling `t`, and its asking price, or the reason
+    /// it can't be bought (already reported).
+    fn seller_of(&mut self, t: EntityId, merchant: Option<EntityId>, ctx: &Ctx) -> Option<(EntityId, i64)> {
         let merchants = self.world.merchants_here();
         if merchants.is_empty() || merchant.is_some_and(|m| !merchants.contains(&m)) {
             self.msg("buy.no_merchant", ctx);
-            return false;
+            return None;
         }
         let seller = merchants.iter().copied().find(|&m| self.world.location(t) == Some(m) && merchant.is_none_or(|n| n == m));
         let (Some(seller), Some(price)) = (seller, self.world.def(t).price) else {
             self.msg("buy.not_for_sale", ctx);
-            return false;
+            return None;
         };
-        let price = i64::from(price);
+        if self.refuses_trade(seller, ctx) {
+            return None;
+        }
+        Some((seller, i64::from(price)))
+    }
+
+    /// A merchant pushed too far won't trade with the player at all.
+    fn refuses_trade(&mut self, merchant: EntityId, ctx: &Ctx) -> bool {
+        if self.world.flag(merchant, "_refuses") {
+            self.msg("trade.refused", &ctx.clone().entity("merchant", merchant));
+            return true;
+        }
+        false
+    }
+
+    pub(crate) fn buy(&mut self, t: EntityId, merchant: Option<EntityId>, ctx: &Ctx) -> bool {
+        let Some((seller, price)) = self.seller_of(t, merchant, ctx) else { return false };
         let have = self.world.money(PLAYER);
         if have < price {
             let ctx = ctx.clone().text("price", self.money_text(price)).text("amount", self.money_text(have));
             self.msg("buy.too_poor", &ctx);
             return false;
         }
-        match self.world.fits(t, PLAYER) {
-            Fit::Yes => {}
-            Fit::TooBig => {
-                self.msg("take.too_big", ctx);
-                return false;
-            }
-            Fit::TooHeavy => {
-                self.msg("take.too_heavy", ctx);
-                return false;
-            }
-            Fit::Full => {
-                self.msg("take.full", ctx);
-                return false;
-            }
+        self.purchase(t, seller, price, "buy.done", ctx)
+    }
+
+    /// Hands `t` over for `price`, if the player can carry it.
+    fn purchase(&mut self, t: EntityId, seller: EntityId, price: i64, key: &str, ctx: &Ctx) -> bool {
+        let refusal = match self.world.fits(t, PLAYER) {
+            Fit::Yes => None,
+            Fit::TooBig => Some("take.too_big"),
+            Fit::TooHeavy => Some("take.too_heavy"),
+            Fit::Full => Some("take.full"),
+        };
+        if let Some(k) = refusal {
+            self.msg(k, ctx);
+            return false;
         }
+        let have = self.world.money(PLAYER);
         self.world.set_money(PLAYER, have - price);
         if self.world.has_money(seller) {
             let m = self.world.money(seller);
@@ -338,8 +357,57 @@ impl<H: ScriptHost> Game<H> {
         let _ = self.world.move_to(t, Some(PLAYER));
         self.world.learn(t);
         let ctx = ctx.clone().entity("merchant", seller).text("price", self.money_text(price));
-        self.msg("buy.done", &ctx);
+        self.msg(key, &ctx);
         true
+    }
+
+    /// OFFER 5 FOR LAMP. The asking price or more buys it. Less is accepted
+    /// down to the merchant's floor (`haggle` percent off); below that, the
+    /// merchant counters, and each lowball offer costs a point of patience.
+    /// Out of patience, the merchant refuses to trade at all.
+    pub(crate) fn offer(&mut self, t: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
+        let Some((seller, price)) = self.seller_of(t, None, ctx) else { return false };
+        let ctx = ctx.clone().entity("merchant", seller);
+        let amount = text.and_then(|s| s.split(|c: char| !c.is_ascii_digit()).find(|w| !w.is_empty())).and_then(|w| w.parse::<i64>().ok());
+        let Some(amount) = amount else {
+            self.msg("offer.how_much", &ctx);
+            return false;
+        };
+        if amount > self.world.money(PLAYER) {
+            let have = self.money_text(self.world.money(PLAYER));
+            self.msg("offer.cant_afford", &ctx.text("amount", have));
+            return false;
+        }
+        if amount >= price {
+            return self.purchase(t, seller, price, "buy.done", &ctx);
+        }
+        let haggle = self.world.def(seller).npc.as_ref().map_or(0, |n| n.haggle);
+        let price_text = self.money_text(price);
+        if haggle == 0 {
+            self.msg("offer.fixed", &ctx.text("price", price_text));
+            return false;
+        }
+        // The least it'll take, rounded up.
+        let floor = (price * i64::from(100 - haggle.min(100)) + 99) / 100;
+        if amount >= floor {
+            return self.purchase(t, seller, amount, "offer.accepted", &ctx);
+        }
+        let patience = match self.world.get(seller, "patience") {
+            Some(Value::Int(i)) => *i,
+            _ => 0,
+        };
+        // Like being attacked: it puts up with `patience` lowball offers.
+        if patience <= 0 {
+            self.world.set(seller, "_refuses", Value::Bool(true));
+            self.msg("offer.insulted", &ctx);
+            return false;
+        }
+        self.world.set(seller, "patience", Value::Int(patience - 1));
+        // Meet the player halfway, but never below the floor.
+        let counter = ((amount + price + 1) / 2).max(floor);
+        let counter = self.money_text(counter);
+        self.msg("offer.counter", &ctx.text("price", counter));
+        false
     }
 
     pub(crate) fn sell(&mut self, t: EntityId, merchant: Option<EntityId>, ctx: &Ctx) -> bool {
@@ -347,6 +415,9 @@ impl<H: ScriptHost> Game<H> {
             self.msg("sell.no_merchant", ctx);
             return false;
         };
+        if self.refuses_trade(buyer, ctx) {
+            return false;
+        }
         let ctx = ctx.clone().entity("merchant", buyer);
         if self.world.location(t) != Some(PLAYER) {
             self.msg("sell.not_held", &ctx);
@@ -386,6 +457,9 @@ impl<H: ScriptHost> Game<H> {
             return false;
         }
         for m in merchants {
+            if self.refuses_trade(m, ctx) {
+                continue;
+            }
             let goods: Vec<EntityId> =
                 self.world.contents(m).into_iter().filter(|&i| self.world.def(i).price.is_some()).collect();
             let ctx = Ctx::new().entity("merchant", m);

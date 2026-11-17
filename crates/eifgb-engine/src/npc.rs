@@ -312,7 +312,8 @@ impl World {
         };
         let short_of_patience = patience.is_some_and(|p| p < i64::from(n.patience));
         let faction_low = faction.as_deref().is_some_and(|f| self.attitude(f) < self.starting_attitude(f));
-        if !grudge && !short_of_patience && !faction_low {
+        let refuses = self.flag(npc, "_refuses");
+        if !grudge && !short_of_patience && !faction_low && !refuses {
             return Apology::Nothing;
         }
         let forgiven = match self.get(npc, "_forgiven") {
@@ -323,6 +324,7 @@ impl World {
             return Apology::Exhausted;
         }
         self.set(npc, "_forgiven", Value::Int(forgiven + 1));
+        self.unset(npc, "_refuses");
         self.set(npc, "foes", Value::List(foes.into_iter().filter(|v| *v != key).collect()));
         if patience.is_some() {
             self.set(npc, "patience", Value::Int(i64::from(n.patience)));

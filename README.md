@@ -1062,6 +1062,22 @@ You sell the brass lamp to the peddler for 4 coins.
   have, and gains what the player spends. Without it they can always pay.
 - **Looking before buying:** a merchant's goods can be examined before
   they're bought.
+- **Haggling:** OFFER 6 FOR LAMP (or BID; HAGGLE FOR LAMP asks how
+  much). The asking price or more just buys it. Below that, a merchant
+  accepts anything down to `haggle` percent off (default 25; `haggle: 0`
+  for fixed prices: "The peddler doesn't haggle. It's 8 coins."). Lower
+  offers get a counter ("\"6 coins, and not a coin less,\" says the
+  peddler.") and cost a point of the merchant's patience. Out of patience,
+  the merchant "looks insulted, and won't trade with you any more" until
+  the player apologises.
+
+  ```
+  > offer 2 for the lamp
+  "6 coins, and not a coin less," says the peddler.
+
+  > offer 6 coins for the lamp
+  The peddler grumbles, but sells you the brass lamp for 6 coins.
+  ```
 - **Currency:** prices read "8 coins". To call it something else, reword
   `money.amount` under `messages:`.
 
@@ -1127,8 +1143,8 @@ In-game commands that every game understands include LOOK, EXAMINE (X),
 TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
-ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, HEALTH (DIAGNOSE), SHOUT (YELL),
-APOLOGISE TO,
+ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, OFFER … FOR (HAGGLE FOR), HEALTH
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO,
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1159,7 +1175,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
-`forgiveness`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`forgiveness`, `haggle`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the

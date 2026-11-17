@@ -292,6 +292,9 @@ pub struct Thing {
     /// How many apologies it accepts. Defaults to 1; 0 never forgives.
     #[serde(default)]
     pub forgiveness: Option<u32>,
+    /// How far below its prices a merchant goes when haggling (percent).
+    #[serde(default)]
+    pub haggle: Option<u32>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

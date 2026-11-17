@@ -114,6 +114,8 @@ impl<'a> Lowerer<'a> {
             eaten_by: vec![],
             kills: None,
             nameable: false,
+            prints: None,
+            leaves_tracks: true,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -196,7 +198,11 @@ impl<'a> Lowerer<'a> {
                 start: start.unwrap_or(PLAYER),
                 max_score: s.game.max_score,
                 ai_fallback: s.game.ai_fallback,
-                settings: Settings { describe_state: s.settings.describe_state, voice: s.player.voice.unwrap_or(2) },
+                settings: Settings {
+                    describe_state: s.settings.describe_state,
+                    voice: s.player.voice.unwrap_or(2),
+                    track_life: s.settings.track_life.unwrap_or(30),
+                },
             },
             intro,
             vars: s.vars.into_iter().collect(),
@@ -539,6 +545,8 @@ impl<'a> Lowerer<'a> {
             eaten_by: vec![],
             kills: None,
             nameable: false,
+            prints: None,
+            leaves_tracks: !r.trackless,
         }
     }
 
@@ -737,6 +745,8 @@ impl<'a> Lowerer<'a> {
         only(self.d, "price", t.price.is_some(), kind == EntityKind::Object, "objects");
         only(self.d, "disguise", t.disguise.is_some(), kind == EntityKind::Object, "objects");
         only(self.d, "eaten_by", !t.eaten_by.is_empty(), kind == EntityKind::Object, "objects");
+        only(self.d, "prints", t.prints.is_some(), is_char, "characters");
+        only(self.d, "leaves_tracks", t.leaves_tracks.is_some(), is_char, "characters");
         if t.disguise.is_some() && !has(Trait::Wearable) {
             self.d.warn(format!("{path}.disguise"), "only works when worn; add the 'wearable' trait");
         }
@@ -782,6 +792,8 @@ impl<'a> Lowerer<'a> {
             eaten_by: t.eaten_by.clone(),
             kills: t.kills.clone(),
             nameable: t.nameable,
+            prints: t.prints.clone().filter(|_| is_char),
+            leaves_tracks: t.leaves_tracks.unwrap_or(true),
         }
     }
 
@@ -802,6 +814,7 @@ impl<'a> Lowerer<'a> {
                 ("likes", !t.likes.is_empty()),
                 ("bribe", t.bribe.is_some()),
                 ("fetches", t.fetches.is_some()),
+                ("tracker", t.tracker.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -884,6 +897,7 @@ impl<'a> Lowerer<'a> {
             likes: objects(self, "likes", &t.likes),
             bribe: t.bribe,
             fetches: t.fetches.unwrap_or(false),
+            tracker: t.tracker.unwrap_or(false),
         })
     }
 
@@ -1272,6 +1286,7 @@ impl<'a> Lowerer<'a> {
                 hostile_to: f.hostile_to.clone(),
                 eats_corpses: f.eats_corpses,
                 kills: f.kills.clone(),
+                prints: f.prints.clone(),
                 patience: f.patience.unwrap_or(2),
             });
         }

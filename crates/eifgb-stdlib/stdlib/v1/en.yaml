@@ -254,6 +254,31 @@ verbs:
       - "call {target}"
       - "name {target}"
       - "rename {target}"
+  tracks:
+    action: tracks
+    reach: false
+    patterns:
+      - "examine tracks"
+      - "x tracks"
+      - "look at tracks"
+      - "look for tracks"
+      - "search for tracks"
+      - "check for tracks"
+      - "study tracks"
+      - "read tracks"
+      - "find tracks"
+      - "tracks"
+      - "examine footprints"
+      - "x footprints"
+      - "look at footprints"
+      - "look for footprints"
+      - "examine prints"
+      - "x prints"
+      - "look at the ground"
+  follow_tracks:
+    action: follow_tracks
+    reach: false
+    patterns: ["follow {text}", "track {text}", "trail {text}"]
   accept:
     action: accept
     patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
@@ -470,6 +495,14 @@ messages:
   sell.fixed: "${The(args.merchant)} doesn't haggle. It'll pay ${args.price}."
   sell.how_much: "How much? Try something like \"sell ${the(args.target)} for 5\"."
   accept.nothing: "There's no offer on the table."
+  tracks.none: "You don't see any tracks here."
+  tracks.trackless: "Nothing here holds a track."
+  tracks.fresh: "fresh ${args.prints} lead ${args.direction}."
+  tracks.plain: "${args.prints} lead ${args.direction}."
+  tracks.old: "old ${args.prints}, half gone, lead ${args.direction}."
+  tracks.own: "your own ${args.prints} lead ${args.direction}."
+  tracks.nothing_to_follow: "There are no tracks here to follow."
+  tracks.follow: "You follow the ${args.prints} ${args.direction}."
   name.done: "From now on, ${args.old} is called ${args.name}."
   name.cant: "You can't give ${the(args.target)} a name."
   name.bad: "That's not much of a name. Try something like \"call ${the(args.target)} Rex\"."

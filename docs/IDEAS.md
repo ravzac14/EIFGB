@@ -14,6 +14,146 @@ Everything from the first list has now been built:
 - **Taming and gifts:** `tame_with`, `likes` and `bribe`.
 - **Throwing:** THROW … AT / THROW … NORTH, and companions that fetch.
 - **Naming things:** CALL THE DOG REX, with `nameable`.
+- **Tracks:** EXAMINE/FOLLOW TRACKS, `prints`, `trackless` rooms, and
+  trackers (from the second list).
 
 Add new ideas below, each with what it builds on, its shape, and a rough
 effort.
+
+## Stealth and sneaking
+
+### Pickpocketing
+
+TAKE KEY FROM GOBLIN while it's eating bait, asleep, or fooled by your
+disguise. Get caught and it costs the victim's patience and its faction's
+attitude.
+
+- Builds on: bait, disguises, patience, faction attitude, and characters'
+  belongings (out of scope today).
+- Shape: characters' carried things in scope for TAKE … FROM; a chance or
+  rule for being noticed (not distracted, not disguised); a `pickpocket`
+  message set; `guarded: true` on things that can't be lifted.
+- Effort: medium.
+
+### Eavesdropping
+
+Hide in the barrel and overhear what characters say to each other when
+they think nobody's listening: clues and secrets only stealthy players
+get.
+
+- Builds on: hiding, factions, characters' turns.
+- Shape: `chatter:` lines on characters (or factions), with `when:`; said
+  on their turn when two or more are together and the player is hidden
+  (or not seen), shown as overheard.
+- Effort: small.
+
+### Witnesses
+
+A faction only sours if a member *sees* it. Silent kills, attacks while
+hidden, or leaving no survivors keep the player's reputation clean.
+
+- Builds on: faction attitude, hiding, corpses.
+- Shape: attitude changes only when a living, non-hidden-from member of
+  the faction (other than the victim, unless it survives) is in the room;
+  witnesses who escape carry the news.
+- Effort: medium.
+
+### Hiding bodies
+
+Faction members who find a body get alarmed. HIDE BODY IN BARREL or BURY
+BODY and nobody finds out.
+
+- Builds on: corpses, containers, witnesses.
+- Shape: a member entering a room with a member's body that isn't hidden
+  sours the faction (once per body) and alerts nearby hunters (noise);
+  bodies can be put in containers, or BURY where `diggable`.
+- Effort: medium.
+
+### Sleep and sneaking
+
+Guards sleep on a timer. SNEAK past a sleeping guard; noise or a fight
+nearby wakes them.
+
+- Builds on: timers, noise, guards, hiding.
+- Shape: `asleep` state (a "sleeping" tag); sleeping characters don't act
+  or see; `sleeps:` schedule via timers; noise within N rooms wakes them;
+  SNEAK moves without waking.
+- Effort: medium.
+
+## Manipulating creatures
+
+### Giving orders
+
+TELL REX TO ATTACK THE GOBLIN, REX, STAY, REX, GUARD THE DOOR, REX, GO
+NORTH.
+
+- Builds on: taming, followers, character methods (`step_toward`,
+  `attack`, `go`).
+- Shape: an ORDER/TELL verb and "NAME, command" syntax for tamed
+  companions; a small set of orders (attack, stay, follow, go, fetch,
+  guard) stored as state and used by the tamed behaviour.
+- Effort: medium.
+
+### Fear and morale
+
+Characters flee when badly hurt or outnumbered, or when the player waves
+something they fear: a torch at wolves, the chief's head at goblins.
+
+- Builds on: behaviours, factions, the alpha's flee script.
+- Shape: `fears: [torch]` on factions or characters, `morale` thresholds
+  (health fraction, outnumbered); fleeing = stepping away from the threat;
+  WAVE/BRANDISH X verbs.
+- Effort: medium.
+
+### Mimicry
+
+HOWL draws only wolves; BLOW GOBLIN HORN draws only goblins. A noise only
+one faction answers.
+
+- Builds on: noise, factions.
+- Shape: noises with an optional `faction:` (timers, `make_noise`, and a
+  `calls: wolves` field on objects or verbs).
+- Effort: small.
+
+### Traps
+
+SET SNARE in a room. A hunter walking through is caught for a few turns.
+Bait it to choose who you catch.
+
+- Builds on: pathfinding, bait, timers.
+- Shape: `trap: { holds: 3, damage: 1 }` on objects; set in a room, it
+  catches the first character to enter (or the player, if careless).
+- Effort: medium.
+
+## The world
+
+### Fire
+
+LIGHT THE TENTS: fire spreads to `flammable` things over a few turns,
+scatters creatures that fear it, and can be heard and seen from nearby.
+
+- Builds on: timers, state, noise, fear.
+- Shape: a `burning` state that spreads each turn to flammable things in
+  the room and next door; burns out after N turns; damages characters in
+  burning rooms.
+- Effort: large.
+
+### Barter
+
+TRADE LAMP FOR ROPE with a merchant, using item prices and haggling
+patience instead of coins.
+
+- Builds on: prices, haggling, patience.
+- Shape: TRADE X FOR Y: accepted when X's resale value covers Y's price
+  less the merchant's haggle; counters ask for "something more".
+- Effort: small.
+
+### Pushing and climbing
+
+PUSH CRATE NORTH to drag heavy things between rooms, STAND ON CRATE to
+reach a high shelf.
+
+- Builds on: weight, supporters, enterable things.
+- Shape: PUSH X <direction> for heavy `pushable` things; `high: true`
+  things out of reach unless the player is on something.
+- Effort: medium.

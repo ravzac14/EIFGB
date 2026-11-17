@@ -2339,3 +2339,77 @@ fn names_are_undone_and_scripts_can_name_too() {
     assert_eq!(say(&mut g, "whistle"), "old dog false Narsil");
     assert_says(&mut g, "i", "Narsil");
 }
+
+// ------------------------------------------------------------------ tracks
+
+const TRACKS: &str = r#"format: eifgb/0.1
+game: { id: tr, title: Tracks, version: "1", start: glade }
+player: { health: 30 }
+factions:
+  wolves: { hostile_to: [player], prints: paw prints }
+rooms:
+  glade: { name: Glade, exits: { north: trail, west: thicket } }
+  thicket: { name: Thicket, exits: { east: glade } }
+  trail: { name: Muddy Trail, exits: { south: glade, east: stream, north: den } }
+  stream: { name: Stream, trackless: true, description: Cold water rushes over the stones., exits: { west: trail, east: meadow } }
+  meadow: { name: Meadow, exits: { west: stream } }
+  den: { name: Den, exits: { south: trail } }
+characters:
+  deer: { name: deer, in: glade, behavior: wanderer, wander: 100, prints: hoof prints, area: [glade, thicket] }
+  wolf: { name: wolf, in: den, faction: wolves, behavior: hunter, range: 0, wander: 0, tracker: true, health: 9, damage: 1 }
+"#;
+
+#[test]
+fn reading_and_following_tracks() {
+    let mut g = game(compile_str(TRACKS).story.unwrap());
+    assert_says(&mut g, "x tracks", "You don't see any tracks here.");
+    say(&mut g, "z");
+    assert_says(&mut g, "look for tracks", "Fresh hoof prints lead west.");
+    let out = say(&mut g, "follow hoof prints");
+    assert!(out.starts_with("You follow the hoof prints west.") && out.contains("Thicket"), "{out}");
+    // FOLLOW with a name works too, and with nothing to follow says so.
+    say(&mut g, "e");
+    assert_says(&mut g, "follow the deer", "You follow the hoof prints");
+}
+
+#[test]
+fn your_own_tracks_and_tracks_that_fade() {
+    let mut g = game(compile_str(TRACKS).story.unwrap());
+    say(&mut g, "n");
+    say(&mut g, "s");
+    assert_says(&mut g, "x tracks", "Your own footprints lead north.");
+    // Your own tracks are never followed (here, without the deer's).
+    let no_deer = TRACKS.replace(
+        "  deer: { name: deer, in: glade, behavior: wanderer, wander: 100, prints: hoof prints, area: [glade, thicket] }\n",
+        "",
+    );
+    let mut g2 = game(compile_str(&no_deer).story.unwrap());
+    say(&mut g2, "n");
+    say(&mut g2, "s");
+    assert_says(&mut g2, "follow tracks", "There are no tracks here to follow.");
+    // With track_life 2, they fade after two actions.
+    let src = TRACKS.replace("format: eifgb/0.1", "format: eifgb/0.1
+settings: { track_life: 2 }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "n");
+    say(&mut g, "s");
+    say(&mut g, "z");
+    say(&mut g, "z");
+    assert!(!say(&mut g, "x tracks").contains("Your own"));
+}
+
+#[test]
+fn trackers_follow_your_trail_until_water_breaks_it() {
+    let mut g = game(compile_str(TRACKS).story.unwrap());
+    say(&mut g, "n");
+    assert_says(&mut g, "n", "The wolf attacks you.");
+    // Out of the den: it can't see the player any more, but follows the prints.
+    assert_says(&mut g, "s", "The wolf arrives.");
+    say(&mut g, "e");
+    assert_says(&mut g, "x tracks", "Nothing here holds a track.");
+    say(&mut g, "e");
+    // The stream holds no prints: the wolf loses the trail.
+    for _ in 0..4 {
+        assert!(!say(&mut g, "z").contains("wolf"));
+    }
+}

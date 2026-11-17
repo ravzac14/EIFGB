@@ -107,6 +107,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Bribe, Some(t)) => self.bribe_action(t, cmd.text.as_deref(), ctx),
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
+            (A::Tracks, _) => self.tracks_action(),
+            (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),
             (A::Apologize, Some(t)) => self.apologize_action(t, ctx),
@@ -418,7 +420,7 @@ impl<H: ScriptHost> Game<H> {
         true
     }
 
-    fn travel(&mut self, here: EntityId, exit: &Exit) -> bool {
+    pub(crate) fn travel(&mut self, here: EntityId, exit: &Exit) -> bool {
         let Some(to) = exit.to else { return false };
         if let Some(door) = exit.through
             && let Some(b) = self.world.door_blocked(door, here)
@@ -448,6 +450,7 @@ impl<H: ScriptHost> Game<H> {
         if self.world.move_to(PLAYER, Some(to)).is_err() {
             return false;
         }
+        self.world.leave_tracks(PLAYER, here, exit.direction);
         // Having come through a door, the player knows it's there, even if
         // it was hidden from this side.
         if let Some(door) = exit.through {

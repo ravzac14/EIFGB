@@ -98,6 +98,9 @@ pub struct Faction {
     /// How members' victims look, unless the weapon or character says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kills: Option<String>,
+    /// What members' tracks look like ("paw prints").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prints: Option<String>,
     /// The faction's starting attitude toward a side it isn't hostile to,
     /// including a player disguised as one of its own: how many of its
     /// members the player can turn into foes before the whole faction
@@ -218,11 +221,18 @@ pub struct Settings {
     /// How many rooms away the player's SHOUT carries (`player.voice`).
     #[serde(default = "two")]
     pub voice: u32,
+    /// How many actions tracks last before fading. 0 means no tracks.
+    #[serde(default = "thirty")]
+    pub track_life: u32,
+}
+
+fn thirty() -> u32 {
+    30
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { describe_state: true, voice: 2 }
+        Settings { describe_state: true, voice: 2, track_life: 30 }
     }
 }
 
@@ -305,6 +315,14 @@ pub struct Entity {
     /// The player can give it a name (CALL THE DOG REX).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub nameable: bool,
+    /// What its tracks look like ("paw prints"). Characters only; None means
+    /// its faction's, or "footprints".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prints: Option<String>,
+    /// Characters: false for ghosts, birds and others that leave no tracks.
+    /// Rooms: false for a stream or bare rock that holds none.
+    #[serde(default = "yes", skip_serializing_if = "Clone::clone")]
+    pub leaves_tracks: bool,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -366,6 +384,9 @@ pub struct Npc {
     /// Tamed or a follower, it fetches what the player throws.
     #[serde(default)]
     pub fetches: bool,
+    /// Follows the player's fresh tracks when it loses sight of them.
+    #[serde(default)]
+    pub tracker: bool,
 }
 
 fn one_u32() -> u32 {
@@ -850,6 +871,10 @@ pub enum BuiltinAction {
     Throw,
     /// Give something `nameable` a name.
     Rename,
+    /// Look for tracks here.
+    Tracks,
+    /// Follow the freshest tracks here.
+    FollowTracks,
 }
 
 impl BuiltinAction {

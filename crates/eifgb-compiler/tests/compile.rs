@@ -526,3 +526,11 @@ fn text_can_end_a_pattern_right_after_another_slot() {
     let out = with("verbs:\n  dub: { patterns: ['dub {target} {text} now'] }\n");
     assert!(format!("{:?}", out.diagnostics).contains("two slots in a row"), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn tracks_settings_are_checked() {
+    let out = with("objects:\n  rock: { name: rock, in: hall, prints: scratches }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only characters can have 'prints'"), "{:#?}", out.diagnostics);
+    let out = with("settings: { track_life: 0 }\ncharacters:\n  ghost: { name: ghost, in: hall, leaves_tracks: false, tracker: true }\n");
+    assert!(out.story.is_some(), "{:#?}", out.diagnostics);
+}

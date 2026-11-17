@@ -991,7 +991,20 @@ characters:
 
 ### Tricks players can find
 
-Eight features reward players who try something clever:
+Nine features reward players who try something clever:
+
+- **Tracks:** everyone who walks out of a room leaves prints there.
+  EXAMINE TRACKS (LOOK FOR TRACKS, X FOOTPRINTS…) reads them, freshest
+  first: "Fresh paw prints lead east. Your own footprints lead south."
+  FOLLOW TRACKS walks the way the freshest prints lead (never your own),
+  and FOLLOW PAW PRINTS or FOLLOW THE WOLF picks whose. Prints are
+  `footprints` unless a character or its faction says otherwise
+  (`prints: paw prints`); ghosts and birds can have `leaves_tracks: false`.
+  They fade after `settings.track_life` actions (default 30; `0` turns
+  tracks off). A room with `trackless: true` (a stream, bare rock) holds
+  none. A hunter with `tracker: true` that loses sight of the player
+  follows their fresh tracks, so wading through a stream is how to throw
+  it off.
 
 - **Naming things:** give an object or character `nameable: true`, and
   CALL THE DOG REX (also NAME … (AS), RENAME … (TO), CHRISTEN) gives it a
@@ -1205,7 +1218,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME),
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1237,8 +1250,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
-`patience`; objects
+`nameable`, `prints`, `leaves_tracks`, `tracker`; rooms can be `trackless`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
+`patience` and `prints`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by` and `nameable`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).

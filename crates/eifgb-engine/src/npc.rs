@@ -717,6 +717,7 @@ impl World {
     fn npc_move(&mut self, npc: EntityId, direction: Direction, to: EntityId) -> Option<NpcEvent> {
         let from = self.room_of(npc)?;
         self.move_to(npc, Some(to)).ok()?;
+        self.leave_tracks(npc, from, direction);
         Some(NpcEvent::Moved { npc, from, to, direction })
     }
 
@@ -917,6 +918,18 @@ impl World {
         };
         if let Some(t) = target {
             return self.npc_step_toward(npc, t);
+        }
+        // A tracker picks up the player's fresh trail.
+        if self.def(npc).npc.as_ref().is_some_and(|n| n.tracker)
+            && self.is_hostile(npc, PLAYER)
+            && let Some(room) = self.room_of(npc)
+            && let Some(t) = self
+                .tracks_in(room)
+                .into_iter()
+                .find(|t| t.who == PLAYER && t.age <= crate::tracks::FRESH)
+            && let Some(step) = self.npc_go(npc, t.direction)
+        {
+            return Some(step);
         }
         if let Some(Value::Str(key)) = self.get(npc, "_last_seen").cloned()
             && let Some(spot) = self.id(&key)

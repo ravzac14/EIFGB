@@ -22,6 +22,7 @@ pub mod game;
 pub mod lang;
 pub mod npc;
 mod people;
+pub mod tracks;
 pub mod parser;
 pub mod rng;
 pub mod script;

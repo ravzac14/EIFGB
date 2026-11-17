@@ -78,11 +78,14 @@ pub struct Settings {
     /// Describe open, closed, locked and worn automatically. On by default.
     #[serde(default = "yes")]
     pub describe_state: bool,
+    /// How many actions tracks last. 0 turns tracks off. Defaults to 30.
+    #[serde(default)]
+    pub track_life: Option<u32>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { describe_state: true }
+        Settings { describe_state: true, track_life: None }
     }
 }
 
@@ -168,6 +171,9 @@ impl<'de> Deserialize<'de> for Capacity {
 #[serde(deny_unknown_fields)]
 pub struct Room {
     pub name: String,
+    /// A floor that holds no tracks: a stream, bare rock.
+    #[serde(default)]
+    pub trackless: bool,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
@@ -310,6 +316,15 @@ pub struct Thing {
     /// The player can name it: CALL THE DOG REX.
     #[serde(default)]
     pub nameable: bool,
+    /// What its tracks look like ("paw prints").
+    #[serde(default)]
+    pub prints: Option<String>,
+    /// False for characters that leave no tracks.
+    #[serde(default)]
+    pub leaves_tracks: Option<bool>,
+    /// Follows the player's fresh tracks.
+    #[serde(default)]
+    pub tracker: Option<bool>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,
@@ -398,6 +413,9 @@ pub struct Faction {
     /// How members' victims look: "torn apart by teeth".
     #[serde(default)]
     pub kills: Option<String>,
+    /// What members' tracks look like: "paw prints".
+    #[serde(default)]
+    pub prints: Option<String>,
     /// How many members the player can provoke before the faction turns
     /// on them (as themselves, or in its disguise). Defaults to 2.
     #[serde(default)]

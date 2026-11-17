@@ -362,7 +362,7 @@ impl World {
                 self.unset(target, "_bribed");
             }
             let change = match (new_foe && attacker == PLAYER, self.def(target).faction.clone()) {
-                (true, Some(f)) => self.sour(&f),
+                (true, Some(f)) if self.witnessed(&f) => self.sour(&f),
                 _ => None,
             };
             return (false, change);
@@ -385,10 +385,23 @@ impl World {
             self.unset(target, "_bribed");
         }
         let change = match (new_foe && attacker == PLAYER, self.def(target).faction.clone()) {
-            (true, Some(f)) => self.sour(&f),
+            (true, Some(f)) if self.witnessed(&f) => self.sour(&f),
             _ => None,
         };
         (false, change)
+    }
+
+    /// Whether any living member of `faction` saw the player just now: one
+    /// in the player's room that can see them. A victim that survived the
+    /// blow counts; one that didn't can't tell anyone.
+    pub fn witnessed(&self, faction: &str) -> bool {
+        if self.player_hidden() {
+            return false;
+        }
+        (0..self.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&c| self.def(c).faction.as_deref() == Some(faction))
+            .any(|c| self.is_active(c) && self.together(c, PLAYER))
     }
 
     /// The key under which a faction's attitude toward the player, as

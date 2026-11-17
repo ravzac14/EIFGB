@@ -2413,3 +2413,51 @@ fn trackers_follow_your_trail_until_water_breaks_it() {
         assert!(!say(&mut g, "z").contains("wolf"));
     }
 }
+
+// --------------------------------------------------------------- witnesses
+
+const WITNESSES: &str = "\
+format: eifgb/0.1
+game: { id: w, title: W, version: '1', start: green }
+player: { health: 30, damage: 5 }
+factions:
+  villagers: { patience: 1 }
+rooms:
+  green: { name: Green, exits: { north: mill, east: forge } }
+  mill: { name: Mill, exits: { south: green } }
+  forge: { name: Forge, exits: { west: green } }
+characters:
+  miller: { name: miller, in: mill, faction: villagers, health: 3, patience: 0 }
+  smith: { name: smith, in: forge, faction: villagers, health: 30, patience: 0 }
+  baker: { name: baker, in: green, faction: villagers, health: 30 }
+";
+
+#[test]
+fn a_kill_nobody_sees_doesnt_reach_the_faction() {
+    let mut g = game(compile_str(WITNESSES).story.unwrap());
+    say(&mut g, "n");
+    // One blow, nobody else in the mill: the villagers never find out.
+    let out = say(&mut g, "hit miller");
+    assert!(out.contains("The miller is defeated.") && !out.contains("villagers"), "{out}");
+    say(&mut g, "s");
+    assert!(!say(&mut g, "z").contains("baker attacks"));
+}
+
+#[test]
+fn a_victim_that_survives_is_its_own_witness() {
+    let mut g = game(compile_str(WITNESSES).story.unwrap());
+    say(&mut g, "e");
+    // The smith lives to tell: with patience 1, that's the end of it.
+    assert_says(&mut g, "hit smith", "The villagers turn against you.");
+    say(&mut g, "w");
+    assert_says(&mut g, "z", "The baker attacks you.");
+}
+
+#[test]
+fn anyone_else_in_the_room_is_a_witness() {
+    let src = WITNESSES.replace("miller: { name: miller, in: mill,", "miller: { name: miller, in: green,");
+    let mut g = game(compile_str(&src).story.unwrap());
+    // The miller dies at once, but the baker saw.
+    let out = say(&mut g, "hit miller");
+    assert!(out.contains("The villagers turn against you.") && out.contains("The baker attacks you."), "{out}");
+}

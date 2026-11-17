@@ -561,7 +561,9 @@ The goblin grunt attacks you.
 
 The same rule works without disguises: a neutral faction, such as
 villagers who aren't `hostile_to` the player, turns on them as a whole
-once they've provoked enough of its members.
+once they've provoked enough of its members. It only counts when another
+member sees it, though, or the victim survives to tell: kill a lone goblin
+in one blow and the band never knows.
 
 It's not always the end. APOLOGISE TO GRUNT, still wearing the helmet,
 and if the grunt accepts, it lets its grudge go and the goblins' patience

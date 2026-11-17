@@ -961,8 +961,12 @@ characters:
   starts at 0 toward a side the faction is hostile to, and at the
   faction's `patience` (default 2) otherwise, including toward a player
   disguised as one of its own. Each member the player provokes into a
-  foe (by using up that member's own patience) lowers it by one: "The
-  villagers are growing wary of you." At 0, every member attacks the
+  foe (by using up that member's own patience) lowers it by one, but only
+  if a member of the faction **witnesses** it: one in the room, alive, who
+  can see the player. A victim that survives the blow is a witness; one
+  killed outright with nobody else around can't tell anyone, so a silent
+  kill leaves the player's reputation clean. Once seen, the news spreads
+  at once: "The villagers are growing wary of you." At 0, every member attacks the
   player on sight, whatever its behaviour: "The villagers turn against
   you.", or in disguise, "The goblins see through your disguise!" Putting
   the disguise back on doesn't help, and it doesn't recover by itself:

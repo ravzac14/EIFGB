@@ -16,6 +16,7 @@ Everything from the first list has now been built:
 - **Naming things:** CALL THE DOG REX, with `nameable`.
 - **Tracks:** EXAMINE/FOLLOW TRACKS, `prints`, `trackless` rooms, and
   trackers (from the second list).
+- **Witnesses:** a faction only sours when a member sees it.
 
 Add new ideas below, each with what it builds on, its shape, and a rough
 effort.
@@ -46,17 +47,6 @@ get.
   on their turn when two or more are together and the player is hidden
   (or not seen), shown as overheard.
 - Effort: small.
-
-### Witnesses
-
-A faction only sours if a member *sees* it. Silent kills, attacks while
-hidden, or leaving no survivors keep the player's reputation clean.
-
-- Builds on: faction attitude, hiding, corpses.
-- Shape: attitude changes only when a living, non-hidden-from member of
-  the faction (other than the victim, unless it survives) is in the room;
-  witnesses who escape carry the news.
-- Effort: medium.
 
 ### Hiding bodies
 

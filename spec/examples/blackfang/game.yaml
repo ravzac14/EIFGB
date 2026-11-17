@@ -1,0 +1,189 @@
+# The finished game from the advanced tutorial (docs/ADVANCED.md): rival
+# factions of monsters who hate each other almost as much as they hate you.
+format: eifgb/0.1
+
+game:
+  id: blackfang
+  title: "Blackfang Pass"
+  version: "1.0"
+  start: trailhead
+  intro: |
+    The shrine at the top of Blackfang Pass holds the last sunstone. Between
+    you and it: a wolf pack, a goblin war band, and whatever guards the
+    shrine gate. None of them like visitors. Luckily, none of them like
+    each other either.
+
+player:
+  health: 20
+  damage: 1
+
+factions:
+  wolves:
+    hostile_to: [goblins, player]
+    eats_corpses: true
+  goblins:
+    hostile_to: [wolves, player]
+  undead:
+    hostile_to: [wolves, goblins, player]
+
+rooms:
+  trailhead:
+    name: Trailhead
+    description: |
+      The path into the pass starts here, between two leaning boulders.
+      It climbs north to a crossroads.
+    exits:
+      north: crossroads
+
+  crossroads:
+    name: Crossroads
+    description: |
+      Three trails meet in a bowl of broken rock. Howls drift from a den
+      to the east; smoke rises from a camp to the west. North, the path
+      climbs to the shrine gate. The trailhead is back to the south.
+    exits:
+      south: trailhead
+      east: den
+      west: camp
+      north: gate_yard
+
+  den:
+    name: Wolf Den
+    description: A hollow under the rocks, littered with gnawed bones.
+    exits:
+      west: crossroads
+
+  camp:
+    name: Goblin Camp
+    description: Ragged tents around a smoky fire.
+    exits:
+      east: crossroads
+
+  gate_yard:
+    name: Shrine Gate
+    description: |
+      A courtyard of cracked flagstones before an iron gate. Beyond it,
+      steps climb to the shrine.
+    exits:
+      south: crossroads
+      north:
+        to: shrine
+        through: iron_gate
+
+  shrine:
+    name: Shrine
+    description: A small stone shrine, open to the sky.
+    exits:
+      south: gate_yard
+
+objects:
+  spear:
+    name: hunting spear
+    synonyms: [spear]
+    in: trailhead
+    traits: [portable]
+    damage: 3
+    description: Long, light and sharp.
+
+  iron_key:
+    name: iron key
+    synonyms: [key]
+    in: chief
+    traits: [portable]
+    description: A heavy iron key on a leather thong.
+
+  iron_gate:
+    name: iron gate
+    synonyms: [gate]
+    in: gate_yard
+    traits: [door, openable, lockable, scenery]
+    state: { locked: true }
+    unlocks_with: iron_key
+    description: Black iron bars, green with age.
+
+  sunstone:
+    name: sunstone
+    synonyms: [stone]
+    in: shrine
+    traits: [portable]
+    description: It glows like a coal, warm in the hand.
+    on:
+      after_take: end_game("won")
+
+characters:
+  alpha:
+    name: alpha wolf
+    synonyms: [alpha, wolf]
+    in: den
+    faction: wolves
+    behavior: hunter
+    range: 1
+    wander: 0
+    health: 10
+    damage: 3
+    description: A huge grey wolf with a torn ear.
+    # Badly hurt, the alpha retreats to its den to lick its wounds, and
+    # only fights there if it's cornered.
+    act: |
+      if self.health > 3 then
+        self:behave()
+      elseif not self:is_in(world.den) then
+        self:step_toward(world.den)
+      elseif self:is_with(player) then
+        self:behave()
+      end
+
+  wolf:
+    name: young wolf
+    synonyms: [wolf]
+    in: den
+    faction: wolves
+    behavior: hunter
+    range: 1
+    wander: 0
+    health: 6
+    damage: 2
+    description: Lean and hungry.
+
+  chief:
+    name: goblin chief
+    synonyms: [chief, goblin]
+    in: camp
+    faction: goblins
+    behavior: hunter
+    range: 1
+    wander: 0
+    health: 10
+    damage: 2
+    description: A squat goblin in a helmet two sizes too big.
+
+  grunt:
+    name: goblin grunt
+    synonyms: [grunt, goblin]
+    in: camp
+    faction: goblins
+    behavior: hunter
+    range: 1
+    wander: 0
+    health: 6
+    damage: 2
+    description: Mostly teeth.
+
+  skeleton:
+    name: skeleton
+    synonyms: [skeleton, bones]
+    in: gate_yard
+    faction: undead
+    behavior: guard
+    health: 6
+    damage: 2
+    corpse: false
+    description: Old bones, held together by spite.
+    on:
+      defeated: return block("The skeleton collapses into a heap of dust.")
+
+endings:
+  won:
+    kind: win
+    text: |
+      The sunstone blazes in your hand. Behind you, the pass falls quiet.

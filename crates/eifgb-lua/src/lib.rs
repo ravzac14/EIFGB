@@ -561,6 +561,18 @@ impl ScriptHost for LuaHost {
                     })?,
                 )?;
                 h.set(
+                    "npc_eat",
+                    scope.create_function(move |_, (id, corpse): (u32, u32)| {
+                        let (id, corpse) = (check(id)?, check(corpse)?);
+                        let ev = world.borrow_mut().npc_eat(id, corpse);
+                        Ok(push(ev))
+                    })?,
+                )?;
+                h.set(
+                    "hostile",
+                    scope.create_function(move |_, (a, b): (u32, u32)| Ok(world.borrow().is_hostile(check(a)?, check(b)?)))?,
+                )?;
+                h.set(
                     "together",
                     scope.create_function(move |_, (a, b): (u32, u32)| Ok(world.borrow().together(check(a)?, check(b)?)))?,
                 )?;

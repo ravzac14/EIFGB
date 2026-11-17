@@ -63,9 +63,33 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("attack.done", &ctx);
                 } else if self.world.room_of(attacker) == Some(here) {
                     self.msg("npc.attacks", &ctx);
+                } else if let Some(room) = self.world.room_of(attacker) {
+                    self.hear(room, "npc.fight_nearby");
+                }
+            }
+            NpcEvent::Ate { npc, corpse, room } => {
+                if room == here {
+                    self.msg("npc.eats", &Ctx::new().entity("npc", npc).entity("target", corpse));
+                } else {
+                    self.hear(room, "npc.eating_nearby");
                 }
             }
         }
+    }
+
+    /// Something in a neighbouring room can be heard, though not seen:
+    /// at most one such message per turn.
+    fn hear(&mut self, room: EntityId, key: &str) {
+        let here = self.world.here();
+        let Some(dir) = self.world.def(here).exits.iter().find(|e| e.to == Some(room)).map(|e| e.direction) else {
+            return;
+        };
+        if self.heard_nearby == Some(self.world.state.turn) {
+            return;
+        }
+        self.heard_nearby = Some(self.world.state.turn);
+        let dir = self.grammar.direction_word(dir);
+        self.msg(key, &Ctx::new().text("direction", dir));
     }
 
     /// Characters whose health has run out are defeated, and a player
@@ -76,6 +100,7 @@ impl<H: ScriptHost> Game<H> {
             .filter(|&id| {
                 self.world.def(id).kind == EntityKind::Character
                     && self.world.room_of(id).is_some()
+                    && !self.world.is_dead(id)
                     && self.world.health(id).is_some_and(|h| h <= 0)
             })
             .collect();
@@ -94,7 +119,9 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// Runs the character's `defeated` handlers. Unless one returns
-    /// `block()`, it drops what it carries and leaves the game.
+    /// `block()`, "X is defeated." and it drops what it carries. Then,
+    /// unless a handler healed it or moved it away, it becomes a corpse
+    /// (`dead`), or with `corpse: false`, leaves the game.
     fn defeat(&mut self, id: EntityId) {
         let codes: Vec<Code> = self
             .world
@@ -109,24 +136,31 @@ impl<H: ScriptHost> Game<H> {
             blocked |= self.run(&code, &Ctx::new().this(id)) == ScriptValue::Block;
         }
         // A handler may have healed it or moved it away.
-        if blocked || self.world.room_of(id).is_none() || self.world.health(id).is_some_and(|h| h > 0) {
+        if self.world.room_of(id).is_none() || self.world.health(id).is_some_and(|h| h > 0) {
             return;
         }
         let room = self.world.room_of(id);
-        let seen = room == Some(self.world.here());
-        if seen {
-            self.msg("npc.defeated", &Ctx::new().entity("target", id));
+        if !blocked {
+            let seen = room == Some(self.world.here());
+            if seen {
+                self.msg("npc.defeated", &Ctx::new().entity("target", id));
+            }
+            let items = self.world.contents(id);
+            for &item in &items {
+                self.world.unset(item, "worn");
+                let _ = self.world.move_to(item, room);
+            }
+            if seen && !items.is_empty() {
+                let list = self.list_a(&items);
+                self.msg("npc.drops", &Ctx::new().entity("target", id).text("list", list));
+            }
         }
-        let items = self.world.contents(id);
-        for &item in &items {
-            self.world.unset(item, "worn");
-            let _ = self.world.move_to(item, room);
+        if self.world.def(id).npc.as_ref().is_none_or(|n| n.corpse) {
+            self.world.set(id, "dead", Value::Bool(true));
+            self.world.learn(id);
+        } else {
+            let _ = self.world.move_to(id, None);
         }
-        if seen && !items.is_empty() {
-            let list = self.list_a(&items);
-            self.msg("npc.drops", &Ctx::new().entity("target", id).text("list", list));
-        }
-        let _ = self.world.move_to(id, None);
     }
 
     /// "12 coins"
@@ -150,6 +184,10 @@ impl<H: ScriptHost> Game<H> {
                 self.msg("attack.not_weapon", ctx);
                 return false;
             }
+        }
+        if self.world.is_dead(t) {
+            self.msg("attack.dead", ctx);
+            return false;
         }
         if self.world.health(t).is_none() {
             self.msg("attack.pointless", ctx);

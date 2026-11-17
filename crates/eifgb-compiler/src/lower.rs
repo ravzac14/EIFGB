@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "dead"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -109,6 +109,7 @@ impl<'a> Lowerer<'a> {
             health: s.player.health,
             damage: Some(s.player.damage.unwrap_or(1)),
             price: None,
+            faction: None,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -134,8 +135,23 @@ impl<'a> Lowerer<'a> {
             let text = stdlib.messages.get("ending.died").map(String::as_str).unwrap_or("You have died.");
             endings.push(Ending { key: "died".into(), kind: EndingKind::Loss, text: self.text(text, "stdlib.messages.ending.died") });
         }
+        let factions = self.lower_factions(&s.factions);
         for e in &entities {
-            if e.npc.as_ref().is_some_and(|n| n.behavior.hostile()) && s.player.health.is_none() {
+            let path = format!("characters.{}.faction", e.key);
+            if let Some(f) = &e.faction
+                && !factions.iter().any(|x| &x.key == f)
+            {
+                let hint = did_you_mean(f, factions.iter().map(|x| x.key.as_str()));
+                self.d.error(&path, format!("unknown faction '{f}'{hint}; declare it under 'factions:'"));
+            }
+        }
+        for e in &entities {
+            // With a faction, its `hostile_to` says whether it goes for the player.
+            let attacks_player = match &e.faction {
+                Some(f) => factions.iter().any(|x| &x.key == f && x.hostile_to.iter().any(|h| h == PLAYER_FACTION)),
+                None => true,
+            };
+            if e.npc.as_ref().is_some_and(|n| n.behavior.hostile()) && attacks_player && s.player.health.is_none() {
                 self.d.warn(
                     format!("characters.{}.behavior", e.key),
                     "attacks the player, but the player has no 'health', so its attacks do nothing; add 'player: { health: 10 }'",
@@ -172,6 +188,7 @@ impl<'a> Lowerer<'a> {
             scripts,
             categories: stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             timers,
+            factions,
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -495,6 +512,7 @@ impl<'a> Lowerer<'a> {
             health: None,
             damage: None,
             price: None,
+            faction: None,
         }
     }
 
@@ -723,6 +741,7 @@ impl<'a> Lowerer<'a> {
             health: t.health.filter(|_| is_char),
             damage,
             price: t.price,
+            faction: t.faction.clone().filter(|_| is_char),
         }
     }
 
@@ -731,6 +750,8 @@ impl<'a> Lowerer<'a> {
     fn lower_npc(&mut self, path: &str, t: &src::Thing, kind: EntityKind, talks: bool) -> Option<Npc> {
         if kind != EntityKind::Character {
             for (field, set) in [
+                ("faction", t.faction.is_some()),
+                ("corpse", t.corpse.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -780,6 +801,7 @@ impl<'a> Lowerer<'a> {
             range: t.range,
             buys_at: t.buys_at.unwrap_or(50),
             act,
+            corpse: t.corpse.unwrap_or(true),
         })
     }
 
@@ -1132,6 +1154,30 @@ impl<'a> Lowerer<'a> {
                 nodes.push(ChoiceNode { key: nkey.clone(), text, run, options, next });
             }
             out.push(ChoiceGraph { key: key.clone(), start, nodes });
+        }
+        out
+    }
+
+    // ------------------------------------------------------------- factions
+
+    fn lower_factions(&mut self, raw: &indexmap::IndexMap<String, src::Faction>) -> Vec<Faction> {
+        let mut out = Vec::new();
+        for (key, f) in raw {
+            let path = format!("factions.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&path, e);
+            }
+            if key == PLAYER_FACTION {
+                self.d.error(&path, "'player' is the player's own side; pick another name");
+            }
+            for (i, h) in f.hostile_to.iter().enumerate() {
+                if h != PLAYER_FACTION && !raw.contains_key(h) {
+                    let candidates = raw.keys().map(String::as_str).chain([PLAYER_FACTION]);
+                    let hint = did_you_mean(h, candidates);
+                    self.d.error(format!("{path}.hostile_to[{i}]"), format!("unknown faction '{h}'{hint}"));
+                }
+            }
+            out.push(Faction { key: key.clone(), hostile_to: f.hostile_to.clone(), eats_corpses: f.eats_corpses });
         }
         out
     }

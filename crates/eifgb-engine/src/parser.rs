@@ -121,6 +121,8 @@ pub struct Grammar {
     /// Every word in any description, so that unknown-word replies don't
     /// claim not to know a word the game itself printed.
     described_words: HashSet<String>,
+    /// "corpse", "body": words for any dead character.
+    corpse_words: HashSet<String>,
 }
 
 /// The words of a text's literal parts, including both branches of every
@@ -274,6 +276,7 @@ impl Grammar {
             pattern_words,
             described,
             described_words,
+            corpse_words: lx.corpse_words.iter().cloned().collect(),
         }
     }
 
@@ -664,7 +667,8 @@ impl Grammar {
     }
 
     fn stem_known(&self, w: &str) -> bool {
-        (self.lang.stems)(w).iter().any(|s| self.vocab_words.contains(s))
+        self.corpse_words.contains(w)
+            || (self.lang.stems)(w).iter().any(|s| self.vocab_words.contains(s) || self.corpse_words.contains(s))
             || self.described_words.contains(w)
             || (self.lang.stems)(w).iter().any(|s| self.described_words.contains(s))
     }
@@ -700,15 +704,18 @@ impl Grammar {
         let mut out = Vec::new();
         for &id in scope {
             let v = &world.def(id).vocab;
+            let dead = world.is_dead(id);
+            let corpse_word = |s: &str| dead && self.corpse_words.contains(s);
             let known = |w: &str| {
-                let check = |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s);
+                let check = |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s);
                 check(w) || (self.lang.stems)(w).iter().any(|s| check(s))
             };
             if v.is_empty() || !words.iter().all(|w| known(w)) {
                 continue;
             }
             let last = words[words.len() - 1];
-            let noun_last = v.nouns.contains(last) || (self.lang.stems)(last).iter().any(|s| v.nouns.contains(s));
+            let noun = |s: &str| v.nouns.iter().any(|n| n == s) || corpse_word(s);
+            let noun_last = noun(last) || (self.lang.stems)(last).iter().any(|s| noun(s));
             let score = if noun_last { 2 } else { 1 };
             if score > best_score {
                 best_score = score;

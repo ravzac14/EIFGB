@@ -16,7 +16,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// `blocked` is built in on doors only (see [`World::door_blocked`]).
 ///
 /// [`World::door_blocked`]: crate::World::door_blocked
-const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden", "health", "money"];
+const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden", "health", "money", "dead"];
 
 /// One thing the automatic state descriptions can say.
 #[derive(Debug, Clone, PartialEq)]
@@ -469,8 +469,12 @@ impl<H: ScriptHost> Game<H> {
         if w.flag(id, "worn") {
             notes.push(StateNote::Builtin("worn"));
         }
+        if w.is_dead(id) {
+            notes.push(StateNote::Builtin("dead"));
+        }
         // Wounds show on characters; the player has HEALTH for that.
         if id != PLAYER
+            && !w.is_dead(id)
             && let (Some(h), Some(max)) = (w.health(id), w.def(id).health)
             && h < i64::from(max)
         {
@@ -534,7 +538,8 @@ impl<H: ScriptHost> Game<H> {
     /// that are "on" get a tag; the rest would just be noise in a list.
     /// Tags only appear once the player has examined or handled the thing.
     pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
-        if !self.world.known(id) {
+        // Death is plain to see.
+        if !self.world.known(id) && !self.world.is_dead(id) {
             return Vec::new();
         }
         self.state_notes(id)
@@ -594,6 +599,7 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("blocked" | "blocked_here") => self.mentions(text, id, &["blocked"], is_own),
             StateNote::Builtin("empty" | "heavy") => false,
             StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
+            StateNote::Builtin("dead") => self.mentions(text, id, &["dead"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
         }
@@ -1005,6 +1011,10 @@ impl<H: ScriptHost> Game<H> {
     fn talk(&mut self, t: EntityId, ctx: &Ctx) -> bool {
         if self.world.def(t).kind != EntityKind::Character {
             self.msg("talk.not_person", ctx);
+            return false;
+        }
+        if self.world.is_dead(t) {
+            self.msg("talk.dead", ctx);
             return false;
         }
         match self.world.def(t).talk {

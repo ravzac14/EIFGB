@@ -40,6 +40,8 @@ pub struct Source {
     pub endings: IndexMap<String, Ending>,
     #[serde(default)]
     pub timers: IndexMap<String, Timer>,
+    #[serde(default)]
+    pub factions: IndexMap<String, Faction>,
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, String>,
@@ -265,6 +267,12 @@ pub struct Thing {
     /// A merchant's money. Without it they can always pay.
     #[serde(default)]
     pub money: Option<u32>,
+    /// The character's side, from `factions`.
+    #[serde(default)]
+    pub faction: Option<String>,
+    /// Whether it leaves a body when defeated. Defaults to true.
+    #[serde(default)]
+    pub corpse: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -331,6 +339,16 @@ pub struct ChoiceOption {
     pub goto: Option<String>,
     #[serde(default)]
     pub end: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Faction {
+    /// Other factions, or `player`.
+    #[serde(default)]
+    pub hostile_to: Vec<String>,
+    #[serde(default)]
+    pub eats_corpses: bool,
 }
 
 /// Something that happens after a number of actions.

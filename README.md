@@ -890,8 +890,10 @@ You're hurt: 12 out of 30.
 - **Wounds** show once the player has seen them: "a grey wolf (wounded)",
   then "(badly wounded)" at half health or less.
 - **Defeat:** at 0 health a character drops what it carries and leaves
-  the game. An `on: { defeated: ... }` handler on the character runs
-  first, and returning `block()` stops that: the wolf could limp away
+  a body (see [Factions and corpses](#factions-and-corpses)). An
+  `on: { defeated: ... }` handler on the character runs first. Returning
+  `block("...")` replaces the usual message and the dropping. A handler
+  can also heal the character or move it away: the wolf could limp off
   instead.
 - **Death:** when the player's health reaches 0, the global `died`
   handlers run, and then the game ends with the `died` ending. Write
@@ -899,6 +901,36 @@ You're hurt: 12 out of 30.
   handler (`player.health = 5`) to save them.
 - **HEALTH** (or DIAGNOSE) tells the player how they're doing, and
   doesn't take a turn, so it never gives an enemy a free hit.
+
+### Factions and corpses
+
+Give enemies sides, and they'll fight each other as well as the player:
+
+```yaml
+factions:
+  wolves: { hostile_to: [goblins, player], eats_corpses: true }
+  goblins: { hostile_to: [wolves, player] }
+
+characters:
+  alpha: { name: alpha wolf, in: den, faction: wolves, behavior: hunter, health: 10, damage: 3 }
+```
+
+- **Who they attack:** hunters and guards attack anyone their faction is
+  `hostile_to`, including the player if `player` is listed. Without a
+  faction, they attack only the player.
+- **Who they pick:** a hunter goes for the nearest enemy, and the player
+  wins a tie. So monsters in a room with the player all attack the
+  player, but leave the room and they turn on each other. Fights and
+  feeding next door can be heard: "You hear snarls and the clash of a
+  fight somewhere north."
+- **Corpses:** a defeated character drops what it carries and leaves a
+  body: "a goblin chief (dead)". Players can call it a corpse, body,
+  remains, carcass or bones. `corpse: false` makes a character vanish
+  instead.
+- **Scavengers:** a faction with `eats_corpses` eats bodies in its room
+  when there's no one to fight, and hunters go looking for them.
+
+[The advanced tutorial](docs/ADVANCED.md) builds a whole game around this.
 
 ### Trading
 
@@ -946,6 +978,8 @@ if the player is there to see:
 | `self:go("north")` | Takes that exit, if it can. |
 | `self:attack(player, weapon)` | Attacks; `weapon` is optional. |
 | `self:behave()` | Does whatever its `behavior` would. |
+| `self:eat(corpse)` | Eats a body in the same room. |
+| `self:is_hostile_to(other)` | Whether its faction would attack them. |
 | `self:is_with(player)` | Whether they're in the same room. |
 | `self:distance_to(player)` | Rooms apart, by ways it can go, or `nil`. |
 
@@ -1021,7 +1055,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 
 **Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
 `merchant`, `hunter`, `guard`, `follower`), `wander` (percent), `area`,
-`range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`; objects
+`range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`, `faction`,
+`corpse`; top-level `factions:` with `hostile_to` and `eats_corpses`; objects
 can have `damage` (weapons) and `price`; the player can have `health`,
 `damage` and `money`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
@@ -1142,6 +1177,8 @@ your patterns to it.
 - **[`spec/examples/lighthouse/game.yaml`](spec/examples/lighthouse/game.yaml)**'s
   keeper is a `conversationalist`; see
   [Characters](#characters-npcs-and-enemies) for wanderers, merchants and enemies.
+- **[The advanced tutorial](docs/ADVANCED.md)** pits rival factions of
+  monsters against each other, and against the player.
 - **[The scripting tutorial](docs/SCRIPTING.md)** builds a second game,
   Campfire, step by step. It covers Lua handlers and `block()`, custom
   verbs, script files, `vars`, changing capacity, controlling timers from

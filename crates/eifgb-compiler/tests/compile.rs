@@ -450,3 +450,18 @@ fn character_settings_are_checked() {
     let out = with("player: { health: 5 }\n");
     assert!(out.story.unwrap().endings.iter().any(|e| e.key == "died"));
 }
+
+#[test]
+fn factions_are_checked() {
+    let out = with("factions:\n  wolves: { hostile_to: [goblns, player] }\n  goblins: {}\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'goblns' (did you mean 'goblins'?)"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  wolves: {}\ncharacters:\n  w: { name: w, in: hall, faction: wolfs }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'wolfs' (did you mean 'wolves'?)"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  player: {}\n");
+    assert!(out.story.is_none());
+    let out = with("factions:\n  wolves: {}\nobjects:\n  rock: { name: rock, in: hall, faction: wolves }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only characters can have 'faction'"), "{:#?}", out.diagnostics);
+    // Hunters whose faction leaves the player alone don't need the player to have health.
+    let out = with("factions:\n  a: { hostile_to: [b] }\n  b: {}\ncharacters:\n  x: { name: x, in: hall, faction: a, behavior: hunter }\n");
+    assert!(!warnings(&out).iter().any(|w| w.contains("player has no 'health'")), "{:#?}", warnings(&out));
+}

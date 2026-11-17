@@ -39,6 +39,7 @@ stay interchangeable.
 | `on`         | Global event handlers (`turn`, `start`, ...). |
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
 | `timers`     | Things that happen after a number of actions. See **Timers**. |
+| `factions`   | Sides for characters: `hostile_to` (factions and/or `player`) and `eats_corpses`. See **Characters**. |
 
 IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `died`, `enter`, `leave`, `defeated`), because handlers are keyed by both.
 
@@ -141,7 +142,7 @@ A handler can be a block of statements or a single expression.
 - **Arguments:** `args.target`, `args.tool`, `args.text`, `args.direction`.
 - **Fields on every entity:** `key`, `name`, `kind`, `location`. These are read-only; use `:move_to` to change `location`.
 - **`capacity`:** readable and writable on every entity, starting from the source `capacity`. Reads give an integer or `nil`. Writes take a whole number ≥ 0, or `nil`/`"none"` for no capacity (unlimited for the player, the size rule for containers and supporters); anything else is a script error. Lowering it doesn't move anything out. It's saved and undone with the game, and because it's built in it can't be used as a state field name.
-- **Character methods:** `:wander()`, `:step_toward(target)`, `:go(direction)`, `:attack(target, weapon?)`, `:behave()` (each returns whether it did something, and its event is described like a behaviour's), `:is_with(other)`, `:distance_to(target)` (moves needed, or `nil`). See **Characters**.
+- **Character methods:** `:wander()`, `:step_toward(target)`, `:go(direction)`, `:attack(target, weapon?)`, `:eat(corpse)`, `:behave()` (each returns whether it did something, and its event is described like a behaviour's), `:is_with(other)`, `:is_hostile_to(other)`, `:distance_to(target)` (moves needed, or `nil`). See **Characters**.
 - **Methods on every entity:** `:move_to(place)` (ignores size and capacity), `:is_in(holder)`, `:contents()`, `:has(trait)`, `:can_hold(thing)` (whether `thing` would fit in, on or be carried by this, by size and capacity; true if it's already there).
 - **State fields** are read and written directly (`self.fueled = true`). Setting one to `nil` removes it. The built-in field and method names above are reserved and can't be used as state fields.
 - **Each entity has exactly one Lua object**, so `==` works as expected (`args.tool == world.oil_can`).
@@ -181,13 +182,16 @@ counts for timers, in declaration order, before `turn` handlers and timers.
 - **`area`:** room IDs the character keeps to. **`range`:** rooms away at which a hunter or follower notices the player (default unlimited), by the shortest route it can take.
 - **Movement:** characters use exits with a `to` and no `when`, passing doors that aren't locked, blocked or hidden from their side, without opening them. "The X goes north." `[npc.leaves]` when leaving the player's room, "The X arrives." `[npc.arrives]` when entering it.
 - **`act`** (Lua, `self` is the character): runs instead of the behaviour. `self:behave()` runs the behaviour from inside it.
-- **Hostile behaviours** (hunter, guard) attack the player when in the same room, with their best carried weapon or their own `damage` (default 1 for them). The compiler warns if the player has no `health`.
+- **Hostile behaviours** (hunter, guard) attack enemies: with a `faction`, whoever its `hostile_to` lists (`player` for the player); without one, the player only. Nobody attacks the dead or itself. They use their best carried weapon or their own `damage` (default 1 for them). The compiler warns if one would attack a player who has no `health`.
+- **Targets:** a hunter or guard attacks the first enemy in its room; a hunter otherwise steps toward the nearest enemy within `range`. Ties go to the player, then to characters in declaration order. Fights and eating in a room adjoining the player's are heard, once per turn `[npc.fight_nearby, npc.eating_nearby]`; NPC-on-NPC attacks in the player's room are shown `[npc.attacks]`.
+- **Factions:** top-level `factions:` maps IDs to `hostile_to` (other faction IDs, or `player`) and `eats_corpses`. Hostility is one-way. `player` can't be a faction ID. Characters join one with `faction:`; unknown IDs are errors with suggestions.
+- **Corpses:** unless `corpse: false`, a defeated character stays where it fell with the state `dead: true` (tag "dead", always shown; "X is dead." `[state.dead]`). The dead don't act, can't be attacked `[attack.dead]` or talked to `[talk.dead]`, and match the lexicon's `corpse_words` (corpse, body, remains, carcass, bones). A member of an `eats_corpses` faction with no enemy in its room eats a body there instead of anything else (it's removed; "X devours what's left of Y." `[npc.eats]`); a hunter with nothing to hunt heads for the nearest body in range.
 
 **Health and damage.** `health` on characters and the player is the maximum, and the current value is the `health` state field (reserved, like `money`). `damage` on characters and the player is unarmed damage (player default 1); on objects it makes a weapon. An attack takes the weapon's damage, else the attacker's, else 1, never going below 0 health.
 
 - **ATTACK** (verb `hit`: hit, attack, kill, fight, strike, smash, stab, slay, punch, break, optionally WITH a held weapon): needs reach. "You hit X (with Y)." `[attack.done]`; no health → `[attack.pointless]`, which, like a script verb, gives way to `revealed_by`'s "You find …"; a tool without `damage` → `[attack.not_weapon]`; not held → `[attack.not_held]`. Handlers on `hit` still replace it per object.
 - **Wounds:** below full, "wounded"; at half or less, "badly wounded" `[state.wounded, state.badly_wounded, state.tag.*, state.here.*]`. Not shown for the player.
-- **Defeat:** checked after the player's action (before characters act, so a killing blow isn't answered), after each character's turn, and after timers. The character's `defeated` handlers run (`self` is it). Unless one returns `block()`, or heals or moves it, "X is defeated." `[npc.defeated]`, it drops what it carries `[npc.drops]`, and it leaves play (location `nil`).
+- **Defeat:** checked after the player's action (before characters act, so a killing blow isn't answered), after each character's turn, and after timers. The character's `defeated` handlers run (`self` is it). If one healed it or moved it out of play, that's all. Otherwise, unless one returned `block()`, "X is defeated." `[npc.defeated]` and it drops what it carries `[npc.drops]`. Then it becomes a corpse, or with `corpse: false` leaves play (location `nil`).
 - **Death:** at 0 player health, global `died` handlers run. If none ended the game or restored health, the game ends with `died`. The compiler adds a loss ending `died` ("You have died." `[ending.died]`) when the player has `health` and the author didn't write one.
 - **HEALTH / DIAGNOSE / HP / STATUS:** `[health.full, health.hurt, health.none]`. Doesn't take a turn.
 

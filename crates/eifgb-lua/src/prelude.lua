@@ -101,6 +101,14 @@ function Entity:behave() return H.npc_behave(need_entity(self, "the character"))
 function Entity:distance_to(target)
   return H.distance(need_entity(self, "the character"), need_entity(target, "distance_to's target"))
 end
+-- Eats a corpse in the same room; it's gone for good.
+function Entity:eat(corpse)
+  return H.npc_eat(need_entity(self, "the character"), need_entity(corpse, "eat's corpse"))
+end
+-- Whether this character's faction would attack `other`.
+function Entity:is_hostile_to(other)
+  return H.hostile(need_entity(self, "the character"), need_entity(other, "is_hostile_to's other"))
+end
 function Entity:is_with(other)
   return H.together(need_entity(self, "the thing"), need_entity(other, "is_with's other"))
 end

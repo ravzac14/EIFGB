@@ -66,7 +66,7 @@ fn every_example_walkthrough_wins() {
         assert_eq!(last.ended, Some(EndingKind::Win), "{}\n{}", dir.display(), last.text());
         played += 1;
     }
-    assert!(played >= 3, "expected the lighthouse, midnight_snack and campfire walkthroughs");
+    assert!(played >= 4, "expected the lighthouse, midnight_snack, campfire and blackfang walkthroughs");
 }
 
 #[test]
@@ -1364,7 +1364,11 @@ fn fighting_wounds_and_defeats() {
     let out = say(&mut g, "kill wolf with sword");
     // Defeated by that blow, so it doesn't strike back.
     assert_eq!(out, "You hit the grey wolf with the sword.\nThe grey wolf is defeated.");
-    assert!(!say(&mut g, "look").contains("wolf"));
+    // It leaves a body, which "corpse" and "body" refer to.
+    assert_says(&mut g, "look", "You can see a grey wolf (dead) here.");
+    assert_eq!(say(&mut g, "x corpse"), "The grey wolf is dead.");
+    assert_says(&mut g, "hit the body", "The grey wolf is already dead.");
+    assert!(!say(&mut g, "z").contains("attacks"));
     // Things that can't be hurt.
     assert_says(&mut g, "hit sword", "Violence isn't the answer here.");
 }
@@ -1523,4 +1527,76 @@ characters:
     // Unlocked but closed: characters slip through without opening it.
     assert_says(&mut g, "unlock gate", "The mouse goes north.");
     assert_says(&mut g, "x gate", "It's closed.");
+}
+
+// ---------------------------------------------------------------- factions
+
+const FACTIONS: &str = "\
+format: eifgb/0.1
+game: { id: f, title: F, version: '1', start: south_room }
+player: { health: 50 }
+factions:
+  cats: { hostile_to: [rats, player], eats_corpses: true }
+  rats: { hostile_to: [cats] }
+  ghosts: { hostile_to: [player] }
+rooms:
+  south_room: { name: South Room, exits: { north: hall } }
+  hall: { name: Hall, exits: { south: south_room } }
+characters:
+  cat: { name: cat, in: hall, faction: cats, behavior: hunter, wander: 0, health: 9, damage: 3 }
+  rat: { name: rat, in: hall, faction: rats, behavior: guard, health: 3, damage: 1 }
+  rat2: { name: brown rat, synonyms: [rat], in: hall, faction: rats, behavior: guard, health: 3, damage: 1 }
+  ghost: { name: ghost, in: hall, faction: ghosts, behavior: guard, health: 3, corpse: false }
+";
+
+#[test]
+fn factions_fight_each_other_and_the_hungry_eat_the_fallen() {
+    let mut g = game(compile_str(FACTIONS).story.unwrap());
+    // Out of sight but next door: the fight can be heard.
+    assert_says(&mut g, "z", "You hear snarls and the clash of a fight somewhere north.");
+    say(&mut g, "z");
+    // Both rats dead; the cat eats one body a turn.
+    assert_says(&mut g, "z", "You hear tearing and crunching somewhere north.");
+    let out = say(&mut g, "n");
+    // One body left, plus the cat and the ghost, who both go for the player.
+    // The dead are plain to see; the cat's wounds aren't tagged until the player looks.
+    assert!(out.contains("You can see a cat, a brown rat (dead) and a ghost here."), "{out}");
+    assert!(out.contains("The cat attacks you.") && out.contains("The ghost attacks you."), "{out}");
+}
+
+#[test]
+fn the_player_comes_first_when_everyone_is_in_the_room() {
+    let src = FACTIONS.replace("start: south_room", "start: hall");
+    let mut g = game(compile_str(&src).story.unwrap());
+    let out = say(&mut g, "z");
+    // The cat could fight the rats, but goes for the player. The rats don't hate the player.
+    assert!(out.contains("The cat attacks you.") && out.contains("The ghost attacks you."), "{out}");
+    assert!(out.contains("The rat attacks the cat.") && out.contains("The brown rat attacks the cat."), "{out}");
+}
+
+#[test]
+fn bodies_can_vanish_and_handlers_can_reword_defeat() {
+    let src = FACTIONS
+        .replace("start: south_room", "start: hall")
+        .replace("corpse: false }", "corpse: false, on: { defeated: 'return block(\"The ghost fades away.\")' } }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    let out = say(&mut g, "hit ghost");
+    let out2 = say(&mut g, "hit ghost");
+    let out3 = say(&mut g, "hit ghost");
+    let all = format!("{out}\n{out2}\n{out3}");
+    assert!(all.contains("The ghost fades away.") && !all.contains("ghost is defeated"), "{all}");
+    // corpse: false, so nothing is left, and the handler doesn't run again.
+    let out = say(&mut g, "look");
+    assert!(!out.contains("ghost"), "{out}");
+    assert!(!say(&mut g, "z").contains("fades"));
+}
+
+#[test]
+fn scripts_can_ask_about_factions_and_eat() {
+    let src = FACTIONS.replace(
+        "  ghost: { name: ghost",
+        "  probe: { name: probe, in: south_room, act: 'if game.turn == 1 then say(tostring(world.cat:is_hostile_to(world.rat2)), \" \", tostring(world.rat:is_hostile_to(player)), \" \", tostring(world.cat:is_hostile_to(player))) end' }\n  ghost: { name: ghost",
+    );
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_says(&mut g, "z", "true false true");
 }

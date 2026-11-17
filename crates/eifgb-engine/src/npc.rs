@@ -7,7 +7,7 @@
 //! `self:wander()` describe things the same way.
 
 use crate::world::World;
-use eifgb_ir::{Behavior, Direction, EntityId, EntityKind, Value, PLAYER};
+use eifgb_ir::{Behavior, Direction, EntityId, EntityKind, Faction, Value, PLAYER, PLAYER_FACTION};
 use std::collections::{HashMap, VecDeque};
 
 /// Something a character did that the player may see.
@@ -17,6 +17,8 @@ pub enum NpcEvent {
     Moved { npc: EntityId, from: EntityId, to: EntityId, direction: Direction },
     /// Attacked `target`, taking `damage` health. `weapon` is what was used, if anything.
     Attacked { attacker: EntityId, target: EntityId, weapon: Option<EntityId>, damage: u32 },
+    /// Ate a corpse, which is now gone.
+    Ate { npc: EntityId, corpse: EntityId, room: EntityId },
 }
 
 impl World {
@@ -52,7 +54,60 @@ impl World {
     pub fn is_active(&self, id: EntityId) -> bool {
         self.def(id).kind == EntityKind::Character
             && self.room_of(id).is_some()
+            && !self.is_dead(id)
             && self.health(id).is_none_or(|h| h > 0)
+    }
+
+    /// A defeated character's body, still lying where it fell.
+    pub fn is_dead(&self, id: EntityId) -> bool {
+        self.def(id).kind == EntityKind::Character && self.flag(id, "dead")
+    }
+
+    pub fn faction(&self, id: EntityId) -> Option<&Faction> {
+        let key = self.def(id).faction.as_ref()?;
+        self.story().factions.iter().find(|f| &f.key == key)
+    }
+
+    /// Whether `a` would attack `b`. With a faction, that's whatever its
+    /// `hostile_to` says; without one, hunters and guards go for the
+    /// player only. Nobody attacks the dead, or themselves.
+    pub fn is_hostile(&self, a: EntityId, b: EntityId) -> bool {
+        if a == b {
+            return false;
+        }
+        let b_alive = if b == PLAYER { self.health(PLAYER).is_none_or(|h| h > 0) } else { self.is_active(b) };
+        if !b_alive {
+            return false;
+        }
+        match self.faction(a) {
+            Some(f) => {
+                let side = if b == PLAYER { Some(PLAYER_FACTION) } else { self.def(b).faction.as_deref() };
+                side.is_some_and(|s| f.hostile_to.iter().any(|h| h == s))
+            }
+            None => b == PLAYER && self.def(a).npc.as_ref().is_some_and(|n| n.behavior.hostile()),
+        }
+    }
+
+    /// Everyone `npc` would attack: the player first, then characters in
+    /// the order they're declared.
+    fn enemies_of(&self, npc: EntityId) -> Vec<EntityId> {
+        let chars = (0..self.story().entities.len() as u32).map(EntityId).filter(|&id| self.def(id).kind == EntityKind::Character);
+        std::iter::once(PLAYER).chain(chars).filter(|&b| self.is_hostile(npc, b)).collect()
+    }
+
+    /// Bodies in `room`.
+    fn corpses_in(&self, room: EntityId) -> Vec<EntityId> {
+        self.contents(room).into_iter().filter(|&c| self.is_dead(c)).collect()
+    }
+
+    /// Eats a corpse in the same room: it's gone for good.
+    pub fn npc_eat(&mut self, npc: EntityId, corpse: EntityId) -> Option<NpcEvent> {
+        let room = self.room_of(npc)?;
+        if !self.is_dead(corpse) || self.room_of(corpse) != Some(room) {
+            return None;
+        }
+        self.move_to(corpse, None).ok()?;
+        Some(NpcEvent::Ate { npc, corpse, room })
     }
 
     /// Whether `a` and `b` are in the same room.
@@ -193,26 +248,45 @@ impl World {
         if !self.is_active(npc) {
             return Vec::new();
         }
-        let with_player = self.together(npc, PLAYER);
-        let in_range = |w: &World| w.distance(npc, PLAYER).is_some_and(|d| n.range.is_none_or(|r| d <= r));
+        let room = self.room_of(npc);
+        let in_range = |w: &World, target: EntityId| w.distance(npc, target).filter(|&d| n.range.is_none_or(|r| d <= r));
+        let enemies = self.enemies_of(npc);
+        // The nearest enemy it can reach; the player wins a tie.
+        let nearest = enemies
+            .iter()
+            .filter_map(|&e| in_range(self, e).map(|d| (d, e)))
+            .min_by_key(|&(d, _)| d);
+        let eater = self.faction(npc).is_some_and(|f| f.eats_corpses);
+        let corpse_here = room.and_then(|r| self.corpses_in(r).into_iter().next());
+
         let event = match n.behavior {
+            Behavior::Hunter | Behavior::Guard if matches!(nearest, Some((0, _))) => {
+                let target = nearest.map(|(_, e)| e).unwrap_or(PLAYER);
+                let weapon = self.best_weapon(npc);
+                self.attack(npc, target, weapon).or(Some(NpcEvent::Attacked { attacker: npc, target, weapon, damage: 0 }))
+            }
+            // Nothing to fight here: a scavenger eats.
+            _ if eater && corpse_here.is_some() => self.npc_eat(npc, corpse_here.unwrap_or(npc)),
+            Behavior::Hunter if nearest.is_some() => self.npc_step_toward(npc, nearest.map(|(_, e)| e).unwrap_or(PLAYER)),
+            Behavior::Hunter if eater => {
+                // Nobody to hunt: go after the nearest body instead.
+                let body = (0..self.story().entities.len() as u32)
+                    .map(EntityId)
+                    .filter(|&c| self.is_dead(c) && self.room_of(c).is_some())
+                    .filter_map(|c| in_range(self, c).map(|d| (d, c)))
+                    .min_by_key(|&(d, _)| d);
+                match body {
+                    Some((_, c)) => self.npc_step_toward(npc, c),
+                    None => self.maybe_wander(npc, n.wander),
+                }
+            }
             Behavior::Stationary | Behavior::Conversationalist | Behavior::Wanderer => self.maybe_wander(npc, n.wander),
             // Merchants don't walk off in the middle of a sale.
-            Behavior::Merchant if with_player => None,
+            Behavior::Merchant if self.together(npc, PLAYER) => None,
             Behavior::Merchant => self.maybe_wander(npc, n.wander),
-            Behavior::Hunter | Behavior::Guard if with_player => {
-                let weapon = self.best_weapon(npc);
-                self.attack(npc, PLAYER, weapon).or(Some(NpcEvent::Attacked {
-                    attacker: npc,
-                    target: PLAYER,
-                    weapon,
-                    damage: 0,
-                }))
-            }
-            Behavior::Hunter if in_range(self) => self.npc_step_toward(npc, PLAYER),
             Behavior::Hunter | Behavior::Guard => self.maybe_wander(npc, n.wander),
-            Behavior::Follower if with_player => None,
-            Behavior::Follower if in_range(self) => self.npc_step_toward(npc, PLAYER),
+            Behavior::Follower if self.together(npc, PLAYER) => None,
+            Behavior::Follower if in_range(self, PLAYER).is_some() => self.npc_step_toward(npc, PLAYER),
             Behavior::Follower => self.maybe_wander(npc, n.wander),
         };
         event.into_iter().collect()

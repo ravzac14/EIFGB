@@ -310,6 +310,8 @@ lexicon:
   pronouns: [it, them, him, her]
   all_words: [all, everything]
   self_words: [me, myself, self]
+  # Refer to any dead character: "x corpse", "search the body".
+  corpse_words: [corpse, body, remains, carcass, bones]
   # Never treated as referring to something, even when a description uses them.
   stopwords: [
     and, or, but, nor, not, yet, the, some, any, each, every, all, both, either, neither,
@@ -342,6 +344,11 @@ messages:
   npc.attacks: "${The(args.npc)} attacks ${the(args.target)}."
   npc.defeated: "${The(args.target)} is defeated."
   npc.drops: "${The(args.target)} drops ${args.list}."
+  npc.eats: "${The(args.npc)} devours what's left of ${the(args.target)}."
+  npc.fight_nearby: "You hear snarls and the clash of a fight somewhere ${args.direction}."
+  npc.eating_nearby: "You hear tearing and crunching somewhere ${args.direction}."
+  attack.dead: "${The(args.target)} is already dead."
+  talk.dead: "${The(args.target)} is beyond conversation now."
   # fighting
   attack.pointless: "Violence isn't the answer here."
   attack.self: "That would hurt."
@@ -403,6 +410,7 @@ messages:
   state.worn: "You're wearing it."
   state.empty: "It's empty."
   state.wounded: "${The(args.target)} is wounded."
+  state.dead: "${The(args.target)} is dead."
   state.badly_wounded: "${The(args.target)} is badly wounded."
   state.heavy: "It's too heavy to lift with everything in it."
   state.blocked: "It's blocked."
@@ -414,6 +422,7 @@ messages:
   state.here.blocked_here: "${The(args.target)} is blocked from this side."
   state.here.empty: "${The(args.target)} is empty."
   state.here.wounded: "${The(args.target)} is wounded."
+  state.here.dead: "${The(args.target)} is dead."
   state.here.badly_wounded: "${The(args.target)} is badly wounded."
   state.here.heavy: "${The(args.target)} is too heavy to lift with everything in it."
   state.tag.open: "open"
@@ -424,6 +433,7 @@ messages:
   state.tag.blocked_here: "blocked from this side"
   state.tag.empty: "empty"
   state.tag.wounded: "wounded"
+  state.tag.dead: "dead"
   state.tag.badly_wounded: "badly wounded"
   state.tag.heavy: "heavy"
   # an author's own state fields, e.g. `fueled: true` or `channel: 16`

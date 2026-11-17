@@ -89,6 +89,8 @@ pub struct Game<H: ScriptHost> {
     last: Option<Vec<String>>,
     /// Set by an action that only asked a question, so the turn doesn't count.
     pub(crate) no_turn: bool,
+    /// The turn the player last heard a fight next door, so it's said once per turn.
+    pub(crate) heard_nearby: Option<u64>,
     pub(crate) out: Output,
     pub(crate) end_requested: Option<String>,
     /// True while a command's action runs: a timer started then counts
@@ -109,6 +111,7 @@ impl<H: ScriptHost> Game<H> {
             pending: None,
             last: None,
             no_turn: false,
+            heard_nearby: None,
             out: Output::default(),
             end_requested: None,
             in_action: false,

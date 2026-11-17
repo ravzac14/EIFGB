@@ -1,0 +1,20 @@
+# Winning playthrough of Blackfang Pass (the advanced tutorial).
+take spear
+n
+# Both packs come running. Step back and let them fight each other.
+s
+z
+z
+z
+z
+z
+n
+kill young wolf with spear
+kill young wolf with spear
+take key
+n
+kill skeleton with spear
+kill skeleton with spear
+unlock gate
+n
+take sunstone

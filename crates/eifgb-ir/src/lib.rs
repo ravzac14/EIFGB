@@ -80,7 +80,25 @@ pub struct Story {
     pub categories: BTreeMap<String, Vec<String>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub factions: Vec<Faction>,
 }
+
+/// A side in a fight. Hunters and guards attack whoever their faction is
+/// hostile to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Faction {
+    pub key: String,
+    /// Faction keys, and/or [`PLAYER_FACTION`] for the player.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hostile_to: Vec<String>,
+    /// Members eat the corpses of the fallen.
+    #[serde(default)]
+    pub eats_corpses: bool,
+}
+
+/// The name `hostile_to` uses for the player.
+pub const PLAYER_FACTION: &str = "player";
 
 /// Something that happens after a number of actions (turns that took time).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -242,6 +260,9 @@ pub struct Entity {
     /// What a merchant sells this for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub price: Option<u32>,
+    /// A character's side, a key in `Story::factions`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction: Option<String>,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -265,6 +286,9 @@ pub struct Npc {
     /// The author's own algorithm, run instead of the behaviour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub act: Option<Code>,
+    /// Whether it leaves a body when defeated, instead of vanishing.
+    #[serde(default = "yes")]
+    pub corpse: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -799,6 +823,9 @@ pub struct Lexicon {
     /// "x glint" after "Something glints at the bottom."
     #[serde(default)]
     pub stopwords: Vec<String>,
+    /// Words for a dead character's body: "corpse", "body".
+    #[serde(default)]
+    pub corpse_words: Vec<String>,
 }
 
 // ------------------------------------------------------------------ handlers

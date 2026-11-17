@@ -83,6 +83,9 @@ pub enum NpcEvent {
     Fed { npc: EntityId, food: EntityId, room: EntityId, finished: bool },
     /// Reached where it last saw the player, and found nothing.
     Searched { npc: EntityId, room: EntityId },
+    /// Found the body of one of its own that the player killed, and raised
+    /// the alarm.
+    Discovered { npc: EntityId, body: EntityId, room: EntityId, attitude: Option<AttitudeChange> },
     /// Fetching something the player threw: `Grabbed` it, or `Brought` it back.
     Fetched { npc: EntityId, item: EntityId, room: EntityId, brought: bool },
 }
@@ -402,6 +405,43 @@ impl World {
             .map(EntityId)
             .filter(|&c| self.def(c).faction.as_deref() == Some(faction))
             .any(|c| self.is_active(c) && self.together(c, PLAYER))
+    }
+
+    /// Whether something can be seen where it is: not shut away inside
+    /// anything closed that can't be seen into.
+    pub fn in_plain_sight(&self, id: EntityId) -> bool {
+        let mut cur = self.location(id);
+        while let Some(c) = cur {
+            if self.def(c).kind == EntityKind::Room {
+                return true;
+            }
+            if self.has(c, eifgb_ir::Trait::Container) && !self.shows_contents(c) {
+                return false;
+            }
+            cur = self.location(c);
+        }
+        false
+    }
+
+    /// A member of a faction comes across the body of one of its own that
+    /// the player killed, lying in plain sight: the faction sours (once
+    /// per body), and hunters within two rooms come running.
+    pub fn discover_bodies(&mut self, npc: EntityId) -> Option<NpcEvent> {
+        let faction = self.def(npc).faction.clone()?;
+        let room = self.room_of(npc)?;
+        let player = Value::Str(self.def(PLAYER).key.clone());
+        let body = (0..self.story().entities.len() as u32).map(EntityId).find(|&b| {
+            self.is_dead(b)
+                && self.def(b).faction.as_deref() == Some(faction.as_str())
+                && self.room_of(b) == Some(room)
+                && !self.flag(b, "_found")
+                && self.get(b, "killed_by") == Some(&player)
+                && self.in_plain_sight(b)
+        })?;
+        self.set(body, "_found", Value::Bool(true));
+        let attitude = self.sour(&faction);
+        self.make_noise(room, 2);
+        Some(NpcEvent::Discovered { npc, body, room, attitude })
     }
 
     /// The key under which a faction's attitude toward the player, as
@@ -783,6 +823,14 @@ impl World {
             }
         }
         let (tolerated, attitude) = self.provoke(target, attacker);
+        // Killed in front of its own: there's no body left to discover.
+        if attacker == PLAYER
+            && self.health(target).is_some_and(|h| h <= 0)
+            && let Some(f) = self.def(target).faction.clone()
+            && self.witnessed(&f)
+        {
+            self.set(target, "_found", Value::Bool(true));
+        }
         Some(NpcEvent::Attacked { attacker, target, weapon, damage, tolerated, attitude })
     }
 

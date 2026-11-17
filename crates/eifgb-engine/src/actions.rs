@@ -108,6 +108,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
             (A::Tracks, _) => self.tracks_action(),
+            (A::Bury, Some(t)) => self.bury_action(t, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),
@@ -708,11 +709,12 @@ impl<H: ScriptHost> Game<H> {
             Some("take.self")
         } else if w.location(t) == Some(PLAYER) {
             Some("take.already")
-        } else if w.def(t).kind == EntityKind::Character {
+        } else if w.def(t).kind == EntityKind::Character && !w.is_dead(t) {
             Some("take.person")
         } else if w.def(t).kind == EntityKind::Room || w.has(t, Trait::Scenery) {
             Some("take.scenery")
-        } else if !w.has(t, Trait::Portable) {
+        // A body can be carried off, if it isn't too heavy.
+        } else if !w.has(t, Trait::Portable) && !w.is_dead(t) {
             Some("take.fixed")
         } else if w.is_within(PLAYER, t) {
             Some("enter.held")
@@ -757,7 +759,8 @@ impl<H: ScriptHost> Game<H> {
         let w = &self.world;
         let key = if dest == t || w.is_within(dest, t) {
             Some("put.into_self")
-        } else if w.location(t) != Some(PLAYER) {
+        // A body lying here can be stuffed somewhere without picking it up.
+        } else if w.location(t) != Some(PLAYER) && !(w.is_dead(t) && w.room_of(t) == Some(w.here())) {
             Some("put.not_held")
         } else if on && !w.has(dest, Trait::Supporter) {
             Some("put.not_supporter")

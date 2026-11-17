@@ -96,6 +96,8 @@ verbs:
     patterns:
       - "put {target} in {tool}"
       - "put {target} into {tool}"
+      - "hide {target} in {tool}"
+      - "stuff {target} in {tool}"
       - "put {target} inside {tool}"
       - "insert {target} in {tool}"
       - "insert {target} into {tool}"
@@ -279,6 +281,9 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  bury:
+    action: bury
+    patterns: ["bury {target}", "dig a grave for {target}"]
   accept:
     action: accept
     patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
@@ -453,6 +458,8 @@ messages:
   npc.losing_patience: "${The(args.target)} is losing patience with ${the(args.npc)}."
   npc.drops: "${The(args.target)} drops ${args.list}."
   npc.eats: "${The(args.npc)} devours what's left of ${the(args.target)}."
+  npc.discovers: "${The(args.npc)} finds the body of ${the(args.target)}, and raises the alarm!"
+  npc.alarm_nearby: "You hear a cry of alarm somewhere ${args.direction}."
   npc.fight_nearby: "You hear snarls and the clash of a fight somewhere ${args.direction}."
   npc.eating_nearby: "You hear tearing and crunching somewhere ${args.direction}."
   npc.feeds: "${The(args.npc)} tears into ${the(args.target)}."
@@ -495,6 +502,9 @@ messages:
   sell.fixed: "${The(args.merchant)} doesn't haggle. It'll pay ${args.price}."
   sell.how_much: "How much? Try something like \"sell ${the(args.target)} for 5\"."
   accept.nothing: "There's no offer on the table."
+  bury.cant: "The ground here is too hard to dig."
+  bury.not_that: "You can't bury ${the(args.target)}."
+  bury.done: "You dig a shallow hole and bury ${the(args.target)}."
   tracks.none: "You don't see any tracks here."
   tracks.trackless: "Nothing here holds a track."
   tracks.fresh: "fresh ${args.prints} lead ${args.direction}."

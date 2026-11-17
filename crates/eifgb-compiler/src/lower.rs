@@ -116,6 +116,7 @@ impl<'a> Lowerer<'a> {
             nameable: false,
             prints: None,
             leaves_tracks: true,
+            diggable: false,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -547,6 +548,7 @@ impl<'a> Lowerer<'a> {
             nameable: false,
             prints: None,
             leaves_tracks: !r.trackless,
+            diggable: r.diggable,
         }
     }
 
@@ -794,6 +796,7 @@ impl<'a> Lowerer<'a> {
             nameable: t.nameable,
             prints: t.prints.clone().filter(|_| is_char),
             leaves_tracks: t.leaves_tracks.unwrap_or(true),
+            diggable: false,
         }
     }
 

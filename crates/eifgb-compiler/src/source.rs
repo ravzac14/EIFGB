@@ -174,6 +174,9 @@ pub struct Room {
     /// A floor that holds no tracks: a stream, bare rock.
     #[serde(default)]
     pub trackless: bool,
+    /// Soft ground: BURY works here.
+    #[serde(default)]
+    pub diggable: bool,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]

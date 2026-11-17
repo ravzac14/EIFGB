@@ -24,6 +24,13 @@ impl<H: ScriptHost> Game<H> {
             if !self.world.is_active(npc) {
                 continue;
             }
+            // A body of its own, left in plain sight: raising the alarm is
+            // its whole turn, whatever its behaviour or script.
+            if let Some(event) = self.world.discover_bodies(npc) {
+                self.narrate(&event);
+                self.check_defeats();
+                continue;
+            }
             match self.world.def(npc).npc.as_ref().and_then(|n| n.act.clone()) {
                 Some(code) => {
                     self.run(&code, &Ctx::new().this(npc));
@@ -91,6 +98,22 @@ impl<H: ScriptHost> Game<H> {
                     self.msg(key, &Ctx::new().entity("npc", npc).entity("target", food));
                 } else {
                     self.hear(room, "npc.eating_nearby");
+                }
+            }
+            NpcEvent::Discovered { npc, body, room, ref attitude } => {
+                if room == here && !self.world.player_hidden() {
+                    self.msg("npc.discovers", &Ctx::new().entity("npc", npc).entity("target", body));
+                    if let Some(a) = attitude {
+                        let words = a.faction.replace('_', " ");
+                        let key = match (a.left <= 0, a.disguise.as_deref() == Some(a.faction.as_str())) {
+                            (true, true) => "faction.sees_through",
+                            (true, false) => "faction.turns",
+                            (false, _) => "faction.wary",
+                        };
+                        self.msg(key, &Ctx::new().text("faction", words));
+                    }
+                } else {
+                    self.hear(room, "npc.alarm_nearby");
                 }
             }
             NpcEvent::Fetched { npc, item, room, brought } => {
@@ -301,6 +324,24 @@ impl<H: ScriptHost> Game<H> {
                 self.msg("npc.fetches", &Ctx::new().entity("npc", f).entity("target", t));
             }
         }
+        true
+    }
+
+    /// BURY X: in soft ground, it's gone for good. Bodies most of all.
+    pub(crate) fn bury_action(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        if !self.world.def(here).diggable {
+            self.msg("bury.cant", ctx);
+            return false;
+        }
+        let movable = self.world.is_dead(t) || self.world.has(t, eifgb_ir::Trait::Portable);
+        if !movable || self.world.room_of(t) != Some(here) {
+            self.msg("bury.not_that", ctx);
+            return false;
+        }
+        self.world.unset(t, "worn");
+        let _ = self.world.move_to(t, None);
+        self.msg("bury.done", ctx);
         true
     }
 

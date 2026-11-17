@@ -2461,3 +2461,85 @@ fn anyone_else_in_the_room_is_a_witness() {
     let out = say(&mut g, "hit miller");
     assert!(out.contains("The villagers turn against you.") && out.contains("The baker attacks you."), "{out}");
 }
+
+// ------------------------------------------------------------ hiding bodies
+
+const BODIES: &str = r#"format: eifgb/0.1
+game: { id: b, title: Bodies, version: "1", start: green }
+player: { health: 30, damage: 5 }
+factions:
+  villagers: { patience: 1 }
+rooms:
+  green: { name: Green, exits: { north: mill, east: garden } }
+  mill: { name: Mill, exits: { south: green } }
+  garden: { name: Garden, diggable: true, exits: { west: green } }
+objects:
+  chest: { name: flour chest, synonyms: [chest], in: mill, traits: [container, openable, scenery], size: 4 }
+characters:
+  miller: { name: miller, in: mill, faction: villagers, health: 3, patience: 0 }
+  watchman:
+    name: watchman
+    in: green
+    faction: villagers
+    health: 30
+    # Looks in on the mill every fourth turn.
+    act: |
+      if game.turn % 4 == 0 then
+        if self:is_in(world.green) then self:go("north") else self:go("south") end
+      end
+"#;
+
+fn bodies(cmds: &[&str]) -> Game<LuaHost> {
+    let mut g = game(compile_str(BODIES).story.unwrap());
+    for c in cmds {
+        say(&mut g, c);
+    }
+    g
+}
+
+#[test]
+fn a_body_left_lying_is_found_and_the_alarm_raised() {
+    let mut g = bodies(&["n", "hit miller", "s", "z"]);
+    // The watchman looks in on the mill, and finds it.
+    assert_says(&mut g, "z", "You hear a cry of alarm somewhere north.");
+    // The villagers have turned (the watchman's own patrol script decides
+    // what he does about it): an apology now has something to mend.
+    say(&mut g, "n");
+    assert_says(&mut g, "apologize to watchman", "The villagers seem a little less wary of you.");
+}
+
+#[test]
+fn a_body_hidden_in_a_closed_chest_stays_secret() {
+    let mut g = bodies(&["n", "hit miller", "open chest", "hide body in chest", "close chest", "s"]);
+    for _ in 0..6 {
+        let out = say(&mut g, "z");
+        assert!(!out.contains("alarm"), "{out}");
+    }
+    say(&mut g, "n");
+    assert!(!say(&mut g, "z").contains("attacks you"));
+}
+
+#[test]
+fn a_body_can_be_carried_off_and_buried_but_is_seen_in_your_arms() {
+    let mut g = bodies(&["n", "hit miller"]);
+    assert_eq!(say(&mut g, "take body"), "Taken.");
+    // The watchman arrives and sees it in the player's arms.
+    say(&mut g, "i");
+    assert_says(&mut g, "bury body", "The ground here is too hard to dig.");
+    let mut g = bodies(&["n", "hit miller", "take body", "s", "e"]);
+    assert_eq!(say(&mut g, "bury body"), "You dig a shallow hole and bury the miller.");
+    assert!(!say(&mut g, "look").contains("miller"));
+}
+
+#[test]
+fn a_kill_seen_happening_isnt_found_again() {
+    // Killed in front of the watchman: the villagers know at once, and the
+    // watchman fights rather than "finding" the body.
+    let src = BODIES.replace("in: green
+    faction: villagers", "in: mill
+    faction: villagers");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "n");
+    let out = say(&mut g, "hit miller");
+    assert!(out.contains("The villagers turn against you.") && !out.contains("finds the body"), "{out}");
+}

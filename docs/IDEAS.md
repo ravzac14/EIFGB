@@ -17,6 +17,7 @@ Everything from the first list has now been built:
 - **Tracks:** EXAMINE/FOLLOW TRACKS, `prints`, `trackless` rooms, and
   trackers (from the second list).
 - **Witnesses:** a faction only sours when a member sees it.
+- **Hiding bodies:** found bodies raise the alarm; carry, hide or BURY them.
 
 Add new ideas below, each with what it builds on, its shape, and a rough
 effort.
@@ -47,17 +48,6 @@ get.
   on their turn when two or more are together and the player is hidden
   (or not seen), shown as overheard.
 - Effort: small.
-
-### Hiding bodies
-
-Faction members who find a body get alarmed. HIDE BODY IN BARREL or BURY
-BODY and nobody finds out.
-
-- Builds on: corpses, containers, witnesses.
-- Shape: a member entering a room with a member's body that isn't hidden
-  sours the faction (once per body) and alerts nearby hunters (noise);
-  bodies can be put in containers, or BURY where `diggable`.
-- Effort: medium.
 
 ### Sleep and sneaking
 

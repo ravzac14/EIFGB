@@ -323,6 +323,9 @@ pub struct Entity {
     /// Rooms: false for a stream or bare rock that holds none.
     #[serde(default = "yes", skip_serializing_if = "Clone::clone")]
     pub leaves_tracks: bool,
+    /// Rooms: soft ground, where things can be buried.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub diggable: bool,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -875,6 +878,8 @@ pub enum BuiltinAction {
     Tracks,
     /// Follow the freshest tracks here.
     FollowTracks,
+    /// Bury something (a body, usually) in soft ground.
+    Bury,
 }
 
 impl BuiltinAction {

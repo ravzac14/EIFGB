@@ -995,7 +995,20 @@ characters:
 
 ### Tricks players can find
 
-Nine features reward players who try something clever:
+Ten features reward players who try something clever:
+
+- **Hiding bodies:** a silent kill stays secret only until someone finds
+  the body. A faction member that comes across the body of one of its
+  own that the player killed, in plain sight, raises the alarm: "The
+  watchman finds the body of the miller, and raises the alarm!" (or, from
+  next door, "You hear a cry of alarm somewhere north."). The faction
+  sours as if it had seen the kill, and hunters within two rooms come
+  running. Bodies can be carried (TAKE BODY), though one in the player's
+  arms is in plain sight too. Put one somewhere closed (HIDE BODY IN
+  CHEST works on a body lying on the floor) or BURY BODY in a room with
+  `diggable: true`, and nobody finds out. Scavengers that eat a body
+  destroy the evidence too. Bodies killed by someone else don't count
+  against the player.
 
 - **Tracks:** everyone who walks out of a room leaves prints there.
   EXAMINE TRACKS (LOOK FOR TRACKS, X FOOTPRINTS…) reads them, freshest
@@ -1222,7 +1235,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS),
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN,
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1254,7 +1267,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`, `prints`, `leaves_tracks`, `tracker`; rooms can be `trackless`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
+`nameable`, `prints`, `leaves_tracks`, `tracker`; rooms can be `trackless` or
+`diggable`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience` and `prints`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by` and `nameable`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the

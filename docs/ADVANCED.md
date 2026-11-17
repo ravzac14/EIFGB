@@ -540,7 +540,28 @@ The goblin chief attacks the alpha wolf.
 The goblin grunt attacks the alpha wolf.
 ```
 
-Attacking a goblin while disguised still makes it fight back.
+The disguise doesn't survive picking fights with goblins. A faction has
+a `patience` with anyone it takes for one of its own (default 2). Each
+goblin you provoke into fighting you uses one up, and at 0 the whole
+band sees through the helmet:
+
+```
+> hit grunt with spear
+You hit the goblin grunt with the hunting spear.
+The goblins are growing wary of you.
+...
+
+> hit chief with spear
+You hit the goblin chief with the hunting spear.
+The goblins see through your disguise!
+...
+The goblin chief attacks you with the crude club.
+The goblin grunt attacks you.
+```
+
+The same rule works without disguises: a neutral faction, such as
+villagers who aren't `hostile_to` the player, turns on them as a whole
+once they've provoked enough of its members.
 
 **Bait.** An object with `eaten_by: [<faction>]` is food for that
 faction. Food left lying in their room beats everything except fighting

@@ -1226,6 +1226,7 @@ impl<'a> Lowerer<'a> {
                 hostile_to: f.hostile_to.clone(),
                 eats_corpses: f.eats_corpses,
                 kills: f.kills.clone(),
+                patience: f.patience.unwrap_or(2),
             });
         }
         out

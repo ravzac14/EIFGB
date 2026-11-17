@@ -1768,3 +1768,70 @@ fn blackfang_has_more_than_one_way_through() {
     let out = g.input("take sunstone");
     assert_eq!(out.ended, Some(EndingKind::Win), "{}", out.text());
 }
+
+// -------------------------------------------------------- faction attitude
+
+#[test]
+fn provoking_a_faction_in_disguise_blows_it() {
+    let mut g = blackfang();
+    for cmd in ["take spear", "take helmet", "wear helmet", "n"] {
+        say(&mut g, cmd);
+    }
+    // Hunters have no patience, so each goblin hit is a new foe, and the
+    // goblins' patience with "one of their own" (2) drops by one.
+    let out = say(&mut g, "hit grunt with spear");
+    assert!(out.contains("The goblins are growing wary of you.") && out.contains("The goblin chief attacks the alpha wolf."), "{out}");
+    let out = say(&mut g, "hit chief with spear");
+    assert!(out.contains("The goblins see through your disguise!"), "{out}");
+    assert!(out.contains("The goblin chief attacks you"), "{out}");
+}
+
+#[test]
+fn a_blown_disguise_stays_blown() {
+    let src = "\
+format: eifgb/0.1
+game: { id: g, title: G, version: '1', start: hall }
+player: { health: 30 }
+factions:
+  goblins: { hostile_to: [player], patience: 1 }
+rooms:
+  hall: { name: Hall }
+objects:
+  hat: { name: goblin hat, synonyms: [hat], in: player, traits: [wearable], disguise: goblins }
+characters:
+  goblin: { name: goblin, in: hall, faction: goblins, behavior: guard, health: 50 }
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    assert_says(&mut g, "z", "The goblin attacks you.");
+    assert_eq!(say(&mut g, "wear hat"), "You put on the goblin hat.");
+    assert_eq!(say(&mut g, "z"), "Time passes.");
+    assert_says(&mut g, "hit goblin", "The goblins see through your disguise!");
+    say(&mut g, "take off hat");
+    assert_says(&mut g, "wear hat", "The goblin attacks you.");
+}
+
+const VILLAGE: &str = "\
+format: eifgb/0.1
+game: { id: v, title: V, version: '1', start: green }
+player: { health: 30 }
+factions:
+  villagers: { patience: 2 }
+rooms:
+  green: { name: Green }
+characters:
+  baker: { name: baker, in: green, faction: villagers, health: 9, patience: 0 }
+  smith: { name: smith, in: green, faction: villagers, health: 9, patience: 0 }
+  miller: { name: miller, in: green, faction: villagers, health: 9 }
+";
+
+#[test]
+fn a_neutral_faction_turns_on_a_player_who_provokes_enough_of_it() {
+    let mut g = game(compile_str(VILLAGE).story.unwrap());
+    let out = say(&mut g, "hit baker");
+    assert!(out.contains("The villagers are growing wary of you.") && out.contains("The baker attacks you."), "{out}");
+    assert!(!out.contains("miller attacks"), "{out}");
+    let out = say(&mut g, "hit smith");
+    assert!(out.contains("The villagers turn against you."), "{out}");
+    // The miller was never touched, but now attacks too.
+    assert!(out.contains("The miller attacks you."), "{out}");
+}

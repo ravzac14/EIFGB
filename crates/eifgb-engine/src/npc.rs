@@ -8,7 +8,18 @@
 
 use crate::world::World;
 use eifgb_ir::{Behavior, Direction, EntityId, EntityKind, Faction, Value, PLAYER, PLAYER_FACTION};
+
 use std::collections::{HashMap, VecDeque};
+
+/// A faction thinking less of the player.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttitudeChange {
+    pub faction: String,
+    /// What's left; at 0 or below, every member attacks the player.
+    pub left: i64,
+    /// The faction the player was disguised as, if any.
+    pub disguise: Option<String>,
+}
 
 /// Something a character did that the player may see.
 #[derive(Debug, Clone, PartialEq)]
@@ -17,8 +28,16 @@ pub enum NpcEvent {
     Moved { npc: EntityId, from: EntityId, to: EntityId, direction: Direction },
     /// Attacked `target`, taking `damage` health. `weapon` is what was used,
     /// if anything. `tolerated` means the target let it go this time, but
-    /// its patience is wearing thin.
-    Attacked { attacker: EntityId, target: EntityId, weapon: Option<EntityId>, damage: u32, tolerated: bool },
+    /// its patience is wearing thin. `attitude` is set when the attack
+    /// soured the target's whole faction on the player.
+    Attacked {
+        attacker: EntityId,
+        target: EntityId,
+        weapon: Option<EntityId>,
+        damage: u32,
+        tolerated: bool,
+        attitude: Option<AttitudeChange>,
+    },
     /// Ate a corpse, which is now gone.
     Ate { npc: EntityId, corpse: EntityId, room: EntityId },
     /// Ate some of `food`; `finished` if it's all gone now.
@@ -89,10 +108,9 @@ impl World {
             return true;
         }
         match self.faction(a) {
-            Some(f) => {
-                let side = if b == PLAYER { Some(self.player_side()) } else { self.def(b).faction.as_deref() };
-                side.is_some_and(|s| f.hostile_to.iter().any(|h| h == s))
-            }
+            // Toward the player, it's the faction's attitude that counts.
+            Some(f) if b == PLAYER => self.attitude(&f.key) <= 0,
+            Some(f) => self.def(b).faction.as_deref().is_some_and(|s| f.hostile_to.iter().any(|h| h == s)),
             None => b == PLAYER && self.def(a).npc.as_ref().is_some_and(|n| n.behavior.hostile()),
         }
     }
@@ -145,9 +163,10 @@ impl World {
     /// `attacker` attacked `target`. If the target fights back, that uses
     /// up a little of its patience, or, with none left, makes the attacker
     /// one of its foes. Returns whether it was let go this time.
-    fn provoke(&mut self, target: EntityId, attacker: EntityId) -> bool {
+    /// A member newly turned against the player also sours its faction.
+    fn provoke(&mut self, target: EntityId, attacker: EntityId) -> (bool, Option<AttitudeChange>) {
         if target == attacker || !self.def(target).npc.as_ref().is_some_and(|n| n.fights_back) {
-            return false;
+            return (false, None);
         }
         let patience = match self.get(target, "patience") {
             Some(Value::Int(i)) => *i,
@@ -156,27 +175,79 @@ impl World {
         };
         if patience > 0 {
             self.set(target, "patience", Value::Int(patience - 1));
-            return true;
+            return (true, None);
         }
-        self.add_foe(target, attacker);
-        false
+        let new_foe = self.add_foe(target, attacker);
+        let change = match (new_foe && attacker == PLAYER, self.def(target).faction.clone()) {
+            (true, Some(f)) => self.sour(&f),
+            _ => None,
+        };
+        (false, change)
+    }
+
+    /// The key under which a faction's attitude toward the player, as
+    /// they present themselves now, is kept: "goblins>player", or
+    /// "goblins>goblins" for a player in goblin disguise.
+    fn attitude_key(&self, faction: &str) -> String {
+        format!("{faction}>{}", self.player_side())
+    }
+
+    /// A faction's attitude toward the player as they present themselves
+    /// now. It starts at 0 toward a side the faction is hostile to, and at
+    /// the faction's `patience` otherwise (including toward its own kind,
+    /// which is how a disguise works). At 0 or below, members attack.
+    pub fn attitude(&self, faction: &str) -> i64 {
+        let key = self.attitude_key(faction);
+        if let Some(Value::Map(m)) = self.get(PLAYER, "_attitude")
+            && let Some(Value::Int(v)) = m.get(&key)
+        {
+            return *v;
+        }
+        let side = self.player_side();
+        match self.story().factions.iter().find(|f| f.key == faction) {
+            Some(f) if f.hostile_to.iter().any(|h| h == side) => 0,
+            Some(f) => i64::from(f.patience),
+            None => 0,
+        }
+    }
+
+    /// Lowers a faction's attitude toward the player (as they present
+    /// themselves now) by one, unless it's already at 0.
+    fn sour(&mut self, faction: &str) -> Option<AttitudeChange> {
+        let now = self.attitude(faction);
+        if now <= 0 {
+            return None;
+        }
+        let key = self.attitude_key(faction);
+        let mut map = match self.get(PLAYER, "_attitude") {
+            Some(Value::Map(m)) => m.clone(),
+            _ => Default::default(),
+        };
+        map.insert(key, Value::Int(now - 1));
+        self.set(PLAYER, "_attitude", Value::Map(map));
+        let side = self.player_side();
+        let disguise = (side != PLAYER_FACTION).then(|| side.to_string());
+        Some(AttitudeChange { faction: faction.to_string(), left: now - 1, disguise })
     }
 
     /// Remembers that `attacker` attacked `target`, in the target's `foes`
     /// (a list of keys, which scripts can read or clear).
-    fn add_foe(&mut self, target: EntityId, attacker: EntityId) {
+    /// Returns whether `attacker` is a new foe.
+    fn add_foe(&mut self, target: EntityId, attacker: EntityId) -> bool {
         if target == attacker || self.def(target).kind != EntityKind::Character {
-            return;
+            return false;
         }
         let key = Value::Str(self.def(attacker).key.clone());
         let mut foes = match self.get(target, "foes") {
             Some(Value::List(l)) => l.clone(),
             _ => Vec::new(),
         };
-        if !foes.contains(&key) {
-            foes.push(key);
-            self.set(target, "foes", Value::List(foes));
+        if foes.contains(&key) {
+            return false;
         }
+        foes.push(key);
+        self.set(target, "foes", Value::List(foes));
+        true
     }
 
     /// Whether `a` holds a grudge against `b` and fights back.
@@ -347,8 +418,8 @@ impl World {
                 None => self.unset(target, "killed_with"),
             }
         }
-        let tolerated = self.provoke(target, attacker);
-        Some(NpcEvent::Attacked { attacker, target, weapon, damage, tolerated })
+        let (tolerated, attitude) = self.provoke(target, attacker);
+        Some(NpcEvent::Attacked { attacker, target, weapon, damage, tolerated, attitude })
     }
 
     /// The best weapon `id` is carrying: the one that does the most damage.
@@ -397,6 +468,17 @@ impl World {
             let weapon = self.best_weapon(npc);
             return self.attack(npc, foe, weapon).into_iter().collect();
         }
+        // A faction that's had enough of the player: every member attacks on
+        // sight, whatever its behaviour.
+        if !n.behavior.hostile()
+            && self.faction(npc).is_some()
+            && !hidden
+            && self.together(npc, PLAYER)
+            && self.is_hostile(npc, PLAYER)
+        {
+            let weapon = self.best_weapon(npc);
+            return self.attack(npc, PLAYER, weapon).into_iter().collect();
+        }
         // Food beats everything, even a fight.
         if let Some(&food) = self.food_in(npc, room).first() {
             return self.npc_feed(npc, food).into_iter().collect();
@@ -412,6 +494,7 @@ impl World {
                     weapon,
                     damage: 0,
                     tolerated: false,
+                    attitude: None,
                 }))
             }
             // Nothing to fight here: a scavenger eats.

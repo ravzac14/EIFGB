@@ -367,6 +367,10 @@ pub struct Faction {
     /// How members' victims look: "torn apart by teeth".
     #[serde(default)]
     pub kills: Option<String>,
+    /// How many members the player can provoke before the faction turns
+    /// on them (as themselves, or in its disguise). Defaults to 2.
+    #[serde(default)]
+    pub patience: Option<u32>,
 }
 
 /// Something that happens after a number of actions.

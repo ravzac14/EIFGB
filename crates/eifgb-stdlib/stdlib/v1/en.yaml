@@ -344,6 +344,10 @@ messages:
   npc.attacks: "${The(args.npc)} attacks ${the(args.target)}."
   npc.defeated: "${The(args.target)} is defeated."
   npc.losing_patience_you: "${The(args.target)} is losing patience with you."
+  # A faction's attitude to the player souring, and running out.
+  faction.wary: "The ${args.faction} are growing wary of you."
+  faction.turns: "The ${args.faction} turn against you."
+  faction.sees_through: "The ${args.faction} see through your disguise!"
   npc.losing_patience: "${The(args.target)} is losing patience with ${the(args.npc)}."
   npc.drops: "${The(args.target)} drops ${args.list}."
   npc.eats: "${The(args.npc)} devours what's left of ${the(args.target)}."

@@ -50,7 +50,7 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("npc.arrives", &Ctx::new().entity("npc", npc));
                 }
             }
-            NpcEvent::Attacked { attacker, target, weapon, tolerated, .. } => {
+            NpcEvent::Attacked { attacker, target, weapon, tolerated, ref attitude, .. } => {
                 let mut ctx = Ctx::new().entity("npc", attacker).entity("target", target);
                 if let Some(w) = weapon {
                     ctx = ctx.entity("weapon", w);
@@ -65,6 +65,16 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("npc.attacks", &ctx);
                 } else if let Some(room) = self.world.room_of(attacker) {
                     self.hear(room, "npc.fight_nearby");
+                }
+                // The whole faction thinks less of the player.
+                if let Some(a) = attitude {
+                    let words = a.faction.replace('_', " ");
+                    let key = match (a.left <= 0, a.disguise.as_deref() == Some(a.faction.as_str())) {
+                        (true, true) => "faction.sees_through",
+                        (true, false) => "faction.turns",
+                        (false, _) => "faction.wary",
+                    };
+                    self.msg(key, &Ctx::new().text("faction", words).entity("target", target));
                 }
                 // Patience wearing thin: worth a warning, if the player is there.
                 if tolerated && self.world.room_of(target) == Some(here) && self.world.health(target).is_some_and(|h| h > 0) {

@@ -954,6 +954,16 @@ characters:
   body: "a goblin chief (dead)". Players can call it a corpse, body,
   remains, carcass or bones. `corpse: false` makes a character vanish
   instead.
+- **Attitude:** each faction has an attitude toward the player, as they
+  present themselves (as themselves, or disguised as some faction). It
+  starts at 0 toward a side the faction is hostile to, and at the
+  faction's `patience` (default 2) otherwise, including toward a player
+  disguised as one of its own. Each member the player provokes into a
+  foe (by using up that member's own patience) lowers it by one: "The
+  villagers are growing wary of you." At 0, every member attacks the
+  player on sight, whatever its behaviour: "The villagers turn against
+  you.", or in disguise, "The goblins see through your disguise!" It
+  doesn't recover, and putting the disguise back on doesn't help.
 - **Scavengers:** a faction with `eats_corpses` eats bodies in its room
   when there's no one to fight, and hunters go looking for them.
 
@@ -967,7 +977,8 @@ Four features reward players who try something clever:
   nothing."), and give up. Guards ignore a hidden player.
 - **Disguises:** a wearable with `disguise: goblins` makes the goblins
   take the wearer for one of their own. Enemies of goblins now see a
-  goblin, and anyone the player attacks still fights back.
+  goblin. Pick fights with goblins and the disguise won't last (see
+  faction attitude, above).
 - **Bait:** an object with `eaten_by: [wolves]` is food for that faction.
   Left lying in their room, they'll eat it rather than attack, unless
   someone attacks them, and hunters head for food in range. It lasts as
@@ -1106,7 +1117,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 **Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
-`faction`, `corpse`, `fights_back`, `patience`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses` and `kills`; objects
+`faction`, `corpse`, `fights_back`, `patience`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage` and `money`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).

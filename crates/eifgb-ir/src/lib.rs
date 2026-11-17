@@ -98,6 +98,16 @@ pub struct Faction {
     /// How members' victims look, unless the weapon or character says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kills: Option<String>,
+    /// The faction's starting attitude toward a side it isn't hostile to,
+    /// including a player disguised as one of its own: how many of its
+    /// members the player can turn into foes before the whole faction
+    /// turns on them.
+    #[serde(default = "two")]
+    pub patience: u32,
+}
+
+fn two() -> u32 {
+    2
 }
 
 /// The name `hostile_to` uses for the player.

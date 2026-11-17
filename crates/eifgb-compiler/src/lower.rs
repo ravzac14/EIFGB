@@ -70,6 +70,7 @@ impl<'a> Lowerer<'a> {
         self.allocate_ids(&s);
         self.categories = stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         let verbs = self.lower_verbs(&s.verbs, &stdlib);
+        let lexicon = author_first_lexicon(&stdlib.lexicon, &verbs);
 
         let messages = self.lower_messages(&s.messages, &stdlib);
         let player_name = messages
@@ -135,7 +136,7 @@ impl<'a> Lowerer<'a> {
             vars: s.vars.into_iter().collect(),
             entities,
             verbs,
-            lexicon: stdlib.lexicon.clone(),
+            lexicon,
             messages,
             choices,
             handlers,
@@ -303,7 +304,9 @@ impl<'a> Lowerer<'a> {
                     default = self.text_opt(std.default.as_deref(), &format!("stdlib.verbs.{key}.default"));
                 }
             }
-            verbs.push(Verb { key: key.clone(), patterns, action, default, origin: VerbOrigin::Author });
+            let std_reach = std.map(|s| s.reach.unwrap_or_else(|| s.action.is_none_or(|a| a.needs_reach())));
+            let reach = v.reach.or(std_reach).unwrap_or(true);
+            verbs.push(Verb { key: key.clone(), patterns, action, default, origin: VerbOrigin::Author, reach });
         }
 
         // Later stdlib patterns that an author pattern shadows are still
@@ -333,7 +336,8 @@ impl<'a> Lowerer<'a> {
             }
             let action = std.action.map_or(VerbAction::Script, VerbAction::Builtin);
             let default = self.text_opt(std.default.as_deref(), &format!("stdlib.verbs.{key}.default"));
-            verbs.push(Verb { key: key.clone(), patterns, action, default, origin: VerbOrigin::Stdlib });
+            let reach = std.reach.unwrap_or_else(|| std.action.is_none_or(|a| a.needs_reach()));
+            verbs.push(Verb { key: key.clone(), patterns, action, default, origin: VerbOrigin::Stdlib, reach });
         }
         self.verb_keys = verbs.iter().map(|v| v.key.clone()).collect();
         verbs
@@ -1000,6 +1004,24 @@ impl<'a> Lowerer<'a> {
             }
         }
     }
+}
+
+/// The stdlib lexicon, minus synonym phrases that would hijack the
+/// author's own verbs: with an author verb "read {target}", the stdlib's
+/// "read" → "examine" is dropped so READ reaches the author's verb.
+fn author_first_lexicon(lexicon: &Lexicon, verbs: &[Verb]) -> Lexicon {
+    let author_words: HashSet<&str> = verbs
+        .iter()
+        .filter(|v| v.origin == VerbOrigin::Author)
+        .flat_map(|v| &v.patterns)
+        .filter_map(|p| match p.0.first() {
+            Some(PatternToken::Word(w)) => Some(w.as_str()),
+            _ => None,
+        })
+        .collect();
+    let mut out = lexicon.clone();
+    out.phrases.retain(|from, _| !from.split_whitespace().next().is_some_and(|w| author_words.contains(w)));
+    out
 }
 
 /// Builds parser vocabulary. The last word of the name and of each

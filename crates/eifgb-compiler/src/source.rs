@@ -195,6 +195,10 @@ pub struct Verb {
     pub patterns: Vec<String>,
     #[serde(default)]
     pub default: Option<String>,
+    /// Whether the player must be able to touch the thing. On by default;
+    /// set it to false for verbs like READ that work through glass.
+    #[serde(default)]
+    pub reach: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -296,6 +296,26 @@ fn door_hidden_sides_are_checked() {
 }
 
 #[test]
+fn author_verbs_win_over_stdlib_synonyms() {
+    let story = with("").story.unwrap();
+    assert_eq!(story.lexicon.phrases.get("read").map(String::as_str), Some("examine"));
+    let story = with("verbs:\n  read: { patterns: ['read {target}'] }\n").story.unwrap();
+    assert!(!story.lexicon.phrases.contains_key("read"), "the author's READ replaces the synonym");
+    assert!(story.lexicon.phrases.contains_key("grab"), "other synonyms stay");
+}
+
+#[test]
+fn verbs_need_reach_unless_they_say_otherwise() {
+    let out = with("verbs:\n  polish: { patterns: ['polish {target}'] }\n  read: { patterns: ['read {target}'], reach: false }\n");
+    let story = out.story.as_ref().unwrap();
+    let reach = |k: &str| story.verbs.iter().find(|v| v.key == k).unwrap().reach;
+    assert!(reach("polish"), "author verbs need reach by default");
+    assert!(!reach("read"));
+    assert!(reach("take") && reach("kick"), "touching verbs need reach");
+    assert!(!reach("examine") && !reach("listen") && !reach("look"), "looking and listening don't");
+}
+
+#[test]
 fn container_traits_are_checked() {
     assert_error(&with("objects:\n  rug: { name: rug, in: hall, traits: [enterable] }\n"), "'enterable' needs 'container'");
     let out = with("objects:\n  pane: { name: pane, in: hall, traits: [transparent] }\n");

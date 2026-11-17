@@ -73,15 +73,6 @@ impl Output {
     }
 }
 
-/// Built-in actions that need the player to touch the thing, not just see it.
-fn needs_reach(a: BuiltinAction) -> bool {
-    use BuiltinAction as A;
-    matches!(
-        a,
-        A::Take | A::PutIn | A::PutOn | A::Open | A::Close | A::Lock | A::Unlock | A::Wear | A::TakeOff | A::Eat | A::Enter | A::Empty
-    )
-}
-
 pub(crate) enum Pending {
     /// We asked "which do you mean?"; the reply fills in the noun.
     Which { before: Vec<String>, after: Vec<String>, options: Vec<EntityId> },
@@ -484,10 +475,9 @@ impl<H: ScriptHost> Game<H> {
         let with_owner = |owner: Option<EntityId>| Ctx { this: owner, ..ctx.clone() };
 
         // Things behind glass (in a closed transparent container) can be
-        // seen but not touched.
-        if let VerbAction::Builtin(a) = verb.action
-            && needs_reach(a)
-        {
+        // seen but not touched. Each verb says whether it needs touch;
+        // custom verbs do unless the author says `reach: false`.
+        if verb.reach {
             for thing in target.into_iter().chain(cmd.tool) {
                 if let Some(holder) = self.world.blocked_reach(thing) {
                     self.msg("reach.closed", &Ctx::new().entity("target", thing).entity("holder", holder));

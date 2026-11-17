@@ -510,7 +510,7 @@ objects:
 | `container` | Holds things in it. Without `openable` it's always open (a jar, a bowl). |
 | `supporter` | Holds things on it, always visible. |
 | `openable`, `lockable` | Can be opened and closed, locked and unlocked (with `unlocks_with:`). A closed container hides what's inside. |
-| `transparent` | A closed container whose contents can be seen but not reached: "You can't reach the jewel: the glass case is closed." |
+| `transparent` | A closed container whose contents can be seen but not reached: "You can't reach the jewel: the glass case is closed." This applies to every verb that touches things, including your own and KICK, PULL and the other try-it verbs, and their handlers don't run. EXAMINE, SEARCH and LISTEN work through the glass, and so does any verb you mark `reach: false`. |
 | `enterable` | The player can get in it (a container) or on it (a supporter): GET IN, CLIMB INTO, SIT ON, LIE ON, then GET OUT, GET OFF or STAND UP. |
 
 What players can do and see:
@@ -697,7 +697,13 @@ verbs:
   light:
     patterns: ["light {target}", "ignite {target}"]
     default: "That won't burn."
+  read:
+    patterns: ["read {target}"]
+    reach: false        # works on a label behind glass; verbs need to touch things by default
 ```
+
+Your own verbs win over the standard synonyms: defining READ stops
+"read" from meaning EXAMINE.
 
 `{target}` is the thing acted on and `{tool}` is a second thing (`fill {target} with {tool}`).
 A verb's ID can't be an event name (`start`, `turn`, `parse_failed`,

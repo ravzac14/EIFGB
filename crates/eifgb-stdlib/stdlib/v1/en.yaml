@@ -201,6 +201,7 @@ verbs:
   listen:
     patterns: ["listen to {target}", "listen"]
     default: "You hear nothing unusual."
+    reach: false          # you can hear through glass
   taste:
     patterns: ["taste {target}", "lick {target}"]
     default: "You'd rather not."

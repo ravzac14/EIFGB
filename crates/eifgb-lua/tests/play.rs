@@ -949,3 +949,35 @@ fn sizes_decide_what_fits() {
     assert_says(&mut g, "take crate", "Taken.");
     assert_says(&mut g, "take sack", "You're carrying too much already.");
 }
+
+#[test]
+fn custom_verbs_check_reach_too() {
+    let src = format!(
+        "{CONTAINERS}  label: {{ name: label, in: case, traits: [scenery] }}\nverbs:\n  polish: {{ patterns: ['polish {{target}}'], default: \"It gleams.\" }}\n  read: {{ patterns: ['read {{target}}'], reach: false }}\n"
+    )
+    .replace("objects:\n", "objects:\n");
+    // `verbs:` must come after `objects:` entries; CONTAINERS ends with objects, so append works.
+    let out = compile_str(&src);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    let mut g = game(out.story.unwrap());
+    // Try-it verbs and the author's own verbs need touch by default.
+    assert_says(&mut g, "kick jewel", "You can't reach the jewel: the glass case is closed.");
+    assert_says(&mut g, "polish jewel", "You can't reach the jewel: the glass case is closed.");
+    // Verbs marked `reach: false` work through glass, as does LISTEN.
+    assert_says(&mut g, "read label", "Nothing happens.");
+    assert_says(&mut g, "listen to jewel", "You hear nothing unusual.");
+    say(&mut g, "open case");
+    assert_says(&mut g, "polish jewel", "It gleams.");
+}
+
+#[test]
+fn handlers_behind_glass_do_not_run_for_verbs_that_need_reach() {
+    let src = CONTAINERS.replace(
+        "  jewel: { name: jewel, in: case, traits: [portable] }",
+        "  jewel: { name: jewel, in: case, traits: [portable], on: { kick: 'say(\"Ow.\")' } }",
+    );
+    let out = compile_str(&src);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    let out = say(&mut g, "kick jewel");
+    assert_eq!(out, "You can't reach the jewel: the glass case is closed.");
+}

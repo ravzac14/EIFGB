@@ -39,6 +39,10 @@ pub struct StdVerb {
     pub patterns: Vec<String>,
     #[serde(default)]
     pub default: Option<String>,
+    /// Whether the player must be able to touch the target. Defaults to
+    /// what the built-in action needs, or true for verbs without one.
+    #[serde(default)]
+    pub reach: Option<bool>,
 }
 
 /// Raw source for a version and language, if that combination exists.

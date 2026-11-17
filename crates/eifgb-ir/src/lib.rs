@@ -465,6 +465,31 @@ pub struct Verb {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<Text>,
     pub origin: VerbOrigin,
+    /// Whether the player must be able to touch the target and tool, not
+    /// just see them. Things in a closed `transparent` container can be
+    /// seen but not reached.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub reach: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
+}
+
+impl BuiltinAction {
+    /// Whether this built-in behaviour needs the player to touch the thing.
+    /// Looking, listening and moving about don't.
+    pub fn needs_reach(self) -> bool {
+        use BuiltinAction as A;
+        matches!(
+            self,
+            A::Take | A::PutIn | A::PutOn | A::Open | A::Close | A::Lock | A::Unlock | A::Wear | A::TakeOff | A::Eat | A::Enter | A::Empty
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

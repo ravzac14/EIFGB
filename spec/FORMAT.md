@@ -34,7 +34,7 @@ stay interchangeable.
 | `rooms`      | Locations and their exits. |
 | `objects`    | Things. Each starts somewhere via `in:`. |
 | `characters` | NPCs: objects that can be talked to. |
-| `verbs`      | Custom verbs and their grammar patterns. |
+| `verbs`      | Custom verbs: grammar `patterns`, a `default` reply, and `reach` (default `true`). An author verb's leading words take priority over stdlib synonym phrases. |
 | `choices`    | Choice graphs, used for menus and dialogue. |
 | `on`         | Global event handlers (`turn`, `start`, ...). |
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
@@ -52,7 +52,8 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
 
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
 - **Containers and supporters.** These are the `container` and `supporter` traits, with `in:` placing things inside or on top:
-  - **Visibility:** a closed container hides its contents, unless it's `transparent`, in which case they're visible but out of reach: "You can't reach the jewel: the glass case is closed." Built-in actions that touch things check reach; EXAMINE and SEARCH don't. A container without `openable` is always open. Characters' belongings are never in scope.
+  - **Visibility:** a closed container hides its contents, unless it's `transparent`, in which case they're visible but out of reach: "You can't reach the jewel: the glass case is closed." `[reach.closed]`
+  - **Reach:** every verb carries a `reach` flag in the IR. When it's set, a target or tool out of reach stops the command before any handler runs. The built-in verbs that touch things need reach (TAKE, OPEN, PUT, EAT…); EXAMINE, SEARCH, LOOK and TALK don't. Author verbs and the stdlib's try-it verbs need it by default. LISTEN doesn't (`reach: false` in the stdlib), and authors opt out per verb with `reach: false`. A container without `openable` is always open. Characters' belongings are never in scope.
   - **Descriptions:** LOOK, EXAMINE and SEARCH describe contents as deep as the player can see. The inventory nests them: "a cloth bag (open) (containing a coin)" `[list.containing, list.supporting]`.
   - **TAKE X FROM Y** checks that X is in or on Y, at any depth: "The coin isn't in the glass jar." `[take.not_in, take.not_on]`.
   - **ALL with a second object:** TAKE ALL FROM Y means what's in Y. PUT ALL IN/ON Y means what you carry, except Y itself, anything containing Y, and worn things.

@@ -553,9 +553,10 @@ impl World {
         self.is_lit(room) || self.sees_in_dark(viewer)
     }
 
-    /// A light source that's burning: `lit` or `on`.
+    /// Something giving light and heat: a light source that's `lit` or
+    /// `on`, or something flammable that's on fire.
     pub fn is_burning(&self, id: EntityId) -> bool {
-        self.has(id, eifgb_ir::Trait::LightSource) && (self.flag(id, "lit") || self.flag(id, "on"))
+        (self.has(id, eifgb_ir::Trait::LightSource) && (self.flag(id, "lit") || self.flag(id, "on"))) || self.on_fire(id)
     }
 
     /// Whether `room` can be seen in: it isn't `dark`, or a burning light
@@ -797,6 +798,12 @@ impl World {
     fn threat(&self, npc: EntityId) -> Option<EntityId> {
         if self.is_frightened(npc) {
             return self.together(npc, PLAYER).then_some(PLAYER);
+        }
+        // A blaze in the room, for anything that fears fire.
+        if self.fears_fire(npc)
+            && let Some(fire) = self.room_of(npc).and_then(|r| self.fire_in(r))
+        {
+            return Some(fire);
         }
         if self.morale_of(npc) == 0 {
             return None;

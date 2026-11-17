@@ -602,10 +602,14 @@ pub enum Trait {
     Enterable,
     /// A container whose contents can be seen, but not reached, while closed.
     Transparent,
+    /// Can be set alight.
+    Flammable,
+    /// Can be smashed, and burns away completely if it's flammable too.
+    Destructible,
 }
 
 impl Trait {
-    pub const ALL: [Trait; 12] = [
+    pub const ALL: [Trait; 14] = [
         Trait::Portable,
         Trait::Scenery,
         Trait::Container,
@@ -618,6 +622,8 @@ impl Trait {
         Trait::Edible,
         Trait::Enterable,
         Trait::Transparent,
+        Trait::Flammable,
+        Trait::Destructible,
     ];
 
     pub fn key(self) -> &'static str {
@@ -634,10 +640,16 @@ impl Trait {
             Trait::Edible => "edible",
             Trait::Enterable => "enterable",
             Trait::Transparent => "transparent",
+            Trait::Flammable => "flammable",
+            Trait::Destructible => "destructible",
         }
     }
 
     pub fn from_key(s: &str) -> Option<Trait> {
+        // A common spelling, accepted too.
+        if s == "destructable" {
+            return Some(Trait::Destructible);
+        }
         Trait::ALL.into_iter().find(|t| t.key() == s)
     }
 }
@@ -964,6 +976,8 @@ pub enum BuiltinAction {
     Order,
     /// Wave something about, to frighten whoever fears it.
     Brandish,
+    /// Set something flammable alight.
+    Burn,
     /// Blow, sound, play or ring something that `calls`.
     Sound,
     /// Mimic a creature's call: HOWL, IMITATE A WOLF.

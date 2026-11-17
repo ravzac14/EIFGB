@@ -308,6 +308,17 @@ verbs:
       - "caw"
       - "grunt"
       - "bleat"
+  burn:
+    action: burn
+    patterns:
+      - "burn {target}"
+      - "burn {target} with {tool}"
+      - "set {target} alight"
+      - "set {target} alight with {tool}"
+      - "set {target} on fire"
+      - "set fire to {target}"
+      - "set light to {target}"
+      - "torch {target}"
   brandish:
     action: brandish
     patterns:
@@ -570,6 +581,15 @@ messages:
   mimic.call: "You let out a convincing ${args.sound}."
   mimic.impression: "You do your best impression of ${args.what}."
   mimic.strange: "You make a strange noise."
+  burn.done: "You touch ${the(args.tool)} to ${the(args.target)}, and it catches fire."
+  burn.cant: "${The(args.target)} won't burn."
+  burn.already: "${The(args.target)} is already burning."
+  burn.no_flame: "You've nothing burning to light it with."
+  fire.spreads: "The fire spreads to ${the(args.target)}."
+  fire.burnt_up: "${The(args.target)} burns away to ash."
+  fire.burns_out: "The fire on ${the(args.target)} burns out."
+  smash.done: "You smash ${the(args.target)} to pieces."
+  destroy.spills: "Out of what's left of ${the(args.target)} falls ${args.list}."
   brandish.done: "You brandish ${the(args.target)}."
   brandish.nothing: "Nobody seems impressed."
   npc.afraid: "${The(args.npc)} shrinks back in fear!"

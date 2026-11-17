@@ -121,6 +121,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Eavesdrop, t) => self.eavesdrop_action(t, cmd.direction, ctx),
             (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
             (A::Brandish, Some(t)) => self.brandish_action(t, cmd.tool, ctx),
+            (A::Burn, Some(t)) => self.burn_action(t, cmd.tool, ctx),
             (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
             (A::SetTrap, Some(t)) => self.set_trap(t, ctx),
             (A::DisarmTrap, Some(t)) => self.disarm_trap(t, ctx),
@@ -603,7 +604,11 @@ impl<H: ScriptHost> Game<H> {
     /// Tags only appear once the player has examined or handled the thing.
     pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
         // Death, sleep, terror and traps are plain to see.
-        let obvious = self.world.is_dead(id) || self.world.is_asleep(id) || self.world.is_frightened(id) || self.world.held_by(id).is_some();
+        let obvious = self.world.is_dead(id)
+            || self.world.is_asleep(id)
+            || self.world.is_frightened(id)
+            || self.world.held_by(id).is_some()
+            || self.world.on_fire(id);
         if !self.world.known(id) && !obvious {
             return Vec::new();
         }
@@ -705,7 +710,8 @@ impl<H: ScriptHost> Game<H> {
     /// are on.
     /// Like list tags, these only appear once the player knows the thing.
     fn describe_state_here(&mut self, id: EntityId, room_description: Option<&Text>, attach: bool) {
-        if !self.world.known(id) {
+        // Fire is plain to see, known or not.
+        if !self.world.known(id) && !self.world.on_fire(id) {
             return;
         }
         let notes: Vec<StateNote> = self
@@ -747,6 +753,21 @@ impl<H: ScriptHost> Game<H> {
     /// LIGHT / EXTINGUISH a `light_source`. Lighting one in the dark shows
     /// the room; putting the last one out plunges it into darkness.
     fn light(&mut self, t: EntityId, on: bool, ctx: &Ctx) -> bool {
+        // Something flammable: LIGHT sets it alight, PUT OUT puts it out.
+        if !self.world.has(t, Trait::LightSource) && self.world.has(t, Trait::Flammable) {
+            if on {
+                // LIGHT X has no "with": any burning thing in hand will do.
+                return self.burn_action(t, None, ctx);
+            }
+            if self.world.flag(t, "burning") {
+                self.world.set(t, "burning", Value::Bool(false));
+                self.world.unset(t, "_fire");
+                self.msg("extinguish.done", ctx);
+                return true;
+            }
+            self.msg("extinguish.not_lit", ctx);
+            return false;
+        }
         if !self.world.has(t, Trait::LightSource) {
             self.msg(if on { "light.cant" } else { "extinguish.cant" }, ctx);
             return false;

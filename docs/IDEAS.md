@@ -30,19 +30,20 @@ Everything from the first list has now been built:
 - **Fear and morale:** `morale`, `fears`, BRANDISH, fleeing and cornering.
 - **Mimicry:** faction `calls`, HOWL/IMITATE, horns that call one faction.
 - **Traps:** `trap`, SET/DISARM, hidden traps that catch the player.
+- **Fire and smashing:** `flammable`, `destructible`, SET … ALIGHT, SMASH.
 
 ## The world
 
-### Fire
+### More fire
 
-LIGHT THE TENTS: fire spreads to `flammable` things over a few turns,
-scatters creatures that fear it, and can be heard and seen from nearby.
+Fire is built (spreading in a room, burning away, lighting rooms,
+scaring fire-fearers). Still to do: fire spreading through doorways to
+the next room, burning characters (damage in a burning room), smoke
+that can be seen and smelt from nearby, and water or sand to put fires
+out.
 
-- Builds on: timers, state, noise, fear.
-- Shape: a `burning` state that spreads each turn to flammable things in
-  the room and next door; burns out after N turns; damages characters in
-  burning rooms.
-- Effort: large.
+- Builds on: fire, noise, darkness.
+- Effort: medium.
 
 ### Barter
 

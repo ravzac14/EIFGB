@@ -658,6 +658,8 @@ objects:
 | `supporter` | Holds things on it, always visible. |
 | `openable`, `lockable` | Can be opened and closed, locked and unlocked (with `unlocks_with:`). A closed container hides what's inside. |
 | `transparent` | A closed container whose contents can be seen but not reached: "You can't reach the jewel: the glass case is closed." This applies to every verb that touches things, including your own and KICK, PULL and the other try-it verbs, and their handlers don't run. EXAMINE, SEARCH and LISTEN work through the glass, and so does any verb you mark `reach: false`. |
+| `flammable` | Can be set alight (SET IT ALIGHT, BURN, LIGHT, with something burning in hand). See [Tricks players can find](#tricks-players-can-find). |
+| `destructible` | Can be smashed (HIT, SMASH, BREAK), spilling what's in it, and burns away completely if it's `flammable` too. `destructable` is accepted as well. |
 | `enterable` | The player can get in it (a container) or on it (a supporter): GET IN, CLIMB INTO, SIT ON, LIE ON, then GET OUT, GET OFF or STAND UP. |
 
 What players can do and see:
@@ -995,7 +997,20 @@ characters:
 
 ### Tricks players can find
 
-Eighteen features reward players who try something clever:
+Nineteen features reward players who try something clever:
+
+- **Fire:** SET THE TENT ALIGHT (BURN, SET FIRE TO, TORCH, or LIGHT for
+  anything `flammable`) with something burning in hand: a lit torch or
+  lamp. "You touch the torch to the tent, and it catches fire." A fire
+  lights the room, sends anything that `fears: [fire]` running, and each
+  turn spreads to one more flammable thing in the room (or inside it).
+  After three turns it burns out: a `destructible` thing burns away to
+  ash, spilling what was in it ("Out of what's left of the tent falls a
+  key."); anything else is just left. Burning things are plain to see:
+  "The tent is burning.", "a crate (burning)". PUT OUT works on them too.
+- **Smashing:** HIT, SMASH or BREAK something `destructible` (with no
+  health) and it's destroyed, spilling its contents: "You smash the barrel
+  to pieces."
 
 - **Traps:** an object with `trap: { holds: 3 }` (and optional `damage`)
   can be SET (ARM, LAY) wherever the player is: "a snare (armed)". The
@@ -1379,7 +1394,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING), SET / DISARM (traps),
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING), SET / DISARM (traps), BURN (SET … ALIGHT), SMASH,
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1401,7 +1416,7 @@ end-of-turn event.
 
 **Traits:** `portable`, `scenery`, `container`, `supporter`, `openable`,
 `lockable`, `door`, `wearable`, `edible`, `light_source`, `enterable`,
-`transparent`. `open` is shorthand for `state: { open: true }`. Things can
+`transparent`, `flammable`, `destructible`. `open` is shorthand for `state: { open: true }`. Things can
 also have a `size` (default 1) and a `capacity`; see
 [Containers and supporters](#containers-and-supporters). The player's
 carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`

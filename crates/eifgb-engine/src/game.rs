@@ -648,6 +648,7 @@ impl<H: ScriptHost> Game<H> {
         }
         self.npc_turns();
         self.report_traps();
+        self.fires();
         if self.end_requested.is_some() {
             return;
         }

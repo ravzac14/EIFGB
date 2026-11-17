@@ -927,6 +927,10 @@ impl<H: ScriptHost> Game<H> {
             return false;
         }
         if self.world.health(t).is_none() && !self.world.is_invincible(t) {
+            // Something that can be broken, is.
+            if self.world.has(t, eifgb_ir::Trait::Destructible) && self.world.def(t).kind == EntityKind::Object {
+                return self.smash(t, ctx);
+            }
             self.msg("attack.pointless", ctx);
             return false;
         }

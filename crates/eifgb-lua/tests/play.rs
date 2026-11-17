@@ -3207,3 +3207,89 @@ fn ghosts_dont_set_traps_off() {
     let out = say(&mut g, "set snare");
     assert!(out.contains("The wolf arrives.") && !out.contains("caught"), "{out}");
 }
+
+// -------------------------------------------------------------------- fire
+
+const FIRE: &str = r#"format: eifgb/0.1
+game: { id: f, title: Fire, version: "1", start: path }
+player: { health: 30 }
+factions:
+  goblins: { fears: [fire] }
+rooms:
+  camp: { name: Goblin Camp, dark: true, exits: { south: path } }
+  path: { name: Path, exits: { north: camp } }
+objects:
+  torch: { name: torch, in: player, traits: [portable, light_source], state: { lit: false } }
+  tent: { name: tent, in: camp, traits: [scenery, container, open, flammable, destructible] }
+  key: { name: key, in: tent, traits: [portable] }
+  crate: { name: crate, in: camp, traits: [container, open, flammable, destructible] }
+  bars: { name: iron bars, synonyms: [bars], in: camp, traits: [scenery] }
+  barrel: { name: barrel, in: path, traits: [container, open, destructible] }
+  coin: { name: coin, in: barrel, traits: [portable] }
+characters:
+  goblin: { name: goblin, in: camp, faction: goblins, health: 5 }
+"#;
+
+fn blaze(cmds: &[&str]) -> Game<LuaHost> {
+    let mut g = game(compile_str(FIRE).story.unwrap());
+    for c in cmds {
+        say(&mut g, c);
+    }
+    g
+}
+
+#[test]
+fn setting_things_alight_needs_a_flame() {
+    let mut g = blaze(&["light torch", "n"]);
+    assert_eq!(say(&mut g, "burn bars"), "The iron bars won't burn.");
+    // On the (lit) path, with a crate but no flame.
+    let src = FIRE.replace("crate: { name: crate, in: camp", "crate: { name: crate, in: path");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_says(&mut g, "set crate alight", "You've nothing burning to light it with.");
+}
+
+#[test]
+fn fire_spreads_burns_things_away_and_scares_the_goblins() {
+    let mut g = blaze(&["light torch", "n"]);
+    let out = say(&mut g, "set tent alight");
+    assert!(out.starts_with("You touch the torch to the tent, and it catches fire."), "{out}");
+    assert!(out.contains("The goblin flees south!") && out.contains("The fire spreads to the crate."), "{out}");
+    assert_says(&mut g, "look", "The tent is burning.");
+    let out = say(&mut g, "z");
+    assert!(out.contains("The tent burns away to ash.") && out.contains("Out of what's left of the tent falls a key."), "{out}");
+    assert_says(&mut g, "z", "The crate burns away to ash.");
+    assert_says(&mut g, "look", "You can see a key here.");
+}
+
+#[test]
+fn a_fire_lights_a_dark_room_and_can_be_put_out() {
+    let mut g = blaze(&["light torch", "n", "set crate alight", "put out torch"]);
+    // The burning crate lights the room, even with the torch out.
+    assert_says(&mut g, "look", "a crate (burning)");
+    let mut g = blaze(&["light torch", "n", "set crate alight"]);
+    // Put out; but the tent it set alight is still burning, and it catches again.
+    let out = say(&mut g, "put out crate");
+    assert!(out.starts_with("You put out the crate.") && out.contains("The fire spreads to the crate."), "{out}");
+}
+
+#[test]
+fn smashing_breaks_destructible_things() {
+    let mut g = blaze(&[]);
+    assert_eq!(say(&mut g, "smash barrel"), "You smash the barrel to pieces.
+Out of what's left of the barrel falls a coin.");
+    assert_says(&mut g, "look", "a coin");
+    let src = FIRE.replace("traits: [container, open, destructible] }", "traits: [container, open, destructable] }");
+    assert!(compile_str(&src).story.is_some());
+}
+
+#[test]
+fn something_flammable_but_tough_just_burns_out() {
+    let src = FIRE.replace("traits: [container, open, flammable, destructible] }", "traits: [container, open, flammable] }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    for c in ["light torch", "n", "burn crate"] {
+        say(&mut g, c);
+    }
+    say(&mut g, "z");
+    say(&mut g, "z");
+    assert_says(&mut g, "look", "You can see a crate here.");
+}

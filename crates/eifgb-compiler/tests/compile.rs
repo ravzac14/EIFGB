@@ -406,6 +406,7 @@ fn a_misspelled_key_gives_one_error_and_no_follow_on_warning() {
 fn state_fields_cannot_shadow_builtin_fields_or_methods() {
     assert_error(&with("objects:\n  box: { name: box, state: { contents: 3 } }\n"), "built-in field or method");
     assert_error(&with("objects:\n  box: { name: box, state: { location: hall } }\n"), "built-in field or method");
+    assert_error(&with("objects:\n  box: { name: box, state: { capacity: 3 } }\n"), "built-in field or method");
 }
 
 #[test]

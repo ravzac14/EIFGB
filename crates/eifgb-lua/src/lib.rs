@@ -183,6 +183,18 @@ fn to_lua(lua: &Lua, v: &Value) -> mlua::Result<mlua::Value> {
 
 /// Converts a Lua value into a storable [`Value`]. Tables become a list
 /// when their keys are exactly 1..n, and otherwise a map with string keys.
+/// `x.capacity = n`: a whole number, or nil / "none" for no limit.
+fn capacity_from_lua(v: &mlua::Value) -> mlua::Result<Option<u32>> {
+    let bad = || rt("capacity must be a whole number (0 or more), or nil or \"none\" for no limit");
+    match v {
+        mlua::Value::Nil => Ok(None),
+        mlua::Value::String(s) if s.to_str()?.eq_ignore_ascii_case("none") => Ok(None),
+        mlua::Value::Integer(i) => u32::try_from(*i).map(Some).map_err(|_| bad()),
+        mlua::Value::Number(n) if n.fract() == 0.0 && *n >= 0.0 && *n <= f64::from(u32::MAX) => Ok(Some(*n as u32)),
+        _ => Err(bad()),
+    }
+}
+
 fn from_lua(v: mlua::Value, depth: usize) -> mlua::Result<Value> {
     if depth > 32 {
         return Err(rt("value is nested too deeply to store (does a table contain itself?)"));
@@ -298,6 +310,10 @@ impl ScriptHost for LuaHost {
                             "key" => (s(&def.key)?, false),
                             "name" => (s(&def.name)?, false),
                             "kind" => (s(kind_name(def.kind))?, false),
+                            "capacity" => match w.capacity(id) {
+                                Some(n) => (mlua::Value::Integer(i64::from(n)), false),
+                                None => (mlua::Value::Nil, false),
+                            },
                             "location" => match w.location(id) {
                                 Some(l) => (mlua::Value::Integer(i64::from(l.0)), true),
                                 None => (mlua::Value::Nil, false),
@@ -319,6 +335,10 @@ impl ScriptHost for LuaHost {
                             return Err(rt(format!("'{k}' can't be changed{hint}")));
                         }
                         let mut w = world.borrow_mut();
+                        if k == "capacity" {
+                            w.set_capacity(id, capacity_from_lua(&v)?);
+                            return Ok(());
+                        }
                         if v.is_nil() {
                             w.unset(id, &k);
                         } else {

@@ -197,6 +197,15 @@ impl World {
         self.def(id).size
     }
 
+    /// The current capacity, which scripts may have changed from the story's.
+    pub fn capacity(&self, id: EntityId) -> Option<u32> {
+        self.state.entities[id.index()].capacity
+    }
+
+    pub fn set_capacity(&mut self, id: EntityId, capacity: Option<u32>) {
+        self.state.entities[id.index()].capacity = capacity;
+    }
+
     /// Total size of what's directly in or on `holder`.
     pub fn load(&self, holder: EntityId) -> u32 {
         self.contents(holder).iter().map(|c| self.size(*c)).sum()
@@ -208,7 +217,7 @@ impl World {
     /// the player can carry anything.
     pub fn fits(&self, item: EntityId, holder: EntityId) -> Fit {
         let size = self.size(item);
-        let Some(cap) = self.def(holder).capacity else {
+        let Some(cap) = self.capacity(holder) else {
             let bigger = holder != PLAYER && self.def(holder).kind == EntityKind::Object && size > self.size(holder);
             return if bigger { Fit::TooBig } else { Fit::Yes };
         };

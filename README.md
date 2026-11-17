@@ -656,6 +656,29 @@ player:
 
 `check` warns if the player starts out carrying more than their capacity.
 
+Scripts can change a capacity during play, the player's or a container's.
+A backpack that lets the player carry more:
+
+```yaml
+  backpack:
+    name: backpack
+    in: hall
+    traits: [portable, wearable]
+    on:
+      after_wear: |
+        player.capacity = 15
+        say("With the backpack on, you can carry much more.")
+      after_take_off: player.capacity = 10
+```
+
+`player.capacity` reads the current limit, or `nil` when there's none.
+Set it to a whole number, or to `nil` (or `"none"`) to remove the limit.
+For a container, `nil` brings back the "nothing bigger than itself" rule.
+Lowering a capacity never drops anything; it only stops more from being
+added. Changes are saved and undone like everything else. Because
+`capacity` has this meaning, it can't be used as the name of a state
+field.
+
 ```
 > put piano in jar
 The piano is too big for the glass jar.
@@ -846,7 +869,8 @@ chooses text. `the(x)`, `The(x)`, `a(x)` and `A(x)` add articles.
 `vars.<name>`, `game.turn`, `game.score`; `say()`, `block()`, `score(n)`,
 `end_game(id)`, `open_choice(id)`, `random(a, b)`, `start_timer(id)`,
 `stop_timer(id)`, `timer_left(id)`; on objects,
-`:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`.
+`:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`, and
+`.capacity`, which can be changed.
 
 **Custom verbs:**
 

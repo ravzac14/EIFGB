@@ -978,6 +978,55 @@ fn a_zero_capacity_carries_nothing_and_none_carries_anything() {
     }
 }
 
+const BACKPACK: &str = "\
+player: { capacity: 1 }
+objects:
+  pack: { name: backpack, synonyms: [pack], in: hall, traits: [portable, wearable], on: { after_wear: 'player.capacity = 3; say(\"Now you can carry more.\")', after_take_off: 'player.capacity = 1' } }
+  rock: { name: rock, in: hall, traits: [portable] }
+  stick: { name: stick, in: hall, traits: [portable] }
+  jar: { name: jar, in: hall, traits: [container], on: { push: 'say(tostring(self.capacity)); self.capacity = 0', pull: 'self.capacity = nil' } }
+  oops: { name: oops, in: hall, traits: [scenery], on: { push: 'player.capacity = -2', pull: 'player.capacity = \"lots\"', touch: 'player.capacity = \"none\"; say(tostring(player.capacity))' } }
+verbs:
+  push: { patterns: ['push {target}'] }
+  pull: { patterns: ['pull {target}'] }
+  touch: { patterns: ['touch {target}'] }
+";
+
+#[test]
+fn scripts_can_change_capacity() {
+    let mut g = small(BACKPACK);
+    assert_says(&mut g, "take pack", "Taken.");
+    assert_says(&mut g, "take rock", "You're carrying too much already.");
+    assert_says(&mut g, "wear pack", "Now you can carry more.");
+    assert_says(&mut g, "take rock", "Taken.");
+    assert_says(&mut g, "take stick", "Taken.");
+    // Undo puts the old capacity back along with everything else.
+    say(&mut g, "undo");
+    say(&mut g, "drop rock");
+    assert_says(&mut g, "take off pack", "You take off");
+    assert_says(&mut g, "take stick", "You're carrying too much already.");
+
+    // Saved and restored.
+    say(&mut g, "wear pack");
+    let data = g.input("save").save.expect("a save");
+    say(&mut g, "take off pack");
+    g.restore(&data);
+    assert_says(&mut g, "take stick", "Taken.");
+
+    // Containers too; nil goes back to the "no bigger than the holder" rule.
+    let mut g = small(BACKPACK);
+    assert_says(&mut g, "push jar", "nil");
+    assert_says(&mut g, "take rock", "Taken.");
+    assert_says(&mut g, "put rock in jar", "The rock is too big for the jar.");
+    say(&mut g, "pull jar");
+    assert_says(&mut g, "put rock in jar", "You put the rock in the jar.");
+
+    // "none" means no limit; bad values are script errors.
+    assert_says(&mut g, "touch oops", "nil");
+    assert_says(&mut g, "push oops", "capacity must be a whole number");
+    assert_says(&mut g, "pull oops", "capacity must be a whole number");
+}
+
 #[test]
 fn custom_verbs_check_reach_too() {
     let src = format!(

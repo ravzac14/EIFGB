@@ -31,6 +31,10 @@ pub struct GameState {
 pub struct EntityState {
     pub location: Option<EntityId>,
     pub state: BTreeMap<String, Value>,
+    /// How much it can hold: starts as the story's `capacity` and can be
+    /// changed by scripts. `None` means no limit for the player, and the
+    /// "nothing bigger than the holder" rule for containers and supporters.
+    pub capacity: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,7 +54,7 @@ impl GameState {
             entities: story
                 .entities
                 .iter()
-                .map(|e| EntityState { location: e.location, state: e.state.clone() })
+                .map(|e| EntityState { location: e.location, state: e.state.clone(), capacity: e.capacity })
                 .collect(),
             visited,
             rng: Rng::new(seed),
@@ -67,7 +71,7 @@ impl GameState {
     }
 }
 
-pub const SAVE_FORMAT: &str = "eifgb-save/1";
+pub const SAVE_FORMAT: &str = "eifgb-save/2";
 
 /// A save game: the state, plus enough about the story to refuse loading
 /// it into a different game or an incompatible version.

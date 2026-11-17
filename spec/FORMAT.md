@@ -136,6 +136,7 @@ A handler can be a block of statements or a single expression.
 - **Names:** `world.<id>`, `player`, `here` (the current room), `vars.<name>`, `game.turn`, `game.score`, `game.max_score`, `game.title`.
 - **Arguments:** `args.target`, `args.tool`, `args.text`, `args.direction`.
 - **Fields on every entity:** `key`, `name`, `kind`, `location`. These are read-only; use `:move_to` to change `location`.
+- **`capacity`:** readable and writable on every entity, starting from the source `capacity`. Reads give an integer or `nil`. Writes take a whole number ≥ 0, or `nil`/`"none"` for no capacity (unlimited for the player, the size rule for containers and supporters); anything else is a script error. Lowering it doesn't move anything out. It's saved and undone with the game, and because it's built in it can't be used as a state field name.
 - **Methods on every entity:** `:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`.
 - **State fields** are read and written directly (`self.fueled = true`). Setting one to `nil` removes it. The built-in field and method names above are reserved and can't be used as state fields.
 - **Each entity has exactly one Lua object**, so `==` works as expected (`args.tool == world.oil_can`).

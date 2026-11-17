@@ -16,7 +16,8 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// `blocked` is built in on doors only (see [`World::door_blocked`]).
 ///
 /// [`World::door_blocked`]: crate::World::door_blocked
-const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden", "health", "money", "dead", "patience"];
+const BUILTIN_STATE: &[&str] =
+    &["open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with"];
 
 /// One thing the automatic state descriptions can say.
 #[derive(Debug, Clone, PartialEq)]
@@ -471,6 +472,9 @@ impl<H: ScriptHost> Game<H> {
         }
         if w.is_dead(id) {
             notes.push(StateNote::Builtin("dead"));
+            if w.get(id, "killed_by").is_some() {
+                notes.push(StateNote::Builtin("killed"));
+            }
         }
         // Wounds show on characters; the player has HEALTH for that.
         if id != PLAYER
@@ -484,7 +488,7 @@ impl<H: ScriptHost> Game<H> {
         if w.known(id) && w.def(id).kind == EntityKind::Object {
             if w.has(id, Trait::Container)
                 && w.shows_contents(id)
-                && w.contents(id).iter().all(|&c| w.is_hidden(c) || c == PLAYER)
+                && w.contents(id).iter().all(|&c| w.is_hidden(c))
                 && !self.hints_at_hidden(id)
             {
                 notes.push(StateNote::Builtin("empty"));
@@ -600,6 +604,7 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("empty" | "heavy") => false,
             StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
             StateNote::Builtin("dead") => self.mentions(text, id, &["dead"], is_own),
+            StateNote::Builtin("killed") => self.mentions(text, id, &["killed_by", "killed_with"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
         }
@@ -614,6 +619,10 @@ impl<H: ScriptHost> Game<H> {
             }
             let ctx = Ctx::new().entity("target", id);
             let s = match note {
+                StateNote::Builtin("killed") => match self.kill_story(id) {
+                    Some(s) => s,
+                    None => continue,
+                },
                 StateNote::Builtin(t) => self.msg_str(&format!("state.{t}"), &ctx),
                 StateNote::Flag { words, on, .. } => {
                     self.msg_str(if on { "state.custom.on" } else { "state.custom.off" }, &ctx.text("state", words))
@@ -640,7 +649,7 @@ impl<H: ScriptHost> Game<H> {
             .state_notes(id)
             .into_iter()
             .filter(|n| match n {
-                StateNote::Builtin("worn") => false,
+                StateNote::Builtin("worn" | "killed") => false,
                 StateNote::Builtin(_) | StateNote::Flag { on: true, .. } => true,
                 _ => false,
             })

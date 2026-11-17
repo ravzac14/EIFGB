@@ -13,6 +13,8 @@ You'll use:
 - corpses, and the words players use for them
 - an `act` script that changes a character's mind when it's hurt
 - a `defeated` handler, and `corpse: false`
+- tricks a creative player can find: hiding, disguises, bait, and bodies
+  that tell you what killed them
 
 The finished game is in
 [`spec/examples/blackfang/`](../spec/examples/blackfang/game.yaml). It
@@ -49,7 +51,8 @@ rooms:
     name: Trailhead
     description: |
       The path into the pass starts here, between two leaning boulders.
-      It climbs north to a crossroads.
+      A hunter's game bag hangs from a branch. The path climbs north to a
+      crossroads.
     exits:
       north: crossroads
 
@@ -58,7 +61,8 @@ rooms:
     description: |
       Three trails meet in a bowl of broken rock. Howls drift from a den
       to the east; smoke rises from a camp to the west. North, the path
-      climbs to the shrine gate. The trailhead is back to the south.
+      climbs to the shrine gate. The trailhead is back to the south. An
+      empty rain barrel stands against the rocks.
     exits:
       south: trailhead
       east: den
@@ -100,7 +104,7 @@ the game adds a "You have died." ending for you. `damage: 1` is what
 their bare fists do.
 
 The objects are a weapon, the key to the gate, the gate itself, and the
-prize:
+prize. (The game bag and the barrel come in Step 7.)
 
 ```yaml
 objects:
@@ -115,9 +119,9 @@ objects:
   iron_key:
     name: iron key
     synonyms: [key]
-    in: chief
+    in: camp
     traits: [portable]
-    description: A heavy iron key on a leather thong.
+    description: A heavy iron key on a leather thong. The goblins left it behind.
 
   iron_gate:
     name: iron gate
@@ -146,8 +150,8 @@ endings:
 
 - **`damage: 3`** makes the spear a weapon: `kill wolf with spear` does
   3 damage instead of 1.
-- **`in: chief`**: the key starts in the goblin chief's hands. Things a
-  character carries are dropped where they fall.
+- **`in: camp`**: the key lies in the goblins' camp, so the player has
+  to get past the goblins one way or another.
 
 ## Step 2: factions
 
@@ -226,6 +230,21 @@ characters:
     description: Mostly teeth.
 ```
 
+The chief carries a weapon, which it fights with, and drops when it falls:
+
+```yaml
+  club:
+    name: crude club
+    synonyms: [club]
+    in: chief
+    traits: [portable]
+    damage: 2
+    kills: clubbed
+    description: A knobbly length of wood, studded with nails.
+```
+
+(`kills` comes up in Step 4.)
+
 - **`behavior: hunter`** goes after enemies: anyone its faction is
   hostile to.
 - **`range: 1`** means it only notices enemies one room away or closer.
@@ -261,7 +280,7 @@ Stand your ground and everyone attacks you:
 Time passes.
 The alpha wolf attacks you.
 The young wolf attacks you.
-The goblin chief attacks you.
+The goblin chief attacks you with the crude club.
 The goblin grunt attacks you.
 ```
 
@@ -303,7 +322,7 @@ Time passes.
 You hear tearing and crunching somewhere north.
 ```
 
-Back at the crossroads, the goblins are gone. Only the key the chief
+Back at the crossroads, the goblins are gone. Only the club the chief
 dropped is left, and a wolf that's still hungry:
 
 ```
@@ -311,13 +330,59 @@ dropped is left, and a wolf that's still hungry:
 
 Crossroads
 ...
-You can see an iron key and a young wolf here.
+You can see a crude club and a young wolf here.
 Exits: south, east, west and north.
 The young wolf attacks you.
 ```
 
 Goblins don't eat corpses, so if they had won, the wolves' bodies would
 still be lying there.
+
+**Bodies tell a story.** Examining a body says how it died. The words
+come from a `kills` phrase: on the weapon that struck the last blow,
+else on the killer, else on the killer's faction. Add them to the
+factions, and give the spear one too:
+
+```yaml
+factions:
+  wolves:
+    hostile_to: [goblins, player]
+    eats_corpses: true
+    kills: torn apart by teeth
+  goblins:
+    hostile_to: [wolves, player]
+    kills: hacked at with crude blades
+```
+
+```yaml
+  spear:
+    ...
+    damage: 3
+    kills: run through
+```
+
+A character can also start the game dead. Put a goblin scout at the
+trailhead, as a warning:
+
+```yaml
+  scout:
+    name: goblin scout
+    synonyms: [scout, goblin]
+    in: trailhead
+    faction: goblins
+    health: 4
+    state: { dead: true, killed_by: alpha }
+    description: A skinny goblin, not much bigger than a child.
+```
+
+```
+> x corpse
+A skinny goblin, not much bigger than a child. The goblin scout is dead. The
+goblin scout has been torn apart by teeth.
+```
+
+Without any `kills` words, the body names its killer instead: "The grey
+wolf was killed by the goblin chief.", or "You killed the grey wolf."
 
 ## Step 5: a cowardly alpha
 
@@ -402,9 +467,130 @@ You hit the skeleton with the hunting spear.
 The skeleton collapses into a heap of dust.
 ```
 
-## Step 7: the walkthrough
+## Step 7: other ways through
+
+Creative players won't all solve it the same way. Three more things make
+that possible, and each one is a single field.
+
+**Hiding.** Add a barrel at the crossroads:
+
+```yaml
+  barrel:
+    name: rain barrel
+    synonyms: [barrel, lid]
+    in: crossroads
+    traits: [scenery, container, openable, enterable]
+    size: 5
+    state: { open: true }
+    description: Big enough to crouch in, with a lid you could pull shut over you.
+```
+
+A player shut inside something they can't see out of is hidden, and
+nobody can see them. Hunters head for where they last saw the player,
+search, and give up. Meanwhile, with the player out of the picture, the
+two packs turn on each other, and the player can hear every blow:
 
 ```
+> get in barrel
+You get into the rain barrel.
+The alpha wolf attacks you.
+The young wolf attacks you.
+The goblin chief attacks you with the crude club.
+The goblin grunt attacks you.
+
+> close barrel
+You close the rain barrel.
+The alpha wolf attacks the goblin chief.
+The young wolf attacks the goblin chief.
+The goblin chief attacks the alpha wolf.
+The goblin grunt attacks the alpha wolf.
+```
+
+Several turns later, when the fight is over and the bodies eaten:
+
+```
+> z
+Time passes.
+The young wolf searches all around, but finds nothing.
+```
+
+**Disguises.** An object with `disguise: <faction>`, when worn, makes
+that faction take the player for one of its own. Leave a goblin helmet
+by the scout's body:
+
+```yaml
+  helmet:
+    name: goblin helmet
+    synonyms: [helmet, helm]
+    in: trailhead
+    traits: [portable, wearable]
+    disguise: goblins
+    description: Dented, greasy, and two sizes too big. It smells of goblin.
+```
+
+The goblins leave a disguised player alone. Everyone else sees a goblin,
+and the wolves hate goblins:
+
+```
+> z
+Time passes.
+The alpha wolf attacks you.
+The young wolf attacks you.
+The goblin chief attacks the alpha wolf.
+The goblin grunt attacks the alpha wolf.
+```
+
+Attacking a goblin while disguised still makes it fight back.
+
+**Bait.** An object with `eaten_by: [<faction>]` is food for that
+faction. Food left lying in their room beats everything except fighting
+back: they'll eat it rather than attack the player, and hunters head for
+food in range as readily as for enemies. It lasts as many bites as its
+`size`. Put a haunch in the game bag:
+
+```yaml
+  game_bag:
+    name: game bag
+    synonyms: [bag]
+    in: trailhead
+    traits: [scenery, container, open]
+    description: A canvas bag, stiff with old blood.
+
+  haunch:
+    name: haunch of venison
+    synonyms: [haunch, venison, meat]
+    in: game_bag
+    traits: [portable]
+    size: 6
+    eaten_by: [wolves]
+    description: Raw and heavy. Something with a good nose would smell it a mile off.
+```
+
+Together, the helmet and the haunch make a second solution. The goblins
+ignore the disguised player and the wolves stop to eat, so the player
+can walk into the goblin camp for the key:
+
+```
+> drop haunch
+Dropped.
+The alpha wolf tears into the haunch of venison.
+The young wolf tears into the haunch of venison.
+The goblin chief attacks the alpha wolf.
+The goblin grunt attacks the alpha wolf.
+
+> w
+
+Goblin Camp
+Ragged tents around a smoky fire.
+You can see an iron key here.
+Exits: east.
+You hear snarls and the clash of a fight somewhere east.
+```
+
+## Step 8: the walkthrough
+
+```
+x corpse
 take spear
 n
 # Both packs come running. Step back and let them fight each other.
@@ -417,7 +603,9 @@ z
 n
 kill young wolf with spear
 kill young wolf with spear
+w
 take key
+e
 n
 kill skeleton with spear
 kill skeleton with spear
@@ -435,6 +623,9 @@ the same way every time. Give the hunters some `wander`, and the packs
 will roam and meet in different places on every playthrough. Use
 `--seed` to replay one.
 
+The second solution, with the helmet and the haunch, is checked by the
+tests too.
+
 ## Ideas to try
 
 - **Change the odds:** make the goblins stronger and play again. Since
@@ -444,6 +635,8 @@ will roam and meet in different places on every playthrough. Use
   crossroads.
 - **Bargaining:** a merchant who only trades with players who've killed
   the goblin chief. Check `world.chief.dead` in a `before_buy` handler.
+- **More tricks:** [IDEAS.md](IDEAS.md) lists features we'd like to add
+  next, such as making noise to draw hunters, taming, and throwing.
 - **Revenge:** a `defeated` handler on the young wolf that sets
   `vars.alpha_angry`, and an alpha `act` that ignores its wounds when
   it's angry.

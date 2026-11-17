@@ -21,6 +21,10 @@ pub enum NpcEvent {
     Attacked { attacker: EntityId, target: EntityId, weapon: Option<EntityId>, damage: u32, tolerated: bool },
     /// Ate a corpse, which is now gone.
     Ate { npc: EntityId, corpse: EntityId, room: EntityId },
+    /// Ate some of `food`; `finished` if it's all gone now.
+    Fed { npc: EntityId, food: EntityId, room: EntityId, finished: bool },
+    /// Reached where it last saw the player, and found nothing.
+    Searched { npc: EntityId, room: EntityId },
 }
 
 impl World {
@@ -86,11 +90,56 @@ impl World {
         }
         match self.faction(a) {
             Some(f) => {
-                let side = if b == PLAYER { Some(PLAYER_FACTION) } else { self.def(b).faction.as_deref() };
+                let side = if b == PLAYER { Some(self.player_side()) } else { self.def(b).faction.as_deref() };
                 side.is_some_and(|s| f.hostile_to.iter().any(|h| h == s))
             }
             None => b == PLAYER && self.def(a).npc.as_ref().is_some_and(|n| n.behavior.hostile()),
         }
+    }
+
+    /// The side characters take the player for: a faction they're disguised
+    /// as (by wearing something with `disguise`), or else `player`.
+    pub fn player_side(&self) -> &str {
+        self.contents(PLAYER)
+            .into_iter()
+            .filter(|&i| self.flag(i, "worn"))
+            .find_map(|i| self.def(i).disguise.as_deref())
+            .unwrap_or(PLAYER_FACTION)
+    }
+
+    /// Whether the player is out of sight: shut inside something closed
+    /// they can't see out of, so nobody can see in either.
+    pub fn player_hidden(&self) -> bool {
+        self.ceiling() != self.here()
+    }
+
+    /// Food for `npc`'s faction lying loose in `room` (not carried).
+    fn food_in(&self, npc: EntityId, room: EntityId) -> Vec<EntityId> {
+        let Some(f) = self.def(npc).faction.as_deref() else { return Vec::new() };
+        self.contents(room)
+            .into_iter()
+            .filter(|&i| self.def(i).kind == EntityKind::Object && self.def(i).eaten_by.iter().any(|e| e == f))
+            .collect()
+    }
+
+    /// Takes a bite of `food`. It lasts as many bites as its size.
+    pub fn npc_feed(&mut self, npc: EntityId, food: EntityId) -> Option<NpcEvent> {
+        let room = self.room_of(npc)?;
+        if self.location(food) != Some(room) {
+            return None;
+        }
+        let left = match self.get(food, "_bites") {
+            Some(Value::Int(i)) => *i,
+            _ => i64::from(self.size(food).max(1)),
+        } - 1;
+        let finished = left <= 0;
+        if finished {
+            self.move_to(food, None).ok()?;
+            self.unset(food, "_bites");
+        } else {
+            self.set(food, "_bites", Value::Int(left));
+        }
+        Some(NpcEvent::Fed { npc, food, room, finished })
     }
 
     /// `attacker` attacked `target`. If the target fights back, that uses
@@ -151,6 +200,7 @@ impl World {
         std::iter::once(PLAYER)
             .chain(chars)
             .filter(|&b| self.together(npc, b) && self.is_foe(npc, b) && self.is_hostile_or_foe_alive(b))
+            .filter(|&b| b != PLAYER || !self.player_hidden())
             .collect()
     }
 
@@ -289,6 +339,14 @@ impl World {
             .or(self.def(attacker).damage)
             .unwrap_or(1);
         self.set(target, "health", Value::Int((health - i64::from(damage)).max(0)));
+        // The killing blow is remembered, so the body can tell the story.
+        if health > 0 && health - i64::from(damage) <= 0 && target != PLAYER {
+            self.set(target, "killed_by", Value::Str(self.def(attacker).key.clone()));
+            match weapon {
+                Some(w) => self.set(target, "killed_with", Value::Str(self.def(w).key.clone())),
+                None => self.unset(target, "killed_with"),
+            }
+        }
         let tolerated = self.provoke(target, attacker);
         Some(NpcEvent::Attacked { attacker, target, weapon, damage, tolerated })
     }
@@ -312,24 +370,38 @@ impl World {
         if !self.is_active(npc) {
             return Vec::new();
         }
-        let room = self.room_of(npc);
+        let Some(room) = self.room_of(npc) else { return Vec::new() };
         let in_range = |w: &World, target: EntityId| w.distance(npc, target).filter(|&d| n.range.is_none_or(|r| d <= r));
-        let enemies = self.enemies_of(npc);
-        // The nearest enemy it can reach; the player wins a tie.
-        let nearest = enemies
-            .iter()
-            .filter_map(|&e| in_range(self, e).map(|d| (d, e)))
+        let hidden = self.player_hidden();
+        // The nearest enemy it can see and reach; the player wins a tie.
+        let nearest = self
+            .enemies_of(npc)
+            .into_iter()
+            .filter(|&e| e != PLAYER || !hidden)
+            .filter_map(|e| in_range(self, e).map(|d| (d, e)))
             .min_by_key(|&(d, _)| d);
-        let eater = self.faction(npc).is_some_and(|f| f.eats_corpses);
-        let corpse_here = room.and_then(|r| self.corpses_in(r).into_iter().next());
-
-        // Anyone else fights back against a foe in the room, before anything else.
-        if !n.behavior.hostile()
-            && let Some(&foe) = self.foes_here(npc).first()
+        // A hunter keeps track of where it last saw the player.
+        if n.behavior == Behavior::Hunter
+            && !hidden
+            && self.is_hostile(npc, PLAYER)
+            && in_range(self, PLAYER).is_some()
         {
+            let seen = self.def(self.here()).key.clone();
+            self.set(npc, "_last_seen", Value::Str(seen));
+        }
+        let eater = self.faction(npc).is_some_and(|f| f.eats_corpses);
+
+        // Someone who attacked it is here: fight back, before anything else
+        // (even food).
+        if let Some(&foe) = self.foes_here(npc).first() {
             let weapon = self.best_weapon(npc);
             return self.attack(npc, foe, weapon).into_iter().collect();
         }
+        // Food beats everything, even a fight.
+        if let Some(&food) = self.food_in(npc, room).first() {
+            return self.npc_feed(npc, food).into_iter().collect();
+        }
+        let corpse_here = self.corpses_in(room).into_iter().next();
         let event = match n.behavior {
             Behavior::Hunter | Behavior::Guard if matches!(nearest, Some((0, _))) => {
                 let target = nearest.map(|(_, e)| e).unwrap_or(PLAYER);
@@ -344,30 +416,76 @@ impl World {
             }
             // Nothing to fight here: a scavenger eats.
             _ if eater && corpse_here.is_some() => self.npc_eat(npc, corpse_here.unwrap_or(npc)),
-            Behavior::Hunter if nearest.is_some() => self.npc_step_toward(npc, nearest.map(|(_, e)| e).unwrap_or(PLAYER)),
-            Behavior::Hunter if eater => {
-                // Nobody to hunt: go after the nearest body instead.
-                let body = (0..self.story().entities.len() as u32)
-                    .map(EntityId)
-                    .filter(|&c| self.is_dead(c) && self.room_of(c).is_some())
-                    .filter_map(|c| in_range(self, c).map(|d| (d, c)))
-                    .min_by_key(|&(d, _)| d);
-                match body {
-                    Some((_, c)) => self.npc_step_toward(npc, c),
-                    None => self.maybe_wander(npc, n.wander),
-                }
-            }
+            Behavior::Hunter => self.hunt(npc, nearest, eater, &in_range, n.wander),
             Behavior::Stationary | Behavior::Conversationalist | Behavior::Wanderer | Behavior::Defender => {
                 self.maybe_wander(npc, n.wander)
             }
             // Merchants don't walk off in the middle of a sale.
             Behavior::Merchant if self.together(npc, PLAYER) => None,
             Behavior::Merchant => self.maybe_wander(npc, n.wander),
-            Behavior::Hunter | Behavior::Guard => self.maybe_wander(npc, n.wander),
+            Behavior::Guard => self.maybe_wander(npc, n.wander),
             Behavior::Follower if self.together(npc, PLAYER) => None,
             Behavior::Follower if in_range(self, PLAYER).is_some() => self.npc_step_toward(npc, PLAYER),
             Behavior::Follower => self.maybe_wander(npc, n.wander),
         };
         event.into_iter().collect()
+    }
+
+    /// A hunter with nobody to fight in its room: heads for the nearest
+    /// enemy or food (food wins a tie), else to where it last saw the
+    /// player, else (if it eats corpses) the nearest body, else wanders.
+    fn hunt(
+        &mut self,
+        npc: EntityId,
+        nearest: Option<(u32, EntityId)>,
+        eater: bool,
+        in_range: &dyn Fn(&World, EntityId) -> Option<u32>,
+        wander: u32,
+    ) -> Option<NpcEvent> {
+        let food = self
+            .def(npc)
+            .faction
+            .clone()
+            .map(|f| {
+                (0..self.story().entities.len() as u32)
+                    .map(EntityId)
+                    .filter(|&i| self.def(i).eaten_by.contains(&f))
+                    .filter(|&i| self.location(i).is_some_and(|l| self.def(l).kind == EntityKind::Room))
+                    .filter_map(|i| in_range(self, i).map(|d| (d, i)))
+                    .min_by_key(|&(d, _)| d)
+            })
+            .unwrap_or(None);
+        let target = match (food, nearest) {
+            (Some((fd, f)), Some((ed, _))) if fd <= ed => Some(f),
+            (Some((_, f)), None) => Some(f),
+            (_, Some((_, e))) => Some(e),
+            (None, None) => None,
+        };
+        if let Some(t) = target {
+            return self.npc_step_toward(npc, t);
+        }
+        if let Some(Value::Str(key)) = self.get(npc, "_last_seen").cloned()
+            && let Some(spot) = self.id(&key)
+        {
+            if self.room_of(npc) == Some(spot) {
+                self.unset(npc, "_last_seen");
+                return Some(NpcEvent::Searched { npc, room: spot });
+            }
+            if let Some(step) = self.npc_step_toward(npc, spot) {
+                return Some(step);
+            }
+            self.unset(npc, "_last_seen");
+        }
+        if eater {
+            let body = (0..self.story().entities.len() as u32)
+                .map(EntityId)
+                .filter(|&c| self.is_dead(c) && self.room_of(c).is_some())
+                .filter_map(|c| in_range(self, c).map(|d| (d, c)))
+                .min_by_key(|&(d, _)| d);
+            if let Some((_, c)) = body {
+                return self.npc_step_toward(npc, c);
+            }
+        }
+        self.maybe_wander(npc, wander)
     }
 }

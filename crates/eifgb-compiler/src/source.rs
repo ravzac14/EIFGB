@@ -279,6 +279,15 @@ pub struct Thing {
     /// How many attacks it puts up with before fighting back.
     #[serde(default)]
     pub patience: Option<u32>,
+    /// Wearable disguise: this faction takes the wearer for one of its own.
+    #[serde(default)]
+    pub disguise: Option<String>,
+    /// Factions that eat this when it's left in their room.
+    #[serde(default)]
+    pub eaten_by: Vec<String>,
+    /// How victims of this weapon or character look: "run through".
+    #[serde(default)]
+    pub kills: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -355,6 +364,9 @@ pub struct Faction {
     pub hostile_to: Vec<String>,
     #[serde(default)]
     pub eats_corpses: bool,
+    /// How members' victims look: "torn apart by teeth".
+    #[serde(default)]
+    pub kills: Option<String>,
 }
 
 /// Something that happens after a number of actions.

@@ -957,7 +957,30 @@ characters:
 - **Scavengers:** a faction with `eats_corpses` eats bodies in its room
   when there's no one to fight, and hunters go looking for them.
 
-[The advanced tutorial](docs/ADVANCED.md) builds a whole game around this.
+### Tricks players can find
+
+Four features reward players who try something clever:
+
+- **Hiding:** a player shut inside something they can't see out of (a
+  closed barrel, a wardrobe) can't be seen. Hunters go to where they last
+  saw the player, search ("The young wolf searches all around, but finds
+  nothing."), and give up. Guards ignore a hidden player.
+- **Disguises:** a wearable with `disguise: goblins` makes the goblins
+  take the wearer for one of their own. Enemies of goblins now see a
+  goblin, and anyone the player attacks still fights back.
+- **Bait:** an object with `eaten_by: [wolves]` is food for that faction.
+  Left lying in their room, they'll eat it rather than attack, unless
+  someone attacks them, and hunters head for food in range. It lasts as
+  many bites as its `size`: "The alpha wolf tears into the haunch of
+  venison."
+- **Bodies tell a story:** examining a body says how it died, from a
+  `kills` phrase on the weapon that struck the last blow, the killer, or
+  the killer's faction: "The goblin scout has been torn apart by teeth."
+  Without one, it names the killer: "You killed the grey wolf." A
+  character can start dead, with `state: { dead: true, killed_by: alpha }`.
+
+[The advanced tutorial](docs/ADVANCED.md) builds a whole game around
+factions, with all four tricks as ways through.
 
 ### Trading
 
@@ -1083,8 +1106,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 **Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
-`faction`, `corpse`, `fights_back`, `patience`; top-level `factions:` with `hostile_to` and `eats_corpses`; objects
-can have `damage` (weapons) and `price`; the player can have `health`,
+`faction`, `corpse`, `fights_back`, `patience`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses` and `kills`; objects
+can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage` and `money`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 

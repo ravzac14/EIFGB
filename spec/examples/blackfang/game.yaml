@@ -21,8 +21,10 @@ factions:
   wolves:
     hostile_to: [goblins, player]
     eats_corpses: true
+    kills: torn apart by teeth
   goblins:
     hostile_to: [wolves, player]
+    kills: hacked at with crude blades
   undead:
     hostile_to: [wolves, goblins, player]
 
@@ -31,7 +33,8 @@ rooms:
     name: Trailhead
     description: |
       The path into the pass starts here, between two leaning boulders.
-      It climbs north to a crossroads.
+      A hunter's game bag hangs from a branch. The path climbs north to a
+      crossroads.
     exits:
       north: crossroads
 
@@ -40,7 +43,8 @@ rooms:
     description: |
       Three trails meet in a bowl of broken rock. Howls drift from a den
       to the east; smoke rises from a camp to the west. North, the path
-      climbs to the shrine gate. The trailhead is back to the south.
+      climbs to the shrine gate. The trailhead is back to the south. An
+      empty rain barrel stands against the rocks.
     exits:
       south: trailhead
       east: den
@@ -83,14 +87,57 @@ objects:
     in: trailhead
     traits: [portable]
     damage: 3
+    kills: run through
     description: Long, light and sharp.
+
+  game_bag:
+    name: game bag
+    synonyms: [bag]
+    in: trailhead
+    traits: [scenery, container, open]
+    description: A canvas bag, stiff with old blood.
+
+  haunch:
+    name: haunch of venison
+    synonyms: [haunch, venison, meat]
+    in: game_bag
+    traits: [portable]
+    size: 6
+    eaten_by: [wolves]
+    description: Raw and heavy. Something with a good nose would smell it a mile off.
+
+  barrel:
+    name: rain barrel
+    synonyms: [barrel, lid]
+    in: crossroads
+    traits: [scenery, container, openable, enterable]
+    size: 5
+    state: { open: true }
+    description: Big enough to crouch in, with a lid you could pull shut over you.
+
+  helmet:
+    name: goblin helmet
+    synonyms: [helmet, helm]
+    in: trailhead
+    traits: [portable, wearable]
+    disguise: goblins
+    description: Dented, greasy, and two sizes too big. It smells of goblin.
 
   iron_key:
     name: iron key
     synonyms: [key]
+    in: camp
+    traits: [portable]
+    description: A heavy iron key on a leather thong. The goblins left it behind.
+
+  club:
+    name: crude club
+    synonyms: [club]
     in: chief
     traits: [portable]
-    description: A heavy iron key on a leather thong.
+    damage: 2
+    kills: clubbed
+    description: A knobbly length of wood, studded with nails.
 
   iron_gate:
     name: iron gate
@@ -144,6 +191,16 @@ characters:
     health: 6
     damage: 2
     description: Lean and hungry.
+
+  # Found dead at the start. Its body tells you what's ahead.
+  scout:
+    name: goblin scout
+    synonyms: [scout, goblin]
+    in: trailhead
+    faction: goblins
+    health: 4
+    state: { dead: true, killed_by: alpha }
+    description: A skinny goblin, not much bigger than a child.
 
   chief:
     name: goblin chief

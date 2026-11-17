@@ -72,6 +72,19 @@ impl<H: ScriptHost> Game<H> {
                     self.msg(key, &Ctx::new().entity("target", target).entity("npc", attacker));
                 }
             }
+            NpcEvent::Fed { npc, food, room, finished } => {
+                if room == here {
+                    let key = if finished { "npc.finishes" } else { "npc.feeds" };
+                    self.msg(key, &Ctx::new().entity("npc", npc).entity("target", food));
+                } else {
+                    self.hear(room, "npc.eating_nearby");
+                }
+            }
+            NpcEvent::Searched { npc, room } => {
+                if room == here {
+                    self.msg("npc.searches", &Ctx::new().entity("npc", npc));
+                }
+            }
             NpcEvent::Ate { npc, corpse, room } => {
                 if room == here {
                     self.msg("npc.eats", &Ctx::new().entity("npc", npc).entity("target", corpse));
@@ -166,6 +179,28 @@ impl<H: ScriptHost> Game<H> {
         } else {
             let _ = self.world.move_to(id, None);
         }
+    }
+
+    /// How a body came to be one: "The goblin chief has been torn apart
+    /// by teeth." The words come from the weapon's `kills`, else the
+    /// killer's, else the killer's faction's.
+    pub(crate) fn kill_story(&mut self, id: EntityId) -> Option<String> {
+        let key = |w: &crate::World, field: &str| match w.get(id, field) {
+            Some(Value::Str(k)) => w.id(k),
+            _ => None,
+        };
+        let killer = key(&self.world, "killed_by")?;
+        let weapon = key(&self.world, "killed_with");
+        let how = weapon
+            .and_then(|w| self.world.def(w).kills.clone())
+            .or_else(|| self.world.def(killer).kills.clone())
+            .or_else(|| self.world.faction(killer).and_then(|f| f.kills.clone()));
+        let ctx = Ctx::new().entity("target", id).entity("by", killer);
+        Some(match how {
+            Some(how) => self.msg_str("state.killed_how", &ctx.text("how", how)),
+            None if killer == PLAYER => self.msg_str("state.killed_by_you", &ctx),
+            None => self.msg_str("state.killed_by", &ctx),
+        })
     }
 
     /// "12 coins"

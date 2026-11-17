@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "dead", "foes"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -110,6 +110,9 @@ impl<'a> Lowerer<'a> {
             damage: Some(s.player.damage.unwrap_or(1)),
             price: None,
             faction: None,
+            disguise: None,
+            eaten_by: vec![],
+            kills: None,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -136,6 +139,24 @@ impl<'a> Lowerer<'a> {
             endings.push(Ending { key: "died".into(), kind: EndingKind::Loss, text: self.text(text, "stdlib.messages.ending.died") });
         }
         let factions = self.lower_factions(&s.factions);
+        for e in &entities {
+            let section = if e.kind == EntityKind::Character { "characters" } else { "objects" };
+            let mut faction_ref = |field: &str, f: &str| {
+                if !factions.iter().any(|x| x.key == f) {
+                    let hint = did_you_mean(f, factions.iter().map(|x| x.key.as_str()));
+                    self.d.error(
+                        format!("{section}.{}.{field}", e.key),
+                        format!("unknown faction '{f}'{hint}; declare it under 'factions:'"),
+                    );
+                }
+            };
+            if let Some(f) = &e.disguise {
+                faction_ref("disguise", f);
+            }
+            for f in &e.eaten_by {
+                faction_ref("eaten_by", f);
+            }
+        }
         for e in &entities {
             let path = format!("characters.{}.faction", e.key);
             if let Some(f) = &e.faction
@@ -513,6 +534,9 @@ impl<'a> Lowerer<'a> {
             damage: None,
             price: None,
             faction: None,
+            disguise: None,
+            eaten_by: vec![],
+            kills: None,
         }
     }
 
@@ -709,6 +733,11 @@ impl<'a> Lowerer<'a> {
         let is_char = kind == EntityKind::Character;
         only(self.d, "health", t.health.is_some(), is_char, "characters (and the player)");
         only(self.d, "price", t.price.is_some(), kind == EntityKind::Object, "objects");
+        only(self.d, "disguise", t.disguise.is_some(), kind == EntityKind::Object, "objects");
+        only(self.d, "eaten_by", !t.eaten_by.is_empty(), kind == EntityKind::Object, "objects");
+        if t.disguise.is_some() && !has(Trait::Wearable) {
+            self.d.warn(format!("{path}.disguise"), "only works when worn; add the 'wearable' trait");
+        }
         only(self.d, "money", t.money.is_some(), is_char, "characters (and the player)");
         if let Some(h) = t.health {
             if h == 0 {
@@ -747,6 +776,9 @@ impl<'a> Lowerer<'a> {
             damage,
             price: t.price,
             faction: t.faction.clone().filter(|_| is_char),
+            disguise: t.disguise.clone(),
+            eaten_by: t.eaten_by.clone(),
+            kills: t.kills.clone(),
         }
     }
 
@@ -1189,7 +1221,12 @@ impl<'a> Lowerer<'a> {
                     self.d.error(format!("{path}.hostile_to[{i}]"), format!("unknown faction '{h}'{hint}"));
                 }
             }
-            out.push(Faction { key: key.clone(), hostile_to: f.hostile_to.clone(), eats_corpses: f.eats_corpses });
+            out.push(Faction {
+                key: key.clone(),
+                hostile_to: f.hostile_to.clone(),
+                eats_corpses: f.eats_corpses,
+                kills: f.kills.clone(),
+            });
         }
         out
     }

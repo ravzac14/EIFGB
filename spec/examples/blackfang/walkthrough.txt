@@ -1,4 +1,5 @@
 # Winning playthrough of Blackfang Pass (the advanced tutorial).
+x corpse
 take spear
 n
 # Both packs come running. Step back and let them fight each other.
@@ -11,7 +12,9 @@ z
 n
 kill young wolf with spear
 kill young wolf with spear
+w
 take key
+e
 n
 kill skeleton with spear
 kill skeleton with spear

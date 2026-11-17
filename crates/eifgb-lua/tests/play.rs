@@ -1366,7 +1366,7 @@ fn fighting_wounds_and_defeats() {
     assert_eq!(out, "You hit the grey wolf with the sword.\nThe grey wolf is defeated.");
     // It leaves a body, which "corpse" and "body" refer to.
     assert_says(&mut g, "look", "You can see a grey wolf (dead) here.");
-    assert_eq!(say(&mut g, "x corpse"), "The grey wolf is dead.");
+    assert_eq!(say(&mut g, "x corpse"), "The grey wolf is dead. You killed the grey wolf.");
     assert_says(&mut g, "hit the body", "The grey wolf is already dead.");
     assert!(!say(&mut g, "z").contains("attacks"));
     // Things that can't be hurt.
@@ -1672,4 +1672,99 @@ fn characters_defend_themselves_from_each_other() {
     say(&mut g, "n");
     let out = say(&mut g, "z");
     assert!(out.contains("The wolf attacks the deer.") && out.contains("The deer attacks the wolf."), "{out}");
+}
+
+// ------------------------------------------------- creative solutions
+
+fn blackfang() -> Game<LuaHost> {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples/blackfang");
+    let out = compile(&DirFiles { root: dir }, "game.yaml");
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+#[test]
+fn a_disguise_fools_its_faction_but_not_their_enemies() {
+    let mut g = blackfang();
+    say(&mut g, "take helmet");
+    say(&mut g, "wear helmet");
+    say(&mut g, "n");
+    let out = say(&mut g, "z");
+    assert!(out.contains("The alpha wolf attacks you.") && out.contains("The goblin chief attacks the alpha wolf."), "{out}");
+    assert!(!out.contains("goblin chief attacks you") && !out.contains("goblin grunt attacks you"), "{out}");
+    // Take it off and you're fair game again.
+    let out = say(&mut g, "take off helmet");
+    assert!(out.contains("goblin") && out.contains("attacks you"), "{out}");
+}
+
+#[test]
+fn bait_beats_a_fight_and_lasts_by_size() {
+    let mut g = blackfang();
+    say(&mut g, "take haunch");
+    say(&mut g, "n");
+    let out = say(&mut g, "drop haunch");
+    assert!(out.contains("The alpha wolf tears into the haunch of venison."), "{out}");
+    assert!(!out.contains("wolf attacks you"), "{out}");
+    // Size 6: two wolves take three turns to finish it.
+    assert!(!say(&mut g, "z").contains("finishes off"));
+    assert_says(&mut g, "z", "The young wolf finishes off the haunch of venison.");
+}
+
+#[test]
+fn hunters_lose_a_hidden_player_and_search_where_they_last_saw_them() {
+    let mut g = blackfang();
+    say(&mut g, "n");
+    say(&mut g, "get in barrel");
+    let out = say(&mut g, "close barrel");
+    // Hidden: they fight each other instead, in plain view.
+    assert!(out.contains("The alpha wolf attacks the goblin chief.") && !out.contains("attacks you"), "{out}");
+    let mut seen = String::new();
+    for _ in 0..6 {
+        seen.push_str(&say(&mut g, "z"));
+    }
+    assert!(seen.contains("searches all around, but finds nothing."), "{seen}");
+    assert!(!seen.contains("attacks you"), "{seen}");
+    // Out of the barrel, it's noticed again.
+    assert_says(&mut g, "open barrel", "attacks you");
+}
+
+#[test]
+fn corpses_tell_how_they_died() {
+    let mut g = blackfang();
+    // Set up in the story: killed by the alpha, whose faction says how.
+    assert_eq!(say(&mut g, "x corpse"), "A skinny goblin, not much bigger than a child. The goblin scout is dead. The goblin scout has been torn apart by teeth.");
+    say(&mut g, "take spear");
+    say(&mut g, "n");
+    say(&mut g, "s");
+    for _ in 0..5 {
+        say(&mut g, "z");
+    }
+    say(&mut g, "n");
+    say(&mut g, "kill young wolf with spear");
+    say(&mut g, "kill young wolf with spear");
+    // The weapon's words win over the killer's faction.
+    assert_says(&mut g, "x young wolf", "The young wolf has been run through.");
+}
+
+#[test]
+fn plain_kills_name_the_killer() {
+    let mut g = people("");
+    say(&mut g, "z");
+    say(&mut g, "z");
+    for _ in 0..8 {
+        say(&mut g, "hit wolf");
+    }
+    assert_says(&mut g, "x wolf", "You killed the grey wolf.");
+}
+
+#[test]
+fn blackfang_has_more_than_one_way_through() {
+    let mut g = blackfang();
+    for cmd in [
+        "take spear", "take helmet", "wear helmet", "take haunch", "n", "drop haunch", "w", "take key", "e", "n",
+        "kill skeleton with spear", "kill skeleton with spear", "unlock gate", "n",
+    ] {
+        say(&mut g, cmd);
+    }
+    let out = g.input("take sunstone");
+    assert_eq!(out.ended, Some(EndingKind::Win), "{}", out.text());
 }

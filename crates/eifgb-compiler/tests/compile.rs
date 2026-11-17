@@ -465,3 +465,15 @@ fn factions_are_checked() {
     let out = with("factions:\n  a: { hostile_to: [b] }\n  b: {}\ncharacters:\n  x: { name: x, in: hall, faction: a, behavior: hunter }\n");
     assert!(!warnings(&out).iter().any(|w| w.contains("player has no 'health'")), "{:#?}", warnings(&out));
 }
+
+#[test]
+fn disguises_and_bait_name_real_factions() {
+    let out = with("factions:\n  goblins: {}\nobjects:\n  hat: { name: hat, in: hall, traits: [wearable], disguise: goblns }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'goblns' (did you mean 'goblins'?)"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  wolves: {}\nobjects:\n  meat: { name: meat, in: hall, eaten_by: [wolfs] }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'wolfs'"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  goblins: {}\nobjects:\n  hat: { name: hat, in: hall, disguise: goblins }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("only works when worn")), "{:#?}", warnings(&out));
+    let out = with("factions:\n  goblins: {}\ncharacters:\n  g: { name: g, in: hall, disguise: goblins }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only objects can have 'disguise'"), "{:#?}", out.diagnostics);
+}

@@ -95,6 +95,9 @@ pub struct Faction {
     /// Members eat the corpses of the fallen.
     #[serde(default)]
     pub eats_corpses: bool,
+    /// How members' victims look, unless the weapon or character says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kills: Option<String>,
 }
 
 /// The name `hostile_to` uses for the player.
@@ -263,6 +266,16 @@ pub struct Entity {
     /// A character's side, a key in `Story::factions`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub faction: Option<String>,
+    /// Worn by the player, this faction treats them as one of its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disguise: Option<String>,
+    /// Factions whose members eat this when it's left lying in their room.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub eaten_by: Vec<String>,
+    /// How its victims look: "run through" for a spear, "mauled" for a
+    /// bear. Completes "The goblin has been …".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kills: Option<String>,
 }
 
 /// A character's turn-by-turn behaviour.

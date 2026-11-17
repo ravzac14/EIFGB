@@ -409,6 +409,10 @@ Replay it at any time, to check that your changes haven't broken the game:
 That's a complete game. Compare yours with
 [`spec/examples/midnight_snack/game.yaml`](spec/examples/midnight_snack/game.yaml).
 
+Ready for more code? The [scripting tutorial](docs/SCRIPTING.md) builds a
+campfire game with Lua handlers, custom verbs, a script file, variables,
+timers you control from code, and random events.
+
 ## States and descriptions
 
 Objects change during play: doors open, lamps get lit, oil runs out. EIFGB
@@ -869,8 +873,8 @@ chooses text. `the(x)`, `The(x)`, `a(x)` and `A(x)` add articles.
 `vars.<name>`, `game.turn`, `game.score`; `say()`, `block()`, `score(n)`,
 `end_game(id)`, `open_choice(id)`, `random(a, b)`, `start_timer(id)`,
 `stop_timer(id)`, `timer_left(id)`; on objects,
-`:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`, and
-`.capacity`, which can be changed.
+`:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`,
+`:can_hold(thing)`, and `.capacity`, which can be changed.
 
 **Custom verbs:**
 
@@ -895,6 +899,10 @@ your patterns to it.
 
 ## Where to go next
 
+- **[The scripting tutorial](docs/SCRIPTING.md)** builds a second game,
+  Campfire, step by step. It covers Lua handlers and `block()`, custom
+  verbs, script files, `vars`, changing capacity, controlling timers from
+  code, `random()` and multiple endings.
 - **[`spec/examples/lighthouse/game.yaml`](spec/examples/lighthouse/game.yaml)**
   is a fuller game with comments. It has custom verbs, a dialogue with a
   character, a menu puzzle, global variables, timers for a time limit, a

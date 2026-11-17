@@ -1,0 +1,189 @@
+# The finished game from the scripting tutorial (docs/SCRIPTING.md).
+format: eifgb/0.1
+
+game:
+  id: campfire
+  title: "Campfire"
+  version: "1.0"
+  start: campsite
+  max_score: 10
+  intro: |
+    The sun is sinking behind the pines. If you want a fire before dark,
+    you'd better get moving.
+
+scripts:
+  - scripts/camp.lua
+
+vars:
+  wood: 0
+
+player:
+  capacity: 2
+
+rooms:
+  campsite:
+    name: Campsite
+    description: |
+      A flat clearing beside your tent. In the middle is a ring of
+      blackened stones: the fire pit. A trail leads north into the woods.
+    exits:
+      north: woods
+
+  woods:
+    name: Pine Woods
+    description: |
+      Tall pines, and a carpet of needles. Fallen branches lie everywhere.
+      The campsite is back to the south.
+    exits:
+      south: campsite
+
+objects:
+  backpack:
+    name: backpack
+    synonyms: [pack, bag]
+    in: campsite
+    traits: [portable, wearable, container, open]
+    description: A battered hiking pack.
+    on:
+      after_wear: |
+        player.capacity = 6
+        say("With the pack on your back, your hands are free.")
+      after_take_off: player.capacity = 2
+
+  matches:
+    name: box of matches
+    synonyms: [matches, box]
+    in: backpack
+    traits: [portable]
+    description: A small box of strike-anywhere matches.
+
+  marshmallows:
+    name: bag of marshmallows
+    synonyms: [marshmallows, marshmallow]
+    in: backpack
+    traits: [portable, edible]
+    description: Fat, white and squishy.
+    on:
+      before_roast: |
+        if not world.fire_pit.burning then
+          return block("You need a fire first.")
+        end
+        if here ~= world.campsite then
+          return block("The fire is back at the campsite.")
+        end
+      roast: |
+        score(5)
+        end_game("cozy")
+
+  tent:
+    name: tent
+    in: campsite
+    traits: [scenery]
+    description: Small, green and slightly lopsided.
+
+  branches:
+    name: fallen branches
+    synonyms: [branches, branch, sticks, wood]
+    in: woods
+    traits: [scenery]
+    description: Dry, and plenty of them.
+    on:
+      gather: gather_wood()
+
+  firewood:
+    name: armful of firewood
+    synonyms: [firewood, armful, pile]
+    traits: [portable]
+    size: 2
+    description: |
+      Dry pine branches. ${if vars.wood > 1}Enough for a good fire.${else}Not much yet.${end}
+
+  fire_pit:
+    name: fire pit
+    synonyms: [pit, fire, campfire, stones, ring]
+    in: campsite
+    traits: [scenery]
+    state: { burning: false }
+    description: |
+      A ring of blackened stones. ${if self.burning}${fire_words()}${else}It's cold and empty.${end}
+    on:
+      before_light: |
+        if self.burning then
+          return block("It's already burning.")
+        end
+        if not world.matches:is_in(player) then
+          return block("You need something to light it with.")
+        end
+        if vars.wood < 2 then
+          return block("You'll need more wood than that. At least two armfuls.")
+        end
+      light: |
+        burn_wood(2)
+        self.burning = true
+        start_timer("fire_burns")
+        say("The match flares, the kindling catches, and soon you have a crackling fire.")
+        score(5)
+      before_stoke: |
+        if not self.burning then
+          return block("There's no fire to add wood to.")
+        end
+        if vars.wood < 1 then
+          return block("You don't have any wood.")
+        end
+      stoke: |
+        burn_wood(1)
+        stop_timer("fire_burns")
+        start_timer("fire_burns")
+        say("You add the wood, and the fire roars back up.")
+
+verbs:
+  gather:
+    patterns: ["gather {target}", "collect {target}"]
+    default: "There's nothing to gather."
+  light:
+    patterns: ["light {target}", "light {target} with {tool}", "start {target}"]
+    default: "That won't burn."
+  stoke:
+    patterns: ["stoke {target}", "feed {target}", "add wood to {target}"]
+    default: "That doesn't need feeding."
+  roast:
+    patterns: ["roast {target}", "toast {target}", "cook {target}"]
+    default: "You can't roast that."
+
+timers:
+  fire_burns:
+    after: 8
+    running: false
+    do: world.fire_pit.burning = false
+    say: Your fire sputters and dies down to embers.
+
+  nightfall:
+    after: 25
+    do: |
+      if world.fire_pit.burning then
+        say("Night falls. Your fire holds back the dark.")
+      else
+        end_game("cold")
+      end
+
+  owl:
+    every: 4
+    do: |
+      if here == world.woods then
+        local calls = { "An owl hoots somewhere above you.",
+                        "Something rustles in the needles.",
+                        "A branch creaks in the wind." }
+        say(calls[random(1, #calls)])
+      end
+
+endings:
+  cozy:
+    kind: win
+    text: |
+      You toast a marshmallow until it's golden, then another, then a
+      third. The stars come out one by one.
+  cold:
+    kind: loss
+    text: |
+      Darkness swallows the clearing. You crawl into the tent, cold and
+      hungry, and listen to the owls all night.

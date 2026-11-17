@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "move_to", "is_in", "contents", "has"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "move_to", "is_in", "contents", "has", "can_hold"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,

@@ -374,6 +374,15 @@ impl ScriptHost for LuaHost {
                 )?;
 
                 h.set(
+                    "can_hold",
+                    scope.create_function(move |_, (holder, item): (u32, u32)| {
+                        let (holder, item) = (check(holder)?, check(item)?);
+                        let w = world.borrow();
+                        Ok(w.location(item) == Some(holder) || w.fits(item, holder) == eifgb_engine::Fit::Yes)
+                    })?,
+                )?;
+
+                h.set(
                     "contents",
                     scope.create_function(move |_, id: u32| {
                         Ok(world.borrow().contents(check(id)?).into_iter().map(|e| e.0).collect::<Vec<u32>>())

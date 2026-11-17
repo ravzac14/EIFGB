@@ -1,0 +1,12 @@
+# Winning playthrough of Campfire (the scripting tutorial).
+take pack
+wear it
+n
+gather branches
+gather branches
+gather branches
+s
+light fire
+x fire
+add wood to fire
+roast marshmallows

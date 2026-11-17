@@ -79,6 +79,12 @@ function Entity:contents()
   return out
 end
 
+-- Whether `thing` would fit in or on this (or be carried, for the
+-- player), by size and capacity. True if it's already there.
+function Entity:can_hold(thing)
+  return H.can_hold(need_entity(self, "the holder"), need_entity(thing, "can_hold's thing"))
+end
+
 function Entity:has(trait)
   return H.has_trait(need_entity(self, "the thing"), trait)
 end

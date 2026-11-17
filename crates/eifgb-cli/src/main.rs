@@ -62,12 +62,28 @@ pub(crate) fn run_compile(game: &Path) -> Result<Output, String> {
     Ok(out)
 }
 
+/// Loads the story's script files the way `play` does, so that `check`
+/// and `build` catch errors that would otherwise only show at start-up:
+/// Lua syntax errors, and top-level code that isn't a function.
+fn check_scripts(story: &eifgb_engine::ir::Story) -> bool {
+    use eifgb_engine::ScriptHost;
+    let result = eifgb_lua::LuaHost::new().and_then(|mut host| host.load(story));
+    match result {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("error: {e}");
+            eprintln!("1 error(s), 0 warning(s)");
+            false
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
-        Command::Check { game } => run_compile(&game).map(|out| out.story.is_some()),
+        Command::Check { game } => run_compile(&game).map(|out| out.story.as_ref().is_some_and(check_scripts)),
         Command::Build { game, out, pretty } => run_compile(&game).and_then(|o| {
-            let Some(story) = o.story else { return Ok(false) };
+            let Some(story) = o.story.filter(check_scripts) else { return Ok(false) };
             let path = out.unwrap_or_else(|| {
                 game.with_file_name(format!("{}.story.json", story.meta.id))
             });

@@ -66,7 +66,7 @@ fn every_example_walkthrough_wins() {
         assert_eq!(last.ended, Some(EndingKind::Win), "{}\n{}", dir.display(), last.text());
         played += 1;
     }
-    assert!(played >= 2, "expected at least the lighthouse and midnight_snack walkthroughs");
+    assert!(played >= 3, "expected the lighthouse, midnight_snack and campfire walkthroughs");
 }
 
 #[test]
@@ -1025,6 +1025,25 @@ fn scripts_can_change_capacity() {
     assert_says(&mut g, "touch oops", "nil");
     assert_says(&mut g, "push oops", "capacity must be a whole number");
     assert_says(&mut g, "pull oops", "capacity must be a whole number");
+}
+
+#[test]
+fn can_hold_checks_size_and_capacity() {
+    let src = "\
+player: { capacity: 2 }
+objects:
+  rock: { name: rock, in: hall, traits: [portable] }
+  log: { name: log, in: hall, traits: [portable], size: 2 }
+  jar: { name: jar, in: hall, traits: [container, open] }
+  probe: { name: probe, in: hall, traits: [scenery], on: { push: 'say(tostring(player:can_hold(world.rock)), \" \", tostring(player:can_hold(world.log)), \" \", tostring(world.jar:can_hold(world.log)))' } }
+verbs:
+  push: { patterns: ['push {target}'] }
+";
+    let mut g = small(src);
+    assert_says(&mut g, "push probe", "true true false");
+    say(&mut g, "take rock");
+    // Already carried counts as "can hold"; the log no longer fits.
+    assert_says(&mut g, "push probe", "true false false");
 }
 
 #[test]

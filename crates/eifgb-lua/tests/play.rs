@@ -2745,3 +2745,46 @@ fn a_body_in_the_dark_isnt_found_by_someone_who_cant_see() {
         assert!(!say(&mut g, "z").contains("alarm"));
     }
 }
+
+const NIGHT: &str = "\
+format: eifgb/0.1
+game: { id: n, title: N, version: '1', start: cellar }
+rooms:
+  cellar: { name: Cellar, dark: true, description: Damp stone walls. }
+objects:
+  goggles: { name: night goggles, synonyms: [goggles], in: player, traits: [portable, wearable], sees_in_dark: true }
+  potion: { name: potion, in: player, traits: [portable, edible], on: { after_eat: 'player.sees_in_dark = true' } }
+  lantern: { name: lantern, in: player, traits: [portable, light_source], state: { lit: true } }
+  wardrobe: { name: wardrobe, in: cellar, traits: [container, openable, enterable, scenery], size: 5 }
+  coat: { name: coat, in: wardrobe, traits: [portable] }
+";
+
+#[test]
+fn the_player_can_see_in_the_dark_with_goggles_or_a_potion() {
+    let src = NIGHT.replace("state: { lit: true }", "state: { lit: false }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_says(&mut g, "look", "It's pitch dark.");
+    assert_says(&mut g, "wear goggles", "You put on the night goggles.");
+    assert_says(&mut g, "look", "Damp stone walls.");
+    say(&mut g, "take off goggles");
+    assert_says(&mut g, "look", "It's pitch dark.");
+    say(&mut g, "eat potion");
+    assert_says(&mut g, "look", "Damp stone walls.");
+    // As a starting trait.
+    let src = src.replace("game: { id: n,", "player: { sees_in_dark: true }\ngame: { id: n,");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_says(&mut g, "look", "Damp stone walls.");
+}
+
+#[test]
+fn a_lamp_lights_the_inside_of_whatever_youre_shut_in() {
+    let mut g = game(compile_str(NIGHT).story.unwrap());
+    say(&mut g, "open wardrobe");
+    say(&mut g, "get in wardrobe");
+    let out = say(&mut g, "close wardrobe");
+    assert!(!out.contains("pitch dark"), "{out}");
+    assert_says(&mut g, "look", "You're shut inside the wardrobe.");
+    assert_says(&mut g, "take coat", "Taken.");
+    // Put it out, and it's dark in there.
+    assert_says(&mut g, "put out lantern", "It's pitch dark.");
+}

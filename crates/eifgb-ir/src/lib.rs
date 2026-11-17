@@ -332,6 +332,9 @@ pub struct Entity {
     /// Rooms: unlit, so peeking in shows nothing unless a light is burning.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dark: bool,
+    /// Objects: worn by the player, lets them see in the dark.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub night_vision: bool,
 }
 
 /// A character's turn-by-turn behaviour.

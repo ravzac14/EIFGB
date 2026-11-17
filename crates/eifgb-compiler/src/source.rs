@@ -116,6 +116,9 @@ pub struct Player {
     /// How many rooms away SHOUT can be heard. Defaults to 2.
     #[serde(default)]
     pub voice: Option<u32>,
+    /// Sees in unlit rooms (the `sees_in_dark` state, which scripts can change).
+    #[serde(default)]
+    pub sees_in_dark: bool,
 }
 
 /// A carrying capacity: a whole number, or `none` (or null) for no limit.

@@ -18,6 +18,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// [`World::door_blocked`]: crate::World::door_blocked
 const BUILTIN_STATE: &[&str] = &[
     "open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with", "asleep",
+    "sees_in_dark",
 ];
 
 /// One thing the automatic state descriptions can say.

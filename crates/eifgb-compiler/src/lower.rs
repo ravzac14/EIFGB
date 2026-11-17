@@ -96,6 +96,7 @@ impl<'a> Lowerer<'a> {
                 .map(|h| ("health".to_string(), Value::Int(i64::from(h))))
                 .into_iter()
                 .chain(s.player.money.map(|m| ("money".to_string(), Value::Int(i64::from(m)))))
+                .chain(s.player.sees_in_dark.then(|| ("sees_in_dark".to_string(), Value::Bool(true))))
                 .collect(),
             location: start,
             exits: vec![],
@@ -118,6 +119,7 @@ impl<'a> Lowerer<'a> {
             leaves_tracks: true,
             diggable: false,
             dark: false,
+            night_vision: false,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -551,6 +553,7 @@ impl<'a> Lowerer<'a> {
             leaves_tracks: !r.trackless,
             diggable: r.diggable,
             dark: r.dark,
+            night_vision: false,
         }
     }
 
@@ -750,6 +753,9 @@ impl<'a> Lowerer<'a> {
         only(self.d, "disguise", t.disguise.is_some(), kind == EntityKind::Object, "objects");
         only(self.d, "eaten_by", !t.eaten_by.is_empty(), kind == EntityKind::Object, "objects");
         only(self.d, "prints", t.prints.is_some(), is_char, "characters");
+        if kind == EntityKind::Object && t.sees_in_dark == Some(true) && !has(Trait::Wearable) {
+            self.d.warn(format!("{path}.sees_in_dark"), "on an object, it only works when worn; add the 'wearable' trait");
+        }
         only(self.d, "leaves_tracks", t.leaves_tracks.is_some(), is_char, "characters");
         if t.disguise.is_some() && !has(Trait::Wearable) {
             self.d.warn(format!("{path}.disguise"), "only works when worn; add the 'wearable' trait");
@@ -800,6 +806,7 @@ impl<'a> Lowerer<'a> {
             leaves_tracks: t.leaves_tracks.unwrap_or(true),
             diggable: false,
             dark: false,
+            night_vision: kind == EntityKind::Object && t.sees_in_dark == Some(true),
         }
     }
 
@@ -821,7 +828,6 @@ impl<'a> Lowerer<'a> {
                 ("bribe", t.bribe.is_some()),
                 ("fetches", t.fetches.is_some()),
                 ("tracker", t.tracker.is_some()),
-                ("sees_in_dark", t.sees_in_dark.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),

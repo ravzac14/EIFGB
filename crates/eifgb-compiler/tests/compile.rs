@@ -534,3 +534,11 @@ fn tracks_settings_are_checked() {
     let out = with("settings: { track_life: 0 }\ncharacters:\n  ghost: { name: ghost, in: hall, leaves_tracks: false, tracker: true }\n");
     assert!(out.story.is_some(), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn dark_sight_on_objects_needs_wearing() {
+    let out = with("objects:\n  lens: { name: lens, in: hall, sees_in_dark: true }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("only works when worn")), "{:#?}", warnings(&out));
+    let out = with("player: { sees_in_dark: true }\n");
+    assert!(out.story.is_some(), "{:#?}", out.diagnostics);
+}

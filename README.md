@@ -1014,6 +1014,12 @@ Thirteen features reward players who try something clever:
   they do, or find a body; the moment the player lights a lamp, it can.
   A monster with `sees_in_dark` hunts happily in pitch darkness.
 
+  The player can see in the dark too: with `player: { sees_in_dark: true }`,
+  a script setting `player.sees_in_dark = true` (a potion), or by wearing
+  something with `sees_in_dark: true` (night goggles). And when the player
+  is shut inside something (a wardrobe, a barrel), a lamp in there with
+  them lights it, even in a dark room.
+
 - **Peeking:** PEEK THROUGH THE DOOR, PEEK NORTH, PEER NORTH or LOOK
   NORTH gives an impression of the next room without going in or being
   noticed: never its description, just whether anyone's there (and
@@ -1323,8 +1329,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience`, `prints` and `sees_in_dark`; objects
-can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by` and `nameable`; the player can have `health`,
-`damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the
+can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable` and (worn) `sees_in_dark`; the player can have `health`,
+`damage`, `money`, `voice` and `sees_in_dark`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 
 **Settings:** `describe_state` (default `true`) describes state

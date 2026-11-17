@@ -467,9 +467,47 @@ impl World {
                 .any(|i| self.room_of(i) == Some(room) && self.is_burning(i) && self.in_plain_sight(i))
     }
 
-    /// Whether the player is in the dark.
+    /// Whether the player is in the dark: their surroundings aren't lit,
+    /// and they can't see in the dark.
     pub fn in_darkness(&self) -> bool {
-        !self.is_lit(self.here())
+        !self.surroundings_lit() && !self.player_sees_in_dark()
+    }
+
+    /// Whether the player can see without light: the `sees_in_dark` state,
+    /// or something worn with `night_vision` (`sees_in_dark` in the source).
+    pub fn player_sees_in_dark(&self) -> bool {
+        self.flag(PLAYER, "sees_in_dark")
+            || self.contents(PLAYER).into_iter().any(|i| self.flag(i, "worn") && self.def(i).night_vision)
+    }
+
+    /// Whether the space around the player is lit: the room, or, when
+    /// they're shut inside something, a light burning in there with them.
+    fn surroundings_lit(&self) -> bool {
+        let here = self.here();
+        if self.is_lit(here) {
+            return true;
+        }
+        let ceiling = self.ceiling();
+        ceiling != here
+            && (0..self.story().entities.len() as u32)
+                .map(EntityId)
+                .any(|i| self.is_burning(i) && self.is_within(i, ceiling) && self.visible_within(i, ceiling))
+    }
+
+    /// Whether `id` can be seen from inside `space`: nothing closed and
+    /// see-through-less between them.
+    fn visible_within(&self, id: EntityId, space: EntityId) -> bool {
+        let mut cur = self.location(id);
+        while let Some(c) = cur {
+            if c == space {
+                return true;
+            }
+            if self.has(c, eifgb_ir::Trait::Container) && !self.shows_contents(c) {
+                return false;
+            }
+            cur = self.location(c);
+        }
+        false
     }
 
     /// Whether something can be seen where it is: not shut away inside

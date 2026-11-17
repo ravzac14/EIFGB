@@ -115,6 +115,7 @@ impl<'a> Lowerer<'a> {
         let handlers = self.lower_handlers("on", &s.on, GLOBAL_EVENTS);
         let choices = self.lower_choices(&s.choices);
         let endings = self.lower_endings(&s.endings);
+        let timers = self.lower_timers(&s.timers, &endings);
         let scripts = self.load_scripts(&s.scripts);
 
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
@@ -143,6 +144,7 @@ impl<'a> Lowerer<'a> {
             endings,
             scripts,
             categories: stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            timers,
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -629,49 +631,12 @@ impl<'a> Lowerer<'a> {
         if let Some(rules) = &t.revealed_by {
             let rpath = format!("{path}.revealed_by");
             for rule in rules.items() {
-                let shape = || format!("'{rule}': write it as '<verb> <object>' or '(<category>) <object>', e.g. 'search mat' or '(physical action) rug'");
-                // "(physical action) rug" names a category; "search mat" a verb.
-                let (verbs, category, rest) = if let Some(inner) = rule.trim().strip_prefix('(') {
-                    let Some((name, rest)) = inner.split_once(')') else {
-                        self.d.error(&rpath, shape());
-                        continue;
-                    };
-                    let name = name.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join("_");
-                    match self.categories.iter().find(|(k, _)| *k == name) {
-                        Some((_, verbs)) => (verbs.clone(), Some(name), rest),
-                        None => {
-                            let names: Vec<String> = self.categories.iter().map(|(k, _)| k.replace('_', " ")).collect();
-                            let hint = did_you_mean(&name.replace('_', " "), names.iter().map(String::as_str));
-                            self.d.error(
-                                &rpath,
-                                format!("'({})' is not an action category{hint}; the categories are ({})", name.replace('_', " "), names.join("), (")),
-                            );
-                            continue;
-                        }
-                    }
-                } else {
-                    let Some((verb, rest)) = rule.trim().split_once(char::is_whitespace) else {
-                        self.d.error(&rpath, shape());
-                        continue;
-                    };
-                    if !self.verb_keys.iter().any(|v| v == verb) {
-                        let hint = did_you_mean(verb, self.verb_keys.iter().map(String::as_str));
-                        self.d.error(&rpath, format!("'{verb}' is not a verb{hint}"));
-                        continue;
-                    }
-                    (vec![verb.to_string()], None, rest)
-                };
-                let words: Vec<&str> = rest.split_whitespace().collect();
-                let [target] = words[..] else {
-                    self.d.error(&rpath, shape());
-                    continue;
-                };
-                let Some(target_id) = self.entity_ref(target, &rpath) else { continue };
-                if target == key {
+                let Some(r) = self.action_rule(rule, &rpath) else { continue };
+                if r.target == self.entity_ids[key] {
                     self.d.error(&rpath, "a hidden thing can't be revealed by acting on itself, since it can't be seen");
                     continue;
                 }
-                revealed_by.push(Reveal { verbs, category, target: target_id });
+                revealed_by.push(r);
             }
             let starts_hidden = match state.get("hidden") {
                 Some(Value::Bool(b)) => *b,
@@ -867,6 +832,113 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// Parses `"search mat"` or `"(physical action) rug"`, as used by
+    /// `revealed_by`, `started_by` and `stopped_by`.
+    fn action_rule(&mut self, rule: &str, rpath: &str) -> Option<ActionRule> {
+        let shape = || {
+            format!("'{rule}': write it as '<verb> <object>' or '(<category>) <object>', e.g. 'search mat' or '(physical action) rug'")
+        };
+        let (verbs, category, rest) = if let Some(inner) = rule.trim().strip_prefix('(') {
+            let Some((name, rest)) = inner.split_once(')') else {
+                self.d.error(rpath, shape());
+                return None;
+            };
+            let name = name.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join("_");
+            match self.categories.iter().find(|(k, _)| *k == name) {
+                Some((_, verbs)) => (verbs.clone(), Some(name), rest),
+                None => {
+                    let names: Vec<String> = self.categories.iter().map(|(k, _)| k.replace('_', " ")).collect();
+                    let hint = did_you_mean(&name.replace('_', " "), names.iter().map(String::as_str));
+                    self.d.error(
+                        rpath,
+                        format!(
+                            "'({})' is not an action category{hint}; the categories are ({})",
+                            name.replace('_', " "),
+                            names.join("), (")
+                        ),
+                    );
+                    return None;
+                }
+            }
+        } else {
+            let Some((verb, rest)) = rule.trim().split_once(char::is_whitespace) else {
+                self.d.error(rpath, shape());
+                return None;
+            };
+            if !self.verb_keys.iter().any(|v| v == verb) {
+                let hint = did_you_mean(verb, self.verb_keys.iter().map(String::as_str));
+                self.d.error(rpath, format!("'{verb}' is not a verb{hint}"));
+                return None;
+            }
+            (vec![verb.to_string()], None, rest)
+        };
+        let words: Vec<&str> = rest.split_whitespace().collect();
+        let [target] = words[..] else {
+            self.d.error(rpath, shape());
+            return None;
+        };
+        let target = self.entity_ref(target, rpath)?;
+        Some(ActionRule { verbs, category, target })
+    }
+
+    // -------------------------------------------------------------- timers
+
+    fn lower_timers(&mut self, raw: &indexmap::IndexMap<String, src::Timer>, endings: &[Ending]) -> Vec<Timer> {
+        let mut out = Vec::new();
+        for (key, t) in raw {
+            let path = format!("timers.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&path, e);
+            }
+            let schedule = match (t.after, t.every) {
+                (Some(n), None) => Schedule::After(n),
+                (None, Some(n)) => Schedule::Every(n),
+                (Some(_), Some(_)) => {
+                    self.d.error(&path, "use either 'after' (once) or 'every' (repeating), not both");
+                    continue;
+                }
+                (None, None) => {
+                    self.d.error(&path, "a timer needs 'after: <actions>' or 'every: <actions>'");
+                    continue;
+                }
+            };
+            if matches!(schedule, Schedule::After(0) | Schedule::Every(0)) {
+                self.d.error(&path, "the number of actions must be at least 1");
+            }
+            let rules = |field: &str, list: &Option<src::OneOrMany>, this: &mut Self| -> Vec<ActionRule> {
+                list.iter()
+                    .flat_map(|l| l.items())
+                    .filter_map(|r| this.action_rule(r, &format!("{path}.{field}")))
+                    .collect()
+            };
+            let started_by = rules("started_by", &t.started_by, self);
+            let stopped_by = rules("stopped_by", &t.stopped_by, self);
+            let end = t.end.as_deref().and_then(|e| {
+                let found = endings.iter().position(|x| x.key == e).map(|i| EndingId(i as u32));
+                if found.is_none() {
+                    let hint = did_you_mean(e, endings.iter().map(|x| x.key.as_str()));
+                    self.d.error(format!("{path}.end"), format!("no ending called '{e}'{hint}"));
+                }
+                found
+            });
+            if t.say.is_none() && t.run.is_none() && t.end.is_none() {
+                self.d.warn(&path, "this timer does nothing; give it 'say', 'do' or 'end'");
+            }
+            out.push(Timer {
+                key: key.clone(),
+                schedule,
+                running: t.running.unwrap_or(started_by.is_empty()),
+                started_by,
+                stopped_by,
+                when: t.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
+                say: self.text_opt(t.say.as_deref(), &format!("{path}.say")),
+                run: t.run.as_deref().map(|r| self.code(r, &format!("{path}.do"))),
+                end,
+            });
+        }
+        out
+    }
+
     // ------------------------------------------------------------- choices
 
     fn lower_choices(&mut self, raw: &indexmap::IndexMap<String, src::Choice>) -> Vec<ChoiceGraph> {
@@ -996,6 +1068,14 @@ impl<'a> Lowerer<'a> {
                     self.d.error(origin, format!("end_game(\"{name}\"): no such ending{hint}"));
                 }
             }
+            for call in ["start_timer", "stop_timer", "timer_left"] {
+                for name in literal_calls(src, call) {
+                    if !story.timers.iter().any(|t| t.key == name) {
+                        let hint = did_you_mean(name, story.timers.iter().map(|t| t.key.as_str()));
+                        self.d.error(origin, format!("{call}(\"{name}\"): no such timer{hint}"));
+                    }
+                }
+            }
             for name in literal_calls(src, "open_choice") {
                 if !choices.contains(&name) {
                     let hint = did_you_mean(name, choices.iter().copied());
@@ -1111,6 +1191,15 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
     }
     for e in &story.endings {
         text(&e.text, f);
+    }
+    for t in &story.timers {
+        if let Some(w) = &t.when {
+            f(w);
+        }
+        opt_text(&t.say, f);
+        if let Some(r) = &t.run {
+            f(r);
+        }
     }
 }
 

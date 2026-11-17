@@ -38,6 +38,7 @@ stay interchangeable.
 | `choices`    | Choice graphs, used for menus and dialogue. |
 | `on`         | Global event handlers (`turn`, `start`, ...). |
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
+| `timers`     | Things that happen after a number of actions. See **Timers**. |
 
 IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `enter`, `leave`), because handlers are keyed by both.
 
@@ -150,6 +151,19 @@ A handler can be a block of statements or a single expression.
 - Reading an undefined global is an error, not `nil`, so a misspelled function name fails loudly.
 - **Story state lives only in `vars` and in entity state.** Script globals are for functions. That rule is what makes save, restore and undo possible: saving is just serializing `vars` and entity state.
 - On the server, scripts are only parsed and checked during compilation, never executed. They run on the player's machine. *(Optional later: a sandboxed automated playtest.)*
+
+## Timers
+
+A timer fires after a number of **actions**: commands that took a turn.
+Parse failures and meta commands (SAVE, UNDO, SCORE…) don't count.
+
+- **Schedule:** `after: N` (once) or `every: N` (repeating), exactly one. N ≥ 1.
+- **Start:** `running` (default `true`, or `false` when `started_by` is given) starts it with the game. `started_by` and `stopped_by` take the same rules as `revealed_by`, including categories. They're checked when the action happens and isn't blocked by a `before_` handler. Starting a running timer leaves it alone.
+- **Counting:** a timer started during an action counts the actions after it. One started outside an action (the `start` handler, or a choice) counts from the next action.
+- **Firing:** due timers fire at the end of the turn, after `turn` handlers, in declaration order. `when` (Lua) is checked first; if false, the firing is skipped, and an `after` timer is then done. Then `say`, `do`, and `end` (an ending ID). Firing stops once an ending is requested.
+- **Scripts:** `start_timer(id)`, `stop_timer(id)` (both take effect when the script returns), and `timer_left(id)`, the number of actions left counting the current one, or `nil`.
+- **State:** running timers live in `GameState.timers` (ID → due turn), so they're saved and undone.
+- **Compiler checks:** schedule shape, ending IDs, rules, and literal `start_timer`/`stop_timer`/`timer_left` names. A warning is given for timers that do nothing.
 
 ## Choices
 

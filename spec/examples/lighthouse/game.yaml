@@ -239,14 +239,21 @@ choices:
 
 # --------------------------------------------------------- global events
 
-on:
-  turn: |
-    if game.turn == 40 and not vars.ship_contacted then
-      say("Out at sea, the ship's lights swing dangerously close to the rocks.")
-    elseif game.turn >= 60 and not vars.ship_contacted then
-      end_game("lost")
-    end
+# ---------------------------------------------------------------- timers
+# Counted in actions. Both start with the game and only fire if the ship
+# hasn't been contacted by then.
 
+timers:
+  ship_closer:
+    after: 40
+    when: not vars.ship_contacted
+    say: Out at sea, the ship's lights swing dangerously close to the rocks.
+  shipwreck:
+    after: 60
+    when: not vars.ship_contacted
+    end: lost
+
+on:
   # Runs only after the whole fallback chain has failed (see FORMAT.md,
   # "Never leave the player stuck"). args.text is the raw input.
   parse_failed: |

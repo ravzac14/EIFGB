@@ -78,6 +78,47 @@ pub struct Story {
     /// Action categories from the stdlib: name → verb keys.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub categories: BTreeMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timers: Vec<Timer>,
+}
+
+/// Something that happens after a number of actions (turns that took time).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Timer {
+    pub key: String,
+    pub schedule: Schedule,
+    /// Whether it's counting from the start of the game.
+    pub running: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub started_by: Vec<ActionRule>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stopped_by: Vec<ActionRule>,
+    /// Checked when due; false skips this firing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say: Option<Text>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<EndingId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Schedule {
+    /// Once, this many actions after starting.
+    After(u32),
+    /// Every this many actions, until stopped.
+    Every(u32),
+}
+
+impl Schedule {
+    pub fn actions(self) -> u32 {
+        match self {
+            Schedule::After(n) | Schedule::Every(n) => n,
+        }
+    }
 }
 
 impl Story {
@@ -184,7 +225,7 @@ pub struct Entity {
     pub size: u32,
     /// Actions that reveal this entity while it's `hidden`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub revealed_by: Vec<Reveal>,
+    pub revealed_by: Vec<ActionRule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
 }
@@ -203,11 +244,12 @@ impl Entity {
     }
 }
 
-/// "Doing any of `verbs` to `target` reveals me", e.g. SEARCH MAT reveals
-/// a key. A category such as `(physical action)` is expanded into its
-/// verbs at compile time, so the pinned stdlib decides what it covers.
+/// "Doing any of `verbs` to `target`", e.g. SEARCH MAT. Used by
+/// `revealed_by` and by timers' `started_by`/`stopped_by`. A category
+/// such as `(physical action)` is expanded into its verbs at compile
+/// time, so the pinned stdlib decides what it covers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Reveal {
+pub struct ActionRule {
     pub verbs: Vec<String>,
     /// The category the rule was written with, kept for display.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -140,6 +140,10 @@ end
 function env.score(n) H.score(n) end
 function env.end_game(key) H.end_game(key) end
 function env.open_choice(key) H.open_choice(key) end
+function env.start_timer(key) H.start_timer(key) end
+function env.stop_timer(key) H.stop_timer(key) end
+-- Actions until the timer is next due, or nil when it isn't running.
+function env.timer_left(key) return H.timer_left(key) end
 
 function env.random(a, b)
   if b == nil then a, b = 1, a end

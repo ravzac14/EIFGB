@@ -456,6 +456,30 @@ impl ScriptHost for LuaHost {
                     })?,
                 )?;
 
+                for (name, start) in [("start_timer", true), ("stop_timer", false)] {
+                    h.set(
+                        name,
+                        scope.create_function(move |_, key: String| {
+                            if !world.borrow().story().timers.iter().any(|t| t.key == key) {
+                                return Err(rt(format!("{name}: there is no timer called '{key}'")));
+                            }
+                            effects.borrow_mut().push(if start { Effect::StartTimer(key) } else { Effect::StopTimer(key) });
+                            Ok(())
+                        })?,
+                    )?;
+                }
+
+                h.set(
+                    "timer_left",
+                    scope.create_function(move |_, key: String| {
+                        let w = world.borrow();
+                        if !w.story().timers.iter().any(|t| t.key == key) {
+                            return Err(rt(format!("timer_left: there is no timer called '{key}'")));
+                        }
+                        Ok(w.state.timers.get(&key).map(|due| due.saturating_sub(w.state.turn) as i64))
+                    })?,
+                )?;
+
                 h.set(
                     "random",
                     scope.create_function(move |_, (lo, hi): (i64, i64)| {

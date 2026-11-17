@@ -100,6 +100,8 @@ pub enum Effect {
     Score(i64),
     EndGame(String),
     OpenChoice(String),
+    StartTimer(String),
+    StopTimer(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

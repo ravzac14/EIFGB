@@ -38,6 +38,8 @@ pub struct Source {
     pub on: IndexMap<String, String>,
     #[serde(default)]
     pub endings: IndexMap<String, Ending>,
+    #[serde(default)]
+    pub timers: IndexMap<String, Timer>,
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, String>,
@@ -237,6 +239,36 @@ pub struct ChoiceOption {
     pub goto: Option<String>,
     #[serde(default)]
     pub end: bool,
+}
+
+/// Something that happens after a number of actions.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Timer {
+    /// Fires once, this many actions after it starts.
+    #[serde(default)]
+    pub after: Option<u32>,
+    /// Fires every this many actions, until stopped.
+    #[serde(default)]
+    pub every: Option<u32>,
+    /// Running from the start of the game. Defaults to true unless the
+    /// timer has `started_by`.
+    #[serde(default)]
+    pub running: Option<bool>,
+    #[serde(default)]
+    pub started_by: Option<OneOrMany>,
+    #[serde(default)]
+    pub stopped_by: Option<OneOrMany>,
+    /// Lua condition checked when the timer is due; false skips it.
+    #[serde(default)]
+    pub when: Option<String>,
+    #[serde(default)]
+    pub say: Option<String>,
+    #[serde(default, rename = "do")]
+    pub run: Option<String>,
+    /// Ends the game with this ending.
+    #[serde(default)]
+    pub end: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

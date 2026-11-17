@@ -22,6 +22,9 @@ pub struct GameState {
     pub choice: Option<ChoiceCursor>,
     /// Objects the most recent command referred to. Pronouns like "it" resolve to these.
     pub mentioned: Vec<EntityId>,
+    /// Running timers: key → the turn number when it's next due.
+    #[serde(default)]
+    pub timers: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -54,6 +57,12 @@ impl GameState {
             ending: None,
             choice: None,
             mentioned: Vec::new(),
+            timers: story
+                .timers
+                .iter()
+                .filter(|t| t.running)
+                .map(|t| (t.key.clone(), u64::from(t.schedule.actions())))
+                .collect(),
         }
     }
 }

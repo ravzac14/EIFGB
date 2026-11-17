@@ -91,6 +91,9 @@ pub struct Game<H: ScriptHost> {
     pub(crate) no_turn: bool,
     pub(crate) out: Output,
     pub(crate) end_requested: Option<String>,
+    /// True while a command's action runs: a timer started then counts
+    /// from the next action, not this one.
+    in_action: bool,
     pub(crate) choice_requested: Option<String>,
 }
 
@@ -108,6 +111,7 @@ impl<H: ScriptHost> Game<H> {
             no_turn: false,
             out: Output::default(),
             end_requested: None,
+            in_action: false,
             choice_requested: None,
         })
     }
@@ -273,6 +277,10 @@ impl<H: ScriptHost> Game<H> {
                     self.end_requested.get_or_insert(k);
                 }
                 Effect::OpenChoice(k) => self.choice_requested = Some(k),
+                Effect::StartTimer(k) => self.start_timer(&k),
+                Effect::StopTimer(k) => {
+                    self.world.state.timers.remove(&k);
+                }
             }
         }
     }
@@ -373,7 +381,9 @@ impl<H: ScriptHost> Game<H> {
         }
 
         let before = self.world.state.clone();
+        self.in_action = true;
         self.perform(&verb, &cmd);
+        self.in_action = false;
         if std::mem::take(&mut self.no_turn) {
             return false;
         }
@@ -516,6 +526,9 @@ impl<H: ScriptHost> Game<H> {
             },
         };
 
+        if let Some(t) = target {
+            self.timer_rules(&verb.key, t);
+        }
         let found: Vec<EntityId> = reveals.into_iter().filter(|id| self.world.is_hidden(*id)).collect();
         if !found.is_empty() {
             for id in &found {
@@ -601,6 +614,75 @@ impl<H: ScriptHost> Game<H> {
         }
         let here = self.world.here();
         self.room_event(here, "turn");
+        self.fire_timers();
+    }
+
+    // ------------------------------------------------------------ timers
+
+    fn start_timer(&mut self, key: &str) {
+        let Some(t) = self.world.story().timers.iter().find(|t| t.key == key) else { return };
+        if self.world.state.timers.contains_key(key) {
+            return;
+        }
+        let offset = u64::from(self.in_action);
+        let due = self.world.state.turn + offset + u64::from(t.schedule.actions());
+        self.world.state.timers.insert(key.to_string(), due);
+    }
+
+    /// `started_by` and `stopped_by` rules matching this action.
+    fn timer_rules(&mut self, verb: &str, target: EntityId) {
+        let hits = |rules: &[ActionRule]| rules.iter().any(|r| r.target == target && r.verbs.iter().any(|v| v == verb));
+        let (start, stop): (Vec<String>, Vec<String>) = {
+            let timers = &self.world.story().timers;
+            (
+                timers.iter().filter(|t| hits(&t.started_by)).map(|t| t.key.clone()).collect(),
+                timers.iter().filter(|t| hits(&t.stopped_by)).map(|t| t.key.clone()).collect(),
+            )
+        };
+        for k in stop {
+            self.world.state.timers.remove(&k);
+        }
+        for k in start {
+            self.start_timer(&k);
+        }
+    }
+
+    /// Runs timers that are due this turn, in the order they're declared.
+    fn fire_timers(&mut self) {
+        let now = self.world.state.turn;
+        let timers = self.world.story().timers.clone();
+        for t in timers {
+            if self.end_requested.is_some() {
+                break;
+            }
+            let Some(&due) = self.world.state.timers.get(&t.key) else { continue };
+            if due > now {
+                continue;
+            }
+            match t.schedule {
+                Schedule::After(_) => {
+                    self.world.state.timers.remove(&t.key);
+                }
+                Schedule::Every(n) => {
+                    self.world.state.timers.insert(t.key.clone(), now + u64::from(n));
+                }
+            }
+            if let Some(w) = &t.when
+                && !self.run(w, &Ctx::new()).truthy()
+            {
+                continue;
+            }
+            if let Some(s) = &t.say {
+                self.render_line(LineKind::Text, s, &Ctx::new());
+            }
+            if let Some(r) = &t.run {
+                self.run(r, &Ctx::new());
+            }
+            if let Some(e) = t.end {
+                let key = self.world.story().endings[e.index()].key.clone();
+                self.end_requested.get_or_insert(key);
+            }
+        }
     }
 
     /// Carries out an ending or an opened choice that a script asked for.

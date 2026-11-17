@@ -234,7 +234,7 @@ fn revealed_by_rules_are_checked() {
     let key = story.entity(story.entity_by_key("key").unwrap());
     assert_eq!(
         key.revealed_by,
-        vec![Reveal { verbs: vec!["search".into()], category: None, target: story.entity_by_key("mat").unwrap() }]
+        vec![ActionRule { verbs: vec!["search".into()], category: None, target: story.entity_by_key("mat").unwrap() }]
     );
     assert!(out.diagnostics.is_empty());
 
@@ -322,6 +322,26 @@ fn container_traits_are_checked() {
     assert!(warnings(&out).iter().any(|w| w.contains("'transparent' only matters on a 'container'")), "{:#?}", warnings(&out));
     let out = with("objects:\n  cup: { name: cup, in: hall, traits: [container], capacity: 1 }\n  a: { name: a, in: cup }\n  b: { name: b, in: cup, size: 2 }\n");
     assert!(warnings(&out).iter().any(|w| w.contains("total size 3, more than its capacity of 1")), "{:#?}", warnings(&out));
+}
+
+#[test]
+fn timers_are_checked() {
+    let t = |body: &str| with(&format!("objects:\n  fuse: {{ name: fuse, in: hall }}\nendings:\n  boom: {{ text: Boom }}\ntimers:\n  t: {{ {body} }}\n"));
+    let ok = t("after: 3, started_by: kick fuse, end: boom");
+    let story = ok.story.as_ref().unwrap_or_else(|| panic!("{:#?}", ok.diagnostics));
+    let timer = &story.timers[0];
+    assert_eq!(timer.schedule, Schedule::After(3));
+    assert!(!timer.running, "a timer with started_by waits to be started");
+    assert!(t("every: 2, say: drip").story.unwrap().timers[0].running);
+
+    assert_error(&t("after: 3, every: 2, say: x"), "not both");
+    assert_error(&t("say: x"), "needs 'after");
+    assert_error(&t("after: 0, say: x"), "at least 1");
+    assert_error(&t("after: 3, end: bom"), "did you mean 'boom'?");
+    assert_error(&t("after: 3, started_by: kick fuze, say: x"), "did you mean 'fuse'?");
+    let quiet = t("after: 3");
+    assert!(warnings(&quiet).iter().any(|w| w.contains("this timer does nothing")), "{:#?}", warnings(&quiet));
+    assert_error(&with("on: { start: 'start_timer(\"nope\")' }\n"), "start_timer(\"nope\"): no such timer");
 }
 
 #[test]

@@ -21,6 +21,7 @@ You unlock the pantry door with the small key.
 - [Tutorial: Midnight Snack](#tutorial-midnight-snack)
 - [States and descriptions](#states-and-descriptions)
 - [Containers and supporters](#containers-and-supporters)
+- [Timed events](#timed-events)
 - [Command reference](#command-reference)
 - [Cheat sheet](#cheat-sheet)
 - [Where to go next](#where-to-go-next)
@@ -558,6 +559,54 @@ The boulder is too big to carry.
 You're carrying too much already.
 ```
 
+## Timed events
+
+Timers make things happen after a number of **actions**. Any command
+that takes a turn counts. Commands the game didn't understand, and
+out-of-game commands like SAVE, UNDO and SCORE, don't.
+
+```yaml
+timers:
+  ship_closer:
+    after: 40                        # once, after 40 actions
+    when: not vars.ship_contacted    # skipped if this is false when it's due
+    say: Out at sea, the ship's lights swing dangerously close.
+  shipwreck:
+    after: 60
+    when: not vars.ship_contacted
+    end: lost                        # ends the game with the `lost` ending
+
+  fuse:
+    after: 3
+    started_by: light fuse           # starts when the player does this
+    stopped_by: (physical action) fuse
+    say: The fuse burns down...
+    end: boom
+
+  drip:
+    every: 5                         # repeats until stopped
+    started_by: turn tap
+    stopped_by: push tap
+    say: Water drips from the tap.
+```
+
+| Field | Meaning |
+|---|---|
+| `after: N` / `every: N` | Fire once N actions after starting, or every N actions. Exactly one is required. |
+| `started_by`, `stopped_by` | Rules like `revealed_by`: `"<verb> <object>"`, `"(<category>) <object>"`, or a list. Starting a timer that's already running doesn't reset it. |
+| `running` | Whether it counts from the start of the game. Defaults to `true`, or `false` if it has `started_by`. |
+| `when` | A Lua condition checked when it's due. If false, this firing is skipped. |
+| `say`, `do`, `end` | What happens: print text, run Lua, end the game. Any combination. |
+
+A timer started by an action counts the actions *after* that one. With
+`after: 3`, lighting the fuse and then waiting three times gives the
+explosion on the third wait. Timers are saved and undone with everything
+else.
+
+Scripts can also use `start_timer("bell")`, `stop_timer("bell")` and
+`timer_left("bell")`. `timer_left` gives the number of actions left,
+counting the current one, or `nil` if the timer isn't running.
+
 ## Command reference
 
 | Command | What it does |
@@ -593,8 +642,8 @@ end-of-turn event.
 ## Cheat sheet
 
 **Top-level sections:** `format`, `game`, `settings`, `vars`, `player`, `rooms`,
-`objects`, `characters`, `verbs`, `choices`, `on`, `endings`, `messages`,
-`scripts`.
+`objects`, `characters`, `verbs`, `choices`, `on`, `endings`, `timers`,
+`messages`, `scripts`.
 
 **Traits:** `portable`, `scenery`, `container`, `supporter`, `openable`,
 `lockable`, `door`, `wearable`, `edible`, `light_source`, `enterable`,
@@ -687,7 +736,8 @@ chooses text. `the(x)`, `The(x)`, `a(x)` and `A(x)` add articles.
 
 **Lua:** `world.<id>`, `player`, `here`, `self`, `args.target`, `args.tool`,
 `vars.<name>`, `game.turn`, `game.score`; `say()`, `block()`, `score(n)`,
-`end_game(id)`, `open_choice(id)`, `random(a, b)`; on objects,
+`end_game(id)`, `open_choice(id)`, `random(a, b)`, `start_timer(id)`,
+`stop_timer(id)`, `timer_left(id)`; on objects,
 `:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`.
 
 **Custom verbs:**
@@ -715,8 +765,8 @@ your patterns to it.
 
 - **[`spec/examples/lighthouse/game.yaml`](spec/examples/lighthouse/game.yaml)**
   is a fuller game with comments. It has custom verbs, a dialogue with a
-  character, a menu puzzle, global variables, a turn limit, a scoring
-  system and a Lua helper file.
+  character, a menu puzzle, global variables, timers for a time limit, a
+  scoring system and a Lua helper file.
 - **[`spec/FORMAT.md`](spec/FORMAT.md)** is the full reference: every
   section and field, the scripting API and sandbox rules, and the
   **Parser behavior** section, which shows how the game answers typos,

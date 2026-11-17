@@ -152,18 +152,6 @@ fn radio_ends_the_game_only_once_the_lamp_is_lit() {
 }
 
 #[test]
-fn turn_handler_ends_the_game_at_turn_60() {
-    let mut t = T::new();
-    let code = t.w.story().handlers.iter().find(|h| h.event == "turn").unwrap().code.clone();
-    t.w.state.turn = 40;
-    let (_, fx) = t.run(&code, &Ctx::new());
-    assert!(says(&fx).contains("dangerously close"));
-    t.w.state.turn = 60;
-    let (_, fx) = t.run(&code, &Ctx::new());
-    assert_eq!(fx, vec![Effect::EndGame("lost".into())]);
-}
-
-#[test]
 fn helper_functions_from_script_files_are_callable() {
     let mut t = T::new();
     assert_eq!(t.eval("trust_level()").unwrap(), ScriptValue::Str("cold".into()));

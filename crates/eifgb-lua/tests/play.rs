@@ -981,3 +981,117 @@ fn handlers_behind_glass_do_not_run_for_verbs_that_need_reach() {
     let out = say(&mut g, "kick jewel");
     assert_eq!(out, "You can't reach the jewel: the glass case is closed.");
 }
+
+// ---------------------------------------------------------------- timers
+
+#[test]
+fn lighthouse_timers_warn_then_end_the_game() {
+    let mut g = game(lighthouse());
+    let mut warned = false;
+    for i in 1..=60 {
+        let out = g.input("wait");
+        if i == 40 {
+            warned = out.text().contains("dangerously close");
+        }
+        assert_eq!(out.ended.is_some(), i == 60, "turn {i}");
+    }
+    assert!(warned);
+}
+
+const FUSE: &str = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall }
+objects:
+  fuse:
+    name: fuse
+    in: hall
+    traits: [scenery]
+    on: { measure: 'say(timer_left(\"fuse\") or \"It is not lit.\")' }
+  tap: { name: tap, in: hall, traits: [scenery] }
+verbs:
+  light: { patterns: ['light {target}'], default: 'The fuse sputters into life.' }
+  measure: { patterns: ['measure {target}'], reach: false }
+endings:
+  boom: { kind: loss, text: BOOM. }
+on:
+  start: 'start_timer(\"bell\")'
+timers:
+  fuse:
+    after: 3
+    started_by: light fuse
+    stopped_by: (physical action) fuse
+    say: The fuse burns down...
+    end: boom
+  drip:
+    every: 2
+    started_by: twist tap
+    stopped_by: push tap
+    say: Drip.
+  bell:
+    after: 2
+    running: false
+    say: A bell rings.
+";
+
+fn fuse() -> Game<LuaHost> {
+    let out = compile_str(FUSE);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn a_started_timer_counts_the_actions_after_the_one_that_started_it() {
+    let mut g = fuse();
+    say(&mut g, "light fuse");
+    assert!(!say(&mut g, "wait").contains("BOOM"));
+    assert!(!say(&mut g, "wait").contains("BOOM"));
+    let out = g.input("wait");
+    assert!(out.text().contains("The fuse burns down...") && out.text().contains("BOOM."), "{}", out.text());
+    assert_eq!(out.ended, Some(EndingKind::Loss));
+}
+
+#[test]
+fn stopped_by_cancels_and_categories_work() {
+    let mut g = fuse();
+    say(&mut g, "light fuse");
+    say(&mut g, "kick fuse");
+    for _ in 0..5 {
+        assert!(!say(&mut g, "wait").contains("BOOM"));
+    }
+}
+
+#[test]
+fn repeating_timers_and_scripted_starts() {
+    let mut g = fuse();
+    // The bell was started by the `start` handler: it rings after 2 actions.
+    assert!(!say(&mut g, "wait").contains("bell"));
+    assert_says(&mut g, "wait", "A bell rings.");
+    say(&mut g, "turn tap");
+    let outs: Vec<String> = (0..4).map(|_| say(&mut g, "wait")).collect();
+    let drips = outs.iter().filter(|o| o.contains("Drip.")).count();
+    assert_eq!(drips, 2, "every 2 actions: {outs:?}");
+    say(&mut g, "push tap");
+    for _ in 0..4 {
+        assert!(!say(&mut g, "wait").contains("Drip."));
+    }
+}
+
+#[test]
+fn timer_left_counts_down_and_undo_rewinds_timers() {
+    let mut g = fuse();
+    assert_eq!(say(&mut g, "measure fuse"), "It is not lit.");
+    say(&mut g, "light fuse");
+    // Three actions after lighting: this MEASURE is the first, so three are
+    // left counting it. It fires at the end of the second WAIT after this.
+    assert_eq!(say(&mut g, "measure fuse"), "3");
+    say(&mut g, "wait");
+    assert_says(&mut g, "wait", "BOOM.");
+    // Undo the two waits, the measure and the lighting.
+    for _ in 0..4 {
+        say(&mut g, "undo");
+    }
+    // (This is the game's second action, so the bell rings as well.)
+    assert_says(&mut g, "measure fuse", "It is not lit.");
+}

@@ -815,7 +815,7 @@ actions that count for timers). What they do depends on their
 | `hunter` | Attacks the player if they're in the same room. Otherwise heads one room closer to them, if they're within `range` rooms (default: anywhere), or else wanders (default 25%). |
 | `guard` | Attacks the player in its own room, and otherwise stays put. |
 | `follower` | Follows the player from room to room. |
-| `defender` | Never starts a fight, but attacks anyone who attacked it, when they're in the same room. Otherwise stays put. |
+| `defender` | Never starts a fight, but attacks anyone who attacked it (at once: its `patience` is 0), when they're in the same room. Otherwise stays put. |
 
 ```yaml
 player:
@@ -888,12 +888,32 @@ You're hurt: 12 out of 30.
   something without health still gets "Violence isn't the answer here."
 - **Enemies** (hunters and guards) hit back with their best weapon, or
   their own `damage`.
-- **Self-defense:** anyone attacked remembers who did it, in a `foes`
-  list. Defenders, hunters and guards fight back against their foes;
-  give any other character `fights_back: true` to make them do the same
-  (a merchant who won't be robbed), or `fights_back: false` to turn it
-  off. They don't chase a foe who leaves, but they don't forget either.
-  A script can forgive with `self.foes = nil`.
+- **Self-defense and patience:** everyone fights back eventually. A
+  character's `patience` is how many attacks it puts up with first:
+  none for hunters, guards and defenders, and 2 for everyone else. Until
+  it runs out, the player gets a warning:
+
+  ```
+  > hit monk
+  You hit the monk.
+  The monk is losing patience with you.
+
+  > hit monk
+  You hit the monk.
+  The monk is losing patience with you.
+
+  > hit monk
+  You hit the monk.
+  The monk attacks you.
+  ```
+
+  After that, the attacker is one of the character's `foes`, and it
+  attacks them whenever they're in the same room. It doesn't chase a foe
+  who leaves, but it doesn't forget either. Set `patience: 0` for a
+  merchant who won't be robbed, a higher number for a saintly one, or
+  `fights_back: false` for someone who never fights at all. Scripts can
+  read and change both: `self.patience = 2` calms a character down, and
+  `self.foes = nil` forgives everyone.
 - **Wounds** show once the player has seen them: "a grey wolf (wounded)",
   then "(badly wounded)" at half health or less.
 - **Defeat:** at 0 health a character drops what it carries and leaves
@@ -1063,7 +1083,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 **Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
-`faction`, `corpse`, `fights_back`; top-level `factions:` with `hostile_to` and `eats_corpses`; objects
+`faction`, `corpse`, `fights_back`, `patience`; top-level `factions:` with `hostile_to` and `eats_corpses`; objects
 can have `damage` (weapons) and `price`; the player can have `health`,
 `damage` and `money`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).

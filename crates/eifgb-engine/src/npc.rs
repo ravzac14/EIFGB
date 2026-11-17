@@ -15,8 +15,10 @@ use std::collections::{HashMap, VecDeque};
 pub enum NpcEvent {
     /// Moved from one room to another, going `direction`.
     Moved { npc: EntityId, from: EntityId, to: EntityId, direction: Direction },
-    /// Attacked `target`, taking `damage` health. `weapon` is what was used, if anything.
-    Attacked { attacker: EntityId, target: EntityId, weapon: Option<EntityId>, damage: u32 },
+    /// Attacked `target`, taking `damage` health. `weapon` is what was used,
+    /// if anything. `tolerated` means the target let it go this time, but
+    /// its patience is wearing thin.
+    Attacked { attacker: EntityId, target: EntityId, weapon: Option<EntityId>, damage: u32, tolerated: bool },
     /// Ate a corpse, which is now gone.
     Ate { npc: EntityId, corpse: EntityId, room: EntityId },
 }
@@ -89,6 +91,26 @@ impl World {
             }
             None => b == PLAYER && self.def(a).npc.as_ref().is_some_and(|n| n.behavior.hostile()),
         }
+    }
+
+    /// `attacker` attacked `target`. If the target fights back, that uses
+    /// up a little of its patience, or, with none left, makes the attacker
+    /// one of its foes. Returns whether it was let go this time.
+    fn provoke(&mut self, target: EntityId, attacker: EntityId) -> bool {
+        if target == attacker || !self.def(target).npc.as_ref().is_some_and(|n| n.fights_back) {
+            return false;
+        }
+        let patience = match self.get(target, "patience") {
+            Some(Value::Int(i)) => *i,
+            Some(Value::Float(f)) => f.floor() as i64,
+            _ => 0,
+        };
+        if patience > 0 {
+            self.set(target, "patience", Value::Int(patience - 1));
+            return true;
+        }
+        self.add_foe(target, attacker);
+        false
     }
 
     /// Remembers that `attacker` attacked `target`, in the target's `foes`
@@ -267,8 +289,8 @@ impl World {
             .or(self.def(attacker).damage)
             .unwrap_or(1);
         self.set(target, "health", Value::Int((health - i64::from(damage)).max(0)));
-        self.add_foe(target, attacker);
-        Some(NpcEvent::Attacked { attacker, target, weapon, damage })
+        let tolerated = self.provoke(target, attacker);
+        Some(NpcEvent::Attacked { attacker, target, weapon, damage, tolerated })
     }
 
     /// The best weapon `id` is carrying: the one that does the most damage.
@@ -312,7 +334,13 @@ impl World {
             Behavior::Hunter | Behavior::Guard if matches!(nearest, Some((0, _))) => {
                 let target = nearest.map(|(_, e)| e).unwrap_or(PLAYER);
                 let weapon = self.best_weapon(npc);
-                self.attack(npc, target, weapon).or(Some(NpcEvent::Attacked { attacker: npc, target, weapon, damage: 0 }))
+                self.attack(npc, target, weapon).or(Some(NpcEvent::Attacked {
+                    attacker: npc,
+                    target,
+                    weapon,
+                    damage: 0,
+                    tolerated: false,
+                }))
             }
             // Nothing to fight here: a scavenger eats.
             _ if eater && corpse_here.is_some() => self.npc_eat(npc, corpse_here.unwrap_or(npc)),

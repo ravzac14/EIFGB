@@ -1615,33 +1615,45 @@ rooms:
   yard: { name: Yard, exits: { south: hall } }
 characters:
   bear: { name: bear, in: hall, behavior: defender, health: 10, damage: 3 }
-  trader: { name: trader, in: hall, behavior: merchant, wander: 0, fights_back: true, health: 6, damage: 1 }
+  trader: { name: trader, in: hall, behavior: merchant, wander: 0, patience: 0, health: 6, damage: 1 }
+  saint: { name: saint, in: hall, health: 9, fights_back: false }
   monk: { name: monk, in: hall, health: 4, on: { pray: 'self.foes = nil; say(\"The monk forgives you.\")' } }
 verbs:
   pray: { patterns: ['pray with {target}'], reach: false }
 ";
 
 #[test]
-fn defenders_only_fight_back() {
+fn defenders_fight_back_at_once() {
     let mut g = game(compile_str(DEFENDERS).story.unwrap());
     // Nobody starts a fight.
     assert_eq!(say(&mut g, "z"), "Time passes.");
-    // Without fights_back, a plain character just takes it.
-    assert_eq!(say(&mut g, "hit monk"), "You hit the monk.");
     assert_eq!(say(&mut g, "hit bear"), "You hit the bear.\nThe bear attacks you.");
     assert_says(&mut g, "z", "The bear attacks you.");
     // It doesn't chase, but it remembers.
     say(&mut g, "n");
     assert_eq!(say(&mut g, "z"), "Time passes.");
     assert_says(&mut g, "s", "The bear attacks you.");
-    // Any behaviour can fight back with fights_back.
-    let out = say(&mut g, "hit trader");
-    assert!(out.contains("The trader attacks you."), "{out}");
+    // patience: 0 makes anyone fight back at once.
+    assert_says(&mut g, "hit trader", "The trader attacks you.");
+}
+
+#[test]
+fn everyone_else_fights_back_once_their_patience_runs_out() {
+    let mut g = game(compile_str(DEFENDERS).story.unwrap());
+    // A plain character puts up with two attacks, and says so.
+    assert_eq!(say(&mut g, "hit monk"), "You hit the monk.\nThe monk is losing patience with you.");
+    assert_eq!(say(&mut g, "hit monk"), "You hit the monk.\nThe monk is losing patience with you.");
+    assert_eq!(say(&mut g, "hit monk"), "You hit the monk.\nThe monk attacks you.");
+    // fights_back: false never does.
+    let mut g = game(compile_str(DEFENDERS).story.unwrap());
+    for _ in 0..4 {
+        assert_eq!(say(&mut g, "hit saint"), "You hit the saint.");
+    }
 }
 
 #[test]
 fn foes_are_remembered_by_key_and_can_be_forgiven() {
-    let src = DEFENDERS.replace("monk: { name: monk, in: hall, health: 4,", "monk: { name: monk, in: hall, health: 4, behavior: defender,");
+    let src = DEFENDERS.replace("monk: { name: monk, in: hall, health: 4,", "monk: { name: monk, in: hall, health: 4, patience: 0,");
     let mut g = game(compile_str(&src).story.unwrap());
     assert_says(&mut g, "hit monk", "The monk attacks you.");
     assert_says(&mut g, "z", "The monk attacks you.");

@@ -16,7 +16,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// `blocked` is built in on doors only (see [`World::door_blocked`]).
 ///
 /// [`World::door_blocked`]: crate::World::door_blocked
-const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden", "health", "money", "dead"];
+const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden", "health", "money", "dead", "patience"];
 
 /// One thing the automatic state descriptions can say.
 #[derive(Debug, Clone, PartialEq)]

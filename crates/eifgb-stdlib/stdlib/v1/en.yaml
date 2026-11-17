@@ -343,6 +343,8 @@ messages:
   npc.attacks_you: "${The(args.npc)} attacks you${if args.weapon} with ${the(args.weapon)}${end}."
   npc.attacks: "${The(args.npc)} attacks ${the(args.target)}."
   npc.defeated: "${The(args.target)} is defeated."
+  npc.losing_patience_you: "${The(args.target)} is losing patience with you."
+  npc.losing_patience: "${The(args.target)} is losing patience with ${the(args.npc)}."
   npc.drops: "${The(args.target)} drops ${args.list}."
   npc.eats: "${The(args.npc)} devours what's left of ${the(args.target)}."
   npc.fight_nearby: "You hear snarls and the clash of a fight somewhere ${args.direction}."

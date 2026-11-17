@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "dead", "foes"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "dead", "foes"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -719,6 +719,11 @@ impl<'a> Lowerer<'a> {
         if let Some(m) = t.money {
             state.insert("money".into(), Value::Int(i64::from(m)));
         }
+        if let Some(n) = &npc
+            && n.fights_back
+        {
+            state.insert("patience".into(), Value::Int(i64::from(n.patience)));
+        }
         let hostile = npc.as_ref().is_some_and(|n| n.behavior.hostile());
         let damage = t.damage.or(if hostile { Some(1) } else { None });
         Entity {
@@ -753,6 +758,7 @@ impl<'a> Lowerer<'a> {
                 ("faction", t.faction.is_some()),
                 ("corpse", t.corpse.is_some()),
                 ("fights_back", t.fights_back.is_some()),
+                ("patience", t.patience.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -785,6 +791,9 @@ impl<'a> Lowerer<'a> {
                 self.d.error(format!("{path}.{field}"), format!("'{field}' is a percentage, so it can't be more than 100"));
             }
         }
+        if t.patience.is_some() && t.fights_back == Some(false) {
+            self.d.warn(format!("{path}.patience"), "has no effect with 'fights_back: false'");
+        }
         if t.buys_at.is_some() && behavior != Behavior::Merchant {
             self.d.warn(format!("{path}.buys_at"), "only matters for a merchant");
         }
@@ -803,7 +812,8 @@ impl<'a> Lowerer<'a> {
             buys_at: t.buys_at.unwrap_or(50),
             act,
             corpse: t.corpse.unwrap_or(true),
-            fights_back: t.fights_back.unwrap_or(behavior.fights_back()),
+            fights_back: t.fights_back.unwrap_or(true),
+            patience: t.patience.unwrap_or(behavior.default_patience()),
         })
     }
 

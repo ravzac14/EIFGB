@@ -50,7 +50,7 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("npc.arrives", &Ctx::new().entity("npc", npc));
                 }
             }
-            NpcEvent::Attacked { attacker, target, weapon, .. } => {
+            NpcEvent::Attacked { attacker, target, weapon, tolerated, .. } => {
                 let mut ctx = Ctx::new().entity("npc", attacker).entity("target", target);
                 if let Some(w) = weapon {
                     ctx = ctx.entity("weapon", w);
@@ -65,6 +65,11 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("npc.attacks", &ctx);
                 } else if let Some(room) = self.world.room_of(attacker) {
                     self.hear(room, "npc.fight_nearby");
+                }
+                // Patience wearing thin: worth a warning, if the player is there.
+                if tolerated && self.world.room_of(target) == Some(here) && self.world.health(target).is_some_and(|h| h > 0) {
+                    let key = if attacker == PLAYER { "npc.losing_patience_you" } else { "npc.losing_patience" };
+                    self.msg(key, &Ctx::new().entity("target", target).entity("npc", attacker));
                 }
             }
             NpcEvent::Ate { npc, corpse, room } => {

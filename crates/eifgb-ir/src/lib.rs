@@ -289,9 +289,14 @@ pub struct Npc {
     /// Whether it leaves a body when defeated, instead of vanishing.
     #[serde(default = "yes")]
     pub corpse: bool,
-    /// Whether it attacks back whoever attacked it (its `foes`).
-    #[serde(default)]
+    /// Whether it attacks back whoever attacked it (its `foes`), once its
+    /// patience runs out.
+    #[serde(default = "yes")]
     pub fights_back: bool,
+    /// How many attacks it puts up with before fighting back. The
+    /// remaining patience is the `patience` state field.
+    #[serde(default)]
+    pub patience: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -358,9 +363,13 @@ impl Behavior {
         matches!(self, Behavior::Hunter | Behavior::Guard)
     }
 
-    /// Whether it fights back when attacked, unless `fights_back` says otherwise.
-    pub fn fights_back(self) -> bool {
-        matches!(self, Behavior::Hunter | Behavior::Guard | Behavior::Defender)
+    /// How many attacks it takes before fighting back, unless the author
+    /// says otherwise: none for fighters, a couple for everyone else.
+    pub fn default_patience(self) -> u32 {
+        match self {
+            Behavior::Hunter | Behavior::Guard | Behavior::Defender => 0,
+            _ => 2,
+        }
     }
 }
 

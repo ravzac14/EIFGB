@@ -27,19 +27,9 @@ Everything from the first list has now been built:
   and the fooled.
 - **Eavesdropping:** `chatter`, loud lines through walls, LISTEN AT THE DOOR.
 - **Giving orders:** TELL REX TO ATTACK/STAY/FOLLOW/GO/FETCH/DROP, and "REX, …".
+- **Fear and morale:** `morale`, `fears`, BRANDISH, fleeing and cornering.
 
 ## Manipulating creatures
-
-### Fear and morale
-
-Characters flee when badly hurt or outnumbered, or when the player waves
-something they fear: a torch at wolves, the chief's head at goblins.
-
-- Builds on: behaviours, factions, the alpha's flee script.
-- Shape: `fears: [torch]` on factions or characters, `morale` thresholds
-  (health fraction, outnumbered); fleeing = stepping away from the threat;
-  WAVE/BRANDISH X verbs.
-- Effort: medium.
 
 ### Mimicry
 

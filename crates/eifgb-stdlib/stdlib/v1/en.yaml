@@ -281,6 +281,16 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  brandish:
+    action: brandish
+    patterns:
+      - "brandish {target}"
+      - "brandish {target} at {tool}"
+      - "wave {target}"
+      - "wave {target} at {tool}"
+      - "thrust {target} at {tool}"
+      - "show {target} to {tool}"
+      - "swing {target} at {tool}"
   order:
     action: order
     reach: false
@@ -516,6 +526,11 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  brandish.done: "You brandish ${the(args.target)}."
+  brandish.nothing: "Nobody seems impressed."
+  npc.afraid: "${The(args.npc)} shrinks back in fear!"
+  npc.flees: "${The(args.npc)} flees ${args.direction}!"
+  order.too_scared: "${The(args.npc)} is too scared."
   order.not_person: "There's nobody there to give orders to."
   order.ignored: "${The(args.npc)} ignores you."
   order.confused: "${The(args.npc)} looks at you blankly. Try something like \"tell ${the(args.npc)} to stay\", \"to attack\" someone, \"to follow\", \"to go north\" or \"to fetch\" something."
@@ -727,6 +742,7 @@ messages:
   state.wounded: "${The(args.target)} is wounded."
   state.dead: "${The(args.target)} is dead."
   state.asleep: "${The(args.target)} is asleep."
+  state.frightened: "${The(args.target)} looks terrified."
   state.killed_how: "${The(args.target)} has been ${args.how}."
   state.killed_by: "${The(args.target)} was killed by ${the(args.by)}."
   state.killed_by_you: "You killed ${the(args.target)}."
@@ -743,6 +759,7 @@ messages:
   state.here.wounded: "${The(args.target)} is wounded."
   state.here.dead: "${The(args.target)} is dead."
   state.here.asleep: "${The(args.target)} is asleep."
+  state.here.frightened: "${The(args.target)} looks terrified."
   state.here.badly_wounded: "${The(args.target)} is badly wounded."
   state.here.heavy: "${The(args.target)} is too heavy to lift with everything in it."
   state.tag.open: "open"
@@ -755,6 +772,7 @@ messages:
   state.tag.wounded: "wounded"
   state.tag.dead: "dead"
   state.tag.asleep: "asleep"
+  state.tag.frightened: "frightened"
   state.tag.badly_wounded: "badly wounded"
   state.tag.heavy: "heavy"
   # an author's own state fields, e.g. `fueled: true` or `channel: 16`

@@ -86,6 +86,8 @@ pub enum NpcEvent {
     /// Found the body of one of its own that the player killed, and raised
     /// the alarm.
     Discovered { npc: EntityId, body: EntityId, room: EntityId, attitude: Option<AttitudeChange> },
+    /// Ran away from something it feared, or from a fight it was losing.
+    Fled { npc: EntityId, from: EntityId, to: EntityId, direction: Direction },
     /// Fetching something the player threw: `Grabbed` it, or `Brought` it back.
     Fetched { npc: EntityId, item: EntityId, room: EntityId, brought: bool },
 }
@@ -688,6 +690,86 @@ impl World {
         Some(f)
     }
 
+    /// The percent of its health below which it flees: its own `morale`,
+    /// its faction's, or 0 (never).
+    pub fn morale_of(&self, id: EntityId) -> u32 {
+        self.def(id).npc.as_ref().and_then(|n| n.morale).or_else(|| self.faction(id).and_then(|f| f.morale)).unwrap_or(0)
+    }
+
+    /// Whether `id` is afraid of `thing`: it (or its faction) fears it by
+    /// name, or fears `fire` and it's burning.
+    pub fn fears(&self, id: EntityId, thing: EntityId) -> bool {
+        let key = &self.def(thing).key;
+        let own = self.def(id).npc.as_ref().map(|n| n.fears.clone()).unwrap_or_default();
+        let faction = self.faction(id).map(|f| f.fears.clone()).unwrap_or_default();
+        own.iter().chain(&faction).any(|f| f == key || (f == "fire" && self.is_burning(thing)))
+    }
+
+    /// Frightened into running for a few turns.
+    pub fn panic(&mut self, id: EntityId) {
+        // Counted down at the start of each of its turns: three turns of running.
+        self.set(id, "_fleeing", Value::Int(4));
+    }
+
+    pub fn is_frightened(&self, id: EntityId) -> bool {
+        matches!(self.get(id, "_fleeing"), Some(Value::Int(n)) if *n > 0)
+    }
+
+    /// Badly hurt, by its own `morale`.
+    pub fn is_demoralized(&self, id: EntityId) -> bool {
+        let m = i64::from(self.morale_of(id));
+        m > 0 && matches!((self.health(id), self.def(id).health), (Some(h), Some(max)) if h * 100 <= i64::from(max) * m)
+    }
+
+    /// Whom `npc` wants to get away from, if anyone: the player, while
+    /// frightened; or, with `morale`, an enemy here when it's badly hurt or
+    /// outnumbered.
+    fn threat(&self, npc: EntityId) -> Option<EntityId> {
+        if self.is_frightened(npc) {
+            return self.together(npc, PLAYER).then_some(PLAYER);
+        }
+        if self.morale_of(npc) == 0 {
+            return None;
+        }
+        let room = self.room_of(npc)?;
+        // Everyone else in the room (the player is entity 0, so already among them).
+        let here: Vec<EntityId> = (0..self.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&c| c != npc && self.room_of(c) == Some(room) && (c == PLAYER || self.is_active(c)))
+            .collect();
+        let enemies: Vec<EntityId> = here
+            .iter()
+            .copied()
+            .filter(|&c| (self.is_hostile(npc, c) || self.is_hostile(c, npc)) && self.can_see(npc, c))
+            .collect();
+        let faction = self.def(npc).faction.clone();
+        let allies = 1 + here.iter().filter(|&&c| c != PLAYER && faction.is_some() && self.def(c).faction == faction).count();
+        let first = enemies.first().copied()?;
+        (self.is_demoralized(npc) || enemies.len() > allies).then_some(first)
+    }
+
+    /// Runs from `threat`: to a neighbouring room it isn't in, and with no
+    /// enemy of `npc` in it if possible. None: cornered.
+    fn flee(&mut self, npc: EntityId, threat: EntityId) -> Option<NpcEvent> {
+        let room = self.room_of(npc)?;
+        let exits = self.npc_exits(npc, room);
+        let safe = |w: &World, to: EntityId| {
+            w.room_of(threat) != Some(to)
+                && !(0..w.story().entities.len() as u32)
+                    .map(EntityId)
+                    .any(|c| w.room_of(c) == Some(to) && w.is_active(c) && w.is_hostile(c, npc))
+        };
+        let pick = exits
+            .iter()
+            .copied()
+            .find(|&(_, to)| safe(self, to))
+            .or_else(|| exits.iter().copied().find(|&(_, to)| self.room_of(threat) != Some(to)))?;
+        match self.npc_move(npc, pick.0, pick.1)? {
+            NpcEvent::Moved { npc, from, to, direction } => Some(NpcEvent::Fled { npc, from, to, direction }),
+            other => Some(other),
+        }
+    }
+
     /// Takes the player's orders: tamed, or `obeys`.
     pub fn obeys(&self, id: EntityId) -> bool {
         self.is_tamed(id) || self.def(id).npc.as_ref().is_some_and(|n| n.obeys)
@@ -1096,6 +1178,24 @@ impl World {
         }
         let eater = self.faction(npc).is_some_and(|f| f.eats_corpses);
 
+        // Fear comes first: run, unless cornered.
+        if let Some(Value::Int(n)) = self.get(npc, "_fleeing").cloned()
+            && n > 0
+        {
+            self.set(npc, "_fleeing", Value::Int(n - 1));
+        }
+        match self.threat(npc) {
+            Some(threat) => {
+                if let Some(event) = self.flee(npc, threat) {
+                    return vec![event];
+                }
+                // Cornered: it fights.
+            }
+            // Scared or badly hurt, with nobody here: it keeps its head down
+            // rather than going looking for trouble.
+            None if self.is_frightened(npc) || self.is_demoralized(npc) => return Vec::new(),
+            None => {}
+        }
         // Someone who attacked it is here: fight back, before anything else
         // (even food).
         if let Some(&foe) = self.foes_here(npc).first() {

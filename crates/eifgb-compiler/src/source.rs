@@ -343,6 +343,12 @@ pub struct Thing {
     /// Takes orders from the player.
     #[serde(default)]
     pub obeys: Option<bool>,
+    /// Flees below this percent of its health, or when outnumbered.
+    #[serde(default)]
+    pub morale: Option<u32>,
+    /// Things it fears: object IDs, or `fire`.
+    #[serde(default)]
+    pub fears: Vec<String>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,
@@ -457,6 +463,12 @@ pub struct Faction {
     /// Members see in unlit rooms.
     #[serde(default)]
     pub sees_in_dark: bool,
+    /// Members flee below this percent of their health, or when outnumbered.
+    #[serde(default)]
+    pub morale: Option<u32>,
+    /// What members fear: object IDs, or `fire`.
+    #[serde(default)]
+    pub fears: Vec<String>,
     /// How many members the player can provoke before the faction turns
     /// on them (as themselves, or in its disguise). Defaults to 2.
     #[serde(default)]

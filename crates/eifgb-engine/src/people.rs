@@ -259,6 +259,14 @@ impl<H: ScriptHost> Game<H> {
                     self.hear(room, "npc.eating_nearby");
                 }
             }
+            NpcEvent::Fled { npc, from, to, direction } => {
+                if from == here {
+                    let dir = self.grammar.direction_word(direction);
+                    self.msg("npc.flees", &who(Ctx::new(), "npc", npc).text("direction", dir));
+                } else if to == here {
+                    self.msg("npc.arrives", &who(Ctx::new(), "npc", npc));
+                }
+            }
             NpcEvent::Discovered { npc, body, room, ref attitude } => {
                 if room == here && !self.world.player_hidden() {
                     self.msg("npc.discovers", &Ctx::new().entity("npc", npc).entity("target", body));
@@ -646,6 +654,10 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("order.pacifist", &ctx);
                     return false;
                 }
+                if self.world.is_demoralized(npc) || self.world.is_frightened(npc) {
+                    self.msg("order.too_scared", &ctx);
+                    return false;
+                }
                 let key = self.world.def(t).key.clone();
                 self.world.set_order(npc, Some("attack"), Some(key));
                 self.msg("order.attack", &ctx.entity("target", t));
@@ -703,6 +715,30 @@ impl<H: ScriptHost> Game<H> {
 
     fn grammar_direction(&self, w: &str) -> Option<eifgb_ir::Direction> {
         self.grammar.direction_of(w)
+    }
+
+    /// BRANDISH TORCH (AT WOLF): whoever here fears it, and can see it,
+    /// panics and runs.
+    pub(crate) fn brandish_action(&mut self, t: EntityId, at: Option<EntityId>, ctx: &Ctx) -> bool {
+        if self.world.location(t) != Some(PLAYER) {
+            self.msg("throw.not_held", ctx);
+            return false;
+        }
+        self.msg("brandish.done", ctx);
+        let scared: Vec<EntityId> = (0..self.world.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&c| at.is_none_or(|a| a == c))
+            .filter(|&c| self.world.is_active(c) && self.world.together(c, PLAYER) && !self.world.is_asleep(c))
+            .filter(|&c| self.world.can_see(c, PLAYER) && self.world.fears(c, t))
+            .collect();
+        if scared.is_empty() {
+            self.msg("brandish.nothing", ctx);
+        }
+        for c in scared {
+            self.world.panic(c);
+            self.msg("npc.afraid", &Ctx::new().entity("npc", c));
+        }
+        true
     }
 
     /// CALL X Y: names something `nameable`.

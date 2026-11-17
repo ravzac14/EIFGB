@@ -2998,3 +2998,88 @@ fn not_everyone_takes_orders() {
     assert_eq!(say(&mut g, "tell pup to attack me"), "The wolf pup won't attack you.");
     assert_eq!(say(&mut g, "pup, drop it"), "The wolf pup isn't carrying anything.");
 }
+
+// ------------------------------------------------------------ fear, morale
+
+const FEAR: &str = r#"format: eifgb/0.1
+game: { id: f, title: Fear, version: "1", start: clearing }
+player: { health: 40, damage: 4 }
+factions:
+  wolves: { hostile_to: [player], fears: [fire], morale: 40 }
+rooms:
+  clearing: { name: Clearing, exits: { north: woods, east: thicket } }
+  woods: { name: Woods, exits: { south: clearing } }
+  thicket: { name: Thicket, exits: { west: clearing } }
+  pit: { name: Pit }
+objects:
+  torch: { name: torch, in: player, traits: [portable, light_source], state: { lit: true } }
+  stick: { name: stick, in: player, traits: [portable] }
+characters:
+  wolf: { name: wolf, in: clearing, faction: wolves, behavior: hunter, wander: 0, range: 0, health: 10, damage: 1 }
+  rat: { name: rat, in: pit, behavior: guard, health: 5, damage: 1, morale: 50 }
+"#;
+
+#[test]
+fn brandishing_what_they_fear_sends_them_running() {
+    let mut g = game(compile_str(FEAR).story.unwrap());
+    assert_says(&mut g, "wave stick at wolf", "Nobody seems impressed.");
+    let out = say(&mut g, "brandish torch");
+    assert!(out.contains("The wolf shrinks back in fear!") && out.contains("The wolf flees north!"), "{out}");
+    // It keeps away while it's frightened.
+    assert!(!say(&mut g, "z").contains("wolf"));
+}
+
+#[test]
+fn a_badly_hurt_character_flees_with_morale() {
+    let mut g = game(compile_str(FEAR).story.unwrap());
+    say(&mut g, "hit wolf");
+    // 2 of 10 left is under its faction's 40% morale.
+    assert_says(&mut g, "hit wolf", "The wolf flees north!");
+}
+
+#[test]
+fn outnumbered_characters_run() {
+    // Two hostile wolves against it: the lone deer (morale 10) runs.
+    let src = FEAR.replace("characters:
+", "characters:
+  deer: { name: deer, in: clearing, faction: deer, health: 10, morale: 10, fights_back: false }
+  wolf2: { name: second wolf, in: clearing, faction: wolves, behavior: hunter, wander: 0, range: 0, health: 10 }
+")
+        .replace("  wolves: { hostile_to: [player], fears: [fire], morale: 40 }", "  wolves: { hostile_to: [player, deer], fears: [fire], morale: 40 }
+  deer: {}");
+    let mut g = game(compile_str(&src).unwrap_or_else_story());
+    assert_says(&mut g, "z", "The deer flees");
+}
+
+trait StoryOrPanic {
+    fn unwrap_or_else_story(self) -> eifgb_engine::ir::Story;
+}
+impl StoryOrPanic for eifgb_compiler::Output {
+    fn unwrap_or_else_story(self) -> eifgb_engine::ir::Story {
+        let d = format!("{:#?}", self.diagnostics);
+        self.story.unwrap_or_else(|| panic!("{d}"))
+    }
+}
+
+#[test]
+fn a_cornered_character_fights() {
+    let src = FEAR
+        .replace("  rat: { name: rat, in: pit", "  rat: { name: rat, in: clearing")
+        .replace("  wolf: { name: wolf, in: clearing", "  wolf: { name: wolf, in: pit")
+        .replace("  clearing: { name: Clearing, exits: { north: woods, east: thicket } }", "  clearing: { name: Clearing }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "hit rat");
+    // Nowhere to run: it fights on, even demoralised.
+    assert!(say(&mut g, "z").contains("The rat attacks you."));
+}
+
+#[test]
+fn a_scared_companion_wont_attack() {
+    // A companion at 2 of 10 health, under its 50% morale.
+    let src = FEAR.replace(
+        "rat: { name: rat, in: pit, behavior: guard, health: 5, damage: 1, morale: 50 }",
+        "rat: { name: rat, in: clearing, behavior: follower, obeys: true, health: 10, morale: 50 }",
+    ) + "on:\n  start: 'world.rat.health = 2'\n";
+    let mut g = game(compile_str(&src).unwrap_or_else_story());
+    assert_says(&mut g, "tell rat to attack the wolf", "The rat is too scared.");
+}

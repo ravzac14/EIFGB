@@ -120,6 +120,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Steal, t) => self.steal_action(t, cmd.tool, ctx),
             (A::Eavesdrop, t) => self.eavesdrop_action(t, cmd.direction, ctx),
             (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
+            (A::Brandish, Some(t)) => self.brandish_action(t, cmd.tool, ctx),
             (A::Light, Some(t)) => self.light(t, true, ctx),
             (A::Extinguish, Some(t)) => self.light(t, false, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
@@ -513,6 +514,9 @@ impl<H: ScriptHost> Game<H> {
         if w.is_asleep(id) && !w.is_dead(id) {
             notes.push(StateNote::Builtin("asleep"));
         }
+        if w.is_frightened(id) && !w.is_dead(id) {
+            notes.push(StateNote::Builtin("frightened"));
+        }
         if w.is_dead(id) {
             notes.push(StateNote::Builtin("dead"));
             if w.get(id, "killed_by").is_some() {
@@ -585,8 +589,8 @@ impl<H: ScriptHost> Game<H> {
     /// that are "on" get a tag; the rest would just be noise in a list.
     /// Tags only appear once the player has examined or handled the thing.
     pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
-        // Death, and sleep, are plain to see.
-        if !self.world.known(id) && !self.world.is_dead(id) && !self.world.is_asleep(id) {
+        // Death, sleep and terror are plain to see.
+        if !self.world.known(id) && !self.world.is_dead(id) && !self.world.is_asleep(id) && !self.world.is_frightened(id) {
             return Vec::new();
         }
         self.state_notes(id)
@@ -648,6 +652,7 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
             StateNote::Builtin("dead") => self.mentions(text, id, &["dead"], is_own),
             StateNote::Builtin("asleep") => self.mentions(text, id, &["asleep"], is_own),
+            StateNote::Builtin("frightened") => false,
             StateNote::Builtin("killed") => self.mentions(text, id, &["killed_by", "killed_with"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),

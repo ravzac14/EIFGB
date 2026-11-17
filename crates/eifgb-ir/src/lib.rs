@@ -104,6 +104,12 @@ pub struct Faction {
     /// Members see in unlit rooms.
     #[serde(default)]
     pub sees_in_dark: bool,
+    /// Members flee below this percent of their health, or when outnumbered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub morale: Option<u32>,
+    /// What members fear: object keys, or `fire`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fears: Vec<String>,
     /// The faction's starting attitude toward a side it isn't hostile to,
     /// including a player disguised as one of its own: how many of its
     /// members the player can turn into foes before the whole faction
@@ -408,6 +414,13 @@ pub struct Npc {
     /// Takes orders from the player (tamed characters always do).
     #[serde(default)]
     pub obeys: bool,
+    /// Flees below this percent of its health, or when outnumbered. None
+    /// means its faction's, or never.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub morale: Option<u32>,
+    /// Things it's afraid of: object keys, or `fire` for anything burning.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fears: Vec<String>,
 }
 
 /// A line of chatter between characters.
@@ -929,6 +942,8 @@ pub enum BuiltinAction {
     Eavesdrop,
     /// Tell a companion what to do: TELL REX TO STAY.
     Order,
+    /// Wave something about, to frighten whoever fears it.
+    Brandish,
 }
 
 impl BuiltinAction {

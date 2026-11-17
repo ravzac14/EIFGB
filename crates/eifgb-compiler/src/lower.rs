@@ -164,6 +164,26 @@ impl<'a> Lowerer<'a> {
                 faction_ref("eaten_by", f);
             }
         }
+        // Fears name objects, or `fire`; morale is a percentage.
+        let check_fears = |d: &mut Diagnostics, path: String, fears: &[String], morale: Option<u32>| {
+            for (i, f) in fears.iter().enumerate() {
+                if f != "fire" && !entities.iter().any(|e| &e.key == f) {
+                    let hint = did_you_mean(f, entities.iter().map(|e| e.key.as_str()).chain(["fire"]));
+                    d.error(format!("{path}.fears[{i}]"), format!("unknown object '{f}'{hint}; fears name objects, or 'fire'"));
+                }
+            }
+            if morale.is_some_and(|m| m > 100) {
+                d.error(format!("{path}.morale"), "'morale' is a percentage, so it can't be more than 100");
+            }
+        };
+        for e in &entities {
+            if let Some(n) = &e.npc {
+                check_fears(self.d, format!("characters.{}", e.key), &n.fears, n.morale);
+            }
+        }
+        for f in &factions {
+            check_fears(self.d, format!("factions.{}", f.key), &f.fears, f.morale);
+        }
         for e in &entities {
             let path = format!("characters.{}.faction", e.key);
             if let Some(f) = &e.faction
@@ -830,6 +850,8 @@ impl<'a> Lowerer<'a> {
                 ("tracker", t.tracker.is_some()),
                 ("chatter", !t.chatter.is_empty()),
                 ("obeys", t.obeys.is_some()),
+                ("morale", t.morale.is_some()),
+                ("fears", !t.fears.is_empty()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -932,6 +954,8 @@ impl<'a> Lowerer<'a> {
                 })
                 .collect(),
             obeys: t.obeys.unwrap_or(false),
+            morale: t.morale,
+            fears: t.fears.clone(),
         })
     }
 
@@ -1322,6 +1346,8 @@ impl<'a> Lowerer<'a> {
                 kills: f.kills.clone(),
                 prints: f.prints.clone(),
                 sees_in_dark: f.sees_in_dark,
+                morale: f.morale,
+                fears: f.fears.clone(),
                 patience: f.patience.unwrap_or(2),
             });
         }

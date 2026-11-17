@@ -995,7 +995,17 @@ characters:
 
 ### Tricks players can find
 
-Sixteen features reward players who try something clever:
+Seventeen features reward players who try something clever:
+
+- **Fear and morale:** a character or faction with `morale: 40` flees its
+  enemies once it's below 40% of its health, or when it's outnumbered in
+  the room (more enemies than allies): "The wolf flees north!" With
+  `fears: [torch]` (object IDs, or `fire` for anything burning), BRANDISH
+  TORCH (WAVE, SHOW … TO, THRUST … AT) makes it panic ("The wolf shrinks
+  back in fear!") and run for three turns, tagged "(frightened)". A
+  frightened or badly hurt character keeps away rather than hunting; one
+  with nowhere to run fights. A companion in that state is "too scared"
+  to attack on orders. Without `morale`, characters never flee.
 
 - **Giving orders:** tamed characters, and any with `obeys: true` (a
   hireling, a soldier), take orders: TELL REX TO … (or ORDER, ASK,
@@ -1346,7 +1356,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …),
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1379,9 +1389,9 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`; rooms can be `trackless`,
+`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`, `morale`, `fears`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
-`patience`, `prints` and `sees_in_dark`; objects
+`patience`, `prints`, `sees_in_dark`, `morale` and `fears`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable` and (worn) `sees_in_dark`; the player can have `health`,
 `damage`, `money`, `voice` and `sees_in_dark`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).

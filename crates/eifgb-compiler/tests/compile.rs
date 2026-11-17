@@ -542,3 +542,13 @@ fn dark_sight_on_objects_needs_wearing() {
     let out = with("player: { sees_in_dark: true }\n");
     assert!(out.story.is_some(), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn fears_and_morale_are_checked() {
+    let out = with("characters:\n  w: { name: w, in: hall, fears: [torhc], morale: 30 }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown object 'torhc'"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  f: { fears: [fire], morale: 150 }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("percentage"), "{:#?}", out.diagnostics);
+    let out = with("factions:\n  f: { fears: [fire], morale: 40 }\n");
+    assert!(out.story.is_some(), "{:#?}", out.diagnostics);
+}

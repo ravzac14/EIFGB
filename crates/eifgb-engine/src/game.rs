@@ -368,6 +368,7 @@ impl<H: ScriptHost> Game<H> {
             }
             Failure::Partial { verb } => self.msg("parser.partial", &ctx.text("verb", verb)),
             Failure::UnknownWord { word } => self.msg("parser.unknown_word", &ctx.text("word", word)),
+            Failure::NotHere if self.world.in_darkness() => self.msg("parser.dark", &ctx),
             Failure::NotHere => self.msg("parser.not_here", &ctx),
             Failure::Scenery => self.msg("parser.scenery", &ctx),
             Failure::NoPronoun => self.msg("parser.no_pronoun", &ctx),

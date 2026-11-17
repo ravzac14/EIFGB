@@ -791,6 +791,8 @@ impl BuiltinAction {
                 | A::Enter
                 | A::Empty
                 | A::Attack
+                | A::Light
+                | A::Extinguish
         )
     }
 }
@@ -887,6 +889,10 @@ pub enum BuiltinAction {
     Sneak,
     /// Get an impression of the next room, through a door or a way out.
     Peek,
+    /// Light a `light_source`.
+    Light,
+    /// Put out a `light_source`.
+    Extinguish,
 }
 
 impl BuiltinAction {

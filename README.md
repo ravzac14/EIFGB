@@ -995,7 +995,18 @@ characters:
 
 ### Tricks players can find
 
-Twelve features reward players who try something clever:
+Thirteen features reward players who try something clever:
+
+- **Darkness:** a room with `dark: true` can only be seen in by the light
+  of a `light_source` that's lit (`lit` or `on`) and in plain sight:
+  lying there, carried by the player or anyone else, but not shut in a
+  bag. In the dark, LOOK gives "Darkness / It's pitch dark. You can't
+  see a thing.", the player can only handle what they're holding
+  ("It's too dark to see."), and characters are just "Something":
+  "Something attacks you." Moving still works, to feel your way out.
+  LIGHT LAMP (TURN ON, SWITCH ON, IGNITE) and EXTINGUISH LAMP (PUT OUT,
+  BLOW OUT, TURN OFF, SNUFF) are standard verbs for light sources;
+  lighting one in the dark shows the room at once.
 
 - **Peeking:** PEEK THROUGH THE DOOR, PEEK NORTH, PEER NORTH or LOOK
   NORTH gives an impression of the next room without going in or being
@@ -1012,8 +1023,7 @@ Twelve features reward players who try something clever:
   You peer down. It's too dark to make anything out.
   ```
 
-  A room with `dark: true` shows nothing unless something in it is a
-  `light_source` that's `lit` (or `on`). (That's all `dark` does for now.)
+  A dark room (below) shows nothing.
 
 - **Sleep and sneaking:** a character with `asleep: true` in its state (or
   put to sleep by a timer or script: `world.guard.asleep = true`) does
@@ -1272,6 +1282,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
+LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 

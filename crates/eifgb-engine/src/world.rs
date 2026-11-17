@@ -309,6 +309,12 @@ impl World {
     /// carry. Hidden things are left out, except for things the player carries.
     pub fn scope(&self) -> Vec<EntityId> {
         let mut out = Vec::new();
+        // In the dark, only what the player is holding.
+        if self.in_darkness() {
+            out.push(PLAYER);
+            self.collect_visible(PLAYER, &mut out);
+            return out;
+        }
         let here = self.here();
         let ceiling = self.ceiling();
         out.push(ceiling);

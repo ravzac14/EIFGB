@@ -289,15 +289,9 @@ You add more branches to the pile in your arms.
 ## Step 4: lighting the fire
 
 The fire pit gets a `burning` state, and LIGHT FIRE checks everything
-needed before it lights. Add the verb:
-
-```yaml
-  light:
-    patterns: ["light {target}", "light {target} with {tool}", "start {target}"]
-    default: "That won't burn."
-```
-
-and the pit:
+needed before it lights. LIGHT is a standard verb (it lights lamps and
+anything else with the `light_source` trait), so there's no verb to add:
+the pit's own handlers hook into it. Add the pit:
 
 ```yaml
   fire_pit:
@@ -340,8 +334,12 @@ and the pit:
   out.
 - **`score(5)`** adds points. Set `max_score: 10` under `game:` so SCORE
   says "out of a possible 10".
-- **`{tool}`** lets players type `light fire with matches`. The handler
-  doesn't need it, but a different game could check `args.tool`.
+- **LIGHT FIRE WITH MATCHES** works too: the standard verb has a `{tool}`
+  pattern. The handler doesn't need it, but a different game could check
+  `args.tool`.
+- **Hooking a standard verb:** `light` on an object runs instead of the
+  built-in LIGHT, for that object only. Anything else the player tries to
+  light gets the standard reply.
 
 `fire_words()` and `start_timer` come in the next step. Add `burn_wood` to
 `camp.lua`; it uses up wood, and puts the firewood back off-stage when

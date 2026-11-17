@@ -441,6 +441,25 @@ impl World {
             .any(|c| self.is_active(c) && self.together(c, PLAYER))
     }
 
+    /// A light source that's burning: `lit` or `on`.
+    pub fn is_burning(&self, id: EntityId) -> bool {
+        self.has(id, eifgb_ir::Trait::LightSource) && (self.flag(id, "lit") || self.flag(id, "on"))
+    }
+
+    /// Whether `room` can be seen in: it isn't `dark`, or a burning light
+    /// is there in plain sight (lying about, or carried by anyone).
+    pub fn is_lit(&self, room: EntityId) -> bool {
+        !self.def(room).dark
+            || (0..self.story().entities.len() as u32)
+                .map(EntityId)
+                .any(|i| self.room_of(i) == Some(room) && self.is_burning(i) && self.in_plain_sight(i))
+    }
+
+    /// Whether the player is in the dark.
+    pub fn in_darkness(&self) -> bool {
+        !self.is_lit(self.here())
+    }
+
     /// Whether something can be seen where it is: not shut away inside
     /// anything closed that can't be seen into.
     pub fn in_plain_sight(&self, id: EntityId) -> bool {

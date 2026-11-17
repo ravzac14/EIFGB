@@ -187,9 +187,6 @@ verbs:
   gather:
     patterns: ["gather {target}", "collect {target}"]
     default: "There's nothing to gather."
-  light:
-    patterns: ["light {target}", "light {target} with {tool}", "start {target}"]
-    default: "That won't burn."
   stoke:
     patterns: ["stoke {target}", "feed {target}", "add wood to {target}"]
     default: "That doesn't need feeding."

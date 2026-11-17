@@ -475,7 +475,7 @@ fn only_doors_or_conditions_can_tell_same_direction_exits_apart() {
 
 // ------------------------------------------------- author-defined states
 
-const GADGETS: &str = "objects:\n  lamp: { name: lamp, in: hall, traits: [portable], description: A brass lamp., state: { is_lit: false, fuel: 3, _uses: 7 } }\n  radio: { name: radio, in: hall, traits: [scenery], state: { broken: true, channel: \"sixteen\" } }\nverbs:\n  light: { patterns: ['light {target}'] }\non:\n  light: 'args.target.is_lit = true; args.target.fuel = args.target.fuel - 1'\n";
+const GADGETS: &str = "objects:\n  lamp: { name: lamp, in: hall, traits: [portable], description: A brass lamp., state: { is_lit: false, fuel: 3, _uses: 7 } }\n  radio: { name: radio, in: hall, traits: [scenery], state: { broken: true, channel: \"sixteen\" } }\non:\n  light: 'args.target.is_lit = true; args.target.fuel = args.target.fuel - 1'\n";
 
 #[test]
 fn author_states_are_described_from_their_names() {
@@ -1165,10 +1165,9 @@ objects:
     name: fuse
     in: hall
     traits: [scenery]
-    on: { measure: 'say(timer_left(\"fuse\") or \"It is not lit.\")' }
+    on: { measure: 'say(timer_left(\"fuse\") or \"It is not lit.\")', light: 'say(\"The fuse sputters into life.\")' }
   tap: { name: tap, in: hall, traits: [scenery] }
 verbs:
-  light: { patterns: ['light {target}'], default: 'The fuse sputters into life.' }
   measure: { patterns: ['measure {target}'], reach: false }
 endings:
   boom: { kind: loss, text: BOOM. }
@@ -2656,4 +2655,61 @@ fn peeking_into_a_lit_room_full_of_things_and_somewhere_youve_been() {
     // Somewhere the player has been is named.
     assert_says(&mut g, "peek south", "You peer through the oak door into the Corridor.");
     assert_says(&mut g, "look through the guard", "You can't see through the guard.");
+}
+
+// ---------------------------------------------------------------- darkness
+
+const DARK: &str = r#"format: eifgb/0.1
+game: { id: d, title: Dark, version: "1", start: hall }
+player: { health: 30 }
+rooms:
+  hall: { name: Hall, exits: { down: cellar } }
+  cellar: { name: Cellar, dark: true, description: Damp stone walls and a smell of mould., exits: { up: hall, east: crypt } }
+  crypt: { name: Crypt, dark: true, exits: { west: cellar } }
+objects:
+  lantern: { name: lantern, in: player, traits: [portable, light_source], state: { lit: false } }
+  bag: { name: bag, in: player, traits: [portable, container, openable] }
+  barrel: { name: barrel, in: cellar, traits: [scenery] }
+  coin: { name: coin, in: cellar, traits: [portable] }
+characters:
+  rat: { name: rat, in: crypt, behavior: hunter, range: 1, wander: 0, health: 3, damage: 1 }
+"#;
+
+#[test]
+fn in_the_dark_you_see_nothing_but_what_you_hold() {
+    let mut g = game(compile_str(DARK).story.unwrap());
+    let out = say(&mut g, "d");
+    assert!(out.contains("Darkness
+It's pitch dark. You can't see a thing.") && !out.contains("mould"), "{out}");
+    // Whoever it is, it's just "something".
+    assert!(out.contains("Something arrives."), "{out}");
+    assert_says(&mut g, "x barrel", "It's too dark to see.");
+    assert_says(&mut g, "take coin", "It's too dark to see.");
+    assert_says(&mut g, "i", "You're carrying a lantern and a bag (closed).");
+    assert_says(&mut g, "z", "Something attacks you.");
+}
+
+#[test]
+fn lighting_a_lamp_shows_the_room_and_putting_it_out_hides_it() {
+    let mut g = game(compile_str(DARK).story.unwrap());
+    say(&mut g, "d");
+    let out = say(&mut g, "light lantern");
+    assert!(out.starts_with("You light the lantern.\nCellar\nDamp stone walls"), "{out}");
+    assert_says(&mut g, "take coin", "Taken.");
+    assert_says(&mut g, "turn off lantern", "It's pitch dark.");
+    assert_says(&mut g, "turn lantern on", "Cellar");
+    assert_says(&mut g, "light lantern", "The lantern is already lit.");
+    assert_says(&mut g, "light bag", "You can't light the bag.");
+}
+
+#[test]
+fn a_lamp_shut_in_a_bag_gives_no_light() {
+    let mut g = game(compile_str(DARK).story.unwrap());
+    say(&mut g, "light lantern");
+    say(&mut g, "open bag");
+    say(&mut g, "put lantern in bag");
+    say(&mut g, "d");
+    assert_says(&mut g, "look", "You can see a coin");
+    say(&mut g, "close bag");
+    assert_says(&mut g, "look", "It's pitch dark.");
 }

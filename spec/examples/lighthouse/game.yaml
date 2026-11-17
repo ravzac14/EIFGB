@@ -175,7 +175,8 @@ characters:
         say(what, " passes straight through him. He doesn't seem to notice.")
 
 # ---------------------------------------------------------------- verbs
-# Custom verbs and their grammar. {target} is the direct object, {tool}
+# Custom verbs and their grammar. (LIGHT is standard: the great lamp's
+# before_light and light handlers hook into it.) {target} is the direct object, {tool}
 # is the indirect object, and {text} is free text. Handlers on the
 # target object run first; `default` is the reply when nothing handles it.
 # Built-in verbs (take, drop, examine, open, unlock, go, search...) don't
@@ -188,9 +189,6 @@ verbs:
       - "pour {tool} into {target}"
       - "refuel {target} with {tool}"
     default: "You can't fill that."
-  light:
-    patterns: ["light {target}", "ignite {target}", "turn on {target}"]
-    default: "That won't burn."
   use:
     patterns: ["use {target}"]
     default: "You're not sure how."

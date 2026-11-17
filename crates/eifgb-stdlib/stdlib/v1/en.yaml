@@ -281,6 +281,28 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  light:
+    action: light
+    patterns:
+      - "light {target}"
+      - "light {target} with {tool}"
+      - "ignite {target}"
+      - "turn on {target}"
+      - "turn {target} on"
+      - "switch on {target}"
+      - "switch {target} on"
+  extinguish:
+    action: extinguish
+    patterns:
+      - "extinguish {target}"
+      - "put out {target}"
+      - "blow out {target}"
+      - "snuff {target}"
+      - "douse {target}"
+      - "turn off {target}"
+      - "turn {target} off"
+      - "switch off {target}"
+      - "switch {target} off"
   peek:
     action: peek
     reach: false
@@ -460,6 +482,15 @@ messages:
   parser.unknown_word: "I don't know the word \"${args.word}\"."
   parser.not_here: "You can't see any such thing."
   parser.scenery: "That's just part of the scenery."
+  parser.dark: "It's too dark to see."
+  look.dark_title: "Darkness"
+  look.dark: "It's pitch dark. You can't see a thing."
+  light.done: "You light ${the(args.target)}."
+  light.already: "${The(args.target)} is already lit."
+  light.cant: "You can't light ${the(args.target)}."
+  extinguish.done: "You put out ${the(args.target)}."
+  extinguish.not_lit: "${The(args.target)} isn't lit."
+  extinguish.cant: "You can't put out ${the(args.target)}."
   # characters acting
   npc.leaves: "${The(args.npc)} goes ${args.direction}."
   npc.arrives: "${The(args.npc)} arrives."

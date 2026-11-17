@@ -47,8 +47,8 @@ impl<H: ScriptHost> Game<H> {
         let in_room = |w: &crate::World, id: EntityId| w.location(id) == Some(room);
         let lit = (0..self.world.story().entities.len() as u32)
             .map(EntityId)
-            .any(|i| self.world.room_of(i) == Some(room) && self.world.has(i, Trait::LightSource) && (self.world.flag(i, "lit") || self.world.flag(i, "on")));
-        if self.world.def(room).dark && !lit {
+            .any(|i| self.world.room_of(i) == Some(room) && self.world.is_burning(i) && self.world.in_plain_sight(i));
+        if !self.world.is_lit(room) {
             sentences.push(self.msg_str("peek.dark", &Ctx::new()));
         } else {
             let people: Vec<EntityId> = self

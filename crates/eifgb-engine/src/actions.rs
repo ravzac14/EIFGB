@@ -112,6 +112,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Bury, Some(t)) => self.bury_action(t, ctx),
             (A::Sneak, _) => self.sneak_action(cmd, ctx),
             (A::Peek, t) => self.peek_action(t, cmd.direction, ctx),
+            (A::Light, Some(t)) => self.light(t, true, ctx),
+            (A::Extinguish, Some(t)) => self.light(t, false, ctx),
             (A::FollowTracks, _) => self.follow_tracks_action(cmd.text.as_deref(), ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),
@@ -134,6 +136,11 @@ impl<H: ScriptHost> Game<H> {
 
     pub(crate) fn look(&mut self) {
         let here = self.world.here();
+        if self.world.in_darkness() {
+            self.msg_kind(LineKind::Title, "look.dark_title", &Ctx::new());
+            self.msg("look.dark", &Ctx::new());
+            return;
+        }
         let (name, description, exits) = {
             let d = self.world.def(here);
             (d.name.clone(), d.description.clone(), d.exits.clone())
@@ -706,6 +713,30 @@ impl<H: ScriptHost> Game<H> {
             }
         };
         self.push_sentence(s, attach);
+    }
+
+    // ------------------------------------------------------------ light
+
+    /// LIGHT / EXTINGUISH a `light_source`. Lighting one in the dark shows
+    /// the room; putting the last one out plunges it into darkness.
+    fn light(&mut self, t: EntityId, on: bool, ctx: &Ctx) -> bool {
+        if !self.world.has(t, Trait::LightSource) {
+            self.msg(if on { "light.cant" } else { "extinguish.cant" }, ctx);
+            return false;
+        }
+        if self.world.is_burning(t) == on {
+            self.msg(if on { "light.already" } else { "extinguish.not_lit" }, ctx);
+            return false;
+        }
+        let was_dark = self.world.in_darkness();
+        // Switch-style lights keep `on`; everything else is `lit`.
+        let field = if self.world.get(t, "on").is_some() { "on" } else { "lit" };
+        self.world.set(t, field, Value::Bool(on));
+        self.msg(if on { "light.done" } else { "extinguish.done" }, ctx);
+        if was_dark != self.world.in_darkness() {
+            self.look();
+        }
+        true
     }
 
     // ---------------------------------------------------- taking and dropping

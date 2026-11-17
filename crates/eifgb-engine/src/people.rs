@@ -69,17 +69,20 @@ impl<H: ScriptHost> Game<H> {
     /// Describes what a character did, if the player is there to see it.
     pub(crate) fn narrate(&mut self, event: &NpcEvent) {
         let here = self.world.here();
+        // In the dark, whoever it is, it's just "something".
+        let dark = self.world.in_darkness();
+        let who = |c: Ctx, key: &str, id: EntityId| if dark && id != PLAYER { c.text(key, "something") } else { c.entity(key, id) };
         match *event {
             NpcEvent::Moved { npc, from, to, direction } => {
                 if from == here {
                     let dir = self.grammar.direction_word(direction);
-                    self.msg("npc.leaves", &Ctx::new().entity("npc", npc).text("direction", dir));
+                    self.msg("npc.leaves", &who(Ctx::new(), "npc", npc).text("direction", dir));
                 } else if to == here {
-                    self.msg("npc.arrives", &Ctx::new().entity("npc", npc));
+                    self.msg("npc.arrives", &who(Ctx::new(), "npc", npc));
                 }
             }
             NpcEvent::Attacked { attacker, target, weapon, tolerated, ref attitude, .. } => {
-                let mut ctx = Ctx::new().entity("npc", attacker).entity("target", target);
+                let mut ctx = who(who(Ctx::new(), "npc", attacker), "target", target);
                 if let Some(w) = weapon {
                     ctx = ctx.entity("weapon", w);
                 }

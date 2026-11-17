@@ -1,16 +1,19 @@
 # Ideas for later
 
-Things a creative player might try, that we'd like the engine to support
-one day. Each builds on something that already exists. Built so far from
-the same list: disguises, bait, corpse stories, hiding, making noise, apologies (calming
-down, by asking), haggling, taming, gifts
-and bribes, and throwing.
+Things a creative player might try, that we'd like the engine to support.
+Each builds on something that already exists.
 
-## Naming things
+Everything from the first list has now been built:
 
-CALL THE DOG REX, and from then on "rex" works and the game calls it Rex.
+- **Disguises, bait, corpse stories and hiding:** see "Tricks players can
+  find" in the README, and the advanced tutorial.
+- **Making noise:** SHOUT, timer noises, `make_noise`.
+- **Calming down:** apologies, which are manual and limited, and also
+  restore a faction's attitude.
+- **Haggling:** OFFER … FOR when buying, SELL … FOR when selling, and ACCEPT.
+- **Taming and gifts:** `tame_with`, `likes` and `bribe`.
+- **Throwing:** THROW … AT / THROW … NORTH, and companions that fetch.
+- **Naming things:** CALL THE DOG REX, with `nameable`.
 
-- Builds on: the parser's vocabulary and entity names.
-- Shape: per-game renaming: a `name` and extra vocabulary in entity state,
-  read by the parser and by `a()`/`the()`; `nameable: true` on characters.
-- Effort: medium (names and vocabulary are fixed in the story today).
+Add new ideas below, each with what it builds on, its shape, and a rough
+effort.

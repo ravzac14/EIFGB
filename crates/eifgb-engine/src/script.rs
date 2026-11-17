@@ -84,7 +84,7 @@ impl ScriptValue {
             ScriptValue::Float(f) if f.fract() == 0.0 && f.abs() < 1e15 => format!("{}", *f as i64),
             ScriptValue::Float(f) => f.to_string(),
             ScriptValue::Str(s) => s.clone(),
-            ScriptValue::Entity(id) => world.def(*id).name.clone(),
+            ScriptValue::Entity(id) => world.display_name(*id),
             ScriptValue::Block => String::new(),
             ScriptValue::Other(kind) => format!("[{kind}]"),
         }

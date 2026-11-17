@@ -245,7 +245,7 @@ fn kind_name(k: EntityKind) -> &'static str {
 }
 
 /// Fields every entity has. Scripts can read them but not assign them.
-const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location"];
+const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper"];
 
 impl ScriptHost for LuaHost {
     fn load(&mut self, story: &Story) -> Result<(), ScriptError> {
@@ -308,7 +308,8 @@ impl ScriptHost for LuaHost {
                         let s = |s: &str| lua.create_string(s).map(mlua::Value::String);
                         Ok(match k.as_str() {
                             "key" => (s(&def.key)?, false),
-                            "name" => (s(&def.name)?, false),
+                            "name" => (s(&w.display_name(id))?, false),
+                            "proper" => (mlua::Value::Boolean(w.is_proper(id)), false),
                             "kind" => (s(kind_name(def.kind))?, false),
                             "capacity" => match w.capacity(id) {
                                 Some(n) => (mlua::Value::Integer(i64::from(n)), false),
@@ -578,6 +579,17 @@ impl ScriptHost for LuaHost {
                         let at = check(at)?;
                         let loudness = u32::try_from(loudness).map_err(|_| rt("make_noise: loudness can't be negative"))?;
                         Ok(world.borrow_mut().make_noise(at, loudness) as i64)
+                    })?,
+                )?;
+                h.set(
+                    "rename",
+                    scope.create_function(move |_, (id, name): (u32, String)| {
+                        let id = check(id)?;
+                        let mut w = world.borrow_mut();
+                        if !w.def(id).nameable {
+                            return Err(rt(format!("rename: '{}' isn't nameable", w.def(id).key)));
+                        }
+                        w.rename(id, &name).ok_or_else(|| rt(format!("rename: '{name}' isn't a usable name")))
                     })?,
                 )?;
                 h.set(

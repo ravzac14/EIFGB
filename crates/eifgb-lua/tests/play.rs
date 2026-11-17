@@ -2285,3 +2285,57 @@ fn followers_that_fetch_bring_things_back_but_only_what_they_can_reach() {
     assert_says(&mut g, "z", "The dog drops the stick at your feet.");
     assert_says(&mut g, "look", "You can see a stick");
 }
+
+// ------------------------------------------------------------------ naming
+
+const NAMING: &str = r#"format: eifgb/0.1
+game: { id: n, title: Naming, version: "1", start: yard }
+rooms:
+  yard: { name: Yard, exits: { north: field } }
+  field: { name: Field, exits: { south: yard } }
+objects:
+  stick: { name: stick, in: player, traits: [portable] }
+  sword: { name: old sword, synonyms: [sword], in: player, traits: [portable], nameable: true, damage: 3 }
+characters:
+  dog: { name: old dog, synonyms: [dog, hound], in: yard, behavior: follower, fetches: true, nameable: true, description: 'Grey around the muzzle. ${The(self)} wags hopefully.' }
+  cat: { name: cat, in: yard }
+verbs:
+  whistle: { patterns: ['whistle'] }
+on:
+  whistle: 'say(world.dog.name, " ", tostring(world.dog.proper), " ", world.sword:rename("narsil"))'
+"#;
+
+#[test]
+fn naming_a_dog_and_a_sword() {
+    let mut g = game(compile_str(NAMING).story.unwrap());
+    assert_eq!(say(&mut g, "call the old dog rex"), "From now on, the old dog is called Rex.");
+    // A proper name: no article, in the description template too.
+    assert_eq!(say(&mut g, "x rex"), "Grey around the muzzle. Rex wags hopefully.");
+    // The old words still work.
+    assert_says(&mut g, "x hound", "Rex wags hopefully.");
+    assert_says(&mut g, "n", "Rex arrives.");
+    say(&mut g, "call sword sting");
+    assert_eq!(say(&mut g, "i"), "You're carrying a stick and Sting.");
+    // "as" isn't part of the name, and names can be changed.
+    assert_eq!(say(&mut g, "name rex as Captain Fluff"), "From now on, Rex is called Captain Fluff.");
+    assert_says(&mut g, "x fluff", "Captain Fluff wags hopefully.");
+}
+
+#[test]
+fn naming_is_only_for_nameable_things_and_takes_a_real_name() {
+    let mut g = game(compile_str(NAMING).story.unwrap());
+    assert_eq!(say(&mut g, "call cat whiskers"), "You can't give the cat a name.");
+    // No name given: a hint, and no turn taken.
+    assert_eq!(say(&mut g, "call dog"), "That's not much of a name. Try something like \"call the old dog Rex\".");
+    assert_says(&mut g, "call dog one two three four", "not much of a name");
+}
+
+#[test]
+fn names_are_undone_and_scripts_can_name_too() {
+    let mut g = game(compile_str(NAMING).story.unwrap());
+    say(&mut g, "call dog rex");
+    say(&mut g, "undo");
+    assert_says(&mut g, "look", "an old dog");
+    assert_eq!(say(&mut g, "whistle"), "old dog false Narsil");
+    assert_says(&mut g, "i", "Narsil");
+}

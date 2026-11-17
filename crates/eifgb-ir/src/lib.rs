@@ -302,6 +302,9 @@ pub struct Entity {
     /// bear. Completes "The goblin has been …".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kills: Option<String>,
+    /// The player can give it a name (CALL THE DOG REX).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub nameable: bool,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -845,6 +848,8 @@ pub enum BuiltinAction {
     Bribe,
     /// Throw something at someone, or in a direction.
     Throw,
+    /// Give something `nameable` a name.
+    Rename,
 }
 
 impl BuiltinAction {

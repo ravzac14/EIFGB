@@ -107,6 +107,13 @@ function Entity:make_noise(loudness)
   return H.make_noise(need_entity(self, "the thing"), loudness)
 end
 
+-- Gives a `nameable` thing a name, as CALL X NAME does. Returns the
+-- tidied name ("rex" -> "Rex").
+function Entity:rename(name)
+  if type(name) ~= "string" then error("rename needs a name, like \"Rex\"", 2) end
+  return H.rename(need_entity(self, "the thing"), name)
+end
+
 -- Eats a corpse in the same room; it's gone for good.
 function Entity:eat(corpse)
   return H.npc_eat(need_entity(self, "the character"), need_entity(corpse, "eat's corpse"))

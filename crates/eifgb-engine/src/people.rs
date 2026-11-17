@@ -7,7 +7,7 @@
 use crate::game::{Game, LineKind};
 use crate::npc::NpcEvent;
 use crate::script::{Ctx, ScriptHost, ScriptValue};
-use crate::world::Fit;
+use crate::world::{Fit, World};
 use eifgb_ir::{Behavior, Code, EntityId, EntityKind, Phase, Value, PLAYER};
 
 impl<H: ScriptHost> Game<H> {
@@ -301,6 +301,23 @@ impl<H: ScriptHost> Game<H> {
                 self.msg("npc.fetches", &Ctx::new().entity("npc", f).entity("target", t));
             }
         }
+        true
+    }
+
+    /// CALL X Y: names something `nameable`.
+    pub(crate) fn rename_action(&mut self, t: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
+        if !self.world.def(t).nameable {
+            self.msg("name.cant", ctx);
+            return false;
+        }
+        let Some(name) = text.and_then(World::clean_name) else {
+            self.no_turn = true;
+            self.msg("name.bad", ctx);
+            return false;
+        };
+        let old = self.the(t);
+        self.world.rename(t, &name);
+        self.msg("name.done", &ctx.clone().text("old", old).text("name", name));
         true
     }
 

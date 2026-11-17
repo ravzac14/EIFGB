@@ -371,7 +371,13 @@ impl Grammar {
                 }
             }
             PatternToken::Slot(slot) => {
-                for end in pos + 1..=toks.len() {
+                // Followed straight by {text}: try the longest object first,
+                // so "call the old dog fido" names "the old dog".
+                let mut ends: Vec<usize> = (pos + 1..=toks.len()).collect();
+                if matches!(pat.get(1), Some(PatternToken::Slot(Slot::Text))) {
+                    ends.reverse();
+                }
+                for end in ends {
                     let mut c = caps.clone();
                     let span = Some((pos, end));
                     match slot {
@@ -648,9 +654,11 @@ impl Grammar {
                 Err(NounFail::Structural)
             }
             0 => {
+                // A name the player gave something elsewhere isn't unknown.
+                let named = |w: &str| (0..world.story().entities.len() as u32).any(|i| world.named_word(EntityId(i), w));
                 let unknown = words
                     .iter()
-                    .find(|w| !self.vocab_words.contains(**w) && !self.stem_known(w))
+                    .find(|w| !self.vocab_words.contains(**w) && !self.stem_known(w) && !named(w))
                     .map(|w| (*w).clone());
                 Err(NounFail::NotFound { unknown_word: unknown })
             }
@@ -705,7 +713,8 @@ impl Grammar {
         for &id in scope {
             let v = &world.def(id).vocab;
             let dead = world.is_dead(id);
-            let corpse_word = |s: &str| dead && self.corpse_words.contains(s);
+            // "corpse" for the dead; a name the player gave it, as a noun.
+            let corpse_word = |s: &str| (dead && self.corpse_words.contains(s)) || world.named_word(id, s);
             let known = |w: &str| {
                 let check = |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s);
                 check(w) || (self.lang.stems)(w).iter().any(|s| check(s))

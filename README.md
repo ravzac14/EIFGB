@@ -991,7 +991,17 @@ characters:
 
 ### Tricks players can find
 
-Seven features reward players who try something clever:
+Eight features reward players who try something clever:
+
+- **Naming things:** give an object or character `nameable: true`, and
+  CALL THE DOG REX (also NAME … (AS), RENAME … (TO), CHRISTEN) gives it a
+  name: "From now on, the old dog is called Rex." It's a proper name from
+  then on ("Rex arrives.", "You're carrying a stick and Sting."),
+  including in `${The(self)}` templates, and the player can use it as
+  well as the old words. Names are tidied to up to three capitalised
+  words, can be changed again, and are saved and undone like everything
+  else. In Lua, `x.name` is the current name, `x.proper` says whether the
+  player named it, and `x:rename("Rex")` names it.
 
 - **Throwing:** THROW (HURL, TOSS, CHUCK) X AT Y attacks from across the
   room with X's `damage` (or the player's own, for anything that isn't a
@@ -1195,7 +1205,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH),
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1226,9 +1236,10 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
-`forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
+`nameable`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
-can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
+can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by` and `nameable`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 

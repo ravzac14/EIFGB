@@ -9,8 +9,8 @@ local M = {}
 local function parts(x)
   if x == nil then return "something", true end
   if type(x) ~= "table" then return tostring(x), true end
-  -- The player ("yourself") never takes an article.
-  return tostring(x), id_of(x) == 0
+  -- The player ("yourself") and things the player named never take one.
+  return tostring(x), id_of(x) == 0 or x.proper
 end
 
 local function capitalize(s)

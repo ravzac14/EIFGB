@@ -518,3 +518,11 @@ fn a_direction_can_sit_next_to_another_slot() {
     let out = with("verbs:\n  hand: { patterns: ['hand {tool} {target}'] }\n");
     assert!(format!("{:?}", out.diagnostics).contains("two slots in a row"), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn text_can_end_a_pattern_right_after_another_slot() {
+    let out = with("verbs:\n  dub: { patterns: ['dub {target} {text}'] }\n");
+    assert!(out.story.is_some(), "{:#?}", out.diagnostics);
+    let out = with("verbs:\n  dub: { patterns: ['dub {target} {text} now'] }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("two slots in a row"), "{:#?}", out.diagnostics);
+}

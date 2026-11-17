@@ -239,6 +239,21 @@ verbs:
       - "throw {target}"
       - "toss {target}"
       - "hurl {target}"
+  rename:
+    action: rename
+    reach: false
+    # The "as"/"to" forms come first, so they aren't read as part of the name.
+    patterns:
+      - "name {target} as {text}"
+      - "rename {target} as {text}"
+      - "rename {target} to {text}"
+      - "call {target} {text}"
+      - "name {target} {text}"
+      - "rename {target} {text}"
+      - "christen {target} {text}"
+      - "call {target}"
+      - "name {target}"
+      - "rename {target}"
   accept:
     action: accept
     patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
@@ -455,6 +470,9 @@ messages:
   sell.fixed: "${The(args.merchant)} doesn't haggle. It'll pay ${args.price}."
   sell.how_much: "How much? Try something like \"sell ${the(args.target)} for 5\"."
   accept.nothing: "There's no offer on the table."
+  name.done: "From now on, ${args.old} is called ${args.name}."
+  name.cant: "You can't give ${the(args.target)} a name."
+  name.bad: "That's not much of a name. Try something like \"call ${the(args.target)} Rex\"."
   throw.not_held: "You need to be holding ${the(args.target)} first."
   throw.too_heavy: "${The(args.target)} is too heavy to throw."
   throw.at: "You throw ${the(args.target)} at ${the(args.tool)}."

@@ -5,7 +5,14 @@ use eifgb_ir::{Pattern, PatternToken, Slot};
 pub fn parse(src: &str) -> Result<Pattern, String> {
     let mut tokens = Vec::new();
     let mut seen: Vec<Slot> = Vec::new();
+    // `{text}` right after another slot is fine only at the very end
+    // ("call {target} {text}"): the parser then takes the longest object
+    // that makes sense, and the rest is the text.
+    let mut trailing_text = false;
     for raw in src.split_whitespace() {
+        if trailing_text {
+            return Err("two slots in a row can't be told apart; put a word between them".into());
+        }
         if let Some(name) = raw.strip_prefix('{') {
             let name = name
                 .strip_suffix('}')
@@ -22,7 +29,11 @@ pub fn parse(src: &str) -> Result<Pattern, String> {
                 && *prev != Slot::Direction
                 && slot != Slot::Direction
             {
-                return Err("two slots in a row can't be told apart; put a word between them".into());
+                if slot == Slot::Text {
+                    trailing_text = true;
+                } else {
+                    return Err("two slots in a row can't be told apart; put a word between them".into());
+                }
             }
             seen.push(slot);
             tokens.push(PatternToken::Slot(slot));

@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise", "proper", "rename"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -113,6 +113,7 @@ impl<'a> Lowerer<'a> {
             disguise: None,
             eaten_by: vec![],
             kills: None,
+            nameable: false,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -537,6 +538,7 @@ impl<'a> Lowerer<'a> {
             disguise: None,
             eaten_by: vec![],
             kills: None,
+            nameable: false,
         }
     }
 
@@ -779,6 +781,7 @@ impl<'a> Lowerer<'a> {
             disguise: t.disguise.clone(),
             eaten_by: t.eaten_by.clone(),
             kills: t.kills.clone(),
+            nameable: t.nameable,
         }
     }
 

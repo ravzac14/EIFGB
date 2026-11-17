@@ -280,6 +280,52 @@ impl World {
         }
     }
 
+    /// The name to show: one the player gave it, or its own.
+    pub fn display_name(&self, id: EntityId) -> String {
+        match self.get(id, "_name") {
+            Some(Value::Str(n)) => n.clone(),
+            _ => self.def(id).name.clone(),
+        }
+    }
+
+    /// Named by the player, so it's a proper name: "Rex", not "the Rex".
+    pub fn is_proper(&self, id: EntityId) -> bool {
+        matches!(self.get(id, "_name"), Some(Value::Str(_)))
+    }
+
+    /// Tidies a name: up to three words of letters, digits, ' or -, each
+    /// capitalised ("rex" → "Rex"). None if there's nothing usable.
+    pub fn clean_name(text: &str) -> Option<String> {
+        let words: Vec<String> = text
+            .split_whitespace()
+            .map(|w| w.trim_matches(|c: char| c == '"' || c == '\''))
+            .filter(|w| !w.is_empty())
+            .map(|w| {
+                let mut c = w.chars();
+                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+            })
+            .collect();
+        let ok = !words.is_empty()
+            && words.len() <= 3
+            && words.iter().all(|w: &String| w.chars().all(|c| c.is_alphanumeric() || c == '\'' || c == '-'));
+        ok.then(|| words.join(" "))
+    }
+
+    /// Gives `id` a name, if it's `nameable` and the name is usable.
+    pub fn rename(&mut self, id: EntityId, name: &str) -> Option<String> {
+        if !self.def(id).nameable {
+            return None;
+        }
+        let name = Self::clean_name(name)?;
+        self.set(id, "_name", Value::Str(name.clone()));
+        Some(name)
+    }
+
+    /// Whether `word` is part of a name the player has given `id`.
+    pub fn named_word(&self, id: EntityId, word: &str) -> bool {
+        matches!(self.get(id, "_name"), Some(Value::Str(n)) if n.split_whitespace().any(|w| w.eq_ignore_ascii_case(word)))
+    }
+
     /// Takes a bite of `food`. It lasts as many bites as its size.
     pub fn npc_feed(&mut self, npc: EntityId, food: EntityId) -> Option<NpcEvent> {
         let room = self.room_of(npc)?;

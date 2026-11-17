@@ -307,6 +307,9 @@ pub struct Thing {
     /// Fetches what the player throws (when tamed, or a follower).
     #[serde(default)]
     pub fetches: Option<bool>,
+    /// The player can name it: CALL THE DOG REX.
+    #[serde(default)]
+    pub nameable: bool,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

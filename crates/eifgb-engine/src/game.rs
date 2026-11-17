@@ -474,7 +474,7 @@ impl<H: ScriptHost> Game<H> {
                 && let Some(t) = target
                 && self.out.lines.len() > start
             {
-                let name = self.world.def(t).name.clone();
+                let name = self.world.display_name(t);
                 let line = &mut self.out.lines[start];
                 line.text = format!("{name}: {}", line.text);
             }
@@ -866,11 +866,11 @@ impl<H: ScriptHost> Game<H> {
     // ----------------------------------------------------------- helpers
 
     pub(crate) fn the(&self, id: EntityId) -> String {
-        (self.grammar.lang().the)(&self.world.def(id).name, id == PLAYER)
+        (self.grammar.lang().the)(&self.world.display_name(id), id == PLAYER || self.world.is_proper(id))
     }
 
     pub(crate) fn a(&self, id: EntityId) -> String {
-        (self.grammar.lang().a)(&self.world.def(id).name, id == PLAYER)
+        (self.grammar.lang().a)(&self.world.display_name(id), id == PLAYER || self.world.is_proper(id))
     }
 
     /// "an iron gate (locked) and an oil can", with state tags when

@@ -674,6 +674,11 @@ pub struct Lexicon {
     /// Words that refer to the player, e.g. "me" or "myself".
     #[serde(default)]
     pub self_words: Vec<String>,
+    /// Common words ("is", "with", "there") that never refer to anything.
+    /// Other words in descriptions let players refer to what they read:
+    /// "x glint" after "Something glints at the bottom."
+    #[serde(default)]
+    pub stopwords: Vec<String>,
 }
 
 // ------------------------------------------------------------------ handlers

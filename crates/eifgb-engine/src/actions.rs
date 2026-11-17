@@ -456,6 +456,7 @@ impl<H: ScriptHost> Game<H> {
             if w.has(id, Trait::Container)
                 && w.shows_contents(id)
                 && w.contents(id).iter().all(|&c| w.is_hidden(c) || c == PLAYER)
+                && !self.hints_at_hidden(id)
             {
                 notes.push(StateNote::Builtin("empty"));
             }
@@ -521,6 +522,18 @@ impl<H: ScriptHost> Game<H> {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Whether `holder`'s description refers to something hidden inside it,
+    /// as in "${if world.brass_key.hidden} Something glints at the bottom.${end}".
+    /// Then calling it empty would contradict the author's hint.
+    fn hints_at_hidden(&self, holder: EntityId) -> bool {
+        let Some(text) = &self.world.def(holder).description else { return false };
+        self.world
+            .contents(holder)
+            .into_iter()
+            .filter(|&c| self.world.is_hidden(c))
+            .any(|c| self.mentions(text, c, &["hidden"], false))
     }
 
     /// Whether a template already reads one of these fields of `id`, in

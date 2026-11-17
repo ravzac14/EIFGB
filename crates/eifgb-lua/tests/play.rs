@@ -1261,3 +1261,56 @@ fn several_room_states_of_one_thing_make_one_sentence() {
     let out = say(&mut g, "look");
     assert!(out.contains("The cupboard is open and empty."), "{out}");
 }
+
+// ------------------------------------------------- words from descriptions
+
+const SHORE: &str = "\
+format: eifgb/0.1
+game: { id: s, title: S, version: '1', start: shore }
+rooms:
+  shore: { name: Shore, description: Waves break against black rocks. A narrow path leads north., exits: { north: cliff } }
+  cliff: { name: Cliff, description: A windswept cliff top with a lonely bench., exits: { south: shore } }
+objects:
+  pool: { name: tide pool, synonyms: [pool], in: shore, traits: [scenery, container, open], description: 'Cold water.${if world.key.hidden} Something glints at the bottom.${end}' }
+  key: { name: brass key, synonyms: [key], in: pool, traits: [portable], state: { hidden: true }, revealed_by: search pool }
+  shell: { name: shell, in: shore, traits: [portable], description: A spiral shell with something rattling inside. }
+  crab: { name: crab, in: shore, traits: [scenery], description: A crab guards the narrow path. }
+";
+
+#[test]
+fn description_words_refer_to_what_they_describe() {
+    let mut g = game(compile_str(SHORE).story.unwrap());
+    // Another form of a description word finds the thing it describes.
+    assert_says(&mut g, "x glinting", "Something glints at the bottom.");
+    assert_says(&mut g, "search the glint", "You find a brass key.");
+    // Once the key is found and taken, the pool really is empty.
+    say(&mut g, "take key");
+    assert_says(&mut g, "x pool", "It's empty.");
+    // A word in two descriptions asks which.
+    assert_says(&mut g, "x something", "Which do you mean");
+    say(&mut g, "shell");
+    // Words only in the room description.
+    assert_says(&mut g, "x waves", "That's just part of the scenery.");
+    assert_says(&mut g, "take black rocks", "That's just part of the scenery.");
+    // "path" is in the crab's description too, so the crab wins over the room.
+    assert_says(&mut g, "x path", "A crab guards");
+    // A description word from another room: known, but not here.
+    assert_says(&mut g, "x bench", "You can't see any such thing.");
+    assert_says(&mut g, "x zorkmid", "I don't know the word \"zorkmid\".");
+    // Stopwords and directions never match.
+    assert_says(&mut g, "x against", "I don't know the word");
+    assert_says(&mut g, "x north", "I don't know the word");
+}
+
+#[test]
+fn a_hint_at_something_hidden_suppresses_empty() {
+    let mut g = game(compile_str(SHORE).story.unwrap());
+    assert_eq!(say(&mut g, "x pool"), "Cold water. Something glints at the bottom.");
+}
+
+#[test]
+fn real_names_beat_description_words() {
+    let src = SHORE.replace("  crab:", "  rocks: { name: black rocks, synonyms: [rocks], in: shore, traits: [scenery], description: Slick with spray. }\n  crab:");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_says(&mut g, "x rocks", "Slick with spray.");
+}

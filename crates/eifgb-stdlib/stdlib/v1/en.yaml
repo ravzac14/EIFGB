@@ -280,6 +280,21 @@ lexicon:
   pronouns: [it, them, him, her]
   all_words: [all, everything]
   self_words: [me, myself, self]
+  # Never treated as referring to something, even when a description uses them.
+  stopwords: [
+    and, or, but, nor, not, yet, the, some, any, each, every, all, both, either, neither,
+    of, to, in, on, at, by, for, from, with, without, into, onto, out, off, over, under,
+    about, above, below, behind, beside, between, beyond, through, across, along, around,
+    against, among, near, nearby, toward, towards, upon, within, inside, outside, past, until,
+    is, are, was, were, be, been, being, am, has, have, had, does, did, can, could, would,
+    should, will, shall, may, might, must, its, it's, this, that, these, those, there, here,
+    there's, here's, you, your, you're, yours, yourself, our, ours, his, hers, their, theirs,
+    they, them, what, which, who, whom, whose, when, where, why, how, than, then, too, very,
+    just, only, also, still, even, ever, never, once, again, almost, already, much, many, more,
+    most, less, least, few, such, own, same, other, another, one, two, three, nothing, anything,
+    everything, can't, won't, don't, isn't, aren't, wasn't, doesn't, didn't, now, away, back, ago,
+    yes, like, into, so, as, if, else, end,
+  ]
 
 messages:
   # the player
@@ -289,6 +304,7 @@ messages:
   parser.unknown_verb: "I don't know the verb \"${args.word}\". Things to try here: ${args.suggestions}."
   parser.unknown_word: "I don't know the word \"${args.word}\"."
   parser.not_here: "You can't see any such thing."
+  parser.scenery: "That's just part of the scenery."
   parser.partial: "I only understood you as far as wanting to ${args.verb}."
   parser.ambiguous: "Which do you mean, ${args.options}?"
   parser.need_target: "What do you want to ${args.verb}?"

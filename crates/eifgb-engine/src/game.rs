@@ -341,9 +341,9 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
-    /// Steps 6 and 8 of the fallback chain: first the author's
+    /// Steps 7 and 9 of the fallback chain: first the author's
     /// `parse_failed` hook, then a failure message that says what was
-    /// understood. (Step 7, the AI fallback, will slot in between.)
+    /// understood. (Step 8, the AI fallback, will slot in between.)
     fn parse_failed(&mut self, toks: &[String], f: Failure) {
         let before = self.out.lines.len();
         let ctx = Ctx::new().text("text", toks.join(" "));
@@ -362,6 +362,7 @@ impl<H: ScriptHost> Game<H> {
             Failure::Partial { verb } => self.msg("parser.partial", &ctx.text("verb", verb)),
             Failure::UnknownWord { word } => self.msg("parser.unknown_word", &ctx.text("word", word)),
             Failure::NotHere => self.msg("parser.not_here", &ctx),
+            Failure::Scenery => self.msg("parser.scenery", &ctx),
             Failure::NoPronoun => self.msg("parser.no_pronoun", &ctx),
             Failure::NoAll => self.msg("parser.no_all", &ctx),
             Failure::AllNone => self.msg("parser.all_none", &ctx),

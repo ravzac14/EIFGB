@@ -195,11 +195,12 @@ players actually see.
 1. **Exact match** against the game's vocabulary: author words plus the standard library.
 2. **Normalization.** Inflected forms are reduced to their base word (`grabbed` → `grab`, `keys` → `key`). Filler like "please" and "I'd like to" is dropped, and pronouns (`it`, `them`) are resolved.
 3. **Built-in synonym lexicon.** The standard library maps synonym phrases to verbs, e.g. `snatch` → `take` and `peer at` → `examine`. It grows with each release. v1 has about 27 verb phrases; noun synonyms come only from authors for now.
-4. **Typo correction.** Edit distance is checked against the words this game actually uses, never the whole dictionary, so corrections stay relevant. A confident correction is applied silently. If two words are equally close, nothing is corrected.
-5. **Clarifying question**, when the input matches more than one thing ("Which do you mean, the brass key or the iron key?") or is missing a part ("What do you want to fill the great lamp with?"). The player's next input is merged back into the command. *(Planned: "Did you mean …?" for near misses that are too uncertain to correct silently.)*
-6. **Author hook:** `on.parse_failed` gets the raw input, so an author can handle unexpected attempts with custom responses.
-7. **AI fallback** *(planned; optional, off by default, hosted web only)*. The author turns it on per game with `game.ai_fallback: true`. The engine sends the input plus a list of actions that are valid right now, i.e. what's in scope and which verbs apply. The model must pick one of those actions or answer "none". It cannot write prose or change state. Its pick then runs through the normal action pipeline. Responses are rate-limited and cached. Offline and desktop builds skip this step.
-8. **Helpful failure.** The game never prints a bare "I don't understand." It names the part of the input it did understand and suggests verbs that apply here.
+4. **Words from descriptions.** If no name matches, a word the player read in a description can refer to what it describes. Every word must be in a thing's name, synonyms or description (any form: `glinting` matches "glints"), and at least one must come from the description. Things in scope are tried first; then, if every word is in the current room's description, the reply is "That's just part of the scenery." `[parser.scenery]`. Both branches of `${if}` count, expressions don't, and the lexicon's `stopwords` (plus articles, pronouns and directions) and words under three letters are skipped. A word found in more than one description gets a clarifying question.
+5. **Typo correction.** Edit distance is checked against the words this game actually uses, never the whole dictionary, so corrections stay relevant. A confident correction is applied silently. If two words are equally close, nothing is corrected.
+6. **Clarifying question**, when the input matches more than one thing ("Which do you mean, the brass key or the iron key?") or is missing a part ("What do you want to fill the great lamp with?"). The player's next input is merged back into the command. *(Planned: "Did you mean …?" for near misses that are too uncertain to correct silently.)*
+7. **Author hook:** `on.parse_failed` gets the raw input, so an author can handle unexpected attempts with custom responses.
+8. **AI fallback** *(planned; optional, off by default, hosted web only)*. The author turns it on per game with `game.ai_fallback: true`. The engine sends the input plus a list of actions that are valid right now, i.e. what's in scope and which verbs apply. The model must pick one of those actions or answer "none". It cannot write prose or change state. Its pick then runs through the normal action pipeline. Responses are rate-limited and cached. Offline and desktop builds skip this step.
+9. **Helpful failure.** The game never prints a bare "I don't understand." It names the part of the input it did understand and suggests verbs that apply here.
 
 **Synonyms are generated when the game is built, not while it runs** *(planned)*. For every
 author noun and verb, the compiler suggests extra synonyms. The web editor
@@ -227,7 +228,9 @@ reword any of them under `messages:`.
 
 | Player types | What happens | Why |
 |---|---|---|
-| `serch pool`, `examin brass kye`, `nrth` | Runs as `search pool`, `examine brass key`, `north` | Typo correction (step 4), using only words this game uses |
+| `serch pool`, `examin brass kye`, `nrth` | Runs as `search pool`, `examine brass key`, `north` | Typo correction (step 5), using only words this game uses |
+| `x glinting`, `search the glint` | Examines / searches the tide pool | The pool's description says "Something glints at the bottom" (step 4) |
+| `x waves`, `take black rocks` | "That's just part of the scenery." `[parser.scenery]` | The words are only in the room description (step 4) |
 | `grabbed the can` | Runs as `take the can` | Stemming (`grabbed` → `grab`), then the synonym `grab` → `take` |
 | `peer at keys` | Examines the brass key | Synonym phrase, plus the plural `keys` → `key` |
 | `please drop the can`, `i'd like to snatch the kerosene` | Drop / take the oil can | Filler dropped; `kerosene` is an author synonym |
@@ -268,7 +271,7 @@ Otherwise:
 |---|---|
 | `dance` | "I don't know the verb "dance". Things to try here: SEARCH, EXAMINE, TAKE, LOOK or INVENTORY." `[parser.unknown_verb]` The suggestions are verbs that nearby objects respond to, plus basics. |
 | `take zorkmid` | "I don't know the word "zorkmid"." `[parser.unknown_word]` |
-| `take radio` (radio is elsewhere) | "You can't see any such thing." `[parser.not_here]` |
+| `take radio` (radio is elsewhere) | "You can't see any such thing." `[parser.not_here]` Also for a word from another room's description, such as `x staircase` on the shore. |
 | `take key from` | "I only understood you as far as wanting to take." `[parser.partial]` |
 | `take it` (nothing mentioned yet) | "I'm not sure what you're referring to." `[parser.no_pronoun]` |
 | `open all` | "You can't use "all" with that." `[parser.no_all]` |

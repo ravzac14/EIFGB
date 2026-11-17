@@ -276,7 +276,9 @@ Then add the mat:
 - **`${if ...}...${else}...${end}`** makes text react to the game. Here it
   gives players a clue, and the lumpy corner disappears once the key is
   found. Inside a template, `world.<id>` is any object and `self` is the
-  object the text belongs to. If an object's own description already talks
+  object the text belongs to. Players can use the words of a description
+  too: `x lumpy corner` examines the mat, because its description
+  mentions one. If an object's own description already talks
   about one of its states this way, the automatic sentence about that state
   is left out, so nothing is said twice.
 
@@ -538,7 +540,8 @@ Two tags come from what's inside rather than from state:
 
 - **`empty`**: a container the player can see into, with nothing visible
   in it. Hidden things don't count, so a box with a secret compartment
-  looks empty.
+  looks empty, unless its description hints at what's hidden with
+  `${if world.<id>.hidden}`. Then the hint is left to speak for itself.
 - **`heavy`**: something the player could carry on its own, but not with
   everything in it (see [Containers and supporters](#containers-and-supporters)).
   It only applies when the player has a carrying capacity.

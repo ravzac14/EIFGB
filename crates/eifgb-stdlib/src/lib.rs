@@ -143,7 +143,8 @@ mod tests {
             .chain(&lx.articles)
             .chain(&lx.filler)
             .chain(&lx.pronouns)
-            .chain(&lx.all_words);
+            .chain(&lx.all_words)
+            .chain(&lx.stopwords);
         for w in words {
             assert_eq!(w, &w.to_lowercase(), "lexicon entry '{w}' must be lowercase");
         }

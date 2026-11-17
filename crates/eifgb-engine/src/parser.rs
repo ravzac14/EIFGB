@@ -1,5 +1,5 @@
 //! The command parser: the "never leave the player stuck" chain from
-//! FORMAT.md. Steps 1 to 5 live here. Steps 6 to 8 (the author hook,
+//! FORMAT.md. Steps 1 to 6 live here. Steps 7 to 9 (the author hook,
 //! the AI fallback and the helpful failure) live in the turn loop,
 //! which acts on the [`Failure`] returned from here.
 //!
@@ -55,6 +55,9 @@ pub enum Failure {
     Partial { verb: String },
     UnknownWord { word: String },
     NotHere,
+    /// The words only appear in the room's description: "x rocks" when the
+    /// room mentions black rocks but there's no rocks object.
+    Scenery,
     NoPronoun,
     NoAll,
     AllNone,
@@ -94,6 +97,7 @@ enum NounFail {
     Ambiguous(Vec<EntityId>),
     NoAll,
     AllNone,
+    Scenery,
 }
 
 /// Precomputed word tables for one story.
@@ -111,6 +115,33 @@ pub struct Grammar {
     vocab_words: HashSet<String>,
     /// Every literal word in any pattern ("with", "from", "up"...).
     pattern_words: HashSet<String>,
+    /// Each entity's description words (and their stems), minus stopwords.
+    /// Indexed like `Story::entities`.
+    described: Vec<HashSet<String>>,
+    /// Every word in any description, so that unknown-word replies don't
+    /// claim not to know a word the game itself printed.
+    described_words: HashSet<String>,
+}
+
+/// The words of a text's literal parts, including both branches of every
+/// `${if}`, lowercased and split on anything that isn't a letter, digit or
+/// apostrophe.
+fn text_words(text: &eifgb_ir::Text, out: &mut Vec<String>) {
+    use eifgb_ir::Segment;
+    for seg in &text.0 {
+        match seg {
+            Segment::Lit(s) => out.extend(
+                s.split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                    .map(|w| w.trim_matches('\'').to_lowercase())
+                    .filter(|w| !w.is_empty()),
+            ),
+            Segment::Expr(_) => {}
+            Segment::If { then, otherwise, .. } => {
+                text_words(then, out);
+                text_words(otherwise, out);
+            }
+        }
+    }
 }
 
 fn words(s: &str) -> Vec<String> {
@@ -197,8 +228,41 @@ impl Grammar {
             .cloned()
             .collect();
 
+        let lang = lang::for_language(&story.meta.language).unwrap_or_else(|| lang::for_language("en").unwrap());
+        let skip: HashSet<&str> = lx
+            .stopwords
+            .iter()
+            .chain(&lx.articles)
+            .chain(&lx.pronouns)
+            .chain(&lx.all_words)
+            .chain(&lx.self_words)
+            .chain(lx.directions.keys())
+            .map(String::as_str)
+            .collect();
+        let described: Vec<HashSet<String>> = story
+            .entities
+            .iter()
+            .map(|e| {
+                let mut words = Vec::new();
+                if let Some(d) = &e.description {
+                    text_words(d, &mut words);
+                }
+                let mut set = HashSet::new();
+                for w in words {
+                    // Very short words ("ox" aside) are almost never what a player means.
+                    if w.chars().count() < 3 || skip.contains(w.as_str()) || w.chars().all(|c| c.is_ascii_digit()) {
+                        continue;
+                    }
+                    set.extend((lang.stems)(&w));
+                    set.insert(w);
+                }
+                set
+            })
+            .collect();
+        let described_words = described.iter().flatten().cloned().collect();
+
         Grammar {
-            lang: lang::for_language(&story.meta.language).unwrap_or_else(|| lang::for_language("en").unwrap()),
+            lang,
             phrases,
             filler,
             articles: lx.articles.iter().cloned().collect(),
@@ -208,6 +272,8 @@ impl Grammar {
             verb_words,
             vocab_words,
             pattern_words,
+            described,
+            described_words,
         }
     }
 
@@ -325,7 +391,7 @@ impl Grammar {
         let mut toks = toks.to_vec();
         let mut cands = self.candidates(story, &toks);
 
-        // Step 4: correct a misspelled verb or direction.
+        // Step 5: correct a misspelled verb or direction.
         if cands.is_empty() && !self.is_known_start(&toks[0]) {
             let starts: Vec<String> = self
                 .verb_words
@@ -470,6 +536,7 @@ impl Grammar {
                 NounFail::NoPronoun => Parsed::Fail(Failure::NoPronoun),
                 NounFail::NotFound { unknown_word: Some(w) } => Parsed::Fail(Failure::UnknownWord { word: w }),
                 NounFail::NotFound { unknown_word: None } => Parsed::Fail(Failure::NotHere),
+                NounFail::Scenery => Parsed::Fail(Failure::Scenery),
                 NounFail::Structural => Parsed::Fail(Failure::Partial { verb: Self::verb_name(verb) }),
                 NounFail::Ambiguous(options) => Parsed::Ambiguous {
                     before: toks[..span.0].to_vec(),
@@ -535,7 +602,15 @@ impl Grammar {
 
         let mut matches = self.match_scope(world, &scope, &words);
         if matches.is_empty() {
-            // Step 4: fix misspelled nouns, using only words of things in scope.
+            // Step 4: words the player read in a description: "x glint" after "Something
+            // glints at the bottom." Real names always win; this is only a fallback.
+            matches = self.match_descriptions(world, &scope, &words);
+            if matches.is_empty() && words.iter().all(|w| self.describes(world.here(), w)) {
+                return Err(NounFail::Scenery);
+            }
+        }
+        if matches.is_empty() {
+            // Step 5: fix misspelled nouns, using only words of things in scope.
             let scope_vocab: Vec<String> = scope
                 .iter()
                 .flat_map(|e| {
@@ -584,6 +659,32 @@ impl Grammar {
 
     fn stem_known(&self, w: &str) -> bool {
         (self.lang.stems)(w).iter().any(|s| self.vocab_words.contains(s))
+            || self.described_words.contains(w)
+            || (self.lang.stems)(w).iter().any(|s| self.described_words.contains(s))
+    }
+
+    /// Whether `id`'s description uses the word, or another form of it.
+    fn describes(&self, id: EntityId, w: &str) -> bool {
+        let set = &self.described[id.index()];
+        set.contains(w) || (self.lang.stems)(w).iter().any(|s| set.contains(s))
+    }
+
+    /// Things in scope (not rooms) where every word is either in their
+    /// vocabulary or in their description, using at least one description word.
+    fn match_descriptions(&self, world: &World, scope: &[EntityId], words: &[&String]) -> Vec<EntityId> {
+        scope
+            .iter()
+            .copied()
+            .filter(|&id| world.def(id).kind != eifgb_ir::EntityKind::Room)
+            .filter(|&id| {
+                let v = &world.def(id).vocab;
+                let named = |w: &str| {
+                    let check = |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s);
+                    check(w) || (self.lang.stems)(w).iter().any(|s| check(s))
+                };
+                words.iter().all(|w| named(w) || self.describes(id, w)) && words.iter().any(|w| self.describes(id, w))
+            })
+            .collect()
     }
 
     /// Entities in scope whose vocabulary covers every word. Matches that

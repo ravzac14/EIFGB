@@ -289,6 +289,9 @@ pub struct Npc {
     /// Whether it leaves a body when defeated, instead of vanishing.
     #[serde(default = "yes")]
     pub corpse: bool,
+    /// Whether it attacks back whoever attacked it (its `foes`).
+    #[serde(default)]
+    pub fights_back: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -308,6 +311,8 @@ pub enum Behavior {
     Guard,
     /// Follows the player from room to room.
     Follower,
+    /// Never starts a fight, but fights back against anyone who attacks it.
+    Defender,
 }
 
 impl Behavior {
@@ -319,6 +324,7 @@ impl Behavior {
         Behavior::Hunter,
         Behavior::Guard,
         Behavior::Follower,
+        Behavior::Defender,
     ];
 
     pub fn key(self) -> &'static str {
@@ -330,6 +336,7 @@ impl Behavior {
             Behavior::Hunter => "hunter",
             Behavior::Guard => "guard",
             Behavior::Follower => "follower",
+            Behavior::Defender => "defender",
         }
     }
 
@@ -349,6 +356,11 @@ impl Behavior {
     /// Whether it attacks the player.
     pub fn hostile(self) -> bool {
         matches!(self, Behavior::Hunter | Behavior::Guard)
+    }
+
+    /// Whether it fights back when attacked, unless `fights_back` says otherwise.
+    pub fn fights_back(self) -> bool {
+        matches!(self, Behavior::Hunter | Behavior::Guard | Behavior::Defender)
     }
 }
 

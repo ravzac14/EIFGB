@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "dead"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "dead", "foes"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -752,6 +752,7 @@ impl<'a> Lowerer<'a> {
             for (field, set) in [
                 ("faction", t.faction.is_some()),
                 ("corpse", t.corpse.is_some()),
+                ("fights_back", t.fights_back.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -802,6 +803,7 @@ impl<'a> Lowerer<'a> {
             buys_at: t.buys_at.unwrap_or(50),
             act,
             corpse: t.corpse.unwrap_or(true),
+            fights_back: t.fights_back.unwrap_or(behavior.fights_back()),
         })
     }
 

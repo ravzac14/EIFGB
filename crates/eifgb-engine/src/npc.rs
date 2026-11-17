@@ -79,6 +79,9 @@ impl World {
         if !b_alive {
             return false;
         }
+        if self.is_foe(a, b) {
+            return true;
+        }
         match self.faction(a) {
             Some(f) => {
                 let side = if b == PLAYER { Some(PLAYER_FACTION) } else { self.def(b).faction.as_deref() };
@@ -88,11 +91,49 @@ impl World {
         }
     }
 
+    /// Remembers that `attacker` attacked `target`, in the target's `foes`
+    /// (a list of keys, which scripts can read or clear).
+    fn add_foe(&mut self, target: EntityId, attacker: EntityId) {
+        if target == attacker || self.def(target).kind != EntityKind::Character {
+            return;
+        }
+        let key = Value::Str(self.def(attacker).key.clone());
+        let mut foes = match self.get(target, "foes") {
+            Some(Value::List(l)) => l.clone(),
+            _ => Vec::new(),
+        };
+        if !foes.contains(&key) {
+            foes.push(key);
+            self.set(target, "foes", Value::List(foes));
+        }
+    }
+
+    /// Whether `a` holds a grudge against `b` and fights back.
+    pub fn is_foe(&self, a: EntityId, b: EntityId) -> bool {
+        let fights_back = self.def(a).npc.as_ref().is_some_and(|n| n.fights_back);
+        let key = &self.def(b).key;
+        fights_back
+            && matches!(self.get(a, "foes"), Some(Value::List(l)) if l.iter().any(|v| matches!(v, Value::Str(s) if s == key)))
+    }
+
     /// Everyone `npc` would attack: the player first, then characters in
     /// the order they're declared.
     fn enemies_of(&self, npc: EntityId) -> Vec<EntityId> {
         let chars = (0..self.story().entities.len() as u32).map(EntityId).filter(|&id| self.def(id).kind == EntityKind::Character);
         std::iter::once(PLAYER).chain(chars).filter(|&b| self.is_hostile(npc, b)).collect()
+    }
+
+    /// Foes of `npc` in its own room, the player first.
+    fn foes_here(&self, npc: EntityId) -> Vec<EntityId> {
+        let chars = (0..self.story().entities.len() as u32).map(EntityId).filter(|&id| self.def(id).kind == EntityKind::Character);
+        std::iter::once(PLAYER)
+            .chain(chars)
+            .filter(|&b| self.together(npc, b) && self.is_foe(npc, b) && self.is_hostile_or_foe_alive(b))
+            .collect()
+    }
+
+    fn is_hostile_or_foe_alive(&self, b: EntityId) -> bool {
+        if b == PLAYER { self.health(PLAYER).is_none_or(|h| h > 0) } else { self.is_active(b) }
     }
 
     /// Bodies in `room`.
@@ -226,6 +267,7 @@ impl World {
             .or(self.def(attacker).damage)
             .unwrap_or(1);
         self.set(target, "health", Value::Int((health - i64::from(damage)).max(0)));
+        self.add_foe(target, attacker);
         Some(NpcEvent::Attacked { attacker, target, weapon, damage })
     }
 
@@ -259,6 +301,13 @@ impl World {
         let eater = self.faction(npc).is_some_and(|f| f.eats_corpses);
         let corpse_here = room.and_then(|r| self.corpses_in(r).into_iter().next());
 
+        // Anyone else fights back against a foe in the room, before anything else.
+        if !n.behavior.hostile()
+            && let Some(&foe) = self.foes_here(npc).first()
+        {
+            let weapon = self.best_weapon(npc);
+            return self.attack(npc, foe, weapon).into_iter().collect();
+        }
         let event = match n.behavior {
             Behavior::Hunter | Behavior::Guard if matches!(nearest, Some((0, _))) => {
                 let target = nearest.map(|(_, e)| e).unwrap_or(PLAYER);
@@ -280,7 +329,9 @@ impl World {
                     None => self.maybe_wander(npc, n.wander),
                 }
             }
-            Behavior::Stationary | Behavior::Conversationalist | Behavior::Wanderer => self.maybe_wander(npc, n.wander),
+            Behavior::Stationary | Behavior::Conversationalist | Behavior::Wanderer | Behavior::Defender => {
+                self.maybe_wander(npc, n.wander)
+            }
             // Merchants don't walk off in the middle of a sale.
             Behavior::Merchant if self.together(npc, PLAYER) => None,
             Behavior::Merchant => self.maybe_wander(npc, n.wander),

@@ -1600,3 +1600,64 @@ fn scripts_can_ask_about_factions_and_eat() {
     let mut g = game(compile_str(&src).story.unwrap());
     assert_says(&mut g, "z", "true false true");
 }
+
+// ------------------------------------------------------------ self-defense
+
+const DEFENDERS: &str = "\
+format: eifgb/0.1
+game: { id: d, title: D, version: '1', start: hall }
+player: { health: 20 }
+factions:
+  wolves: { hostile_to: [deer] }
+  deer: {}
+rooms:
+  hall: { name: Hall, exits: { north: yard } }
+  yard: { name: Yard, exits: { south: hall } }
+characters:
+  bear: { name: bear, in: hall, behavior: defender, health: 10, damage: 3 }
+  trader: { name: trader, in: hall, behavior: merchant, wander: 0, fights_back: true, health: 6, damage: 1 }
+  monk: { name: monk, in: hall, health: 4, on: { pray: 'self.foes = nil; say(\"The monk forgives you.\")' } }
+verbs:
+  pray: { patterns: ['pray with {target}'], reach: false }
+";
+
+#[test]
+fn defenders_only_fight_back() {
+    let mut g = game(compile_str(DEFENDERS).story.unwrap());
+    // Nobody starts a fight.
+    assert_eq!(say(&mut g, "z"), "Time passes.");
+    // Without fights_back, a plain character just takes it.
+    assert_eq!(say(&mut g, "hit monk"), "You hit the monk.");
+    assert_eq!(say(&mut g, "hit bear"), "You hit the bear.\nThe bear attacks you.");
+    assert_says(&mut g, "z", "The bear attacks you.");
+    // It doesn't chase, but it remembers.
+    say(&mut g, "n");
+    assert_eq!(say(&mut g, "z"), "Time passes.");
+    assert_says(&mut g, "s", "The bear attacks you.");
+    // Any behaviour can fight back with fights_back.
+    let out = say(&mut g, "hit trader");
+    assert!(out.contains("The trader attacks you."), "{out}");
+}
+
+#[test]
+fn foes_are_remembered_by_key_and_can_be_forgiven() {
+    let src = DEFENDERS.replace("monk: { name: monk, in: hall, health: 4,", "monk: { name: monk, in: hall, health: 4, behavior: defender,");
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_says(&mut g, "hit monk", "The monk attacks you.");
+    assert_says(&mut g, "z", "The monk attacks you.");
+    // Clearing `foes` ends the grudge.
+    assert_eq!(say(&mut g, "pray with monk"), "The monk forgives you.");
+    assert_eq!(say(&mut g, "z"), "Time passes.");
+}
+
+#[test]
+fn characters_defend_themselves_from_each_other() {
+    let src = DEFENDERS.replace(
+        "characters:\n",
+        "characters:\n  wolf: { name: wolf, in: yard, faction: wolves, behavior: hunter, wander: 0, health: 30, damage: 1 }\n  deer: { name: deer, in: yard, faction: deer, behavior: defender, health: 30, damage: 1 }\n",
+    );
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "n");
+    let out = say(&mut g, "z");
+    assert!(out.contains("The wolf attacks the deer.") && out.contains("The deer attacks the wolf."), "{out}");
+}

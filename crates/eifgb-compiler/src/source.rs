@@ -273,6 +273,9 @@ pub struct Thing {
     /// Whether it leaves a body when defeated. Defaults to true.
     #[serde(default)]
     pub corpse: Option<bool>,
+    /// Whether it attacks back whoever attacks it.
+    #[serde(default)]
+    pub fights_back: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

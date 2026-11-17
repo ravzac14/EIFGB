@@ -165,8 +165,10 @@ factions:
 ```
 
 - **`hostile_to`** lists other factions, and `player` for the player.
-  Hostility only goes one way: goblins attacking wolves doesn't make
-  wolves attack goblins. Here each side happens to hate the other.
+  Hostility only goes one way: goblins hating wolves doesn't make wolves
+  hate goblins. Here each side happens to hate the other. Even without
+  that, hunters and guards fight back against anyone who attacks them,
+  and so does a character with `behavior: defender` or `fights_back: true`.
 - **`eats_corpses`** makes members eat the bodies of the fallen.
 - A character without a faction keeps the simple rule: hunters and
   guards attack the player, and nobody else.

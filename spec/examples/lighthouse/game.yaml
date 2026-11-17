@@ -166,6 +166,13 @@ characters:
     behavior: conversationalist             # stays put, so he's always there to talk to
     pacifist: true                          # never fights (already the default for a conversationalist)
     invincible: true                        # the story needs him: attacks can't hurt him
+    on:
+      # Replaces the built-in attack (the HIT verb: hit, attack, kill, punch...)
+      # for him only. He's a ghost, so "shrugs off the blow" undersells it.
+      hit: |
+        local what = "Your fist"
+        if args.tool then what = The(args.tool) end
+        say(what, " passes straight through him. He doesn't seem to notice.")
 
 # ---------------------------------------------------------------- verbs
 # Custom verbs and their grammar. {target} is the direct object, {tool}

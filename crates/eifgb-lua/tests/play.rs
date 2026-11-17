@@ -542,6 +542,21 @@ fn doors_work_from_the_far_side() {
     assert!(out.contains("(first opening the pantry door)") && out.contains("Kitchen"), "{out}");
 }
 
+#[test]
+fn the_pie_is_too_hot_until_its_timer_runs_out() {
+    let mut g = midnight_snack();
+    assert_says(&mut g, "take pie", "far too hot");
+    assert_says(&mut g, "eat pie", "burn your tongue");
+    for _ in 0..3 {
+        say(&mut g, "wait");
+    }
+    // Six actions in: the timer fires at the end of this one.
+    assert_says(&mut g, "x pie", "must have cooled");
+    assert_says(&mut g, "x pie", "It isn't steaming.");
+    assert_says(&mut g, "take pie", "Taken.");
+    assert_says(&mut g, "eat pie", "Nothing could be better.");
+}
+
 const TRAPDOOR: &str = "\
 format: eifgb/0.1
 game: { id: t, title: T, version: '1', start: hall }

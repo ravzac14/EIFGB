@@ -51,6 +51,24 @@ objects:
     revealed_by: search mat
     description: A small brass key.
 
+  pie:
+    name: apple pie
+    synonyms: [pie]
+    in: kitchen
+    traits: [portable, edible]
+    state: { steaming: true }
+    description: A golden apple pie, fresh from the oven.
+    on:
+      before_take: |
+        if self.steaming then
+          return block("Ow! It's far too hot to pick up. Give it a few minutes.")
+        end
+      before_eat: |
+        if self.steaming then
+          return block("You'd burn your tongue. Let it cool first.")
+        end
+      after_eat: end_game("feast")
+
   apple:
     name: red apple
     synonyms: [fruit]
@@ -60,7 +78,17 @@ objects:
     on:
       after_eat: end_game("fed")
 
+timers:
+  pie_cools:
+    after: 6
+    do: world.pie.steaming = false
+    say: You catch the smell of apple pie. It must have cooled by now.
+
 endings:
   fed:
     kind: win
     text: Crisp, sweet and worth getting up for. Time to go back to bed.
+
+  feast:
+    kind: win
+    text: Warm apple pie at midnight. Nothing could be better.

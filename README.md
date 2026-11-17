@@ -49,8 +49,9 @@ Type commands like `look`, `search pool`, `go north`, `talk to keeper`, and
 
 ## Tutorial: Midnight Snack
 
-In this tutorial you build a small game in five steps: a hungry player, a
-locked pantry, a key hidden under a mat, and an apple. The finished game
+In this tutorial you build a small game in seven steps: a hungry player, a
+locked pantry, a key hidden under a mat, an apple, and a pie that's too hot
+to touch until it cools. The finished game
 is in [`spec/examples/midnight_snack/`](spec/examples/midnight_snack/game.yaml).
 
 Every command below is run from the repository folder.
@@ -293,7 +294,97 @@ Finally, mention the mat in the kitchen description so players know it's there:
 A multi-line description is reflowed when displayed, so wrap the lines in
 your file however you like. A blank line starts a new paragraph.
 
-### Step 6: a walkthrough file
+### Step 6: a pie that has to cool
+
+Timers make things happen after a number of actions. Use one to give the
+player a second snack, if they're patient: a pie that's too hot to touch
+until it has cooled. Add it to `objects`:
+
+```yaml
+  pie:
+    name: apple pie
+    synonyms: [pie]
+    in: kitchen
+    traits: [portable, edible]
+    state: { steaming: true }
+    description: A golden apple pie, fresh from the oven.
+    on:
+      before_take: |
+        if self.steaming then
+          return block("Ow! It's far too hot to pick up. Give it a few minutes.")
+        end
+      before_eat: |
+        if self.steaming then
+          return block("You'd burn your tongue. Let it cool first.")
+        end
+      after_eat: end_game("feast")
+```
+
+Then add a `timers` section that cools it, and an ending for eating it:
+
+```yaml
+timers:
+  pie_cools:
+    after: 6
+    do: world.pie.steaming = false
+    say: You catch the smell of apple pie. It must have cooled by now.
+
+endings:
+  # ...fed stays as before
+  feast:
+    kind: win
+    text: Warm apple pie at midnight. Nothing could be better.
+```
+
+- **`steaming`** is a state you made up. The game describes it for you:
+  the kitchen lists "an apple pie (steaming)", and `x pie` says "It's
+  steaming."
+- **`before_take`** and **`before_eat`** run before the built-in verbs.
+  Returning `block(...)` stops the verb and prints the message instead.
+  Once `steaming` is false they return nothing, so taking and eating work
+  as normal.
+- **`after: 6`** fires the timer once, six actions into the game. Any
+  command that takes a turn counts, including ones that fail, like trying
+  to take the hot pie. Commands the game didn't understand, and SAVE, UNDO
+  or SCORE, don't count.
+- **`do`** runs Lua when the timer fires, and **`say`** prints a message.
+  The message is shown wherever the player is, so it's worded to make
+  sense from the pantry too.
+
+Play it: `take pie`, `eat pie`, then `wait` until the smell reaches you.
+
+```
+> take pie
+Ow! It's far too hot to pick up. Give it a few minutes.
+
+> eat pie
+You'd burn your tongue. Let it cool first.
+
+> z
+Time passes.
+
+> z
+Time passes.
+
+> z
+Time passes.
+
+> x pie
+A golden apple pie, fresh from the oven. It's steaming.
+You catch the smell of apple pie. It must have cooled by now.
+
+> x pie
+A golden apple pie, fresh from the oven. It isn't steaming.
+
+> take pie
+Taken.
+```
+
+A timer can also wait for the player to start it, with `started_by: light
+fuse` for example, or repeat with `every:`.
+[Timed events](#timed-events) has the details.
+
+### Step 7: a walkthrough file
 
 Save a winning playthrough as `games/midnight_snack/walkthrough.txt`, one
 command per line. Lines starting with `#` are comments:

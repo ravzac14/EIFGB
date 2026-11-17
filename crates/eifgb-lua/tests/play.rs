@@ -878,7 +878,7 @@ fn inventory_shows_what_is_in_carried_containers() {
     say(&mut g, "take box");
     assert_eq!(
         say(&mut g, "i"),
-        "You're carrying a cloth bag (open) (containing a coin) and a small box (containing a ring)."
+        "You're carrying a cloth bag (open, containing a coin) and a small box (containing a ring)."
     );
     say(&mut g, "close bag");
     assert_says(&mut g, "i", "a cloth bag (closed) and a small box (containing a ring)");

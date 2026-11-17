@@ -621,7 +621,7 @@ In the small box you can see a ring.
 The coin isn't in the glass jar.
 
 > i
-You're carrying a cloth bag (open) (containing a coin) and a small box (containing a ring).
+You're carrying a cloth bag (open, containing a coin) and a small box (containing a ring).
 
 > put all in bag
 > empty bag                  (onto the floor)

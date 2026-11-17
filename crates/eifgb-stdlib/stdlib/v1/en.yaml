@@ -363,8 +363,9 @@ messages:
   put.full: "There's no more room in ${the(args.tool)}."
   put.too_big: "${The(args.target)} is too big for ${the(args.tool)}."
   # carried containers in lists
-  list.containing: "${args.item} (containing ${args.list})"
-  list.supporting: "${args.item} (with ${args.list} on it)"
+  # Tags in inventory lists, joined with any state tags: "a bag (open, containing a coin)".
+  list.containing: "containing ${args.list}"
+  list.supporting: "with ${args.list} on it"
   # emptying
   empty.done: "You tip ${args.list} out of ${the(args.target)}."
   empty.into: "You tip ${args.list} from ${the(args.target)} into ${the(args.tool)}."

@@ -226,20 +226,20 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// Like `list_a`, but with what's in or on each item you can see into:
-    /// "a cloth bag (open) (containing a pebble and a coin)".
+    /// "a cloth bag (open, containing a pebble and a coin)". What's inside
+    /// is one more tag, so it shares the brackets with the state tags.
     fn list_tree(&mut self, ids: &[EntityId], depth: usize) -> String {
         let lang = self.grammar.lang();
         let mut names = Vec::new();
         for &id in ids {
-            let tags = self.state_tag_texts(id);
-            let mut item = (lang.tagged)(&self.a(id), &tags);
+            let mut tags = self.state_tag_texts(id);
             let inside = if depth < 8 && self.world.shows_contents(id) { self.listable(id) } else { Vec::new() };
             if !inside.is_empty() {
                 let list = self.list_tree(&inside, depth + 1);
                 let key = if self.world.has(id, Trait::Supporter) { "list.supporting" } else { "list.containing" };
-                item = self.msg_str(key, &Ctx::new().text("item", item).text("list", list));
+                tags.push(self.msg_str(key, &Ctx::new().text("list", list)));
             }
-            names.push(item);
+            names.push((lang.tagged)(&self.a(id), &tags));
         }
         (lang.list_and)(&names)
     }

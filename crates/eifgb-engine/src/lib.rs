@@ -14,11 +14,14 @@
 //! * [`text`]: template rendering and reflowing prose;
 //! * [`parser`]: turns input into commands, with typo correction and clarifying questions;
 //! * [`game`]: the turn loop, which is the entry point for hosts;
+//! * [`npc`]: what characters do on their turn: moving and fighting;
 //! * [`lang`]: language rules such as stemming, articles and lists.
 
 mod actions;
 pub mod game;
 pub mod lang;
+pub mod npc;
+mod people;
 pub mod parser;
 pub mod rng;
 pub mod script;
@@ -31,4 +34,5 @@ pub use game::{Game, Line, LineKind, Output, Status};
 pub use eifgb_ir as ir;
 pub use script::{Arg, Ctx, Effect, Outcome, ScriptError, ScriptHost, ScriptValue};
 pub use state::{GameState, SaveError, SaveFile};
+pub use npc::NpcEvent;
 pub use world::{Blocked, Fit, MoveError, World};

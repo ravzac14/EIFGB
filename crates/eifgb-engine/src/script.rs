@@ -102,6 +102,8 @@ pub enum Effect {
     OpenChoice(String),
     StartTimer(String),
     StopTimer(String),
+    /// A character moved or attacked; the engine describes it if the player can see.
+    Npc(crate::npc::NpcEvent),
 }
 
 #[derive(Debug, Clone, PartialEq)]

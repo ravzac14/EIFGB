@@ -163,6 +163,7 @@ characters:
     description: |
       A grey-bearded man in an oilskin coat. Rain runs straight through him.
     talk: keeper_talk                       # "talk to keeper" opens this choice graph
+    behavior: conversationalist             # stays put, so he's always there to talk to
 
 # ---------------------------------------------------------------- verbs
 # Custom verbs and their grammar. {target} is the direct object, {tool}

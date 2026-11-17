@@ -228,6 +228,104 @@ pub struct Entity {
     pub revealed_by: Vec<ActionRule>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
+    /// How a character acts on its turn. Only characters have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub npc: Option<Npc>,
+    /// Full health. The current value is the `health` state field. Things
+    /// without it can't be hurt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<u32>,
+    /// Damage dealt by an attack: a character's or the player's bare hands,
+    /// or a weapon's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage: Option<u32>,
+    /// What a merchant sells this for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub price: Option<u32>,
+}
+
+/// A character's turn-by-turn behaviour.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Npc {
+    pub behavior: Behavior,
+    /// Percent chance of moving to a neighbouring room on a turn with
+    /// nothing better to do.
+    #[serde(default)]
+    pub wander: u32,
+    /// Rooms it may move between. Empty means anywhere.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub area: Vec<EntityId>,
+    /// How many rooms away a hunter or follower notices the player.
+    /// None means from anywhere.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range: Option<u32>,
+    /// Percent of an item's price a merchant pays when buying from the player.
+    #[serde(default)]
+    pub buys_at: u32,
+    /// The author's own algorithm, run instead of the behaviour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub act: Option<Code>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Behavior {
+    /// Never moves.
+    Stationary,
+    /// Never moves, so the player can always find them to talk to.
+    Conversationalist,
+    /// Wanders between rooms.
+    Wanderer,
+    /// Trades with the player (BUY, SELL, WARES), and may wander.
+    Merchant,
+    /// Seeks the player out and attacks them.
+    Hunter,
+    /// Stays put and attacks the player when they're in the same room.
+    Guard,
+    /// Follows the player from room to room.
+    Follower,
+}
+
+impl Behavior {
+    pub const ALL: &[Behavior] = &[
+        Behavior::Stationary,
+        Behavior::Conversationalist,
+        Behavior::Wanderer,
+        Behavior::Merchant,
+        Behavior::Hunter,
+        Behavior::Guard,
+        Behavior::Follower,
+    ];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Behavior::Stationary => "stationary",
+            Behavior::Conversationalist => "conversationalist",
+            Behavior::Wanderer => "wanderer",
+            Behavior::Merchant => "merchant",
+            Behavior::Hunter => "hunter",
+            Behavior::Guard => "guard",
+            Behavior::Follower => "follower",
+        }
+    }
+
+    pub fn from_key(s: &str) -> Option<Behavior> {
+        Behavior::ALL.iter().copied().find(|b| b.key() == s)
+    }
+
+    /// The `wander` chance when the author doesn't give one.
+    pub fn default_wander(self) -> u32 {
+        match self {
+            Behavior::Wanderer => 50,
+            Behavior::Merchant | Behavior::Hunter => 25,
+            _ => 0,
+        }
+    }
+
+    /// Whether it attacks the player.
+    pub fn hostile(self) -> bool {
+        matches!(self, Behavior::Hunter | Behavior::Guard)
+    }
 }
 
 fn one() -> u32 {
@@ -529,7 +627,19 @@ impl BuiltinAction {
         use BuiltinAction as A;
         matches!(
             self,
-            A::Take | A::PutIn | A::PutOn | A::Open | A::Close | A::Lock | A::Unlock | A::Wear | A::TakeOff | A::Eat | A::Enter | A::Empty
+            A::Take
+                | A::PutIn
+                | A::PutOn
+                | A::Open
+                | A::Close
+                | A::Lock
+                | A::Unlock
+                | A::Wear
+                | A::TakeOff
+                | A::Eat
+                | A::Enter
+                | A::Empty
+                | A::Attack
         )
     }
 }
@@ -590,6 +700,16 @@ pub enum BuiltinAction {
     /// Repeat the previous command.
     Again,
     Quit,
+    /// Attack something with health, bare-handed or with a weapon.
+    Attack,
+    /// Buy something a merchant here is selling.
+    Buy,
+    /// Sell something to a merchant here.
+    Sell,
+    /// List what the merchants here are selling.
+    Wares,
+    /// Say how healthy the player is.
+    Health,
 }
 
 impl BuiltinAction {
@@ -700,7 +820,9 @@ pub struct Handler {
 }
 
 /// Events that aren't verbs, and where each may be declared.
-pub const GLOBAL_EVENTS: &[&str] = &["start", "turn", "parse_failed"];
+pub const GLOBAL_EVENTS: &[&str] = &["start", "turn", "parse_failed", "died"];
+/// Events on a character: `defeated` runs when its health reaches 0.
+pub const CHARACTER_EVENTS: &[&str] = &["defeated"];
 pub const ROOM_EVENTS: &[&str] = &["enter", "leave", "turn"];
 
 // ------------------------------------------------------------------- choices

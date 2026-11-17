@@ -429,3 +429,24 @@ fn player_capacity_is_a_number_or_none() {
     let out = with("player: { capacity: 0 }\nobjects:\n  coin: { name: coin, in: player, traits: [portable] }\n");
     assert!(warnings(&out).iter().any(|w| w.contains("more than its capacity of 0")), "{:#?}", warnings(&out));
 }
+
+#[test]
+fn character_settings_are_checked() {
+    let out = with("characters:\n  cat: { name: cat, in: hall, behavior: wandrer }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("unknown behavior 'wandrer' (did you mean 'wanderer'?)"), "{:#?}", out.diagnostics);
+    let out = with("objects:\n  rock: { name: rock, in: hall, health: 3 }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only characters (and the player) can have 'health'"), "{:#?}", out.diagnostics);
+    let out = with("objects:\n  rock: { name: rock, in: hall, behavior: hunter }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only characters can have 'behavior'"), "{:#?}", out.diagnostics);
+    let out = with("characters:\n  wolf: { name: wolf, in: hall, behavior: hunter }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("the player has no 'health'")), "{:#?}", warnings(&out));
+    let out = with("characters:\n  sage: { name: sage, in: hall, behavior: conversationalist }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("needs 'talk'")), "{:#?}", warnings(&out));
+    let out = with("characters:\n  cat: { name: cat, in: hall, behavior: wanderer, wander: 150 }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("percentage"), "{:#?}", out.diagnostics);
+    let out = with("characters:\n  cat: { name: cat, in: hall, area: [nowhere] }\n");
+    assert!(out.story.is_none());
+    // A player who can be hurt gets a `died` ending unless the author wrote one.
+    let out = with("player: { health: 5 }\n");
+    assert!(out.story.unwrap().endings.iter().any(|e| e.key == "died"));
+}

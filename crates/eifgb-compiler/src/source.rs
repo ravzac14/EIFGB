@@ -99,6 +99,15 @@ pub struct Player {
     pub capacity: Option<Capacity>,
     #[serde(default)]
     pub size: Option<u32>,
+    /// Full health. Without it, enemies' attacks do nothing to the player.
+    #[serde(default)]
+    pub health: Option<u32>,
+    /// Bare-handed damage. Defaults to 1.
+    #[serde(default)]
+    pub damage: Option<u32>,
+    /// Starting money, for buying from merchants.
+    #[serde(default)]
+    pub money: Option<u32>,
 }
 
 /// A carrying capacity: a whole number, or `none` (or null) for no limit.
@@ -224,6 +233,38 @@ pub struct Thing {
     pub revealed_by: Option<OneOrMany>,
     #[serde(default)]
     pub on: IndexMap<String, String>,
+
+    // Characters: how they act, fight and trade.
+    /// A built-in behaviour: stationary, conversationalist, wanderer,
+    /// merchant, hunter, guard or follower.
+    #[serde(default)]
+    pub behavior: Option<String>,
+    /// Lua run on the character's turn instead of its behaviour.
+    #[serde(default)]
+    pub act: Option<String>,
+    /// Percent chance of moving on a turn with nothing better to do.
+    #[serde(default)]
+    pub wander: Option<u32>,
+    /// Rooms the character keeps to.
+    #[serde(default)]
+    pub area: Vec<String>,
+    /// How many rooms away a hunter or follower notices the player.
+    #[serde(default)]
+    pub range: Option<u32>,
+    /// Percent of the price a merchant pays for things the player sells.
+    #[serde(default)]
+    pub buys_at: Option<u32>,
+    #[serde(default)]
+    pub health: Option<u32>,
+    /// A character's attack, or a weapon's.
+    #[serde(default)]
+    pub damage: Option<u32>,
+    /// What a merchant charges for this object.
+    #[serde(default)]
+    pub price: Option<u32>,
+    /// A merchant's money. Without it they can always pay.
+    #[serde(default)]
+    pub money: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

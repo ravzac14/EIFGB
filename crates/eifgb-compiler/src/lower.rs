@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "move_to", "is_in", "contents", "has", "can_hold"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -90,7 +90,13 @@ impl<'a> Lowerer<'a> {
             },
             description: self.text_opt(s.player.description.as_deref(), "player.description"),
             traits: vec![],
-            state: BTreeMap::new(),
+            state: s
+                .player
+                .health
+                .map(|h| ("health".to_string(), Value::Int(i64::from(h))))
+                .into_iter()
+                .chain(s.player.money.map(|m| ("money".to_string(), Value::Int(i64::from(m)))))
+                .collect(),
             location: start,
             exits: vec![],
             unlocks_with: None,
@@ -99,7 +105,14 @@ impl<'a> Lowerer<'a> {
             size: s.player.size.unwrap_or(1),
             revealed_by: vec![],
             handlers: vec![],
+            npc: None,
+            health: s.player.health,
+            damage: Some(s.player.damage.unwrap_or(1)),
+            price: None,
         }];
+        if s.player.health == Some(0) {
+            self.d.error("player.health", "health must be at least 1");
+        }
         for (key, room) in &s.rooms {
             entities.push(self.lower_room(key, room));
         }
@@ -114,7 +127,21 @@ impl<'a> Lowerer<'a> {
 
         let handlers = self.lower_handlers("on", &s.on, GLOBAL_EVENTS);
         let choices = self.lower_choices(&s.choices);
-        let endings = self.lower_endings(&s.endings);
+        let mut endings = self.lower_endings(&s.endings);
+        // A player who can be hurt can die. Unless the author wrote a `died`
+        // ending, they get a plain one.
+        if s.player.health.is_some() && !endings.iter().any(|e| e.key == "died") {
+            let text = stdlib.messages.get("ending.died").map(String::as_str).unwrap_or("You have died.");
+            endings.push(Ending { key: "died".into(), kind: EndingKind::Loss, text: self.text(text, "stdlib.messages.ending.died") });
+        }
+        for e in &entities {
+            if e.npc.as_ref().is_some_and(|n| n.behavior.hostile()) && s.player.health.is_none() {
+                self.d.warn(
+                    format!("characters.{}.behavior", e.key),
+                    "attacks the player, but the player has no 'health', so its attacks do nothing; add 'player: { health: 10 }'",
+                );
+            }
+        }
         let timers = self.lower_timers(&s.timers, &endings);
         let scripts = self.load_scripts(&s.scripts);
 
@@ -268,7 +295,7 @@ impl<'a> Lowerer<'a> {
             if key.starts_with("before_") || key.starts_with("after_") {
                 self.d.error(&path, "verb IDs can't start with 'before_' or 'after_'");
             }
-            if GLOBAL_EVENTS.contains(&key.as_str()) || ROOM_EVENTS.contains(&key.as_str()) {
+            if GLOBAL_EVENTS.contains(&key.as_str()) || ROOM_EVENTS.contains(&key.as_str()) || CHARACTER_EVENTS.contains(&key.as_str()) {
                 self.d.error(
                     &path,
                     format!("'{key}' is the name of an event, so a verb can't use it; pick another ID (the patterns can still say \"{key} ...\")"),
@@ -464,6 +491,10 @@ impl<'a> Lowerer<'a> {
             size: 1,
             revealed_by: vec![],
             handlers,
+            npc: None,
+            health: None,
+            damage: None,
+            price: None,
         }
     }
 
@@ -649,7 +680,29 @@ impl<'a> Lowerer<'a> {
             }
         }
 
-        let handlers = self.lower_handlers(&format!("{path}.on"), &t.on, &[]);
+        let events: &[&str] = if kind == EntityKind::Character { CHARACTER_EVENTS } else { &[] };
+        let handlers = self.lower_handlers(&format!("{path}.on"), &t.on, events);
+        let npc = self.lower_npc(&path, t, kind, talk.is_some());
+        let only = |d: &mut Diagnostics, field: &str, set: bool, ok: bool, who: &str| {
+            if set && !ok {
+                d.error(format!("{path}.{field}"), format!("only {who} can have '{field}'"));
+            }
+        };
+        let is_char = kind == EntityKind::Character;
+        only(self.d, "health", t.health.is_some(), is_char, "characters (and the player)");
+        only(self.d, "price", t.price.is_some(), kind == EntityKind::Object, "objects");
+        only(self.d, "money", t.money.is_some(), is_char, "characters (and the player)");
+        if let Some(h) = t.health {
+            if h == 0 {
+                self.d.error(format!("{path}.health"), "health must be at least 1");
+            }
+            state.insert("health".into(), Value::Int(i64::from(h)));
+        }
+        if let Some(m) = t.money {
+            state.insert("money".into(), Value::Int(i64::from(m)));
+        }
+        let hostile = npc.as_ref().is_some_and(|n| n.behavior.hostile());
+        let damage = t.damage.or(if hostile { Some(1) } else { None });
         Entity {
             key: key.into(),
             kind,
@@ -666,7 +719,68 @@ impl<'a> Lowerer<'a> {
             size: t.size.unwrap_or(1),
             revealed_by,
             handlers,
+            npc,
+            health: t.health.filter(|_| is_char),
+            damage,
+            price: t.price,
         }
+    }
+
+    /// A character's behaviour. Every character has one: `stationary`, or
+    /// `conversationalist` if it has `talk`, unless the author picks another.
+    fn lower_npc(&mut self, path: &str, t: &src::Thing, kind: EntityKind, talks: bool) -> Option<Npc> {
+        if kind != EntityKind::Character {
+            for (field, set) in [
+                ("behavior", t.behavior.is_some()),
+                ("act", t.act.is_some()),
+                ("wander", t.wander.is_some()),
+                ("area", !t.area.is_empty()),
+                ("range", t.range.is_some()),
+                ("buys_at", t.buys_at.is_some()),
+            ] {
+                if set {
+                    self.d.error(format!("{path}.{field}"), format!("only characters can have '{field}'; move this to 'characters'"));
+                }
+            }
+            return None;
+        }
+        let behavior = match t.behavior.as_deref() {
+            None if talks => Behavior::Conversationalist,
+            None => Behavior::Stationary,
+            Some(b) => Behavior::from_key(b).unwrap_or_else(|| {
+                let hint = did_you_mean(b, Behavior::ALL.iter().map(|b| b.key()));
+                self.d.error(format!("{path}.behavior"), format!("unknown behavior '{b}'{hint}"));
+                Behavior::Stationary
+            }),
+        };
+        if behavior == Behavior::Conversationalist && !talks {
+            self.d.warn(format!("{path}.behavior"), "a conversationalist needs 'talk' to have anything to say");
+        }
+        for (field, val) in [("wander", t.wander), ("buys_at", t.buys_at)] {
+            if let Some(v) = val
+                && v > 100
+            {
+                self.d.error(format!("{path}.{field}"), format!("'{field}' is a percentage, so it can't be more than 100"));
+            }
+        }
+        if t.buys_at.is_some() && behavior != Behavior::Merchant {
+            self.d.warn(format!("{path}.buys_at"), "only matters for a merchant");
+        }
+        let area = t
+            .area
+            .iter()
+            .enumerate()
+            .filter_map(|(i, r)| self.room_ref(r, &format!("{path}.area[{i}]")))
+            .collect();
+        let act = t.act.as_deref().map(|c| self.code(c, &format!("{path}.act")));
+        Some(Npc {
+            behavior,
+            wander: t.wander.unwrap_or(behavior.default_wander()),
+            area,
+            range: t.range,
+            buys_at: t.buys_at.unwrap_or(50),
+            act,
+        })
     }
 
     /// Makes doors work from both sides. For every exit from room A to

@@ -110,7 +110,8 @@ mod tests {
                 let lib = load(v, lang).unwrap();
                 for key in lib.verbs.keys() {
                     let clash = eifgb_ir::GLOBAL_EVENTS.contains(&key.as_str())
-                        || eifgb_ir::ROOM_EVENTS.contains(&key.as_str());
+                        || eifgb_ir::ROOM_EVENTS.contains(&key.as_str())
+                        || eifgb_ir::CHARACTER_EVENTS.contains(&key.as_str());
                     assert!(!clash, "v{v}/{lang}: verb '{key}' has the same name as an event");
                 }
             }

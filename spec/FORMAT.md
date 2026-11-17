@@ -30,17 +30,17 @@ stay interchangeable.
 | `game`       | Metadata, start room, intro text, max score. |
 | `settings`   | Game-wide switches. For now just `describe_state` (default `true`). |
 | `vars`       | Global story state (scalars, lists, maps). |
-| `player`     | Player description and carrying capacity. |
+| `player`     | Player description, carrying capacity, `health`, `damage` and `money`. |
 | `rooms`      | Locations and their exits. |
 | `objects`    | Things. Each starts somewhere via `in:`. |
-| `characters` | NPCs: objects that can be talked to. |
+| `characters` | NPCs and enemies: things that talk, move, fight and trade. See **Characters**. |
 | `verbs`      | Custom verbs: grammar `patterns`, a `default` reply, and `reach` (default `true`). An author verb's leading words take priority over stdlib synonym phrases. |
 | `choices`    | Choice graphs, used for menus and dialogue. |
 | `on`         | Global event handlers (`turn`, `start`, ...). |
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
 | `timers`     | Things that happen after a number of actions. See **Timers**. |
 
-IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `enter`, `leave`), because handlers are keyed by both.
+IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `died`, `enter`, `leave`, `defeated`), because handlers are keyed by both.
 
 ## Entities
 
@@ -54,7 +54,7 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   So a conditional route is `[{to: bridge, when: vars.bridge_down}, {blocked: "The bridge is raised."}]`. GO THROUGH, WALK THROUGH, ENTER and GO INTO a door also leave by the exit that uses it.
 - **Containers and supporters.** These are the `container` and `supporter` traits, with `in:` placing things inside or on top:
   - **Visibility:** a closed container hides its contents, unless it's `transparent`, in which case they're visible but out of reach: "You can't reach the jewel: the glass case is closed." `[reach.closed]`
-  - **Reach:** every verb carries a `reach` flag in the IR. When it's set, a target or tool out of reach stops the command before any handler runs. The built-in verbs that touch things need reach (TAKE, OPEN, PUT, EAT…); EXAMINE, SEARCH, LOOK and TALK don't. Author verbs and the stdlib's try-it verbs need it by default. LISTEN doesn't (`reach: false` in the stdlib), and authors opt out per verb with `reach: false`. A container without `openable` is always open. Characters' belongings are never in scope.
+  - **Reach:** every verb carries a `reach` flag in the IR. When it's set, a target or tool out of reach stops the command before any handler runs. The built-in verbs that touch things need reach (TAKE, OPEN, PUT, EAT…); EXAMINE, SEARCH, LOOK and TALK don't. Author verbs and the stdlib's try-it verbs need it by default. LISTEN doesn't (`reach: false` in the stdlib), and authors opt out per verb with `reach: false`. A container without `openable` is always open. Characters' belongings are never in scope, except a merchant's priced goods for BUY and EXAMINE.
   - **Descriptions:** LOOK, EXAMINE and SEARCH describe contents as deep as the player can see. The inventory lists carried things, then one sentence per carried thing the player can see into, recursively: "In the cloth bag is a coin." `[inventory.in, inventory.on]` (with `args.count` for is/are).
   - **TAKE X FROM Y** checks that X is in or on Y, at any depth: "The coin isn't in the glass jar." `[take.not_in, take.not_on]`.
   - **ALL with a second object:** TAKE ALL FROM Y means what's in Y. PUT ALL IN/ON Y means what you carry, except Y itself, anything containing Y, and worn things.
@@ -141,6 +141,7 @@ A handler can be a block of statements or a single expression.
 - **Arguments:** `args.target`, `args.tool`, `args.text`, `args.direction`.
 - **Fields on every entity:** `key`, `name`, `kind`, `location`. These are read-only; use `:move_to` to change `location`.
 - **`capacity`:** readable and writable on every entity, starting from the source `capacity`. Reads give an integer or `nil`. Writes take a whole number ≥ 0, or `nil`/`"none"` for no capacity (unlimited for the player, the size rule for containers and supporters); anything else is a script error. Lowering it doesn't move anything out. It's saved and undone with the game, and because it's built in it can't be used as a state field name.
+- **Character methods:** `:wander()`, `:step_toward(target)`, `:go(direction)`, `:attack(target, weapon?)`, `:behave()` (each returns whether it did something, and its event is described like a behaviour's), `:is_with(other)`, `:distance_to(target)` (moves needed, or `nil`). See **Characters**.
 - **Methods on every entity:** `:move_to(place)` (ignores size and capacity), `:is_in(holder)`, `:contents()`, `:has(trait)`, `:can_hold(thing)` (whether `thing` would fit in, on or be carried by this, by size and capacity; true if it's already there).
 - **State fields** are read and written directly (`self.fueled = true`). Setting one to `nil` removes it. The built-in field and method names above are reserved and can't be used as state fields.
 - **Each entity has exactly one Lua object**, so `==` works as expected (`args.tool == world.oil_can`).
@@ -169,6 +170,33 @@ Parse failures and meta commands (SAVE, UNDO, SCORE…) don't count.
 - **Scripts:** `start_timer(id)`, `stop_timer(id)` (both take effect when the script returns), and `timer_left(id)`, the number of actions left counting the current one, or `nil`.
 - **State:** running timers live in `GameState.timers` (ID → due turn), so they're saved and undone.
 - **Compiler checks:** schedule shape, ending IDs, rules, and literal `start_timer`/`stop_timer`/`timer_left` names. A warning is given for timers that do nothing.
+
+## Characters
+
+Every character has a behaviour, and takes a turn after each action that
+counts for timers, in declaration order, before `turn` handlers and timers.
+
+- **`behavior`:** `stationary` (default without `talk`), `conversationalist` (default with `talk`; never moves), `wanderer`, `merchant`, `hunter`, `guard`, `follower`. Unknown names are errors with a suggestion; a conversationalist without `talk` is a warning.
+- **`wander`** (0–100): percent chance of moving to a random neighbouring room on a turn with nothing better to do. Defaults: wanderer 50, merchant and hunter 25, others 0. Merchants never wander while the player is with them.
+- **`area`:** room IDs the character keeps to. **`range`:** rooms away at which a hunter or follower notices the player (default unlimited), by the shortest route it can take.
+- **Movement:** characters use exits with a `to` and no `when`, passing doors that aren't locked, blocked or hidden from their side, without opening them. "The X goes north." `[npc.leaves]` when leaving the player's room, "The X arrives." `[npc.arrives]` when entering it.
+- **`act`** (Lua, `self` is the character): runs instead of the behaviour. `self:behave()` runs the behaviour from inside it.
+- **Hostile behaviours** (hunter, guard) attack the player when in the same room, with their best carried weapon or their own `damage` (default 1 for them). The compiler warns if the player has no `health`.
+
+**Health and damage.** `health` on characters and the player is the maximum, and the current value is the `health` state field (reserved, like `money`). `damage` on characters and the player is unarmed damage (player default 1); on objects it makes a weapon. An attack takes the weapon's damage, else the attacker's, else 1, never going below 0 health.
+
+- **ATTACK** (verb `hit`: hit, attack, kill, fight, strike, smash, stab, slay, punch, break, optionally WITH a held weapon): needs reach. "You hit X (with Y)." `[attack.done]`; no health → `[attack.pointless]`, which, like a script verb, gives way to `revealed_by`'s "You find …"; a tool without `damage` → `[attack.not_weapon]`; not held → `[attack.not_held]`. Handlers on `hit` still replace it per object.
+- **Wounds:** below full, "wounded"; at half or less, "badly wounded" `[state.wounded, state.badly_wounded, state.tag.*, state.here.*]`. Not shown for the player.
+- **Defeat:** checked after the player's action (before characters act, so a killing blow isn't answered), after each character's turn, and after timers. The character's `defeated` handlers run (`self` is it). Unless one returns `block()`, or heals or moves it, "X is defeated." `[npc.defeated]`, it drops what it carries `[npc.drops]`, and it leaves play (location `nil`).
+- **Death:** at 0 player health, global `died` handlers run. If none ended the game or restored health, the game ends with `died`. The compiler adds a loss ending `died` ("You have died." `[ending.died]`) when the player has `health` and the author didn't write one.
+- **HEALTH / DIAGNOSE / HP / STATUS:** `[health.full, health.hurt, health.none]`. Doesn't take a turn.
+
+**Trading.** `price` on objects; `money` on the player and optionally merchants (state field; without it a merchant can always pay).
+
+- **WARES** (browse, shop, trade (with X)): "X has for sale: a lamp (8 coins) …" `[wares.list, wares.item, wares.empty]`. Takes a turn.
+- **BUY X (FROM Y):** X must be priced and carried by a merchant in the room; the merchants' priced goods are in scope for BUY and EXAMINE. Checks money `[buy.too_poor]` and carrying capacity (take messages). `[buy.done]`
+- **SELL X (TO Y):** X must be held directly. The offer is `price × buys_at / 100` (`buys_at` default 50, 0–100); 0 → `[sell.worthless]`. A merchant with `money` can't pay more than they have `[sell.merchant_poor]`. Without TO, the first merchant here. `[sell.done]`
+- **Money text:** `money.amount` ("8 coins", "1 coin"). INVENTORY ends with "You have 12 coins." `[money.have]` when the player has money.
 
 ## Choices
 

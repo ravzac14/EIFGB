@@ -580,7 +580,13 @@ impl Grammar {
         if words.is_empty() {
             return Err(NounFail::Missing);
         }
-        let scope = world.scope();
+        let mut scope = world.scope();
+        // What merchants here are selling can be looked at and bought.
+        if matches!(action, Some(BuiltinAction::Buy | BuiltinAction::Examine)) {
+            for m in world.merchants_here() {
+                scope.extend(world.contents(m).into_iter().filter(|&i| world.def(i).price.is_some()));
+            }
+        }
 
         if words.len() == 1 {
             let w = words[0];

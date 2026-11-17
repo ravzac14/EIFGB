@@ -178,8 +178,38 @@ verbs:
     patterns: ["kick {target}"]
     default: "Kicking that won't help."
   hit:
-    patterns: ["hit {target}", "punch {target}", "strike {target}", "smash {target}", "break {target}", "attack {target}"]
-    default: "Violence isn't the answer here."
+    # Fights anything with health; anything else gets attack.pointless.
+    action: attack
+    patterns:
+      - "hit {target}"
+      - "hit {target} with {tool}"
+      - "punch {target}"
+      - "strike {target}"
+      - "strike {target} with {tool}"
+      - "smash {target}"
+      - "smash {target} with {tool}"
+      - "break {target}"
+      - "attack {target}"
+      - "attack {target} with {tool}"
+      - "kill {target}"
+      - "kill {target} with {tool}"
+      - "fight {target}"
+      - "fight {target} with {tool}"
+      - "stab {target} with {tool}"
+      - "slay {target}"
+      - "slay {target} with {tool}"
+  buy:
+    action: buy
+    patterns: ["buy {target}", "buy {target} from {tool}", "purchase {target}"]
+  sell:
+    action: sell
+    patterns: ["sell {target}", "sell {target} to {tool}"]
+  wares:
+    action: wares
+    patterns: ["wares", "list wares", "browse", "shop", "trade", "trade with {target}", "browse {target}"]
+  health:
+    action: health
+    patterns: ["health", "diagnose", "hp", "status"]
   move:
     patterns: ["move {target}", "drag {target}", "shift {target}", "slide {target}"]
     default: "Nothing obvious happens."
@@ -305,6 +335,38 @@ messages:
   parser.unknown_word: "I don't know the word \"${args.word}\"."
   parser.not_here: "You can't see any such thing."
   parser.scenery: "That's just part of the scenery."
+  # characters acting
+  npc.leaves: "${The(args.npc)} goes ${args.direction}."
+  npc.arrives: "${The(args.npc)} arrives."
+  npc.attacks_you: "${The(args.npc)} attacks you${if args.weapon} with ${the(args.weapon)}${end}."
+  npc.attacks: "${The(args.npc)} attacks ${the(args.target)}."
+  npc.defeated: "${The(args.target)} is defeated."
+  npc.drops: "${The(args.target)} drops ${args.list}."
+  # fighting
+  attack.pointless: "Violence isn't the answer here."
+  attack.self: "That would hurt."
+  attack.done: "You hit ${the(args.target)}${if args.weapon} with ${the(args.weapon)}${end}."
+  attack.not_weapon: "${The(args.tool)} isn't much of a weapon."
+  attack.not_held: "You need to be holding ${the(args.tool)} first."
+  health.full: "You're in perfect health."
+  health.hurt: "You're hurt: ${args.health} out of ${args.max}."
+  health.none: "You feel fine."
+  # buying and selling
+  money.amount: "${args.amount} ${if args.amount == 1}coin${else}coins${end}"
+  money.have: "You have ${args.amount}."
+  buy.no_merchant: "There's nobody here to buy from."
+  buy.not_for_sale: "${The(args.target)} isn't for sale."
+  buy.too_poor: "${The(args.target)} costs ${args.price}, and you have only ${args.amount}."
+  buy.done: "You buy ${the(args.target)} from ${the(args.merchant)} for ${args.price}."
+  sell.no_merchant: "There's nobody here to sell to."
+  sell.not_held: "You're not carrying ${the(args.target)}."
+  sell.worthless: "${The(args.merchant)} isn't interested in ${the(args.target)}."
+  sell.merchant_poor: "${The(args.merchant)} can't afford ${the(args.target)}."
+  sell.done: "You sell ${the(args.target)} to ${the(args.merchant)} for ${args.price}."
+  wares.list: "${The(args.merchant)} has for sale: ${args.list}."
+  wares.empty: "${The(args.merchant)} has nothing left to sell."
+  wares.item: "${args.item} (${args.price})"
+  ending.died: "You have died."
   parser.partial: "I only understood you as far as wanting to ${args.verb}."
   parser.ambiguous: "Which do you mean, ${args.options}?"
   parser.need_target: "What do you want to ${args.verb}?"
@@ -340,6 +402,8 @@ messages:
   state.locked: "It's locked."
   state.worn: "You're wearing it."
   state.empty: "It's empty."
+  state.wounded: "${The(args.target)} is wounded."
+  state.badly_wounded: "${The(args.target)} is badly wounded."
   state.heavy: "It's too heavy to lift with everything in it."
   state.blocked: "It's blocked."
   state.blocked_here: "It's blocked from this side."
@@ -349,6 +413,8 @@ messages:
   state.here.blocked: "${The(args.target)} is blocked."
   state.here.blocked_here: "${The(args.target)} is blocked from this side."
   state.here.empty: "${The(args.target)} is empty."
+  state.here.wounded: "${The(args.target)} is wounded."
+  state.here.badly_wounded: "${The(args.target)} is badly wounded."
   state.here.heavy: "${The(args.target)} is too heavy to lift with everything in it."
   state.tag.open: "open"
   state.tag.closed: "closed"
@@ -357,6 +423,8 @@ messages:
   state.tag.blocked: "blocked"
   state.tag.blocked_here: "blocked from this side"
   state.tag.empty: "empty"
+  state.tag.wounded: "wounded"
+  state.tag.badly_wounded: "badly wounded"
   state.tag.heavy: "heavy"
   # an author's own state fields, e.g. `fueled: true` or `channel: 16`
   state.custom.on: "It's ${args.state}."

@@ -1314,3 +1314,213 @@ fn real_names_beat_description_words() {
     let mut g = game(compile_str(&src).story.unwrap());
     assert_says(&mut g, "x rocks", "Slick with spray.");
 }
+
+// ------------------------------------------------------- characters acting
+
+const PEOPLE: &str = "\
+format: eifgb/0.1
+game: { id: p, title: P, version: '1', start: hall }
+player: { health: 30, money: 20 }
+rooms:
+  hall: { name: Hall, exits: { north: yard, east: shop } }
+  yard: { name: Yard, exits: { south: hall, north: woods } }
+  woods: { name: Woods, exits: { south: yard } }
+  shop: { name: Shop, exits: { west: hall } }
+objects:
+  sword: { name: sword, in: hall, traits: [portable], damage: 4 }
+  lamp: { name: brass lamp, synonyms: [lamp], in: peddler, traits: [portable], price: 8, description: A shiny lamp. }
+  rope: { name: rope, in: peddler, traits: [portable], price: 30 }
+characters:
+  wolf: { name: grey wolf, synonyms: [wolf], in: woods, behavior: hunter, health: 8, damage: 3, wander: 0 }
+  peddler: { name: peddler, in: shop, behavior: merchant, wander: 0, money: 5 }
+";
+
+fn people(extra: &str) -> Game<LuaHost> {
+    let out = compile_str(&format!("{PEOPLE}{extra}"));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+#[test]
+fn a_hunter_seeks_out_the_player_and_attacks() {
+    let mut g = people("");
+    // Two rooms away: one step per turn, out of sight at first.
+    assert!(!say(&mut g, "take sword").contains("wolf"));
+    assert_says(&mut g, "z", "The grey wolf arrives.");
+    assert_says(&mut g, "z", "The grey wolf attacks you.");
+    // HEALTH is free, so the wolf doesn't get another bite.
+    assert_eq!(say(&mut g, "health"), "You're hurt: 27 out of 30.");
+    assert_eq!(say(&mut g, "health"), "You're hurt: 27 out of 30.");
+}
+
+#[test]
+fn fighting_wounds_and_defeats() {
+    let mut g = people("");
+    say(&mut g, "take sword");
+    say(&mut g, "z");
+    let out = say(&mut g, "attack wolf with sword");
+    assert!(out.contains("You hit the grey wolf with the sword.") && out.contains("attacks you"), "{out}");
+    assert_says(&mut g, "x wolf", "The grey wolf is badly wounded.");
+    assert_says(&mut g, "look", "a grey wolf (badly wounded)");
+    let out = say(&mut g, "kill wolf with sword");
+    // Defeated by that blow, so it doesn't strike back.
+    assert_eq!(out, "You hit the grey wolf with the sword.\nThe grey wolf is defeated.");
+    assert!(!say(&mut g, "look").contains("wolf"));
+    // Things that can't be hurt.
+    assert_says(&mut g, "hit sword", "Violence isn't the answer here.");
+}
+
+fn weak_player(extra: &str) -> Game<LuaHost> {
+    let src = format!("{PEOPLE}{extra}").replace("player: { health: 30, money: 20 }", "player: { health: 3, money: 20 }");
+    game(compile_str(&src).story.unwrap())
+}
+
+#[test]
+fn the_player_can_die() {
+    let mut g = weak_player("");
+    say(&mut g, "z");
+    say(&mut g, "z");
+    let out = g.input("z");
+    assert!(out.text().contains("You have died."), "{}", out.text());
+    assert_eq!(out.ended, Some(EndingKind::Loss));
+}
+
+#[test]
+fn a_died_handler_can_save_the_player() {
+    let mut g = weak_player("on:\n  died: 'player.health = 5; say(\"A guardian spirit pulls you back.\")'\n");
+    say(&mut g, "z");
+    say(&mut g, "z");
+    let out = g.input("z");
+    assert!(out.text().contains("A guardian spirit") && out.ended.is_none(), "{}", out.text());
+}
+
+#[test]
+fn a_defeated_handler_can_replace_the_default() {
+    let src = PEOPLE.replace("objects:\n", "objects:\n  pelt: { name: pelt, in: wolf, traits: [portable] }\n");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "take sword");
+    say(&mut g, "z");
+    say(&mut g, "hit wolf with sword");
+    // Without a handler, it drops what it carried.
+    assert_says(&mut g, "hit wolf with sword", "The grey wolf drops a pelt.");
+
+    let src = PEOPLE.replace(
+        "damage: 3, wander: 0 }",
+        "damage: 3, wander: 0, on: { defeated: 'self.health = 1; self:move_to(world.woods); return block(\"The wolf limps away.\")' } }",
+    );
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "take sword");
+    say(&mut g, "z");
+    say(&mut g, "hit wolf with sword");
+    let out = say(&mut g, "hit wolf with sword");
+    // Back in the woods with 1 health; being a hunter, it starts back toward the player.
+    assert!(out.contains("The wolf limps away.") && !out.contains("defeated"), "{out}");
+    assert!(!say(&mut g, "look").contains("You can see a grey wolf"));
+}
+
+#[test]
+fn merchants_buy_and_sell() {
+    let src = PEOPLE.replace("behavior: hunter", "behavior: stationary");
+    let mut g = game(compile_str(&src).story.unwrap());
+    // The peddler's goods can't be seen from here.
+    assert_says(&mut g, "buy lamp", "You can't see any such thing.");
+    assert_says(&mut g, "wares", "There's nobody here to buy from.");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "wares"), "The peddler has for sale: a brass lamp (8 coins) and a rope (30 coins).");
+    assert_eq!(say(&mut g, "x lamp"), "A shiny lamp.");
+    assert_eq!(say(&mut g, "buy lamp"), "You buy the brass lamp from the peddler for 8 coins.");
+    assert_eq!(say(&mut g, "i"), "You're carrying a brass lamp.\nYou have 12 coins.");
+    assert_eq!(say(&mut g, "buy rope"), "The rope costs 30 coins, and you have only 12 coins.");
+    // At half price, and the peddler had 5 + 8.
+    assert_eq!(say(&mut g, "sell lamp"), "You sell the brass lamp to the peddler for 4 coins.");
+    assert_says(&mut g, "i", "You have 16 coins.");
+    say(&mut g, "w");
+    say(&mut g, "take sword");
+    say(&mut g, "e");
+    assert_says(&mut g, "sell sword", "The peddler isn't interested in the sword.");
+}
+
+#[test]
+fn wanderers_followers_and_guards() {
+    let src = "\
+format: eifgb/0.1
+game: { id: w, title: W, version: '1', start: hall }
+player: { health: 10 }
+rooms:
+  hall: { name: Hall, exits: { north: yard } }
+  yard: { name: Yard, exits: { south: hall } }
+characters:
+  cat: { name: cat, in: hall, behavior: wanderer, wander: 100 }
+  dog: { name: dog, in: hall, behavior: follower }
+  troll: { name: troll, in: yard, behavior: guard, damage: 2 }
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    // The cat always wanders, and the hall has one way out.
+    assert_says(&mut g, "z", "The cat goes north.");
+    let out = say(&mut g, "n");
+    // The dog follows; the troll attacks, but only here, and doesn't follow.
+    assert!(out.contains("The dog arrives.") && out.contains("The troll attacks you."), "{out}");
+    let out = say(&mut g, "s");
+    assert!(out.contains("The dog arrives.") && !out.contains("troll"), "{out}");
+    assert_eq!(say(&mut g, "health"), "You're hurt: 8 out of 10.");
+}
+
+#[test]
+fn custom_algorithms_in_lua() {
+    let src = "\
+format: eifgb/0.1
+game: { id: a, title: A, version: '1', start: hall }
+player: { health: 10 }
+rooms:
+  hall: { name: Hall, exits: { north: yard } }
+  yard: { name: Yard, exits: { south: hall } }
+characters:
+  parrot:
+    name: parrot
+    in: yard
+    act: |
+      if self:is_with(player) then
+        say(\"The parrot squawks.\")
+      else
+        self:step_toward(player)
+      end
+  ghost:
+    name: ghost
+    in: yard
+    behavior: hunter
+    damage: 1
+    act: |
+      if game.turn % 2 == 0 then self:behave() end
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    let out = say(&mut g, "z");
+    assert!(out.contains("The parrot arrives.") && !out.contains("ghost"), "{out}");
+    let out = say(&mut g, "z");
+    assert!(out.contains("The parrot squawks.") && out.contains("The ghost arrives."), "{out}");
+    // The ghost only acts on even turns.
+    assert!(!say(&mut g, "z").contains("ghost attacks"));
+    assert_says(&mut g, "z", "The ghost attacks you.");
+}
+
+#[test]
+fn characters_respect_doors_and_areas() {
+    let src = "\
+format: eifgb/0.1
+game: { id: d, title: D, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { north: { to: vault, through: gate }, east: garden } }
+  vault: { name: Vault }
+  garden: { name: Garden }
+objects:
+  gate: { name: gate, in: hall, traits: [door, openable, lockable], state: { locked: true }, unlocks_with: key }
+  key: { name: key, in: hall, traits: [portable] }
+characters:
+  mouse: { name: mouse, in: hall, behavior: wanderer, wander: 100, area: [hall, vault] }
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    // Locked gate, and the garden is outside its area: it can't go anywhere.
+    assert!(!say(&mut g, "z").contains("mouse"));
+    say(&mut g, "take key");
+    // Unlocked but closed: characters slip through without opening it.
+    assert_says(&mut g, "unlock gate", "The mouse goes north.");
+    assert_says(&mut g, "x gate", "It's closed.");
+}

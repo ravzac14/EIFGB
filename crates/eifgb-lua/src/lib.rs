@@ -498,6 +498,73 @@ impl ScriptHost for LuaHost {
                     )?;
                 }
 
+                // Characters acting. Each returns whether something happened,
+                // and hands the engine an event to describe.
+                let push = move |ev: Option<eifgb_engine::NpcEvent>| -> bool {
+                    match ev {
+                        Some(ev) => {
+                            effects.borrow_mut().push(Effect::Npc(ev));
+                            true
+                        }
+                        None => false,
+                    }
+                };
+                h.set(
+                    "npc_wander",
+                    scope.create_function(move |_, id: u32| {
+                        let id = check(id)?;
+                        let ev = world.borrow_mut().npc_wander(id);
+                        Ok(push(ev))
+                    })?,
+                )?;
+                h.set(
+                    "npc_step_toward",
+                    scope.create_function(move |_, (id, target): (u32, u32)| {
+                        let (id, target) = (check(id)?, check(target)?);
+                        let ev = world.borrow_mut().npc_step_toward(id, target);
+                        Ok(push(ev))
+                    })?,
+                )?;
+                h.set(
+                    "npc_go",
+                    scope.create_function(move |_, (id, dir): (u32, String)| {
+                        let id = check(id)?;
+                        let d = eifgb_engine::ir::Direction::from_key(&dir)
+                            .ok_or_else(|| rt(format!("go: '{dir}' isn't a direction")))?;
+                        let ev = world.borrow_mut().npc_go(id, d);
+                        Ok(push(ev))
+                    })?,
+                )?;
+                h.set(
+                    "npc_attack",
+                    scope.create_function(move |_, (id, target, weapon): (u32, u32, Option<u32>)| {
+                        let (id, target) = (check(id)?, check(target)?);
+                        let weapon = weapon.map(check).transpose()?;
+                        let ev = world.borrow_mut().attack(id, target, weapon);
+                        Ok(push(ev))
+                    })?,
+                )?;
+                h.set(
+                    "npc_behave",
+                    scope.create_function(move |_, id: u32| {
+                        let id = check(id)?;
+                        let events = world.borrow_mut().npc_behave(id);
+                        let acted = !events.is_empty();
+                        effects.borrow_mut().extend(events.into_iter().map(Effect::Npc));
+                        Ok(acted)
+                    })?,
+                )?;
+                h.set(
+                    "distance",
+                    scope.create_function(move |_, (id, target): (u32, u32)| {
+                        Ok(world.borrow().distance(check(id)?, check(target)?).map(i64::from))
+                    })?,
+                )?;
+                h.set(
+                    "together",
+                    scope.create_function(move |_, (a, b): (u32, u32)| Ok(world.borrow().together(check(a)?, check(b)?)))?,
+                )?;
+
                 h.set(
                     "timer_left",
                     scope.create_function(move |_, key: String| {

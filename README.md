@@ -22,6 +22,7 @@ You unlock the pantry door with the small key.
 - [States and descriptions](#states-and-descriptions)
 - [Containers and supporters](#containers-and-supporters)
 - [Timed events](#timed-events)
+- [Characters: NPCs and enemies](#characters-npcs-and-enemies)
 - [Command reference](#command-reference)
 - [Cheat sheet](#cheat-sheet)
 - [Where to go next](#where-to-go-next)
@@ -799,6 +800,178 @@ Scripts can also use `start_timer("bell")`, `stop_timer("bell")` and
 `timer_left("bell")`. `timer_left` gives the number of actions left,
 counting the current one, or `nil` if the timer isn't running.
 
+## Characters: NPCs and enemies
+
+Characters take a turn after every action the player takes (the same
+actions that count for timers). What they do depends on their
+`behavior`:
+
+| `behavior` | What it does each turn |
+|---|---|
+| `stationary` | Nothing. The default for a character without `talk`. |
+| `conversationalist` | Nothing, so the player always knows where to find them. The default for a character with `talk`. |
+| `wanderer` | Moves to a random neighbouring room, with a `wander` percent chance (default 50). |
+| `merchant` | Trades with the player (see below). Wanders (default 25%), but never walks off while the player is in the room. |
+| `hunter` | Attacks the player if they're in the same room. Otherwise heads one room closer to them, if they're within `range` rooms (default: anywhere), or else wanders (default 25%). |
+| `guard` | Attacks the player in its own room, and otherwise stays put. |
+| `follower` | Follows the player from room to room. |
+
+```yaml
+player:
+  health: 30
+  money: 20
+
+objects:
+  sword: { name: sword, in: hall, traits: [portable], damage: 4 }
+  lamp: { name: brass lamp, synonyms: [lamp], in: peddler, traits: [portable], price: 8 }
+
+characters:
+  wolf:
+    name: grey wolf
+    synonyms: [wolf]
+    in: woods
+    behavior: hunter
+    health: 8
+    damage: 3
+  peddler:
+    name: peddler
+    in: shop
+    behavior: merchant
+    money: 5
+```
+
+Settings that shape a behaviour:
+
+- **`wander`**: percent chance of moving on a turn with nothing better to
+  do. `wander: 0` keeps a merchant or hunter in one place.
+- **`area: [market, square]`**: the rooms a character keeps to.
+- **`range: 3`**: how many rooms away a hunter or follower notices the player.
+
+Characters use any exit that isn't conditional (`when:`), and slip
+through closed doors as long as they aren't locked, blocked or hidden
+from their side. The player sees them come and go: "The peddler goes
+north.", "The grey wolf arrives."
+
+### Fighting
+
+Give the player and anything that can be hurt a `health`, and anything
+that hits a `damage` (default 1). An object with `damage` is a weapon.
+
+```
+> z
+Time passes.
+The grey wolf arrives.
+
+> attack wolf with sword
+You hit the grey wolf with the sword.
+The grey wolf attacks you.
+
+> look
+
+Hall
+You can see a grey wolf (badly wounded) here.
+Exits: north and east.
+The grey wolf attacks you.
+
+> kill wolf with sword
+You hit the grey wolf with the sword.
+The grey wolf is defeated.
+
+> health
+You're hurt: 12 out of 30.
+```
+
+- **Attacking:** ATTACK, HIT, KILL, FIGHT, STRIKE and STAB, optionally
+  WITH a weapon the player is holding. Without one, the player's own
+  `damage` is used (`player: { damage: 2 }`, default 1). Hitting
+  something without health still gets "Violence isn't the answer here."
+- **Enemies** (hunters and guards) hit back with their best weapon, or
+  their own `damage`.
+- **Wounds** show once the player has seen them: "a grey wolf (wounded)",
+  then "(badly wounded)" at half health or less.
+- **Defeat:** at 0 health a character drops what it carries and leaves
+  the game. An `on: { defeated: ... }` handler on the character runs
+  first, and returning `block()` stops that: the wolf could limp away
+  instead.
+- **Death:** when the player's health reaches 0, the global `died`
+  handlers run, and then the game ends with the `died` ending. Write
+  your own `died` ending to change its text, or heal the player in the
+  handler (`player.health = 5`) to save them.
+- **HEALTH** (or DIAGNOSE) tells the player how they're doing, and
+  doesn't take a turn, so it never gives an enemy a free hit.
+
+### Trading
+
+A merchant sells what they carry that has a `price`. The player's money
+is `player: { money: 20 }`.
+
+```
+> wares
+The peddler has for sale: a brass lamp (8 coins) and a rope (30 coins).
+
+> buy lamp
+You buy the brass lamp from the peddler for 8 coins.
+
+> i
+You're carrying a brass lamp.
+You have 12 coins.
+
+> buy rope
+The rope costs 30 coins, and you have only 12 coins.
+
+> sell lamp
+You sell the brass lamp to the peddler for 4 coins.
+```
+
+- **Prices:** merchants buy at `buys_at` percent of the price (default
+  50), and only things with a price.
+- **Merchant money:** with `money:`, a merchant can only pay what they
+  have, and gains what the player spends. Without it they can always pay.
+- **Looking before buying:** a merchant's goods can be examined before
+  they're bought.
+- **Currency:** prices read "8 coins". To call it something else, reword
+  `money.amount` under `messages:`.
+
+### Your own algorithm
+
+Write an `act` script to run on the character's turn instead of its
+behaviour. These methods work on any character, in `act` or anywhere
+else. Each returns whether it did something, and the game describes it
+if the player is there to see:
+
+| Method | Does |
+|---|---|
+| `self:wander()` | Moves to a random neighbouring room. |
+| `self:step_toward(player)` | Moves one room along the shortest way to someone. |
+| `self:go("north")` | Takes that exit, if it can. |
+| `self:attack(player, weapon)` | Attacks; `weapon` is optional. |
+| `self:behave()` | Does whatever its `behavior` would. |
+| `self:is_with(player)` | Whether they're in the same room. |
+| `self:distance_to(player)` | Rooms apart, by ways it can go, or `nil`. |
+
+```yaml
+characters:
+  parrot:
+    name: parrot
+    in: yard
+    act: |
+      if self:is_with(player) then
+        say("The parrot squawks.")
+      else
+        self:step_toward(player)
+      end
+  ghost:
+    name: ghost
+    in: crypt
+    behavior: hunter
+    act: |
+      -- A slow hunter: it only acts every other turn.
+      if game.turn % 2 == 0 then self:behave() end
+```
+
+`health` and `money` are ordinary numbers to scripts (`player.health =
+player.health + 5`), saved and undone with everything else.
+
 ## Command reference
 
 | Command | What it does |
@@ -819,11 +992,12 @@ In-game commands that every game understands include LOOK, EXAMINE (X),
 TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
+ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, HEALTH (DIAGNOSE),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
 Some verbs exist so that players can try them and authors can respond:
-PUSH, PULL, KICK, HIT, MOVE (DRAG), LIFT, SHAKE, TURN (TWIST), TOUCH (FEEL),
+PUSH, PULL, KICK, MOVE (DRAG), LIFT, SHAKE, TURN (TWIST), TOUCH (FEEL),
 SMELL, LISTEN and TASTE. On their own they give a mild reply ("Nothing
 obvious happens."). Use them in `revealed_by`, or with a handler such as
 `on: { pull: ... }`. The handler names are the verb IDs `push`, `pull`,
@@ -844,6 +1018,13 @@ also have a `size` (default 1) and a `capacity`; see
 [Containers and supporters](#containers-and-supporters). The player's
 carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 (the default) carries anything.
+
+**Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
+`merchant`, `hunter`, `guard`, `follower`), `wander` (percent), `area`,
+`range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`; objects
+can have `damage` (weapons) and `price`; the player can have `health`,
+`damage` and `money`. Events: `defeated` on a character, `died` at the
+top level. See [Characters](#characters-npcs-and-enemies).
 
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including
@@ -958,6 +1139,9 @@ your patterns to it.
 
 ## Where to go next
 
+- **[`spec/examples/lighthouse/game.yaml`](spec/examples/lighthouse/game.yaml)**'s
+  keeper is a `conversationalist`; see
+  [Characters](#characters-npcs-and-enemies) for wanderers, merchants and enemies.
 - **[The scripting tutorial](docs/SCRIPTING.md)** builds a second game,
   Campfire, step by step. It covers Lua handlers and `block()`, custom
   verbs, script files, `vars`, changing capacity, controlling timers from

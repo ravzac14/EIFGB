@@ -16,7 +16,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// `blocked` is built in on doors only (see [`World::door_blocked`]).
 ///
 /// [`World::door_blocked`]: crate::World::door_blocked
-const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden"];
+const BUILTIN_STATE: &[&str] = &["open", "locked", "worn", "hidden", "health", "money"];
 
 /// One thing the automatic state descriptions can say.
 #[derive(Debug, Clone, PartialEq)]
@@ -52,7 +52,18 @@ impl<H: ScriptHost> Game<H> {
         // from now on lists tag it: "a small box (empty)".
         if matches!(
             a,
-            A::Examine | A::Search | A::Open | A::Close | A::Lock | A::Unlock | A::Wear | A::TakeOff | A::PutIn | A::PutOn | A::Empty
+            A::Examine
+                | A::Search
+                | A::Open
+                | A::Close
+                | A::Lock
+                | A::Unlock
+                | A::Wear
+                | A::TakeOff
+                | A::PutIn
+                | A::PutOn
+                | A::Empty
+                | A::Attack
         ) || (a == A::Take && cmd.tool.is_some())
         {
             for id in target.into_iter().chain(cmd.tool) {
@@ -87,6 +98,11 @@ impl<H: ScriptHost> Game<H> {
             (A::Wear, Some(t)) => self.wear(t, ctx),
             (A::TakeOff, Some(t)) => self.take_off(t, ctx),
             (A::Eat, Some(t)) => self.eat(t, ctx),
+            (A::Attack, Some(t)) => self.attack_action(t, cmd.tool, ctx),
+            (A::Buy, Some(t)) => self.buy(t, cmd.tool, ctx),
+            (A::Sell, Some(t)) => self.sell(t, cmd.tool, ctx),
+            (A::Wares, t) => self.wares(t, ctx),
+            (A::Health, _) => self.health_action(),
             _ => {
                 self.msg("action.nothing", ctx);
                 false
@@ -229,6 +245,7 @@ impl<H: ScriptHost> Game<H> {
         let items = self.world.inventory();
         if items.is_empty() {
             self.msg("inventory.empty", &Ctx::new());
+            self.report_money();
             return true;
         }
         let list = self.list_a(&items);
@@ -236,6 +253,7 @@ impl<H: ScriptHost> Game<H> {
         for item in items {
             self.inventory_contents(item, 0);
         }
+        self.report_money();
         true
     }
 
@@ -451,6 +469,13 @@ impl<H: ScriptHost> Game<H> {
         if w.flag(id, "worn") {
             notes.push(StateNote::Builtin("worn"));
         }
+        // Wounds show on characters; the player has HEALTH for that.
+        if id != PLAYER
+            && let (Some(h), Some(max)) = (w.health(id), w.def(id).health)
+            && h < i64::from(max)
+        {
+            notes.push(StateNote::Builtin(if h * 2 <= i64::from(max) { "badly_wounded" } else { "wounded" }));
+        }
         // What the player has found out by looking: only for things they know.
         if w.known(id) && w.def(id).kind == EntityKind::Object {
             if w.has(id, Trait::Container)
@@ -568,6 +593,7 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("worn") => self.mentions(text, id, &["worn"], is_own),
             StateNote::Builtin("blocked" | "blocked_here") => self.mentions(text, id, &["blocked"], is_own),
             StateNote::Builtin("empty" | "heavy") => false,
+            StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
         }

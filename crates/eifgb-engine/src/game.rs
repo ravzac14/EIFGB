@@ -281,6 +281,7 @@ impl<H: ScriptHost> Game<H> {
                 Effect::StopTimer(k) => {
                     self.world.state.timers.remove(&k);
                 }
+                Effect::Npc(event) => self.narrate(&event),
             }
         }
     }
@@ -508,8 +509,11 @@ impl<H: ScriptHost> Game<H> {
         // or a custom verb with no handler) "You find ..." replaces their
         // default reply.
         let reveals = target.map(|t| self.world.reveals(&verb.key, t)).unwrap_or_default();
+        // Hitting something that can't be hurt has nothing else to say either.
+        let pointless_attack = verb.action == VerbAction::Builtin(BuiltinAction::Attack)
+            && target.is_some_and(|t| self.world.health(t).is_none());
         let quiet = !reveals.is_empty()
-            && matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search));
+            && (pointless_attack || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search)));
 
         let before_action = self.out.lines.len();
         let ok = match self.handlers(target, here, Phase::On, &verb.key).into_iter().next() {
@@ -581,7 +585,7 @@ impl<H: ScriptHost> Game<H> {
         out
     }
 
-    fn global_handlers(&self, phase: Phase, event: &str) -> Vec<Code> {
+    pub(crate) fn global_handlers(&self, phase: Phase, event: &str) -> Vec<Code> {
         self.world
             .story()
             .handlers
@@ -607,6 +611,12 @@ impl<H: ScriptHost> Game<H> {
 
     fn end_turn(&mut self) {
         self.world.state.turn += 1;
+        // Someone the player just beat doesn't get to strike back.
+        self.check_defeats();
+        if self.end_requested.is_some() {
+            return;
+        }
+        self.npc_turns();
         if self.end_requested.is_some() {
             return;
         }
@@ -616,6 +626,7 @@ impl<H: ScriptHost> Game<H> {
         let here = self.world.here();
         self.room_event(here, "turn");
         self.fire_timers();
+        self.check_defeats();
     }
 
     // ------------------------------------------------------------ timers

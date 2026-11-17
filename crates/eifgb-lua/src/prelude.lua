@@ -79,6 +79,32 @@ function Entity:contents()
   return out
 end
 
+-- Characters acting on their turn (or any time a script likes). Each
+-- returns true if it did something; the engine describes it if the
+-- player can see.
+function Entity:wander() return H.npc_wander(need_entity(self, "the character")) end
+function Entity:step_toward(target)
+  return H.npc_step_toward(need_entity(self, "the character"), need_entity(target, "step_toward's target"))
+end
+function Entity:go(direction)
+  if type(direction) ~= "string" then error("go needs a direction, like \"north\"", 2) end
+  return H.npc_go(need_entity(self, "the character"), direction)
+end
+function Entity:attack(target, weapon)
+  local w = nil
+  if weapon ~= nil then w = need_entity(weapon, "attack's weapon") end
+  return H.npc_attack(need_entity(self, "the attacker"), need_entity(target, "attack's target"), w)
+end
+-- Runs the character's built-in behaviour once, from an `act` script.
+function Entity:behave() return H.npc_behave(need_entity(self, "the character")) end
+-- Rooms between this and `target`, by ways this character can go; nil if unreachable.
+function Entity:distance_to(target)
+  return H.distance(need_entity(self, "the character"), need_entity(target, "distance_to's target"))
+end
+function Entity:is_with(other)
+  return H.together(need_entity(self, "the thing"), need_entity(other, "is_with's other"))
+end
+
 -- Whether `thing` would fit in or on this (or be carried, for the
 -- player), by size and capacity. True if it's already there.
 function Entity:can_hold(thing)

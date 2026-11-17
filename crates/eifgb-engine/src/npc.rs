@@ -11,6 +11,30 @@ use eifgb_ir::{Behavior, Direction, EntityId, EntityKind, Faction, Value, PLAYER
 
 use std::collections::{HashMap, VecDeque};
 
+/// How a gift went.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Gift {
+    NotHeld,
+    NotPerson,
+    Unwanted,
+    /// Tamed. `eaten` if it ate the gift.
+    Tamed { eaten: bool },
+    /// A welcome gift. `calmed` is the faction that warmed, if any.
+    Liked { calmed: Option<String> },
+}
+
+/// How a bribe went.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Bribe {
+    NotPerson,
+    /// It can't be bought.
+    Refused,
+    Already,
+    CantAfford,
+    TooLittle,
+    Taken,
+}
+
 /// How an apology went.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Apology {
@@ -131,6 +155,14 @@ impl World {
         if self.is_foe(a, b) {
             return true;
         }
+        // Tamed or bought off: leaves the player alone.
+        if b == PLAYER && (self.is_tamed(a) || self.is_bribed(a)) {
+            return false;
+        }
+        // A tamed animal fights whoever would fight the player.
+        if self.is_tamed(a) && self.is_hostile(b, PLAYER) {
+            return true;
+        }
         match self.faction(a) {
             // Toward the player, it's the faction's attitude that counts.
             Some(f) if b == PLAYER => self.attitude(&f.key) <= 0,
@@ -214,6 +246,10 @@ impl World {
         // A pacifist won't fight, but it remembers, and so does its faction.
         if self.is_pacifist(target) {
             let new_foe = self.add_foe(target, attacker);
+            if new_foe && attacker == PLAYER {
+                self.unset(target, "_tamed");
+                self.unset(target, "_bribed");
+            }
             let change = match (new_foe && attacker == PLAYER, self.def(target).faction.clone()) {
                 (true, Some(f)) => self.sour(&f),
                 _ => None,
@@ -233,6 +269,10 @@ impl World {
             return (true, None);
         }
         let new_foe = self.add_foe(target, attacker);
+        if new_foe && attacker == PLAYER {
+            self.unset(target, "_tamed");
+            self.unset(target, "_bribed");
+        }
         let change = match (new_foe && attacker == PLAYER, self.def(target).faction.clone()) {
             (true, Some(f)) => self.sour(&f),
             _ => None,
@@ -324,18 +364,92 @@ impl World {
             return Apology::Exhausted;
         }
         self.set(npc, "_forgiven", Value::Int(forgiven + 1));
-        self.unset(npc, "_refuses");
-        self.set(npc, "foes", Value::List(foes.into_iter().filter(|v| *v != key).collect()));
-        if patience.is_some() {
+        Apology::Accepted { calmed: self.pacify(npc) }
+    }
+
+    /// Makes peace with the player: no grudge, full patience, trading again,
+    /// and its faction's attitude up by one if it's below its start.
+    /// Returns the faction that warmed, if any.
+    fn pacify(&mut self, npc: EntityId) -> Option<String> {
+        let n = self.def(npc).npc.clone()?;
+        let key = Value::Str(self.def(PLAYER).key.clone());
+        if let Some(Value::List(foes)) = self.get(npc, "foes").cloned() {
+            self.set(npc, "foes", Value::List(foes.into_iter().filter(|v| *v != key).collect()));
+        }
+        if matches!(self.get(npc, "patience"), Some(Value::Int(_))) {
             self.set(npc, "patience", Value::Int(i64::from(n.patience)));
         }
-        let mut calmed = None;
-        if let Some(f) = faction.filter(|_| faction_low) {
-            let now = self.attitude(&f) + 1;
-            self.set_attitude(&f, now);
-            calmed = Some(f);
+        self.unset(npc, "_refuses");
+        let f = self.def(npc).faction.clone()?;
+        if self.attitude(&f) >= self.starting_attitude(&f) {
+            return None;
         }
-        Apology::Accepted { calmed }
+        let now = self.attitude(&f) + 1;
+        self.set_attitude(&f, now);
+        Some(f)
+    }
+
+    /// Tamed: follows the player and fights the player's enemies.
+    pub fn is_tamed(&self, id: EntityId) -> bool {
+        self.flag(id, "_tamed")
+    }
+
+    /// Bought off: won't attack the player.
+    pub fn is_bribed(&self, id: EntityId) -> bool {
+        self.flag(id, "_bribed")
+    }
+
+    /// GIVE `item` TO `npc`.
+    pub fn give(&mut self, item: EntityId, npc: EntityId) -> Gift {
+        if self.location(item) != Some(PLAYER) {
+            return Gift::NotHeld;
+        }
+        let Some(n) = self.def(npc).npc.clone() else { return Gift::NotPerson };
+        if !self.is_active(npc) {
+            return Gift::NotPerson;
+        }
+        let tames = n.tame_with.contains(&item);
+        if !tames && !n.likes.contains(&item) {
+            return Gift::Unwanted;
+        }
+        self.unset(item, "worn");
+        // Food its faction eats is eaten; anything else is kept.
+        let food = self.def(npc).faction.as_ref().is_some_and(|f| self.def(item).eaten_by.contains(f));
+        let _ = self.move_to(item, if food { None } else { Some(npc) });
+        let calmed = self.pacify(npc);
+        if tames {
+            self.set(npc, "_tamed", Value::Bool(true));
+            Gift::Tamed { eaten: food }
+        } else {
+            Gift::Liked { calmed }
+        }
+    }
+
+    /// GIVE `amount` COINS TO `npc`.
+    pub fn bribe(&mut self, npc: EntityId, amount: i64) -> Bribe {
+        let Some(n) = self.def(npc).npc.clone() else { return Bribe::NotPerson };
+        if !self.is_active(npc) {
+            return Bribe::NotPerson;
+        }
+        let Some(price) = n.bribe else { return Bribe::Refused };
+        if self.is_bribed(npc) {
+            return Bribe::Already;
+        }
+        if amount > self.money(PLAYER) {
+            return Bribe::CantAfford;
+        }
+        if amount < i64::from(price) {
+            return Bribe::TooLittle;
+        }
+        let have = self.money(PLAYER);
+        self.set_money(PLAYER, have - amount);
+        if self.has_money(npc) {
+            let m = self.money(npc);
+            self.set_money(npc, m + amount);
+        }
+        self.set(npc, "_bribed", Value::Bool(true));
+        self.pacify(npc);
+        Bribe::Taken
     }
 
     /// Lowers a faction's attitude toward the player (as they present
@@ -592,6 +706,22 @@ impl World {
         if let Some(&foe) = self.foes_here(npc).first() {
             let weapon = self.best_weapon(npc);
             return self.attack(npc, foe, weapon).into_iter().collect();
+        }
+        // Tamed: fight the player's enemies here, else stay with the player.
+        if self.is_tamed(npc) {
+            let chars: Vec<EntityId> = (0..self.story().entities.len() as u32)
+                .map(EntityId)
+                .filter(|&c| c != npc && self.def(c).kind == EntityKind::Character && self.together(npc, c))
+                .filter(|&c| self.is_hostile(npc, c))
+                .collect();
+            if let Some(&enemy) = chars.first() {
+                let weapon = self.best_weapon(npc);
+                return self.attack(npc, enemy, weapon).into_iter().collect();
+            }
+            if !self.together(npc, PLAYER) {
+                return self.npc_step_toward(npc, PLAYER).into_iter().collect();
+            }
+            return Vec::new();
         }
         // A faction that's had enough of the player: every member attacks on
         // sight, whatever its behaviour, except pacifists.

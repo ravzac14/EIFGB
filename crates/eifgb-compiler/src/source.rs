@@ -295,6 +295,15 @@ pub struct Thing {
     /// How far below its prices a merchant goes when haggling (percent).
     #[serde(default)]
     pub haggle: Option<u32>,
+    /// Objects that tame it when given to it.
+    #[serde(default)]
+    pub tame_with: Vec<String>,
+    /// Objects it welcomes as gifts.
+    #[serde(default)]
+    pub likes: Vec<String>,
+    /// Money that buys it off.
+    #[serde(default)]
+    pub bribe: Option<u32>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

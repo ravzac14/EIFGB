@@ -210,6 +210,22 @@ verbs:
       - "sell {target} to {tool} for {text}"
       - "ask {text} for {target}"
       - "demand {text} for {target}"
+  give:
+    action: give
+    patterns:
+      - "give {target} to {tool}"
+      - "hand {target} to {tool}"
+      - "offer {target} to {tool}"
+      - "feed {target} to {tool}"
+  bribe:
+    action: bribe
+    patterns:
+      - "give {text} coins to {target}"
+      - "give {text} coin to {target}"
+      - "give {text} money to {target}"
+      - "pay {text} to {target}"
+      - "bribe {target} with {text}"
+      - "bribe {target}"
   accept:
     action: accept
     patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
@@ -427,6 +443,20 @@ messages:
   sell.fixed: "${The(args.merchant)} doesn't haggle. It'll pay ${args.price}."
   sell.how_much: "How much? Try something like \"sell ${the(args.target)} for 5\"."
   accept.nothing: "There's no offer on the table."
+  give.whom: "Give ${the(args.target)} to whom?"
+  give.not_held: "You're not holding ${the(args.target)}."
+  give.not_person: "${The(args.tool)} can't take it."
+  give.unwanted: "${The(args.tool)} doesn't want ${the(args.target)}."
+  give.liked: "${The(args.tool)} gladly accepts ${the(args.target)}."
+  give.tamed: "${The(args.tool)} takes ${the(args.target)}, and seems to have decided you're a friend."
+  give.tamed_eaten: "${The(args.tool)} wolfs down ${the(args.target)}, and seems to have decided you're a friend."
+  give.not_person_money: "There's nobody there to take it."
+  bribe.how_much: "How much? Try something like \"give 5 coins to ${the(args.target)}\"."
+  bribe.refused: "${The(args.target)} won't be bought."
+  bribe.already: "${The(args.target)} has already been paid."
+  bribe.cant_afford: "You only have ${args.amount}."
+  bribe.too_little: "${The(args.target)} scoffs. It'll take more than ${args.price}."
+  bribe.taken: "${The(args.target)} pockets ${args.price} and looks the other way."
   wares.list: "${The(args.merchant)} has for sale: ${args.list}."
   trade.refused: "${The(args.merchant)} won't trade with you any more."
   offer.how_much: "How much? Try something like \"offer 5 for ${the(args.target)}\"."

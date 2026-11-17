@@ -795,6 +795,9 @@ impl<'a> Lowerer<'a> {
                 ("invincible", t.invincible.is_some()),
                 ("forgiveness", t.forgiveness.is_some()),
                 ("haggle", t.haggle.is_some()),
+                ("tame_with", !t.tame_with.is_empty()),
+                ("likes", !t.likes.is_empty()),
+                ("bribe", t.bribe.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -853,6 +856,12 @@ impl<'a> Lowerer<'a> {
             .filter_map(|(i, r)| self.room_ref(r, &format!("{path}.area[{i}]")))
             .collect();
         let act = t.act.as_deref().map(|c| self.code(c, &format!("{path}.act")));
+        let objects = |this: &mut Self, field: &str, keys: &[String]| -> Vec<EntityId> {
+            keys.iter()
+                .enumerate()
+                .filter_map(|(i, k)| this.entity_ref(k, &format!("{path}.{field}[{i}]")))
+                .collect()
+        };
         Some(Npc {
             behavior,
             wander: t.wander.unwrap_or(behavior.default_wander()),
@@ -867,6 +876,9 @@ impl<'a> Lowerer<'a> {
             invincible: t.invincible.unwrap_or(false),
             forgiveness: t.forgiveness.unwrap_or(1),
             haggle: t.haggle.unwrap_or(if behavior == Behavior::Merchant { 25 } else { 0 }),
+            tame_with: objects(self, "tame_with", &t.tame_with),
+            likes: objects(self, "likes", &t.likes),
+            bribe: t.bribe,
         })
     }
 

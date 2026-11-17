@@ -991,7 +991,25 @@ characters:
 
 ### Tricks players can find
 
-Five features reward players who try something clever:
+Six features reward players who try something clever:
+
+- **Taming, gifts and bribes:** GIVE (HAND, OFFER, FEED) something to a
+  character.
+  - `tame_with: [bone]`: giving it tames the character ("The wolf pup
+    wolfs down the bone, and seems to have decided you're a friend."; food
+    its faction eats is eaten). A tamed character follows the player
+    anywhere, fights anyone who'd fight the player, and never attacks the
+    player, unless the player attacks it.
+  - `likes: [flowers]`: a welcome gift ("The aunt gladly accepts the
+    flowers."). It works like an apology, but isn't limited by
+    `forgiveness`.
+  - `bribe: 5`: GIVE 5 COINS TO GUARD (or PAY 5 TO GUARD, BRIBE GUARD
+    WITH 5) buys the character off: "The guard pockets 5 coins and looks
+    the other way." It won't attack the player again, even if its
+    faction turns, unless the player attacks it. Too little: "The guard
+    scoffs. It'll take more than 3 coins."
+  - Anything else: "The wolf pup doesn't want the pebble." Asking "how
+    much?" or "to whom?" doesn't take a turn.
 
 - **Making noise:** SHOUT (or YELL, SCREAM, MAKE NOISE) draws hunters
   that can reach the player within 2 rooms (`player: { voice: 3 }`
@@ -1157,7 +1175,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO,
+(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1188,7 +1206,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
-`forgiveness`, `haggle`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the

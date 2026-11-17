@@ -662,6 +662,9 @@ tests too.
   crossroads.
 - **Bargaining:** a merchant who only trades with players who've killed
   the goblin chief. Check `world.chief.dead` in a `before_buy` handler.
+- **Make a friend:** give the young wolf `tame_with: [haunch]`. Feed it
+  the haunch at the crossroads and it fights for you, starting with the
+  alpha. Or give the skeleton `bribe: 3`, and the player `money: 5`.
 - **Make some noise:** give the hunters `range: 0`, so they never notice
   the player on their own, and have the player SHOUT from inside the
   closed barrel to bring both packs to the crossroads. Or add a shrine

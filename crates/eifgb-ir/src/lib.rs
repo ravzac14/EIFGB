@@ -350,6 +350,16 @@ pub struct Npc {
     /// percent. 0 means fixed prices.
     #[serde(default)]
     pub haggle: u32,
+    /// Things that tame it when given: it then follows the player and
+    /// fights the player's enemies.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tame_with: Vec<EntityId>,
+    /// Gifts it welcomes: like an apology, without the limit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub likes: Vec<EntityId>,
+    /// Money that buys it off: it stops attacking the player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bribe: Option<u32>,
 }
 
 fn one_u32() -> u32 {
@@ -826,6 +836,10 @@ pub enum BuiltinAction {
     Offer,
     /// Take the deal a merchant has on the table.
     Accept,
+    /// Give something to a character: a gift, or something that tames it.
+    Give,
+    /// Give a character money, to buy it off.
+    Bribe,
 }
 
 impl BuiltinAction {

@@ -232,6 +232,53 @@ impl<H: ScriptHost> Game<H> {
         key == "apologize.accepted"
     }
 
+    /// GIVE X TO Y.
+    pub(crate) fn give_action(&mut self, item: EntityId, to: Option<EntityId>, ctx: &Ctx) -> bool {
+        use crate::npc::Gift;
+        let Some(to) = to else {
+            // Just a question back: it doesn't take a turn.
+            self.no_turn = true;
+            self.msg("give.whom", ctx);
+            return false;
+        };
+        let (key, calmed) = match self.world.give(item, to) {
+            Gift::NotHeld => ("give.not_held", None),
+            Gift::NotPerson => ("give.not_person", None),
+            Gift::Unwanted => ("give.unwanted", None),
+            Gift::Tamed { eaten: true } => ("give.tamed_eaten", None),
+            Gift::Tamed { eaten: false } => ("give.tamed", None),
+            Gift::Liked { calmed } => ("give.liked", calmed),
+        };
+        self.msg(key, ctx);
+        if let Some(f) = calmed {
+            self.msg("faction.calmer", &Ctx::new().text("faction", f.replace('_', " ")));
+        }
+        matches!(key, "give.tamed" | "give.tamed_eaten" | "give.liked")
+    }
+
+    /// GIVE 5 COINS TO GUARD, PAY GUARD 5, BRIBE GUARD WITH 5.
+    pub(crate) fn bribe_action(&mut self, npc: EntityId, text: Option<&str>, ctx: &Ctx) -> bool {
+        use crate::npc::Bribe;
+        let Some(amount) = text.and_then(first_number) else {
+            // Just a question back: it doesn't take a turn.
+            self.no_turn = true;
+            self.msg("bribe.how_much", ctx);
+            return false;
+        };
+        let price = self.money_text(amount);
+        let have = self.money_text(self.world.money(PLAYER));
+        let key = match self.world.bribe(npc, amount) {
+            Bribe::NotPerson => "give.not_person_money",
+            Bribe::Refused => "bribe.refused",
+            Bribe::Already => "bribe.already",
+            Bribe::CantAfford => "bribe.cant_afford",
+            Bribe::TooLittle => "bribe.too_little",
+            Bribe::Taken => "bribe.taken",
+        };
+        self.msg(key, &ctx.clone().text("price", price).text("amount", have));
+        key == "bribe.taken"
+    }
+
     /// "12 coins"
     pub(crate) fn money_text(&mut self, amount: i64) -> String {
         self.msg_str("money.amount", &Ctx::new().value("amount", Value::Int(amount)))
@@ -371,6 +418,8 @@ impl<H: ScriptHost> Game<H> {
         let ctx = ctx.clone().entity("merchant", seller);
         let amount = text.and_then(first_number);
         let Some(amount) = amount else {
+            // Just a question back: it doesn't take a turn.
+            self.no_turn = true;
             self.msg("offer.how_much", &ctx);
             return false;
         };
@@ -445,6 +494,8 @@ impl<H: ScriptHost> Game<H> {
         }
         let asked = text.and_then(first_number);
         if text.is_some() && asked.is_none() {
+            // Just a question back: it doesn't take a turn.
+            self.no_turn = true;
             self.msg("sell.how_much", &ctx);
             return false;
         }

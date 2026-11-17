@@ -3,18 +3,7 @@
 Things a creative player might try, that we'd like the engine to support
 one day. Each builds on something that already exists. Built so far from
 the same list: disguises, bait, corpse stories, hiding, making noise, apologies (calming
-down, by asking) and haggling.
-
-## Taming and gifts
-
-GIVE MEAT TO WOLF while it's wounded or hungry, and it becomes a follower
-that fights on your side. GIVE COINS TO GUARD gets you waved through.
-
-- Builds on: bait (`eaten_by`), followers, factions, `revealed_by`-style rules.
-- Shape: `tamed_by` / `bribed_by` rules on characters ("give haunch",
-  "give (money) 5"); taming switches faction to an allies faction and
-  behaviour to `follower`; followers fight the player's enemies.
-- Effort: medium.
+down, by asking), haggling, and taming, gifts and bribes.
 
 ## Throwing
 

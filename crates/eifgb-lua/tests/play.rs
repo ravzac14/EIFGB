@@ -2135,3 +2135,71 @@ fn fixed_price_merchants_buy_straight_away() {
     assert_eq!(say(&mut g, "sell lamp"), "You sell the brass lamp to the peddler for 4 coins.");
     assert_eq!(say(&mut g, "sell ring for 30"), "The peddler doesn't haggle. It'll pay 20 coins.");
 }
+
+// ------------------------------------------------------- taming and gifts
+
+const MENAGERIE: &str = "\
+format: eifgb/0.1
+game: { id: m, title: M, version: '1', start: yard }
+player: { health: 30, money: 10 }
+factions:
+  wolves: { hostile_to: [player] }
+  village: {}
+rooms:
+  yard: { name: Yard, exits: { north: field } }
+  field: { name: Field, exits: { south: yard } }
+objects:
+  bone: { name: bone, in: player, traits: [portable], eaten_by: [wolves] }
+  flowers: { name: flowers, in: player, traits: [portable] }
+  pebble: { name: pebble, in: player, traits: [portable] }
+characters:
+  dog: { name: wolf pup, synonyms: [pup], in: yard, faction: wolves, behavior: hunter, wander: 0, health: 20, damage: 2, tame_with: [bone] }
+  rat: { name: rat, in: yard, behavior: hunter, wander: 0, health: 4, damage: 1 }
+  guard: { name: guard, in: field, behavior: guard, health: 30, damage: 3, bribe: 5 }
+  aunt: { name: aunt, in: yard, faction: village, health: 9, patience: 0, likes: [flowers] }
+";
+
+#[test]
+fn a_tamed_animal_fights_for_the_player_and_follows() {
+    let mut g = game(compile_str(MENAGERIE).story.unwrap());
+    assert_eq!(say(&mut g, "give pebble to pup"), "The wolf pup doesn't want the pebble.\nThe wolf pup attacks you.\nThe rat attacks you.");
+    let out = say(&mut g, "feed bone to pup");
+    assert!(out.starts_with("The wolf pup wolfs down the bone, and seems to have decided you're a friend."), "{out}");
+    // It turns on the rat, which is hostile to the player.
+    assert!(out.contains("The wolf pup attacks the rat.") && !out.contains("pup attacks you"), "{out}");
+    say(&mut g, "z");
+    say(&mut g, "z");
+    assert_says(&mut g, "n", "The wolf pup arrives.");
+}
+
+#[test]
+fn hitting_a_tamed_animal_undoes_it() {
+    let mut g = game(compile_str(MENAGERIE).story.unwrap());
+    say(&mut g, "give bone to pup");
+    assert_says(&mut g, "hit pup", "The wolf pup attacks you.");
+}
+
+#[test]
+fn bribes_buy_a_character_off() {
+    let mut g = game(compile_str(MENAGERIE).story.unwrap());
+    say(&mut g, "n");
+    // Asking how much is free.
+    assert_eq!(say(&mut g, "bribe guard"), "How much? Try something like \"give 5 coins to the guard\".");
+    assert_says(&mut g, "give 3 coins to guard", "The guard scoffs. It'll take more than 3 coins.");
+    assert_says(&mut g, "give 50 coins to guard", "You only have 10 coins.");
+    let out = say(&mut g, "pay 5 to the guard");
+    assert!(out.starts_with("The guard pockets 5 coins and looks the other way.") && !out.contains("guard attacks"), "{out}");
+    assert!(!say(&mut g, "z").contains("guard attacks"));
+    assert_says(&mut g, "give 5 coins to guard", "The guard has already been paid.");
+    assert_says(&mut g, "give 5 coins to rat", "won't be bought");
+}
+
+#[test]
+fn a_welcome_gift_is_an_apology_without_the_limit() {
+    let mut g = game(compile_str(MENAGERIE).story.unwrap());
+    say(&mut g, "hit aunt");
+    let out = say(&mut g, "give flowers to aunt");
+    assert!(out.contains("The aunt gladly accepts the flowers.") && out.contains("The village seem a little less wary of you."), "{out}");
+    assert!(!out.contains("aunt attacks"), "{out}");
+    assert_says(&mut g, "i", "You're carrying a bone and a pebble.");
+}

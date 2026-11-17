@@ -103,6 +103,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Buy, Some(t)) => self.buy(t, cmd.tool, ctx),
             (A::Sell, Some(t)) => self.sell(t, cmd.tool, cmd.text.as_deref(), ctx),
             (A::Accept, _) => self.accept(ctx),
+            (A::Give, Some(t)) => self.give_action(t, cmd.tool, ctx),
+            (A::Bribe, Some(t)) => self.bribe_action(t, cmd.text.as_deref(), ctx),
             (A::Wares, t) => self.wares(t, ctx),
             (A::Health, _) => self.health_action(),
             (A::Apologize, Some(t)) => self.apologize_action(t, ctx),

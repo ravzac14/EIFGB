@@ -964,6 +964,12 @@ characters:
   player on sight, whatever its behaviour: "The villagers turn against
   you.", or in disguise, "The goblins see through your disguise!" It
   doesn't recover, and putting the disguise back on doesn't help.
+- **Pacifists** never join their faction in attacking the player.
+  Merchants and conversationalists are pacifists by default, so the
+  village shopkeeper doesn't pick up a cleaver when the village turns on
+  you. Mark anyone else with `pacifist: true`, or set `pacifist: false`
+  for a merchant who joins in. Pacifists still defend themselves once
+  their own patience runs out.
 - **Scavengers:** a faction with `eats_corpses` eats bodies in its room
   when there's no one to fight, and hunters go looking for them.
 
@@ -1117,7 +1123,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 **Characters:** `behavior` (`stationary`, `conversationalist`, `wanderer`,
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
-`faction`, `corpse`, `fights_back`, `patience`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage` and `money`. Events: `defeated` on a character, `died` at the

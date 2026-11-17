@@ -791,6 +791,7 @@ impl<'a> Lowerer<'a> {
                 ("corpse", t.corpse.is_some()),
                 ("fights_back", t.fights_back.is_some()),
                 ("patience", t.patience.is_some()),
+                ("pacifist", t.pacifist.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -823,6 +824,12 @@ impl<'a> Lowerer<'a> {
                 self.d.error(format!("{path}.{field}"), format!("'{field}' is a percentage, so it can't be more than 100"));
             }
         }
+        if t.pacifist == Some(true) && behavior.hostile() {
+            self.d.warn(
+                format!("{path}.pacifist"),
+                format!("a {} attacks its faction's enemies by nature, so 'pacifist' has no effect", behavior.key()),
+            );
+        }
         if t.patience.is_some() && t.fights_back == Some(false) {
             self.d.warn(format!("{path}.patience"), "has no effect with 'fights_back: false'");
         }
@@ -846,6 +853,7 @@ impl<'a> Lowerer<'a> {
             corpse: t.corpse.unwrap_or(true),
             fights_back: t.fights_back.unwrap_or(true),
             patience: t.patience.unwrap_or(behavior.default_patience()),
+            pacifist: t.pacifist.unwrap_or(behavior.default_pacifist()),
         })
     }
 

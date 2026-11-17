@@ -477,3 +477,9 @@ fn disguises_and_bait_name_real_factions() {
     let out = with("factions:\n  goblins: {}\ncharacters:\n  g: { name: g, in: hall, disguise: goblins }\n");
     assert!(format!("{:?}", out.diagnostics).contains("only objects can have 'disguise'"), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn pacifist_hunters_are_warned_about() {
+    let out = with("player: { health: 5 }\ncharacters:\n  wolf: { name: wolf, in: hall, behavior: hunter, pacifist: true }\n");
+    assert!(warnings(&out).iter().any(|w| w.contains("'pacifist' has no effect")), "{:#?}", warnings(&out));
+}

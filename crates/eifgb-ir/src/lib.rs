@@ -320,6 +320,10 @@ pub struct Npc {
     /// remaining patience is the `patience` state field.
     #[serde(default)]
     pub patience: u32,
+    /// Never joins its faction in attacking the player. It still defends
+    /// itself once its own patience runs out.
+    #[serde(default)]
+    pub pacifist: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -384,6 +388,12 @@ impl Behavior {
     /// Whether it attacks the player.
     pub fn hostile(self) -> bool {
         matches!(self, Behavior::Hunter | Behavior::Guard)
+    }
+
+    /// Whether it stays out of its faction's fights with the player,
+    /// unless the author says otherwise.
+    pub fn default_pacifist(self) -> bool {
+        matches!(self, Behavior::Merchant | Behavior::Conversationalist)
     }
 
     /// How many attacks it takes before fighting back, unless the author

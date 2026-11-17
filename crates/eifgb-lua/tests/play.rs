@@ -1835,3 +1835,22 @@ fn a_neutral_faction_turns_on_a_player_who_provokes_enough_of_it() {
     // The miller was never touched, but now attacks too.
     assert!(out.contains("The miller attacks you."), "{out}");
 }
+
+#[test]
+fn pacifists_stay_out_of_faction_fights_but_still_defend_themselves() {
+    let src = VILLAGE.replace(
+        "  miller:",
+        "  trader: { name: trader, in: green, faction: villagers, behavior: merchant, wander: 0, health: 9 }\n  elder: { name: elder, in: green, faction: villagers, health: 9, pacifist: true }\n  miller:",
+    );
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "hit baker");
+    let out = say(&mut g, "hit smith");
+    assert!(out.contains("The villagers turn against you.") && out.contains("The miller attacks you."), "{out}");
+    // A merchant, and anyone marked pacifist, keeps out of it.
+    assert!(!out.contains("trader attacks") && !out.contains("elder attacks"), "{out}");
+    assert!(!say(&mut g, "z").contains("trader attacks"));
+    // But a pacifist still has its own patience.
+    say(&mut g, "hit trader");
+    say(&mut g, "hit trader");
+    assert_says(&mut g, "hit trader", "The trader attacks you.");
+}

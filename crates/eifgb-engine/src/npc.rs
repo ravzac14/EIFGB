@@ -469,8 +469,9 @@ impl World {
             return self.attack(npc, foe, weapon).into_iter().collect();
         }
         // A faction that's had enough of the player: every member attacks on
-        // sight, whatever its behaviour.
+        // sight, whatever its behaviour, except pacifists.
         if !n.behavior.hostile()
+            && !n.pacifist
             && self.faction(npc).is_some()
             && !hidden
             && self.together(npc, PLAYER)

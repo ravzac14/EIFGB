@@ -279,6 +279,10 @@ pub struct Thing {
     /// How many attacks it puts up with before fighting back.
     #[serde(default)]
     pub patience: Option<u32>,
+    /// Never joins its faction in attacking the player. Defaults to true
+    /// for merchants and conversationalists.
+    #[serde(default)]
+    pub pacifist: Option<bool>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

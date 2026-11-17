@@ -821,6 +821,7 @@ impl<'a> Lowerer<'a> {
                 ("bribe", t.bribe.is_some()),
                 ("fetches", t.fetches.is_some()),
                 ("tracker", t.tracker.is_some()),
+                ("sees_in_dark", t.sees_in_dark.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -904,6 +905,7 @@ impl<'a> Lowerer<'a> {
             bribe: t.bribe,
             fetches: t.fetches.unwrap_or(false),
             tracker: t.tracker.unwrap_or(false),
+            sees_in_dark: t.sees_in_dark.unwrap_or(false),
         })
     }
 
@@ -1293,6 +1295,7 @@ impl<'a> Lowerer<'a> {
                 eats_corpses: f.eats_corpses,
                 kills: f.kills.clone(),
                 prints: f.prints.clone(),
+                sees_in_dark: f.sees_in_dark,
                 patience: f.patience.unwrap_or(2),
             });
         }

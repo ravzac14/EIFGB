@@ -2672,7 +2672,7 @@ objects:
   barrel: { name: barrel, in: cellar, traits: [scenery] }
   coin: { name: coin, in: cellar, traits: [portable] }
 characters:
-  rat: { name: rat, in: crypt, behavior: hunter, range: 1, wander: 0, health: 3, damage: 1 }
+  rat: { name: rat, in: crypt, behavior: hunter, range: 1, wander: 0, health: 3, damage: 1, sees_in_dark: true }
 "#;
 
 #[test]
@@ -2712,4 +2712,36 @@ fn a_lamp_shut_in_a_bag_gives_no_light() {
     assert_says(&mut g, "look", "You can see a coin");
     say(&mut g, "close bag");
     assert_says(&mut g, "look", "It's pitch dark.");
+}
+
+#[test]
+fn only_characters_that_see_in_the_dark_can_find_you_there() {
+    // No rat; a guard who can't see in the dark stands in the cellar.
+    let src = DARK
+        .replace("  rat: { name: rat, in: crypt, behavior: hunter, range: 1, wander: 0, health: 3, damage: 1, sees_in_dark: true }\n", "")
+        + "  guard: { name: guard, in: cellar, behavior: guard, health: 9, damage: 1 }\n";
+    let src = src.replacen("characters:\n", "", 1).replace("  guard: { name: guard", "characters:\n  guard: { name: guard");
+    let mut g = game(compile_str(&src).story.unwrap_or_else(|| panic!("{src}")));
+    say(&mut g, "d");
+    for _ in 0..3 {
+        assert!(!say(&mut g, "z").contains("attacks"));
+    }
+    // Light the lantern, and the guard sees you.
+    assert_says(&mut g, "light lantern", "The guard attacks you.");
+}
+
+#[test]
+fn a_body_in_the_dark_isnt_found_by_someone_who_cant_see() {
+    // A dark mill: the player brings a lantern to do the deed, and takes it away.
+    let src = BODIES
+        .replace("mill: { name: Mill,", "mill: { name: Mill, dark: true,")
+        .replace("objects:\n", "objects:\n  lantern: { name: lantern, in: player, traits: [portable, light_source], state: { lit: true } }\n");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "n");
+    assert_says(&mut g, "hit miller", "The miller is defeated.");
+    say(&mut g, "s");
+    // The watchman looks in on the dark mill, and sees nothing.
+    for _ in 0..6 {
+        assert!(!say(&mut g, "z").contains("alarm"));
+    }
 }

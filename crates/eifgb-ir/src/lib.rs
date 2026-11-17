@@ -101,6 +101,9 @@ pub struct Faction {
     /// What members' tracks look like ("paw prints").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prints: Option<String>,
+    /// Members see in unlit rooms.
+    #[serde(default)]
+    pub sees_in_dark: bool,
     /// The faction's starting attitude toward a side it isn't hostile to,
     /// including a player disguised as one of its own: how many of its
     /// members the player can turn into foes before the whole faction
@@ -393,6 +396,9 @@ pub struct Npc {
     /// Follows the player's fresh tracks when it loses sight of them.
     #[serde(default)]
     pub tracker: bool,
+    /// Sees in unlit rooms. Without it, it's as blind there as the player.
+    #[serde(default)]
+    pub sees_in_dark: bool,
 }
 
 fn one_u32() -> u32 {

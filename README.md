@@ -1008,6 +1008,12 @@ Thirteen features reward players who try something clever:
   BLOW OUT, TURN OFF, SNUFF) are standard verbs for light sources;
   lighting one in the dark shows the room at once.
 
+  Characters are as blind in the dark as the player, unless they have
+  `sees_in_dark: true` (or their faction does). A blind character in an
+  unlit room can't see the player to attack or hunt them, witness what
+  they do, or find a body; the moment the player lights a lamp, it can.
+  A monster with `sees_in_dark` hunts happily in pitch darkness.
+
 - **Peeking:** PEEK THROUGH THE DOOR, PEEK NORTH, PEER NORTH or LOOK
   NORTH gives an impression of the next room without going in or being
   noticed: never its description, just whether anyone's there (and
@@ -1314,9 +1320,9 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`, `prints`, `leaves_tracks`, `tracker`; rooms can be `trackless`,
+`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
-`patience` and `prints`; objects
+`patience`, `prints` and `sees_in_dark`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by` and `nameable`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).

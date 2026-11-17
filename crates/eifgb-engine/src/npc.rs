@@ -432,13 +432,25 @@ impl World {
     /// in the player's room that can see them. A victim that survived the
     /// blow counts; one that didn't can't tell anyone.
     pub fn witnessed(&self, faction: &str) -> bool {
-        if self.player_hidden() {
-            return false;
-        }
         (0..self.story().entities.len() as u32)
             .map(EntityId)
             .filter(|&c| self.def(c).faction.as_deref() == Some(faction))
-            .any(|c| self.is_active(c) && self.together(c, PLAYER))
+            .any(|c| self.is_active(c) && self.together(c, PLAYER) && self.can_see(c, PLAYER))
+    }
+
+    /// Sees in unlit rooms: the character itself, or its whole faction.
+    pub fn sees_in_dark(&self, id: EntityId) -> bool {
+        self.def(id).npc.as_ref().is_some_and(|n| n.sees_in_dark) || self.faction(id).is_some_and(|f| f.sees_in_dark)
+    }
+
+    /// Whether `viewer` can see `target` where it is: the player isn't
+    /// shut away out of sight, and its room is lit or `viewer` sees in the dark.
+    pub fn can_see(&self, viewer: EntityId, target: EntityId) -> bool {
+        if target == PLAYER && self.player_hidden() {
+            return false;
+        }
+        let Some(room) = self.room_of(target) else { return false };
+        self.is_lit(room) || self.sees_in_dark(viewer)
     }
 
     /// A light source that's burning: `lit` or `on`.
@@ -482,6 +494,10 @@ impl World {
     pub fn discover_bodies(&mut self, npc: EntityId) -> Option<NpcEvent> {
         let faction = self.def(npc).faction.clone()?;
         let room = self.room_of(npc)?;
+        // Nobody finds a body they can't see.
+        if !self.is_lit(room) && !self.sees_in_dark(npc) {
+            return None;
+        }
         let player = Value::Str(self.def(PLAYER).key.clone());
         let body = (0..self.story().entities.len() as u32).map(EntityId).find(|&b| {
             self.is_dead(b)
@@ -723,7 +739,7 @@ impl World {
         std::iter::once(PLAYER)
             .chain(chars)
             .filter(|&b| self.together(npc, b) && self.is_foe(npc, b) && self.is_hostile_or_foe_alive(b))
-            .filter(|&b| b != PLAYER || !self.player_hidden())
+            .filter(|&b| self.can_see(npc, b))
             .collect()
     }
 
@@ -918,17 +934,16 @@ impl World {
         }
         let Some(room) = self.room_of(npc) else { return Vec::new() };
         let in_range = |w: &World, target: EntityId| w.distance(npc, target).filter(|&d| n.range.is_none_or(|r| d <= r));
-        let hidden = self.player_hidden();
         // The nearest enemy it can see and reach; the player wins a tie.
         let nearest = self
             .enemies_of(npc)
             .into_iter()
-            .filter(|&e| e != PLAYER || !hidden)
+            .filter(|&e| self.can_see(npc, e))
             .filter_map(|e| in_range(self, e).map(|d| (d, e)))
             .min_by_key(|&(d, _)| d);
         // A hunter keeps track of where it last saw the player.
         if n.behavior == Behavior::Hunter
-            && !hidden
+            && self.can_see(npc, PLAYER)
             && self.is_hostile(npc, PLAYER)
             && in_range(self, PLAYER).is_some()
         {
@@ -948,7 +963,7 @@ impl World {
             let chars: Vec<EntityId> = (0..self.story().entities.len() as u32)
                 .map(EntityId)
                 .filter(|&c| c != npc && self.def(c).kind == EntityKind::Character && self.together(npc, c))
-                .filter(|&c| self.is_hostile(npc, c))
+                .filter(|&c| self.is_hostile(npc, c) && self.can_see(npc, c))
                 .collect();
             if let Some(&enemy) = chars.first() {
                 let weapon = self.best_weapon(npc);
@@ -967,7 +982,7 @@ impl World {
         if !n.behavior.hostile()
             && !n.pacifist
             && self.faction(npc).is_some()
-            && !hidden
+            && self.can_see(npc, PLAYER)
             && self.together(npc, PLAYER)
             && self.is_hostile(npc, PLAYER)
         {

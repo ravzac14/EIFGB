@@ -331,6 +331,9 @@ pub struct Thing {
     /// Follows the player's fresh tracks.
     #[serde(default)]
     pub tracker: Option<bool>,
+    /// Sees in unlit rooms.
+    #[serde(default)]
+    pub sees_in_dark: Option<bool>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,
@@ -422,6 +425,9 @@ pub struct Faction {
     /// What members' tracks look like: "paw prints".
     #[serde(default)]
     pub prints: Option<String>,
+    /// Members see in unlit rooms.
+    #[serde(default)]
+    pub sees_in_dark: bool,
     /// How many members the player can provoke before the faction turns
     /// on them (as themselves, or in its disguise). Defaults to 2.
     #[serde(default)]

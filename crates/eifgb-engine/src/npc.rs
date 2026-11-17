@@ -11,6 +11,21 @@ use eifgb_ir::{Behavior, Direction, EntityId, EntityKind, Faction, Value, PLAYER
 
 use std::collections::{HashMap, VecDeque};
 
+/// How an apology went.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Apology {
+    /// Not someone who can forgive (not a character, or dead).
+    NotPerson,
+    /// It has nothing against the player.
+    Nothing,
+    /// It's hostile by nature, and no apology changes that.
+    Refused,
+    /// It's accepted all the apologies it ever will.
+    Exhausted,
+    /// Forgiven. `calmed` is the faction whose attitude went up, if any.
+    Accepted { calmed: Option<String> },
+}
+
 /// A faction thinking less of the player.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AttitudeChange {
@@ -243,12 +258,82 @@ impl World {
         {
             return *v;
         }
+        self.starting_attitude(faction)
+    }
+
+    /// Where a faction's attitude toward the player's current side starts,
+    /// and the most an apology can bring it back to.
+    fn starting_attitude(&self, faction: &str) -> i64 {
         let side = self.player_side();
         match self.story().factions.iter().find(|f| f.key == faction) {
             Some(f) if f.hostile_to.iter().any(|h| h == side) => 0,
             Some(f) => i64::from(f.patience),
             None => 0,
         }
+    }
+
+    fn set_attitude(&mut self, faction: &str, value: i64) {
+        let key = self.attitude_key(faction);
+        let mut map = match self.get(PLAYER, "_attitude") {
+            Some(Value::Map(m)) => m.clone(),
+            _ => Default::default(),
+        };
+        map.insert(key, Value::Int(value));
+        self.set(PLAYER, "_attitude", Value::Map(map));
+    }
+
+    /// The player apologises to `npc`. If it accepts, it forgets its
+    /// grudge, its patience is restored, and its faction's attitude toward
+    /// the player (as they present themselves now) goes up by one, but
+    /// never above where it started.
+    pub fn apologize(&mut self, npc: EntityId) -> Apology {
+        let Some(n) = self.def(npc).npc.clone() else { return Apology::NotPerson };
+        if !self.is_active(npc) {
+            return Apology::NotPerson;
+        }
+        let faction = self.def(npc).faction.clone();
+        // Hostile to the player by nature: nothing an apology can change.
+        let by_nature = match &faction {
+            Some(f) => self.starting_attitude(f) <= 0,
+            None => n.behavior.hostile(),
+        };
+        if by_nature {
+            return Apology::Refused;
+        }
+        let key = Value::Str(self.def(PLAYER).key.clone());
+        let foes = match self.get(npc, "foes") {
+            Some(Value::List(l)) => l.clone(),
+            _ => Vec::new(),
+        };
+        let grudge = foes.contains(&key);
+        let patience = match self.get(npc, "patience") {
+            Some(Value::Int(i)) => Some(*i),
+            _ => None,
+        };
+        let short_of_patience = patience.is_some_and(|p| p < i64::from(n.patience));
+        let faction_low = faction.as_deref().is_some_and(|f| self.attitude(f) < self.starting_attitude(f));
+        if !grudge && !short_of_patience && !faction_low {
+            return Apology::Nothing;
+        }
+        let forgiven = match self.get(npc, "_forgiven") {
+            Some(Value::Int(i)) => *i,
+            _ => 0,
+        };
+        if forgiven >= i64::from(n.forgiveness) {
+            return Apology::Exhausted;
+        }
+        self.set(npc, "_forgiven", Value::Int(forgiven + 1));
+        self.set(npc, "foes", Value::List(foes.into_iter().filter(|v| *v != key).collect()));
+        if patience.is_some() {
+            self.set(npc, "patience", Value::Int(i64::from(n.patience)));
+        }
+        let mut calmed = None;
+        if let Some(f) = faction.filter(|_| faction_low) {
+            let now = self.attitude(&f) + 1;
+            self.set_attitude(&f, now);
+            calmed = Some(f);
+        }
+        Apology::Accepted { calmed }
     }
 
     /// Lowers a faction's attitude toward the player (as they present
@@ -258,13 +343,7 @@ impl World {
         if now <= 0 {
             return None;
         }
-        let key = self.attitude_key(faction);
-        let mut map = match self.get(PLAYER, "_attitude") {
-            Some(Value::Map(m)) => m.clone(),
-            _ => Default::default(),
-        };
-        map.insert(key, Value::Int(now - 1));
-        self.set(PLAYER, "_attitude", Value::Map(map));
+        self.set_attitude(faction, now - 1);
         let side = self.player_side();
         let disguise = (side != PLAYER_FACTION).then(|| side.to_string());
         Some(AttitudeChange { faction: faction.to_string(), left: now - 1, disguise })

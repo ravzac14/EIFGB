@@ -793,6 +793,7 @@ impl<'a> Lowerer<'a> {
                 ("patience", t.patience.is_some()),
                 ("pacifist", t.pacifist.is_some()),
                 ("invincible", t.invincible.is_some()),
+                ("forgiveness", t.forgiveness.is_some()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -861,6 +862,7 @@ impl<'a> Lowerer<'a> {
             patience: t.patience.unwrap_or(behavior.default_patience()),
             pacifist,
             invincible: t.invincible.unwrap_or(false),
+            forgiveness: t.forgiveness.unwrap_or(1),
         })
     }
 

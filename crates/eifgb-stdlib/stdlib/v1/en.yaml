@@ -207,6 +207,19 @@ verbs:
   wares:
     action: wares
     patterns: ["wares", "list wares", "browse", "shop", "trade", "trade with {target}", "browse {target}"]
+  apologize:
+    action: apologize
+    reach: false
+    patterns:
+      - "apologize to {target}"
+      - "apologise to {target}"
+      - "say sorry to {target}"
+      - "make peace with {target}"
+      - "beg {target} for forgiveness"
+      - "ask {target} for forgiveness"
+      - "calm {target}"
+      - "calm down {target}"
+      - "calm {target} down"
   shout:
     action: shout
     patterns: ["shout", "shout {text}", "yell", "yell {text}", "scream", "holler", "make noise", "make a noise", "call out"]
@@ -369,6 +382,12 @@ messages:
   attack.not_weapon: "${The(args.tool)} isn't much of a weapon."
   attack.not_held: "You need to be holding ${the(args.tool)} first."
   shout.done: "You shout at the top of your lungs."
+  apologize.accepted: "${The(args.target)} accepts your apology."
+  apologize.nothing: "${The(args.target)} has nothing against you."
+  apologize.refused: "${The(args.target)} isn't interested in apologies."
+  apologize.exhausted: "${The(args.target)} has heard enough of your apologies."
+  apologize.not_person: "There's nobody there to forgive you."
+  faction.calmer: "The ${args.faction} seem a little less wary of you."
   health.full: "You're in perfect health."
   health.hurt: "You're hurt: ${args.health} out of ${args.max}."
   health.none: "You feel fine."

@@ -2,7 +2,8 @@
 
 Things a creative player might try, that we'd like the engine to support
 one day. Each builds on something that already exists. Built so far from
-the same list: disguises, bait, corpse stories, hiding and making noise.
+the same list: disguises, bait, corpse stories, hiding, making noise and apologies (calming
+down, by asking).
 
 ## Haggling, with patience
 
@@ -25,16 +26,6 @@ that fights on your side. GIVE COINS TO GUARD gets you waved through.
   "give (money) 5"); taming switches faction to an allies faction and
   behaviour to `follower`; followers fight the player's enemies.
 - Effort: medium.
-
-## Calming down
-
-Patience slowly returns if you stay out of someone's way, and APOLOGISE
-TO MONK or PRAY can earn their trust back.
-
-- Builds on: `patience`, `foes`.
-- Shape: `calms_after: N` actions without being attacked clears `foes`
-  and restores patience; an APOLOGISE verb with a hookable default.
-- Effort: small.
 
 ## Throwing
 

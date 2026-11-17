@@ -343,6 +343,13 @@ pub struct Npc {
     /// Can't be hurt: attacks do no damage. For characters the story needs.
     #[serde(default)]
     pub invincible: bool,
+    /// How many apologies it accepts over the whole game.
+    #[serde(default = "one_u32")]
+    pub forgiveness: u32,
+}
+
+fn one_u32() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -809,6 +816,8 @@ pub enum BuiltinAction {
     Health,
     /// Make a noise that hunters within earshot come to investigate.
     Shout,
+    /// Apologise to a character, to win back its patience and its faction's.
+    Apologize,
 }
 
 impl BuiltinAction {

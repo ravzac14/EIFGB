@@ -1969,3 +1969,58 @@ fn scripts_can_make_noise() {
     assert_says(&mut g, "z", "The ghoul arrives.");
     assert_says(&mut g, "z", "The ghoul attacks you.");
 }
+
+// -------------------------------------------------------------- apologies
+
+#[test]
+fn apologies_win_back_a_character_and_its_faction_but_only_so_often() {
+    let mut g = game(compile_str(VILLAGE).story.unwrap());
+    assert_eq!(say(&mut g, "apologize to miller"), "The miller has nothing against you.");
+    say(&mut g, "hit baker");
+    assert_eq!(
+        say(&mut g, "say sorry to the baker"),
+        "The baker accepts your apology.\nThe villagers seem a little less wary of you."
+    );
+    assert_eq!(say(&mut g, "z"), "Time passes.");
+    // One apology each, by default.
+    say(&mut g, "hit baker");
+    assert_says(&mut g, "apologise to baker", "The baker has heard enough of your apologies.");
+    assert_says(&mut g, "z", "The baker attacks you.");
+}
+
+#[test]
+fn an_apology_can_turn_a_village_back() {
+    let mut g = game(compile_str(VILLAGE).story.unwrap());
+    say(&mut g, "hit baker");
+    say(&mut g, "hit smith");
+    assert_says(&mut g, "z", "The miller attacks you.");
+    // The miller never had a grudge of its own: the apology is for the village.
+    let out = say(&mut g, "make peace with the miller");
+    assert!(out.contains("The villagers seem a little less wary of you.") && !out.contains("miller attacks"), "{out}");
+}
+
+#[test]
+fn an_apology_can_mend_a_blown_disguise() {
+    let mut g = blackfang();
+    for cmd in ["take spear", "take helmet", "wear helmet", "n", "hit grunt with spear", "hit chief with spear"] {
+        say(&mut g, cmd);
+    }
+    // The goblins saw through it; apologising to the grunt (in disguise)
+    // brings their attitude back to 1, and the grunt lets it go.
+    let out = say(&mut g, "apologize to grunt");
+    assert!(out.contains("The goblin grunt accepts your apology.") && out.contains("The goblins seem a little less wary of you."), "{out}");
+    assert!(!out.contains("grunt attacks you"), "{out}");
+    // The chief still holds its own grudge.
+    assert!(out.contains("The goblin chief attacks you"), "{out}");
+    // The wolves hate the player (and goblins) by nature.
+    assert_eq!(say(&mut g, "apologize to the alpha wolf").lines().next(), Some("The alpha wolf isn't interested in apologies."));
+    assert_says(&mut g, "apologize to spear", "There's nobody there to forgive you.");
+}
+
+#[test]
+fn forgiveness_can_be_set_per_character() {
+    let src = VILLAGE.replace("miller: { name: miller, in: green, faction: villagers, health: 9 }", "miller: { name: miller, in: green, faction: villagers, health: 9, patience: 0, forgiveness: 0 }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "hit miller");
+    assert_says(&mut g, "apologize to miller", "The miller has heard enough of your apologies.");
+}

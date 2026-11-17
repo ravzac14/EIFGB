@@ -964,8 +964,18 @@ characters:
   foe (by using up that member's own patience) lowers it by one: "The
   villagers are growing wary of you." At 0, every member attacks the
   player on sight, whatever its behaviour: "The villagers turn against
-  you.", or in disguise, "The goblins see through your disguise!" It
-  doesn't recover, and putting the disguise back on doesn't help.
+  you.", or in disguise, "The goblins see through your disguise!" Putting
+  the disguise back on doesn't help, and it doesn't recover by itself:
+  only an apology does (below).
+- **Apologies:** APOLOGISE TO MILLER (or SAY SORRY TO, MAKE PEACE WITH,
+  BEG … FOR FORGIVENESS, CALM … DOWN). If the character accepts, it drops
+  its grudge, its patience is restored, and its faction's attitude goes
+  up by one ("The villagers seem a little less wary of you."), never
+  above where it started. Each character accepts `forgiveness` apologies
+  over the whole game (default 1; `0` never forgives): "The baker has
+  heard enough of your apologies." Anyone hostile to the player by
+  nature, like a wolf pack, "isn't interested in apologies." Apologising
+  in disguise mends the disguise's standing, one apology at a time.
 - **Pacifists** never fight: not with their faction, and not back.
   Merchants and conversationalists are pacifists by default, so the
   village shopkeeper doesn't pick up a cleaver when the village turns on
@@ -1118,6 +1128,7 @@ TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO
 TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL, WARES, HEALTH (DIAGNOSE), SHOUT (YELL),
+APOLOGISE TO,
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
 
@@ -1148,7 +1159,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `merchant`, `hunter`, `guard`, `follower`, `defender`), `wander` (percent),
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
-`kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
+`forgiveness`, `kills`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills` and
 `patience`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise` and `eaten_by`; the player can have `health`,
 `damage`, `money` and `voice`. Events: `defeated` on a character, `died` at the

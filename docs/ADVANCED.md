@@ -563,6 +563,12 @@ The same rule works without disguises: a neutral faction, such as
 villagers who aren't `hostile_to` the player, turns on them as a whole
 once they've provoked enough of its members.
 
+It's not always the end. APOLOGISE TO GRUNT, still wearing the helmet,
+and if the grunt accepts, it lets its grudge go and the goblins' patience
+with "one of their own" goes back up by one. Each character only accepts
+so many apologies (`forgiveness`, default 1), and the wolves, who hate
+the player by nature, aren't interested at all.
+
 **Bait.** An object with `eaten_by: [<faction>]` is food for that
 faction. Food left lying in their room beats everything except fighting
 back: they'll eat it rather than attack the player, and hunters head for

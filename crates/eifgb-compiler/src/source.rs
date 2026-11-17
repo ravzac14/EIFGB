@@ -289,6 +289,9 @@ pub struct Thing {
     /// Can't be hurt. For characters the story can't do without.
     #[serde(default)]
     pub invincible: Option<bool>,
+    /// How many apologies it accepts. Defaults to 1; 0 never forgives.
+    #[serde(default)]
+    pub forgiveness: Option<u32>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,

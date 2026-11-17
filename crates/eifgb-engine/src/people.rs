@@ -216,6 +216,22 @@ impl<H: ScriptHost> Game<H> {
         })
     }
 
+    pub(crate) fn apologize_action(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        use crate::npc::Apology;
+        let (key, calmed) = match self.world.apologize(t) {
+            Apology::NotPerson => ("apologize.not_person", None),
+            Apology::Nothing => ("apologize.nothing", None),
+            Apology::Refused => ("apologize.refused", None),
+            Apology::Exhausted => ("apologize.exhausted", None),
+            Apology::Accepted { calmed } => ("apologize.accepted", calmed),
+        };
+        self.msg(key, ctx);
+        if let Some(f) = &calmed {
+            self.msg("faction.calmer", &Ctx::new().text("faction", f.replace('_', " ")));
+        }
+        key == "apologize.accepted"
+    }
+
     /// "12 coins"
     pub(crate) fn money_text(&mut self, amount: i64) -> String {
         self.msg_str("money.amount", &Ctx::new().value("amount", Value::Int(amount)))

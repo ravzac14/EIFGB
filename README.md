@@ -995,7 +995,31 @@ characters:
 
 ### Tricks players can find
 
-Fourteen features reward players who try something clever:
+Fifteen features reward players who try something clever:
+
+- **Eavesdropping:** characters with `chatter:` talk among themselves
+  when they have someone awake to talk to and can't see the player.
+
+  ```yaml
+  characters:
+    chief:
+      name: goblin chief
+      in: camp
+      chatter:
+        - "The key's under my pillow, same as always."
+        - { say: "WHERE IS MY SUPPER?", loud: true }
+        - { say: "I'm not asleep.", repeat: true, when: "vars.night" }
+  ```
+
+  At most one line is said per room each turn, in order. Hidden in the
+  same room (in the barrel, or unseen in the dark), the player overhears
+  everything: "The goblin chief says to the goblin grunt, "…"". From the
+  next room they hear `loud` lines ("You hear a voice from the north:
+  "WHERE IS MY SUPPER?""), and quiet ones too while they LISTEN AT THE
+  DOOR, LISTEN NORTH or EAVESDROP ("You hear nothing." if no one speaks).
+  Characters in plain view of the player hush. A line is done with once
+  the player has heard it (unless it `repeat`s), so a clue nobody heard
+  comes round again.
 
 - **Pickpocketing:** STEAL KEY FROM GUARD (also TAKE … FROM, PICKPOCKET …
   FROM, LIFT, PINCH), or PICKPOCKET GUARD / ROB GUARD for the most
@@ -1305,7 +1329,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB),
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1338,7 +1362,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `area`, `range`, `act` (Lua), `health`, `damage`, `money`, `buys_at`,
 `faction`, `corpse`, `fights_back`, `patience`, `pacifist`, `invincible`,
 `forgiveness`, `haggle`, `tame_with`, `likes`, `bribe`, `fetches`, `kills`,
-`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`; rooms can be `trackless`,
+`nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience`, `prints` and `sees_in_dark`; objects
 can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable` and (worn) `sees_in_dark`; the player can have `health`,

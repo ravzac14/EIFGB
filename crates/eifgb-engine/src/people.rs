@@ -47,6 +47,137 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
+    /// Characters talking among themselves: at most one line per room each
+    /// turn, by a character with someone awake to talk to, who can't see
+    /// the player. The player overhears lines in their own room (unseen),
+    /// loud ones from the next room, and quiet ones from rooms they're
+    /// EAVESDROPping on.
+    pub(crate) fn chatter(&mut self) {
+        let here = self.world.here();
+        let listening = std::mem::take(&mut self.listening);
+        let mut heard = false;
+        let mut rooms_done: Vec<EntityId> = Vec::new();
+        let talkers: Vec<EntityId> = (0..self.world.story().entities.len() as u32)
+            .map(EntityId)
+            .filter(|&id| self.world.def(id).npc.as_ref().is_some_and(|n| !n.chatter.is_empty()))
+            .collect();
+        for npc in talkers {
+            if !self.world.is_active(npc) || self.world.is_asleep(npc) {
+                continue;
+            }
+            let Some(room) = self.world.room_of(npc) else { continue };
+            if rooms_done.contains(&room) {
+                continue;
+            }
+            let partner = (0..self.world.story().entities.len() as u32).map(EntityId).find(|&c| {
+                c != npc
+                    && c != PLAYER
+                    && self.world.def(c).kind == EntityKind::Character
+                    && self.world.is_active(c)
+                    && !self.world.is_asleep(c)
+                    && self.world.room_of(c) == Some(room)
+            });
+            let Some(partner) = partner else { continue };
+            // They hush when they can see the player.
+            if self.world.together(npc, PLAYER) && self.world.can_see(npc, PLAYER) {
+                continue;
+            }
+            let Some((index, text, loud, repeat)) = self.next_chatter(npc) else { continue };
+            rooms_done.push(room);
+            let line = self.render_str(&text, &Ctx::new().this(npc));
+            if room == here {
+                // Overheard, unseen: by name, unless it's too dark to tell.
+                let dark = self.world.in_darkness();
+                let mut ctx = Ctx::new().text("line", line);
+                ctx = if dark { ctx.text("npc", "someone").text("listener", "someone else") } else { ctx.entity("npc", npc).entity("listener", partner) };
+                self.msg("chatter.overheard", &ctx);
+                heard = true;
+                self.mark_said(npc, index, repeat);
+            } else if let Some(dir) = self.world.def(here).exits.iter().find(|e| e.to == Some(room)).map(|e| e.direction)
+                && (loud || listening.contains(&room))
+            {
+                let from = self.msg_str(&format!("from.{}", dir.key()), &Ctx::new());
+                self.msg("chatter.nearby", &Ctx::new().text("line", line).text("from", from));
+                heard = true;
+                self.mark_said(npc, index, repeat);
+            }
+        }
+        if !listening.is_empty() && !heard {
+            self.msg("eavesdrop.nothing", &Ctx::new());
+        }
+    }
+
+    /// A line the player heard is done with, unless it repeats. Lines nobody
+    /// heard come round again, so a clue isn't lost for good.
+    fn mark_said(&mut self, npc: EntityId, index: usize, repeat: bool) {
+        if repeat {
+            return;
+        }
+        let mut l = match self.world.get(npc, "_said") {
+            Some(Value::List(l)) => l.clone(),
+            _ => Vec::new(),
+        };
+        l.push(Value::Int(index as i64));
+        self.world.set(npc, "_said", Value::List(l));
+    }
+
+    /// The next line `npc` will say: the first, from where it left off,
+    /// that the player hasn't heard (unless it repeats) and whose `when` holds.
+    fn next_chatter(&mut self, npc: EntityId) -> Option<(usize, eifgb_ir::Text, bool, bool)> {
+        let lines = self.world.def(npc).npc.as_ref()?.chatter.clone();
+        let n = lines.len();
+        let start = match self.world.get(npc, "_chatter") {
+            Some(Value::Int(i)) => *i as usize,
+            _ => 0,
+        };
+        let said: Vec<i64> = match self.world.get(npc, "_said") {
+            Some(Value::List(l)) => l.iter().filter_map(|v| if let Value::Int(i) = v { Some(*i) } else { None }).collect(),
+            _ => Vec::new(),
+        };
+        for k in 0..n {
+            let i = (start + k) % n;
+            let line = &lines[i];
+            if !line.repeat && said.contains(&(i as i64)) {
+                continue;
+            }
+            if let Some(w) = &line.when
+                && !self.run(w, &Ctx::new().this(npc)).truthy()
+            {
+                continue;
+            }
+            self.world.set(npc, "_chatter", Value::Int((i + 1) as i64));
+            return Some((i, line.text.clone(), line.loud, line.repeat));
+        }
+        None
+    }
+
+    /// EAVESDROP / LISTEN AT THE DOOR / LISTEN NORTH: hears quiet talk in
+    /// the room behind (or every room next door) at the end of this turn.
+    pub(crate) fn eavesdrop_action(&mut self, door: Option<EntityId>, dir: Option<eifgb_ir::Direction>, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        let exits = self.world.def(here).exits.clone();
+        let rooms: Vec<EntityId> = match (door, dir) {
+            (Some(d), _) => exits.iter().filter(|e| e.through == Some(d)).filter_map(|e| e.to).collect(),
+            (None, Some(dir)) => exits.iter().filter(|e| e.direction == dir).filter_map(|e| e.to).collect(),
+            (None, None) => exits.iter().filter_map(|e| e.to).collect(),
+        };
+        if rooms.is_empty() {
+            self.no_turn = true;
+            self.msg("eavesdrop.no_way", ctx);
+            return false;
+        }
+        match (door, dir) {
+            (Some(d), _) => self.msg("eavesdrop.door", &ctx.clone().entity("door", d)),
+            (None, Some(d)) => {
+                let from = self.msg_str(&format!("from.{}", d.key()), &Ctx::new());
+                self.msg("eavesdrop.direction", &ctx.clone().text("from", from))
+            }
+            (None, None) => self.msg("eavesdrop.all", ctx),
+        }
+        self.listening = rooms;
+        true
+    }
+
     /// "The guard wakes with a start!" for anyone woken where the player is.
     pub(crate) fn report_woken(&mut self) {
         let here = self.world.here();

@@ -828,6 +828,7 @@ impl<'a> Lowerer<'a> {
                 ("bribe", t.bribe.is_some()),
                 ("fetches", t.fetches.is_some()),
                 ("tracker", t.tracker.is_some()),
+                ("chatter", !t.chatter.is_empty()),
                 ("behavior", t.behavior.is_some()),
                 ("act", t.act.is_some()),
                 ("wander", t.wander.is_some()),
@@ -912,6 +913,23 @@ impl<'a> Lowerer<'a> {
             fetches: t.fetches.unwrap_or(false),
             tracker: t.tracker.unwrap_or(false),
             sees_in_dark: t.sees_in_dark.unwrap_or(false),
+            chatter: t
+                .chatter
+                .iter()
+                .enumerate()
+                .map(|(i, c)| {
+                    let p = format!("{path}.chatter[{i}]");
+                    match c {
+                        src::ChatterLine::Plain(s) => Chatter { text: self.text(s, &p), loud: false, when: None, repeat: false },
+                        src::ChatterLine::Full(f) => Chatter {
+                            text: self.text(&f.say, &format!("{p}.say")),
+                            loud: f.loud,
+                            when: f.when.as_deref().map(|w| self.code(w, &format!("{p}.when"))),
+                            repeat: f.repeat,
+                        },
+                    }
+                })
+                .collect(),
         })
     }
 

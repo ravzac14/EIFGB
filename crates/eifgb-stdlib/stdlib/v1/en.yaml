@@ -281,6 +281,18 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  eavesdrop:
+    action: eavesdrop
+    reach: false
+    patterns:
+      - "eavesdrop"
+      - "eavesdrop {direction}"
+      - "listen {direction}"
+      - "listen at {target}"
+      - "listen through {target}"
+      - "press ear to {target}"
+      - "put ear to {target}"
+      - "listen in"
   steal:
     action: steal
     patterns:
@@ -495,6 +507,25 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  chatter.overheard: "${The(args.npc)} says to ${the(args.listener)}, \"${args.line}\""
+  chatter.nearby: "You hear a voice ${args.from}: \"${args.line}\""
+  eavesdrop.door: "You press your ear to ${the(args.door)} and listen."
+  eavesdrop.direction: "You listen carefully for anything ${args.from}."
+  eavesdrop.all: "You keep still and listen."
+  eavesdrop.nothing: "You hear nothing."
+  eavesdrop.no_way: "There's nothing to listen to that way."
+  from.north: "from the north"
+  from.south: "from the south"
+  from.east: "from the east"
+  from.west: "from the west"
+  from.northeast: "from the northeast"
+  from.northwest: "from the northwest"
+  from.southeast: "from the southeast"
+  from.southwest: "from the southwest"
+  from.up: "from above"
+  from.down: "from below"
+  from.in: "from inside"
+  from.out: "from outside"
   steal.done: "You slip ${the(args.target)} away from ${the(args.tool)} without being noticed."
   steal.done_asleep: "You ease ${the(args.target)} away from ${the(args.tool)} without waking them."
   steal.caught: "${The(args.tool)} catches you reaching for ${the(args.target)}!"

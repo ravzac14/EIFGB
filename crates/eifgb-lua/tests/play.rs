@@ -2867,3 +2867,60 @@ fn a_merchant_who_catches_you_stops_trading() {
     say(&mut g, "apologize to peddler");
     assert_says(&mut g, "wares", "The peddler has for sale");
 }
+
+// ------------------------------------------------------------ eavesdropping
+
+const CHATTER: &str = r#"format: eifgb/0.1
+game: { id: c, title: Chatter, version: "1", start: path }
+rooms:
+  path: { name: Path, exits: { north: { to: camp, through: flap } } }
+  camp:
+    name: Camp
+    exits: { south: path }
+objects:
+  flap: { name: tent flap, synonyms: [flap], in: path, traits: [door, openable, scenery] }
+  barrel: { name: barrel, in: camp, traits: [container, openable, enterable, scenery], state: { open: true }, size: 5 }
+characters:
+  chief:
+    name: goblin chief
+    synonyms: [chief]
+    in: camp
+    chatter:
+      - "The key's under my pillow, same as always."
+      - { say: "WHERE IS MY SUPPER?", loud: true }
+      - { say: "Snore... I mean, I'm awake.", repeat: true }
+  grunt: { name: goblin grunt, synonyms: [grunt], in: camp }
+"#;
+
+#[test]
+fn loud_talk_carries_to_the_next_room_and_quiet_talk_needs_listening() {
+    let mut g = game(compile_str(CHATTER).story.unwrap());
+    // Turn 1 is the quiet line: not heard from outside.
+    assert_eq!(say(&mut g, "z"), "Time passes.");
+    assert_says(&mut g, "z", "You hear a voice from the north: \"WHERE IS MY SUPPER?\"");
+    say(&mut g, "z");
+    // Listening at the flap hears the quiet line, which came round again.
+    let out = say(&mut g, "listen at the flap");
+    assert!(out.starts_with("You press your ear to the tent flap and listen."), "{out}");
+    assert!(out.contains("The key's under my pillow"), "{out}");
+}
+
+#[test]
+fn hidden_in_the_room_you_overhear_everything_by_name() {
+    let mut g = game(compile_str(CHATTER).story.unwrap());
+    // In plain view, they hush.
+    assert!(!say(&mut g, "n").contains("says"));
+    say(&mut g, "get in barrel");
+    assert_says(&mut g, "close barrel", "The goblin chief says to the goblin grunt, \"The key's under my pillow, same as always.\"");
+}
+
+#[test]
+fn listening_when_nothing_is_said() {
+    let src = CHATTER.replace("  grunt: { name: goblin grunt, synonyms: [grunt], in: camp }
+", "");
+    let mut g = game(compile_str(&src).story.unwrap());
+    // Nobody to talk to: nothing is said.
+    assert_eq!(say(&mut g, "eavesdrop"), "You keep still and listen.
+You hear nothing.");
+    assert_eq!(say(&mut g, "listen west"), "There's nothing to listen to that way.");
+}

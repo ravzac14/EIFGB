@@ -338,7 +338,7 @@ pub struct Entity {
 }
 
 /// A character's turn-by-turn behaviour.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Npc {
     pub behavior: Behavior,
     /// Percent chance of moving to a neighbouring room on a turn with
@@ -402,6 +402,24 @@ pub struct Npc {
     /// Sees in unlit rooms. Without it, it's as blind there as the player.
     #[serde(default)]
     pub sees_in_dark: bool,
+    /// Things it says to others when it thinks nobody's listening.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chatter: Vec<Chatter>,
+}
+
+/// A line of chatter between characters.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Chatter {
+    pub text: Text,
+    /// Loud enough to hear from the next room.
+    #[serde(default)]
+    pub loud: bool,
+    /// Said only while this holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    /// Said every time it comes round, instead of once.
+    #[serde(default)]
+    pub repeat: bool,
 }
 
 fn one_u32() -> u32 {
@@ -904,6 +922,8 @@ pub enum BuiltinAction {
     Extinguish,
     /// Take something a character is carrying, without being caught.
     Steal,
+    /// Listen for talk in the next room (or rooms).
+    Eavesdrop,
 }
 
 impl BuiltinAction {

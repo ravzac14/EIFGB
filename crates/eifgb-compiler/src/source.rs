@@ -337,6 +337,9 @@ pub struct Thing {
     /// Sees in unlit rooms.
     #[serde(default)]
     pub sees_in_dark: Option<bool>,
+    /// Lines it says to others when it thinks nobody's listening.
+    #[serde(default)]
+    pub chatter: Vec<ChatterLine>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,
@@ -412,6 +415,26 @@ pub struct ChoiceOption {
     pub goto: Option<String>,
     #[serde(default)]
     pub end: bool,
+}
+
+/// A line of chatter: just the words, or `{ say, loud, when, repeat }`.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ChatterLine {
+    Plain(String),
+    Full(ChatterFull),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChatterFull {
+    pub say: String,
+    #[serde(default)]
+    pub loud: bool,
+    #[serde(default)]
+    pub when: Option<String>,
+    #[serde(default)]
+    pub repeat: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]

@@ -25,20 +25,9 @@ Everything from the first list has now been built:
   you hold in the dark.
 - **Pickpocketing:** STEAL/PICKPOCKET/ROB, from sleepers, the distracted
   and the fooled.
+- **Eavesdropping:** `chatter`, loud lines through walls, LISTEN AT THE DOOR.
 
 ## Stealth and sneaking
-
-### Eavesdropping
-
-Hide in the barrel and overhear what characters say to each other when
-they think nobody's listening: clues and secrets only stealthy players
-get.
-
-- Builds on: hiding, factions, characters' turns.
-- Shape: `chatter:` lines on characters (or factions), with `when:`; said
-  on their turn when two or more are together and the player is hidden
-  (or not seen), shown as overheard.
-- Effort: small.
 
 ## Manipulating creatures
 

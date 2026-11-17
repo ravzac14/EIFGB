@@ -91,6 +91,8 @@ pub struct Game<H: ScriptHost> {
     pub(crate) no_turn: bool,
     /// Set while the player SNEAKs, so arriving doesn't wake anyone.
     pub(crate) sneaking: bool,
+    /// Rooms the player is listening to this turn (EAVESDROP).
+    pub(crate) listening: Vec<EntityId>,
     /// The turn the player last heard a fight next door, so it's said once per turn.
     pub(crate) heard_nearby: Option<u64>,
     pub(crate) out: Output,
@@ -115,6 +117,7 @@ impl<H: ScriptHost> Game<H> {
             no_turn: false,
             heard_nearby: None,
             sneaking: false,
+            listening: Vec::new(),
             out: Output::default(),
             end_requested: None,
             in_action: false,
@@ -628,6 +631,7 @@ impl<H: ScriptHost> Game<H> {
         if self.end_requested.is_some() {
             return;
         }
+        self.chatter();
         for code in self.global_handlers(Phase::On, "turn") {
             self.run(&code, &Ctx::new());
         }

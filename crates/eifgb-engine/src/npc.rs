@@ -88,6 +88,8 @@ pub enum NpcEvent {
     Discovered { npc: EntityId, body: EntityId, room: EntityId, attitude: Option<AttitudeChange> },
     /// Ran away from something it feared, or from a fight it was losing.
     Fled { npc: EntityId, from: EntityId, to: EntityId, direction: Direction },
+    /// Caught in a trap, struggling; `free` when it breaks loose.
+    Struggled { npc: EntityId, trap: EntityId, room: EntityId, free: bool },
     /// Fetching something the player threw: `Grabbed` it, or `Brought` it back.
     Fetched { npc: EntityId, item: EntityId, room: EntityId, brought: bool },
 }
@@ -163,6 +165,67 @@ impl World {
         let fooled = !self.is_foe(victim, PLAYER)
             && self.def(victim).faction.as_deref().is_some_and(|f| f == self.player_side() && self.attitude(f) > 0);
         !fooled
+    }
+
+    /// `who` walked into `room`: the first armed trap lying there catches it
+    /// (not the player's own traps, and nothing that leaves no tracks).
+    pub fn spring_traps(&mut self, who: EntityId, room: EntityId) {
+        if !self.def(who).leaves_tracks {
+            return;
+        }
+        let Some(trap) = self.contents(room).into_iter().find(|&t| {
+            self.def(t).trap.is_some() && self.flag(t, "armed") && !(who == PLAYER && self.flag(t, "_players"))
+        }) else {
+            return;
+        };
+        let holds = i64::from(self.def(trap).trap.map_or(1, |t| t.holds));
+        self.set(trap, "armed", Value::Bool(false));
+        self.unset(trap, "_players");
+        // Once it's gone off, everyone knows it's there.
+        self.unset(trap, "hidden");
+        // The player starts struggling at the end of the turn it caught
+        // them, so one more for them to be held `holds` whole turns.
+        self.set(who, "_held", Value::Int(if who == PLAYER { holds + 1 } else { holds }));
+        self.set(who, "_held_by", Value::Str(self.def(trap).key.clone()));
+        if let Some(d) = self.def(trap).damage
+            && let Some(h) = self.health(who)
+        {
+            if who == PLAYER {
+                self.set(PLAYER, "health", Value::Int((h - i64::from(d)).max(0)));
+            } else {
+                // The player's trap, the player's blow.
+                let _ = self.attack(PLAYER, who, Some(trap));
+            }
+        }
+        self.sprung.push((who, trap));
+    }
+
+    /// Caught in a trap, for this many more turns.
+    pub fn held(&self, id: EntityId) -> i64 {
+        match self.get(id, "_held") {
+            Some(Value::Int(n)) => *n,
+            _ => 0,
+        }
+    }
+
+    /// The trap holding `id`, if any.
+    pub fn held_by(&self, id: EntityId) -> Option<EntityId> {
+        match self.get(id, "_held_by") {
+            Some(Value::Str(k)) if self.held(id) > 0 => self.id(k),
+            _ => None,
+        }
+    }
+
+    /// One turn less in the trap. Returns true if that frees it.
+    pub fn struggle(&mut self, id: EntityId) -> bool {
+        let n = self.held(id) - 1;
+        if n <= 0 {
+            self.unset(id, "_held");
+            true
+        } else {
+            self.set(id, "_held", Value::Int(n));
+            false
+        }
     }
 
     /// Asleep: it does nothing and notices nothing until something wakes it.
@@ -1074,6 +1137,7 @@ impl World {
         let from = self.room_of(npc)?;
         self.move_to(npc, Some(to)).ok()?;
         self.leave_tracks(npc, from, direction);
+        self.spring_traps(npc, to);
         Some(NpcEvent::Moved { npc, from, to, direction })
     }
 
@@ -1166,6 +1230,17 @@ impl World {
             return Vec::new();
         }
         let Some(room) = self.room_of(npc) else { return Vec::new() };
+        // Caught in a trap: it can only lash out at an enemy right here.
+        if let Some(trap) = self.held_by(npc) {
+            let enemy = self.enemies_of(npc).into_iter().find(|&e| self.together(npc, e) && self.can_see(npc, e));
+            if let Some(e) = enemy {
+                self.struggle(npc);
+                let weapon = self.best_weapon(npc);
+                return self.attack(npc, e, weapon).into_iter().collect();
+            }
+            let free = self.struggle(npc);
+            return vec![NpcEvent::Struggled { npc, trap, room, free }];
+        }
         let in_range = |w: &World, target: EntityId| w.distance(npc, target).filter(|&d| n.range.is_none_or(|r| d <= r));
         // The nearest enemy it can see and reach; the player wins a tie.
         let nearest = self

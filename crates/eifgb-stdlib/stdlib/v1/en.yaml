@@ -281,6 +281,12 @@ verbs:
     action: follow_tracks
     reach: false
     patterns: ["follow {text}", "track {text}", "trail {text}"]
+  set_trap:
+    action: set_trap
+    patterns: ["set {target}", "arm {target}", "lay {target}", "set up {target}", "prime {target}"]
+  disarm_trap:
+    action: disarm_trap
+    patterns: ["disarm {target}", "defuse {target}", "unset {target}"]
   sound:
     action: sound
     patterns: ["blow {target}", "sound {target}", "play {target}", "ring {target}", "toot {target}"]
@@ -547,6 +553,18 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  trap.set: "You set ${the(args.target)}."
+  trap.not_trap: "You can't set ${the(args.target)}."
+  trap.already: "${The(args.target)} is already set."
+  trap.disarm: "You disarm ${the(args.target)}."
+  trap.not_set: "${The(args.target)} isn't set."
+  trap.take_armed: "You carefully disarm ${the(args.target)} and pick it up."
+  trap.catches: "${The(args.npc)} is caught in ${the(args.trap)}!"
+  trap.catches_you: "You're caught in ${the(args.trap)}!"
+  trap.struggles: "${The(args.npc)} struggles in ${the(args.trap)}."
+  trap.breaks_free: "${The(args.npc)} breaks free of ${the(args.trap)}."
+  trap.stuck: "You're caught fast in ${the(args.trap)}."
+  trap.you_free: "You work yourself free."
   sound.done: "You ${args.verb} ${the(args.target)}."
   sound.cant: "You can't get a sound out of ${the(args.target)}."
   mimic.call: "You let out a convincing ${args.sound}."
@@ -769,6 +787,7 @@ messages:
   state.dead: "${The(args.target)} is dead."
   state.asleep: "${The(args.target)} is asleep."
   state.frightened: "${The(args.target)} looks terrified."
+  state.caught: "${The(args.target)} is caught in a trap."
   state.killed_how: "${The(args.target)} has been ${args.how}."
   state.killed_by: "${The(args.target)} was killed by ${the(args.by)}."
   state.killed_by_you: "You killed ${the(args.target)}."
@@ -786,6 +805,7 @@ messages:
   state.here.dead: "${The(args.target)} is dead."
   state.here.asleep: "${The(args.target)} is asleep."
   state.here.frightened: "${The(args.target)} looks terrified."
+  state.here.caught: "${The(args.target)} is caught in a trap."
   state.here.badly_wounded: "${The(args.target)} is badly wounded."
   state.here.heavy: "${The(args.target)} is too heavy to lift with everything in it."
   state.tag.open: "open"
@@ -799,6 +819,7 @@ messages:
   state.tag.dead: "dead"
   state.tag.asleep: "asleep"
   state.tag.frightened: "frightened"
+  state.tag.caught: "caught"
   state.tag.badly_wounded: "badly wounded"
   state.tag.heavy: "heavy"
   # an author's own state fields, e.g. `fueled: true` or `channel: 16`

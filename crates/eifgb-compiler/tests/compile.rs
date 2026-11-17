@@ -560,3 +560,11 @@ fn calls_name_real_factions() {
     let out = with("factions:\n  goblins: {}\ntimers:\n  t: { after: 1, noise: { loudness: 2, faction: wolfs } }\n");
     assert!(format!("{:?}", out.diagnostics).contains("unknown faction 'wolfs'"), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn traps_are_checked() {
+    let out = with("objects:\n  snare: { name: snare, in: hall, trap: { holds: 0 } }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("does nothing"), "{:#?}", out.diagnostics);
+    let out = with("characters:\n  w: { name: w, in: hall, trap: { holds: 2 } }\n");
+    assert!(format!("{:?}", out.diagnostics).contains("only objects can have 'trap'"), "{:#?}", out.diagnostics);
+}

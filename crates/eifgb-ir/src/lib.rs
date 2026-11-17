@@ -351,6 +351,16 @@ pub struct Entity {
     /// (`at` is unused: it's wherever the object is).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calls: Option<Noise>,
+    /// Objects: a trap, which holds whoever walks into it while armed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trap: Option<TrapSpec>,
+}
+
+/// How a trap works. Its damage, if any, is the object's `damage`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrapSpec {
+    /// How many turns it holds what it catches.
+    pub holds: u32,
 }
 
 /// A character's turn-by-turn behaviour.
@@ -958,6 +968,10 @@ pub enum BuiltinAction {
     Sound,
     /// Mimic a creature's call: HOWL, IMITATE A WOLF.
     Mimic,
+    /// Set a trap here.
+    SetTrap,
+    /// Make a trap safe.
+    DisarmTrap,
 }
 
 impl BuiltinAction {

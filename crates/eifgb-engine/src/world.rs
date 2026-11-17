@@ -41,12 +41,14 @@ pub struct World {
     undo: VecDeque<GameState>,
     /// Characters woken since the turn loop last looked, so it can say so.
     pub(crate) woken: Vec<EntityId>,
+    /// Traps sprung since the turn loop last looked: (who, trap).
+    pub(crate) sprung: Vec<(EntityId, EntityId)>,
 }
 
 impl World {
     pub fn new(story: Story, seed: u64) -> Self {
         let state = GameState::new(&story, seed);
-        World { story, state, undo: VecDeque::new(), woken: Vec::new() }
+        World { story, state, undo: VecDeque::new(), woken: Vec::new(), sprung: Vec::new() }
     }
 
     pub fn story(&self) -> &Story {

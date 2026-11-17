@@ -639,10 +639,15 @@ impl<H: ScriptHost> Game<H> {
         // Someone the player just beat doesn't get to strike back.
         self.check_defeats();
         self.report_woken();
+        // Working free of a trap, a turn at a time.
+        if self.world.held_by(PLAYER).is_some() && self.world.struggle(PLAYER) {
+            self.msg("trap.you_free", &Ctx::new());
+        }
         if self.end_requested.is_some() {
             return;
         }
         self.npc_turns();
+        self.report_traps();
         if self.end_requested.is_some() {
             return;
         }

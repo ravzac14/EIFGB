@@ -352,6 +352,9 @@ pub struct Thing {
     /// Objects: the noise it makes when blown, sounded, played or rung.
     #[serde(default)]
     pub calls: Option<Noise>,
+    /// Objects: a trap. `{ holds: 3 }`: turns it holds what it catches.
+    #[serde(default)]
+    pub trap: Option<Trap>,
     /// Wearable disguise: this faction takes the wearer for one of its own.
     #[serde(default)]
     pub disguise: Option<String>,
@@ -512,6 +515,12 @@ pub struct Timer {
     /// A noise hunters come to investigate.
     #[serde(default)]
     pub noise: Option<Noise>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Trap {
+    pub holds: u32,
 }
 
 #[derive(Debug, Deserialize)]

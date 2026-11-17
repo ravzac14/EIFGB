@@ -3140,3 +3140,70 @@ timers:
     let out = say(&mut g, "z");
     assert!(out.contains("The grey wolf arrives.") && !out.contains("goblin"), "{out}");
 }
+
+// ------------------------------------------------------------------- traps
+
+const TRAPS: &str = r#"format: eifgb/0.1
+game: { id: t, title: Traps, version: "1", start: glade }
+player: { health: 20 }
+factions:
+  wolves: { hostile_to: [player] }
+rooms:
+  glade: { name: Glade, exits: { north: trail, east: den } }
+  trail: { name: Trail, exits: { south: glade } }
+  den: { name: Den, exits: { west: glade } }
+objects:
+  snare: { name: snare, in: player, traits: [portable], trap: { holds: 3 }, damage: 1, kills: caught in a snare }
+  meat: { name: meat, in: player, traits: [portable], eaten_by: [wolves], size: 2 }
+  pit: { name: hidden pit, synonyms: [pit], in: trail, traits: [scenery], trap: { holds: 2 }, state: { armed: true, hidden: true }, revealed_by: search trail }
+characters:
+  wolf: { name: wolf, in: den, faction: wolves, behavior: hunter, range: 1, wander: 0, health: 10, damage: 1 }
+"#;
+
+#[test]
+fn a_snare_catches_a_hunter_that_cant_then_follow() {
+    let mut g = game(compile_str(TRAPS).story.unwrap());
+    let out = say(&mut g, "set snare");
+    assert!(out.contains("The wolf arrives.") && out.contains("The wolf is caught in the snare!"), "{out}");
+    assert_says(&mut g, "look", "a wolf (caught");
+    // The player walks off; the wolf is held where it is.
+    say(&mut g, "e");
+    assert!(!say(&mut g, "z").contains("arrives"));
+}
+
+#[test]
+fn your_own_traps_dont_catch_you_and_taking_one_disarms_it() {
+    // No pit and no wolf this time.
+    let src: String = TRAPS
+        .lines()
+        .filter(|l| !l.starts_with("  pit:") && !l.starts_with("  wolf:"))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    let mut g = game(compile_str(&src).story.unwrap());
+    say(&mut g, "set snare");
+    say(&mut g, "e");
+    assert!(!say(&mut g, "w").contains("caught"));
+    assert_eq!(say(&mut g, "take snare"), "You carefully disarm the snare and pick it up.");
+    say(&mut g, "set snare");
+    assert_eq!(say(&mut g, "disarm snare"), "You disarm the snare.");
+    assert_eq!(say(&mut g, "disarm snare"), "The snare isn't set.");
+}
+
+#[test]
+fn a_hidden_trap_catches_the_player() {
+    let mut g = game(compile_str(TRAPS).story.unwrap());
+    let out = say(&mut g, "n");
+    assert!(out.contains("You're caught in the hidden pit!"), "{out}");
+    // Caught fast for two turns, then free; and now it's no secret.
+    assert_says(&mut g, "s", "You're caught fast in the hidden pit.");
+    assert_says(&mut g, "z", "You work yourself free.");
+    assert!(!say(&mut g, "x pit").contains("can't see"));
+}
+
+#[test]
+fn ghosts_dont_set_traps_off() {
+    let src = TRAPS.replace("health: 10, damage: 1 }", "health: 10, damage: 1, leaves_tracks: false }");
+    let mut g = game(compile_str(&src).story.unwrap());
+    let out = say(&mut g, "set snare");
+    assert!(out.contains("The wolf arrives.") && !out.contains("caught"), "{out}");
+}

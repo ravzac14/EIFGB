@@ -121,6 +121,7 @@ impl<'a> Lowerer<'a> {
             dark: false,
             night_vision: false,
             calls: None,
+            trap: None,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -587,6 +588,7 @@ impl<'a> Lowerer<'a> {
             dark: r.dark,
             night_vision: false,
             calls: None,
+            trap: None,
         }
     }
 
@@ -786,6 +788,10 @@ impl<'a> Lowerer<'a> {
         only(self.d, "disguise", t.disguise.is_some(), kind == EntityKind::Object, "objects");
         only(self.d, "eaten_by", !t.eaten_by.is_empty(), kind == EntityKind::Object, "objects");
         only(self.d, "prints", t.prints.is_some(), is_char, "characters");
+        only(self.d, "trap", t.trap.is_some(), kind == EntityKind::Object, "objects");
+        if t.trap.as_ref().is_some_and(|tr| tr.holds == 0) {
+            self.d.error(format!("{path}.trap.holds"), "a trap that holds nothing for no turns does nothing; use 1 or more");
+        }
         if kind == EntityKind::Object && t.sees_in_dark == Some(true) && !has(Trait::Wearable) {
             self.d.warn(format!("{path}.sees_in_dark"), "on an object, it only works when worn; add the 'wearable' trait");
         }
@@ -841,6 +847,7 @@ impl<'a> Lowerer<'a> {
             dark: false,
             night_vision: kind == EntityKind::Object && t.sees_in_dark == Some(true),
             calls: t.calls.as_ref().map(|n| Noise { at: None, loudness: n.loudness, faction: n.faction.clone() }),
+            trap: t.trap.as_ref().filter(|_| kind == EntityKind::Object).map(|tr| TrapSpec { holds: tr.holds }),
         }
     }
 

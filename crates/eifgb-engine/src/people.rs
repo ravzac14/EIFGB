@@ -178,6 +178,50 @@ impl<H: ScriptHost> Game<H> {
         true
     }
 
+    /// "The wolf is caught in the snare!" for traps sprung where the player is.
+    pub(crate) fn report_traps(&mut self) {
+        let here = self.world.here();
+        for (who, trap) in std::mem::take(&mut self.world.sprung) {
+            if who == PLAYER {
+                self.msg("trap.catches_you", &Ctx::new().entity("trap", trap));
+            } else if self.world.room_of(who) == Some(here) {
+                self.msg("trap.catches", &Ctx::new().entity("npc", who).entity("trap", trap));
+            }
+        }
+    }
+
+    /// SET SNARE: arms a trap, here (dropping it if held).
+    pub(crate) fn set_trap(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        if self.world.def(t).trap.is_none() {
+            self.msg("trap.not_trap", ctx);
+            return false;
+        }
+        if self.world.flag(t, "armed") {
+            self.msg("trap.already", ctx);
+            return false;
+        }
+        let here = self.world.here();
+        self.world.unset(t, "worn");
+        let _ = self.world.move_to(t, Some(here));
+        self.world.set(t, "armed", Value::Bool(true));
+        self.world.set(t, "_players", Value::Bool(true));
+        self.world.learn(t);
+        self.msg("trap.set", ctx);
+        true
+    }
+
+    /// DISARM SNARE: makes an armed trap safe.
+    pub(crate) fn disarm_trap(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        if self.world.def(t).trap.is_none() || !self.world.flag(t, "armed") {
+            self.msg("trap.not_set", ctx);
+            return false;
+        }
+        self.world.set(t, "armed", Value::Bool(false));
+        self.world.unset(t, "_players");
+        self.msg("trap.disarm", ctx);
+        true
+    }
+
     /// "The guard wakes with a start!" for anyone woken where the player is.
     pub(crate) fn report_woken(&mut self) {
         let here = self.world.here();
@@ -257,6 +301,12 @@ impl<H: ScriptHost> Game<H> {
                     self.msg(key, &Ctx::new().entity("npc", npc).entity("target", food));
                 } else {
                     self.hear(room, "npc.eating_nearby");
+                }
+            }
+            NpcEvent::Struggled { npc, trap, room, free } => {
+                if room == here {
+                    let key = if free { "trap.breaks_free" } else { "trap.struggles" };
+                    self.msg(key, &who(Ctx::new(), "npc", npc).entity("trap", trap));
                 }
             }
             NpcEvent::Fled { npc, from, to, direction } => {

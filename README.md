@@ -995,7 +995,20 @@ characters:
 
 ### Tricks players can find
 
-Seventeen features reward players who try something clever:
+Eighteen features reward players who try something clever:
+
+- **Traps:** an object with `trap: { holds: 3 }` (and optional `damage`)
+  can be SET (ARM, LAY) wherever the player is: "a snare (armed)". The
+  first character to walk into that room is caught ("The wolf is caught in
+  the snare!"), held for `holds` turns, tagged "(caught)", and can only
+  lash out at an enemy right next to it, then breaks free. Any damage
+  counts as the player's blow (`kills: caught in a snare` tells the
+  story). Bait left by a trap leads hungry hunters into it. The player
+  never sets off their own traps, but one an author placed (armed, and
+  perhaps `hidden`) catches them: "You're caught in the hidden pit!", and
+  they can't move until they work free. DISARM makes a trap safe; taking
+  an armed one disarms it first. Characters that leave no tracks (ghosts,
+  birds) pass over traps.
 
 - **Fear and morale:** a character or faction with `morale: 40` flees its
   enemies once it's below 40% of its health, or when it's outnumbered in
@@ -1366,7 +1379,7 @@ TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
 SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
 ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
 (DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING),
+STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING), SET / DISARM (traps),
 LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
 directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
 AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
@@ -1402,7 +1415,7 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`, `morale`, `fears`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience`, `prints`, `sees_in_dark`, `morale`, `fears` and `calls`; objects
-can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls` and (worn) `sees_in_dark`; the player can have `health`,
+can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls`, `trap` and (worn) `sees_in_dark`; the player can have `health`,
 `damage`, `money`, `voice` and `sees_in_dark`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 

@@ -29,18 +29,7 @@ Everything from the first list has now been built:
 - **Giving orders:** TELL REX TO ATTACK/STAY/FOLLOW/GO/FETCH/DROP, and "REX, …".
 - **Fear and morale:** `morale`, `fears`, BRANDISH, fleeing and cornering.
 - **Mimicry:** faction `calls`, HOWL/IMITATE, horns that call one faction.
-
-## Manipulating creatures
-
-### Traps
-
-SET SNARE in a room. A hunter walking through is caught for a few turns.
-Bait it to choose who you catch.
-
-- Builds on: pathfinding, bait, timers.
-- Shape: `trap: { holds: 3, damage: 1 }` on objects; set in a room, it
-  catches the first character to enter (or the player, if careless).
-- Effort: medium.
+- **Traps:** `trap`, SET/DISARM, hidden traps that catch the player.
 
 ## The world
 

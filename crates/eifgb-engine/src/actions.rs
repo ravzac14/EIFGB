@@ -122,6 +122,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
             (A::Brandish, Some(t)) => self.brandish_action(t, cmd.tool, ctx),
             (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
+            (A::SetTrap, Some(t)) => self.set_trap(t, ctx),
+            (A::DisarmTrap, Some(t)) => self.disarm_trap(t, ctx),
             (A::Mimic, _) => self.mimic_action(cmd, ctx),
             (A::Light, Some(t)) => self.light(t, true, ctx),
             (A::Extinguish, Some(t)) => self.light(t, false, ctx),
@@ -444,6 +446,10 @@ impl<H: ScriptHost> Game<H> {
 
     pub(crate) fn travel(&mut self, here: EntityId, exit: &Exit) -> bool {
         let Some(to) = exit.to else { return false };
+        if let Some(trap) = self.world.held_by(PLAYER) {
+            self.msg("trap.stuck", &Ctx::new().entity("trap", trap));
+            return false;
+        }
         if let Some(door) = exit.through
             && let Some(b) = self.world.door_blocked(door, here)
         {
@@ -479,6 +485,8 @@ impl<H: ScriptHost> Game<H> {
             self.world.unset(door, "hidden");
         }
         self.look();
+        self.world.spring_traps(PLAYER, to);
+        self.report_traps();
         // Walking in normally wakes anyone asleep there (after they're seen
         // asleep, so the player knows what they did).
         if !self.sneaking {
@@ -518,6 +526,9 @@ impl<H: ScriptHost> Game<H> {
         }
         if w.is_frightened(id) && !w.is_dead(id) {
             notes.push(StateNote::Builtin("frightened"));
+        }
+        if id != PLAYER && w.held_by(id).is_some() && !w.is_dead(id) {
+            notes.push(StateNote::Builtin("caught"));
         }
         if w.is_dead(id) {
             notes.push(StateNote::Builtin("dead"));
@@ -591,8 +602,9 @@ impl<H: ScriptHost> Game<H> {
     /// that are "on" get a tag; the rest would just be noise in a list.
     /// Tags only appear once the player has examined or handled the thing.
     pub(crate) fn state_tag_texts(&self, id: EntityId) -> Vec<String> {
-        // Death, sleep and terror are plain to see.
-        if !self.world.known(id) && !self.world.is_dead(id) && !self.world.is_asleep(id) && !self.world.is_frightened(id) {
+        // Death, sleep, terror and traps are plain to see.
+        let obvious = self.world.is_dead(id) || self.world.is_asleep(id) || self.world.is_frightened(id) || self.world.held_by(id).is_some();
+        if !self.world.known(id) && !obvious {
             return Vec::new();
         }
         self.state_notes(id)
@@ -654,7 +666,7 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
             StateNote::Builtin("dead") => self.mentions(text, id, &["dead"], is_own),
             StateNote::Builtin("asleep") => self.mentions(text, id, &["asleep"], is_own),
-            StateNote::Builtin("frightened") => false,
+            StateNote::Builtin("frightened" | "caught") => false,
             StateNote::Builtin("killed") => self.mentions(text, id, &["killed_by", "killed_with"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
@@ -799,9 +811,16 @@ impl<H: ScriptHost> Game<H> {
             self.msg(k, ctx);
             return false;
         }
+        let armed = self.world.def(t).trap.is_some() && self.world.flag(t, "armed");
         let _ = self.world.move_to(t, Some(PLAYER));
         self.world.unset(t, "hidden");
-        self.msg("take.done", ctx);
+        if armed {
+            self.world.set(t, "armed", Value::Bool(false));
+            self.world.unset(t, "_players");
+            self.msg("trap.take_armed", ctx);
+        } else {
+            self.msg("take.done", ctx);
+        }
         true
     }
 

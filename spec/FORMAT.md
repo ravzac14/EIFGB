@@ -101,7 +101,8 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   | `fueled: false` | "It isn't fueled." | *(none)* | *(none)* |
   | `channel: 16`, `color: red` | "Its channel is 16." | *(none)* | *(none)* |
 
-  - **Known things only:** list tags, and the derived `empty` and `heavy` notes everywhere, appear only for things in `GameState.known`. A thing becomes known when the player EXAMINEs, SEARCHes or LOOKs IN it; OPENs, CLOSEs, LOCKs, UNLOCKs, WEARs, TAKEs OFF or EMPTYs it; tries to go through it (doors); or names it as the second object of PUT IN/ON, TAKE FROM or EMPTY INTO. Things that start in the player's inventory are known. Examine sentences and room-description sentences for built-in and author states don't depend on it.
+  - **Known things only:** list tags, room-description sentences, and the derived `empty` and `heavy` notes, appear only for things in `GameState.known`. A thing becomes known when the player EXAMINEs, SEARCHes or LOOKs IN it; OPENs, CLOSEs, LOCKs, UNLOCKs, WEARs, TAKEs OFF or EMPTYs it; tries to go through it (doors); or names it as the second object of PUT IN/ON, TAKE FROM or EMPTY INTO. Things that start in the player's inventory are known. Examining always describes every state, since examining makes the thing known.
+  - **One sentence per thing in rooms:** when a scenery thing has several states to mention, they're joined from their tags: "The cupboard is open and empty." `[state.here.several]`
   - **Field names become words:** `_` turns into a space, and a leading `is_` on a true/false field is dropped, so `is_lit` reads "It's lit." Adjectives make the best names: `lit`, `broken`, `fueled`.
   - **Private fields:** a field whose name starts with `_` (`_visits`) is never described. Use that for bookkeeping.
   - **Not described:** lists and tables, and `hidden`.

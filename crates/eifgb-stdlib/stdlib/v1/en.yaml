@@ -347,6 +347,8 @@ messages:
   state.custom.off: "It isn't ${args.state}."
   state.custom.value: "Its ${args.state} is ${args.value}."
   state.here.custom.on: "${The(args.target)} is ${args.state}."
+  # Two or more states of one thing, joined from their tags.
+  state.here.several: "${The(args.target)} is ${args.list}."
   # taking and dropping
   take.done: "Taken."
   take.already: "You already have ${the(args.target)}."

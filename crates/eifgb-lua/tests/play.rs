@@ -349,8 +349,11 @@ fn states_are_described_when_examining_listing_and_looking() {
     let out = say(&mut g, "look");
     // Nothing's been looked at yet, so nothing is tagged.
     assert!(out.contains("You can see a wooden box, a key and a scarf here."), "{out}");
-    // The hatch is scenery, so it isn't listed, but its state is still mentioned.
-    assert!(out.contains("The hatch is closed."), "{out}");
+    // The hatch is scenery, so it isn't listed. Its state gets a sentence
+    // instead, but only once the player knows it.
+    assert!(!out.contains("hatch"), "{out}");
+    say(&mut g, "x hatch");
+    assert_says(&mut g, "look", "The hatch is closed.");
 
     assert_says(&mut g, "x box", "It's locked.");
     assert_says(&mut g, "look", "You can see a wooden box (locked), a key and a scarf here.");
@@ -482,13 +485,14 @@ fn author_states_are_described_from_their_names() {
     // Lists only tag flags that are on, so the lamp has no tag yet. The radio is
     // scenery, so the room description mentions its "on" flag instead.
     let out = say(&mut g, "look");
-    assert!(out.contains("The radio is broken."), "{out}");
+    assert!(!out.contains("radio"), "{out}");
     assert!(out.contains("You can see a lamp here."), "{out}");
 
     say(&mut g, "light lamp");
     assert_eq!(say(&mut g, "x lamp"), "A brass lamp. Its fuel is 2. It's lit.");
     assert_says(&mut g, "look", "You can see a lamp (lit) here.");
     assert_eq!(say(&mut g, "x radio"), "It's broken. Its channel is sixteen.");
+    assert_says(&mut g, "look", "The radio is broken.");
 }
 
 #[test]
@@ -1247,4 +1251,13 @@ fn timer_left_counts_down_and_undo_rewinds_timers() {
     }
     // (This is the game's second action, so the bell rings as well.)
     assert_says(&mut g, "measure fuse", "It is not lit.");
+}
+
+#[test]
+fn several_room_states_of_one_thing_make_one_sentence() {
+    let mut g = small("objects:\n  cupboard: { name: cupboard, in: hall, traits: [container, openable, scenery] }\n");
+    assert!(!say(&mut g, "look").contains("cupboard"));
+    say(&mut g, "open cupboard");
+    let out = say(&mut g, "look");
+    assert!(out.contains("The cupboard is open and empty."), "{out}");
 }

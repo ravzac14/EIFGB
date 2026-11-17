@@ -207,9 +207,10 @@ objects:
   You've already mentioned it in the description.
 - You don't need to describe whether the door is open, closed or locked.
   The game adds that itself: `x door` gives "A sturdy wooden door. It's
-  locked.", and the kitchen mentions "The pantry door is locked." Things
-  that are listed get a tag instead, like "a wooden box (open)", once the
-  player has examined or handled them. The same
+  locked.", and once the player has tried the door, the kitchen mentions
+  "The pantry door is locked." Things that are listed get a tag instead,
+  like "a wooden box (open)", once the player has examined or handled
+  them. The same
   goes for states you invent: give the apple `state: { ripe: true }` and
   `x apple` adds "It's ripe." [States and descriptions](#states-and-descriptions)
   has the details.
@@ -470,7 +471,7 @@ With nothing more than the declarations above, playing gives:
 
 ```
 Garden Shed
-A cramped wooden shed. The cupboard is closed.
+A cramped wooden shed.
 You can see a brass lantern here.
 There's no obvious way out.
 
@@ -488,6 +489,14 @@ Taken.
 
 > i
 You're carrying a brass lantern (lit).
+
+> open cupboard
+You open the cupboard.
+
+> look
+
+Garden Shed
+A cramped wooden shed. The cupboard is open and empty.
 ```
 
 State is mentioned in three places:
@@ -496,14 +505,15 @@ State is mentioned in three places:
 |---|---|---|
 | Examining a thing | Every state, after its description | "It isn't lit. Its oil is 3." |
 | Lists (room contents, inventory, inside containers) | Tags for states that are "on", once the player knows them | "a brass lantern (lit)", "an iron gate (locked)", "a small box (empty)" |
-| Room descriptions | A sentence for things that aren't listed (scenery), for "on" states | "The cupboard is closed." |
+| Room descriptions | A sentence for things that aren't listed (scenery), for "on" states, once the player knows them | "The cupboard is closed.", "The cupboard is open and empty." |
 
 Lists and rooms leave out "off" states and numbers, because "a lantern
 (not lit, oil: 3)" in every list would be clutter. Examine the thing to
 see everything.
 
-**Tags show what the player has found out.** A thing gets tags in lists
-only after the player has examined, searched or looked in it, or handled
+**Tags and room sentences show what the player has found out.** A thing
+gets tags in lists, and scenery gets its sentence in the room
+description, only after the player has examined, searched or looked in it, or handled
 it themselves: opened, closed, locked, unlocked, worn, taken off, emptied,
 walked through (doors), put something in or on it, or taken something
 from it. Things the player starts out carrying count as known. After
@@ -602,6 +612,7 @@ It's standing open.
 | `state.custom.on`, `state.custom.off` | Examining your true/false fields | "It's ${args.state}." / "It isn't ${args.state}." |
 | `state.custom.value` | Examining your number and text fields | "Its ${args.state} is ${args.value}." |
 | `state.here.custom.on` | Room descriptions, your fields | "${The(args.target)} is ${args.state}." |
+| `state.here.several` | Room descriptions, when one thing has several states | "${The(args.target)} is ${args.list}." (the tags, joined: "open and empty") |
 
 To turn automatic state descriptions off for the whole game and write all
 state text yourself:

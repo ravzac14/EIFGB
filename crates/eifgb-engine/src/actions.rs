@@ -586,21 +586,43 @@ impl<H: ScriptHost> Game<H> {
     /// The sentences a room description adds for things that aren't listed
     /// (scenery): built-in states other than "worn", and author flags that
     /// are on.
-    fn describe_state_here(&mut self, id: EntityId, room_description: Option<&Text>, mut attach: bool) {
-        for note in self.state_notes(id) {
-            if self.note_mentioned(&note, room_description, id, false) {
-                continue;
-            }
-            let ctx = Ctx::new().entity("target", id);
-            let s = match note {
-                StateNote::Builtin("worn") => continue,
-                StateNote::Builtin(t) => self.msg_str(&format!("state.here.{t}"), &ctx),
-                StateNote::Flag { words, on: true, .. } => self.msg_str("state.here.custom.on", &ctx.text("state", words)),
-                _ => continue,
-            };
-            self.push_sentence(s, attach);
-            attach = true;
+    /// Like list tags, these only appear once the player knows the thing.
+    fn describe_state_here(&mut self, id: EntityId, room_description: Option<&Text>, attach: bool) {
+        if !self.world.known(id) {
+            return;
         }
+        let notes: Vec<StateNote> = self
+            .state_notes(id)
+            .into_iter()
+            .filter(|n| match n {
+                StateNote::Builtin("worn") => false,
+                StateNote::Builtin(_) | StateNote::Flag { on: true, .. } => true,
+                _ => false,
+            })
+            .filter(|n| !self.note_mentioned(n, room_description, id, false))
+            .collect();
+        let ctx = Ctx::new().entity("target", id);
+        let s = match notes.as_slice() {
+            [] => return,
+            [StateNote::Builtin(t)] => self.msg_str(&format!("state.here.{t}"), &ctx),
+            [StateNote::Flag { words, .. }] => self.msg_str("state.here.custom.on", &ctx.text("state", words.clone())),
+            // Several at once read better as one sentence: "The cupboard is open and empty."
+            _ => {
+                let words: Vec<String> = notes
+                    .iter()
+                    .filter_map(|n| match n {
+                        StateNote::Builtin(t) => {
+                            self.world.story().messages.get(&format!("state.tag.{t}")).and_then(Text::as_literal)
+                        }
+                        StateNote::Flag { words, .. } => Some(words.clone()),
+                        StateNote::Value { .. } => None,
+                    })
+                    .collect();
+                let list = (self.grammar.lang().list_and)(&words);
+                self.msg_str("state.here.several", &ctx.text("list", list))
+            }
+        };
+        self.push_sentence(s, attach);
     }
 
     // ---------------------------------------------------- taking and dropping

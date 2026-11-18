@@ -38,6 +38,13 @@ page. The build fails if a link points at a heading that doesn't exist, or
 at a file that has no page. Code is highlighted at build time; the pages
 need no JavaScript.
 
+## Deploying
+
+`.github/workflows/pages.yml` builds the engine to WebAssembly, runs
+`npm test`, builds the site and publishes `web/dist` to GitHub Pages on
+every push to `main` (Pages' source is set to *GitHub Actions*).
+`.github/workflows/ci.yml` runs the Rust tests and clippy.
+
 ## Pages
 
 - `index.html` (`src/home.ts`): the bundled games, and *Play your own

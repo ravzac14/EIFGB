@@ -45,6 +45,19 @@ patience instead of coins.
   less the merchant's haggle; counters ask for "something more".
 - Effort: small.
 
+### Light from next door
+
+LOOK in a dark room next to a lit one, with no door between them or an
+open one, describes the light coming through: "Light spills in from the
+north." (and the other way, darkness beyond a doorway from a lit room).
+
+- Builds on: darkness, `is_lit`, peeking (which already reads the next
+  room's light), doors' open state.
+- Shape: when describing a room, for each exit whose door is absent or
+  open, if the room beyond is lit and this one isn't (or the reverse), add
+  a sentence from a new message (`light.from`, with `args.from`).
+- Effort: small.
+
 ### Pushing and climbing
 
 PUSH CRATE NORTH to drag heavy things between rooms, STAND ON CRATE to
@@ -54,3 +67,18 @@ reach a high shelf.
 - Shape: PUSH X <direction> for heavy `pushable` things; `high: true`
   things out of reach unless the player is on something.
 - Effort: medium.
+
+## The editor
+
+### Resizable rooms
+
+Let authors resize a room's box on the editor's map, so a great hall can
+look bigger than a closet. Only for picturing the map: it changes nothing
+in the game.
+
+- Builds on: the map (`web/src/editor/map.ts`) and `map.yaml`, which
+  already keeps positions outside the game file.
+- Shape: drag handles on a selected room's corners; store the size beside
+  its position in `map.yaml` (`kitchen: [x, y, w, h]`); lines, handles and
+  drop targets use each room's own size.
+- Effort: small.

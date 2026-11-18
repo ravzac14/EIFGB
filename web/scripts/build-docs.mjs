@@ -141,6 +141,15 @@ function render(src, markdown, page) {
         const t = title ? ` title="${esc(title)}"` : "";
         return `<a href="${esc(r.href)}"${t}${r.external ? ' rel="noopener"' : ""}>${text}</a>`;
       },
+      blockquote({ tokens }) {
+        // GitHub's alerts: > [!NOTE], > [!WARNING]…
+        const html = this.parser.parse(tokens);
+        const alert = html.match(/^<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/);
+        if (!alert) return `<blockquote>${html}</blockquote>\n`;
+        const kind = alert[1].toLowerCase();
+        const label = { note: "Note", tip: "Tip", important: "Important", warning: "Warning", caution: "Caution" }[kind];
+        return `<div class="callout ${kind}" role="note"><p class="callout-label">${label}</p><p>${html.slice(alert[0].length)}</div>\n`;
+      },
       table(token) {
         // Wide tables scroll on their own, not the page.
         return `<div class="table">${marked.Renderer.prototype.table.call(this, token)}</div>`;

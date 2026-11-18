@@ -73,3 +73,15 @@ body { font-family: var(--sans); font-size: calc(var(--text) * 0.9); }
 .hljs-number, .hljs-literal { color: var(--n); }
 .hljs-keyword, .hljs-built_in, .hljs-meta { color: var(--kw); }
 .hljs-bullet, .hljs-punctuation { color: var(--dim); }
+
+/* GitHub-style alerts (> [!WARNING]): risks stand out from reassurance. */
+:root { --warn-bg: #fbefd5; --warn-line: #c98a12; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --warn-bg: #2f2615; --warn-line: #d9a23a; } }
+:root[data-theme="dark"] { --warn-bg: #2f2615; --warn-line: #d9a23a; }
+:root[data-theme="sepia"] { --warn-bg: #ead3a2; --warn-line: #a8700c; }
+.prose .callout { margin: 1.2rem 0; padding: 0.7rem 1rem; border-radius: 0 8px 8px 0; border-left: 4px solid var(--accent); background: var(--panel); }
+.prose .callout p { margin: 0.3rem 0; }
+.prose .callout-label { font-weight: 700; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em; }
+.prose .callout.warning, .prose .callout.caution { background: var(--warn-bg); border-left-color: var(--warn-line); }
+.prose .callout.warning .callout-label, .prose .callout.caution .callout-label { color: var(--warn); }
+.prose .callout.warning .callout-label::before, .prose .callout.caution .callout-label::before { content: "⚠ "; }

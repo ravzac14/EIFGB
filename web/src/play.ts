@@ -77,6 +77,8 @@ let engine: Engine;
 let files: Files;
 let meta: Meta;
 let saves: ReturnType<typeof savesFor>;
+/** The sharing guide's safety section. */
+const SAFETY = "./docs/sharing.html#is-it-safe-to-play-other-peoples-games";
 let last: Output | null = null;
 /** For a game from a link: where it's from, said above the story. */
 let from: string | null = null;
@@ -187,7 +189,10 @@ function begin(): boolean {
     return false;
   }
   meta = loaded.meta;
-  if (from) say(`This game comes from ${from}, not from this site.`, "notice");
+  if (from) {
+    const p = say(`This game comes from ${from}, not from this site. `, "notice");
+    p.append(el("a", { href: SAFETY, target: "_blank", rel: "noopener", textContent: "Is that safe?" }));
+  }
   showDiagnostics(loaded.diagnostics, "The game has some warnings for its author:");
   show(loaded.output);
   return true;

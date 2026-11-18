@@ -84,3 +84,11 @@ hateful or harmful won't be.
 Yes. A game's Lua runs inside the web player with no access to your files,
 the network, or the rest of the page, and with limits on how long it can
 run and how much memory it uses. Everything a game shows is plain text.
+
+> [!WARNING]
+> **The game's host can see that you played it.** A shared game's files
+> are fetched from wherever its author put them, so that site sees your IP
+> address and when you loaded the game, just as it would if you visited it
+> yourself. The player doesn't tell it which page you came from, and once
+> the game is loaded it can't send anything anywhere. If that matters to
+> you, only play games hosted somewhere you trust.

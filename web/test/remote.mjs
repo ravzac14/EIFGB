@@ -70,3 +70,14 @@ const all = errors.join("\n");
 for (const m of [/unknown field `colour`/, /must start with https/, /unknown tag `scary`/, /`url` is missing/, /already in the gallery/]) assert.match(all, m);
 assert.deepEqual(check(readFileSync(new URL("../gallery.yaml", import.meta.url), "utf8")).errors, []);
 console.log("ok   gallery");
+
+// --------------------------- links into the docs' safety section exist
+const sharing = readFileSync(new URL("../public/docs/sharing.html", import.meta.url), "utf8");
+for (const f of ["../gallery.html", "../src/play.ts"]) {
+  const src = readFileSync(new URL(f, import.meta.url), "utf8");
+  const anchor = src.match(/docs\/sharing\.html#([\w-]+)/)?.[1];
+  assert.ok(anchor, `${f} links to the safety section`);
+  assert.ok(sharing.includes(`id="${anchor}"`), `${f} links to #${anchor}, which exists`);
+}
+assert.match(sharing, /class="callout warning"[^>]*><p class="callout-label">Warning</);
+console.log("ok   safety links");

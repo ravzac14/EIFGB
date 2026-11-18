@@ -32,3 +32,4 @@ footer { margin: 3rem auto 2rem; }
 .share-result input { width: 100%; padding: 0.4em 0.6em; font-family: var(--mono); font-size: 0.85em; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 0.4rem 0; }
 .share-result ul { margin: 0.4rem 0; padding-left: 1.2rem; }
 .share-result code { font-family: var(--mono); }
+.safety { margin: -0.8rem 0 1.5rem; padding: 0.45rem 0.8rem; border-left: 3px solid var(--warn); background: var(--panel); border-radius: 0 6px 6px 0; }

@@ -1,0 +1,39 @@
+# The gallery: games anyone can play from the site's Gallery page.
+#
+# To add yours, open a pull request adding an entry at the end of the list.
+# docs/SHARING.md explains how to host a game and what goes here. The site
+# build checks every entry (npm run prepare-site).
+#
+#   - title: The name of your game
+#     author: Your name, or your GitHub user name
+#     url: https://github.com/you/your-game     # a game link: see docs/SHARING.md
+#     about: One or two sentences: what's the story, and what's it like to play?
+#     tags: [short, puzzle]                     # optional, from the list below
+#
+# Tags: short, long, beginner, puzzle, story, combat, mystery, horror,
+# comedy, fantasy, sci-fi, tutorial.
+
+games:
+  - title: Midnight Snack
+    author: EIFGB
+    example: midnight_snack
+    about: You wake up hungry, and something in the pantry is calling your name. A five-minute first game.
+    tags: [short, beginner, comedy, tutorial]
+
+  - title: The Last Light
+    author: EIFGB
+    example: lighthouse
+    about: A storm, a dark lighthouse, and a ship heading for the rocks. Puzzles, a keeper to talk to, and a clock ticking.
+    tags: [puzzle, story, tutorial]
+
+  - title: Campfire
+    author: EIFGB
+    example: campfire
+    about: Gather wood, light a fire and toast marshmallows before the dark comes. The game from the scripting tutorial.
+    tags: [short, beginner, tutorial]
+
+  - title: Blackfang Pass
+    author: EIFGB
+    example: blackfang
+    about: A wolf pack and a goblin war band stand between you and the shrine. Set them against each other.
+    tags: [combat, fantasy, puzzle, tutorial]

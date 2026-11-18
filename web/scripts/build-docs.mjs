@@ -26,6 +26,7 @@ const PAGES = [
   { src: "docs/SCRIPTING.md", page: "scripting.html", nav: "Scripting" },
   { src: "docs/ADVANCED.md", page: "advanced.html", nav: "Advanced" },
   { src: "spec/FORMAT.md", page: "format.html", nav: "Format reference" },
+  { src: "docs/SHARING.md", page: "sharing.html", nav: "Sharing" },
 ];
 const EXAMPLES = {
   midnight_snack: "The game from the README tutorial.",
@@ -56,6 +57,9 @@ function rewrite(href, from) {
   const target = posix.normalize(posix.join(posix.dirname(from), path));
   const page = PAGES.find((p) => p.src === target);
   if (page) return { href: page.page + (hash ? `#${hash}` : ""), page: page.page, hash };
+  // The site's own pages (web/gallery.html → ../gallery.html).
+  const site = target.match(/^web\/([\w-]+\.html)$/);
+  if (site) return { href: `../${site[1]}` };
   const ex = target.match(/^spec\/examples\/([\w-]+)(\/|$)/);
   if (ex) return { href: `example-${ex[1]}.html` };
   return null;

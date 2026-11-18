@@ -3,6 +3,7 @@
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
 import { localGames, savesFor, type SaveFile, type Slot } from "./store.ts";
 import { settingsDialog } from "./settings-ui.ts";
+import { fetchGame, resolve } from "./remote.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const log = $("log");
@@ -34,6 +35,8 @@ function say(text: string, cls = "") {
 interface Source {
   key: string;
   files: () => Promise<Files>;
+  /** For games from a link: where it came from. */
+  from?: string;
 }
 
 function source(): Source | string {
@@ -50,6 +53,17 @@ function source(): Source | string {
       },
     };
   }
+  const link = q.get("game");
+  if (link) {
+    let where;
+    try {
+      where = resolve(link);
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+    const id = where.kind === "gist" ? `gist:${where.id}` : where.url;
+    return { key: `url:${id}`, files: () => fetchGame(link), from: where.kind === "gist" ? "a GitHub gist" : new URL(where.url).host };
+  }
   const local = q.get("local");
   if (local) {
     const g = localGames.get(local);
@@ -64,6 +78,8 @@ let files: Files;
 let meta: Meta;
 let saves: ReturnType<typeof savesFor>;
 let last: Output | null = null;
+/** For a game from a link: where it's from, said above the story. */
+let from: string | null = null;
 let over = false;
 const history: string[] = [];
 let back = 0;
@@ -171,6 +187,7 @@ function begin(): boolean {
     return false;
   }
   meta = loaded.meta;
+  if (from) say(`This game comes from ${from}, not from this site.`, "notice");
   showDiagnostics(loaded.diagnostics, "The game has some warnings for its author:");
   show(loaded.output);
   return true;
@@ -324,6 +341,7 @@ async function main() {
     return;
   }
   saves = savesFor(src.key);
+  from = src.from ?? null;
   if (!begin()) return;
   document.title = meta.title;
   $("title").textContent = meta.title;

@@ -18,3 +18,17 @@ footer { margin: 3rem auto 2rem; }
 .top a { text-decoration: none; }
 .learn { padding-left: 1.2rem; }
 .learn li { margin: 0.35rem 0; }
+.filters { display: grid; gap: 0.6rem; margin-bottom: 1rem; }
+.filters input[type="search"] { padding: 0.45em 0.7em; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.tags button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.games .tag { font-family: var(--sans); font-size: 0.75em; color: var(--dim); border: 1px solid var(--line); border-radius: 999px; padding: 0 0.5em; }
+.games .by { color: var(--dim); font-family: var(--sans); font-size: 0.85em; }
+.share { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.share input { flex: 1; min-width: 12rem; padding: 0.45em 0.7em; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.share-result { margin: 0.8rem 0; font-family: var(--sans); font-size: 0.9em; }
+.share-result .ok { color: var(--fg); }
+.share-result .bad { color: var(--err); }
+.share-result input { width: 100%; padding: 0.4em 0.6em; font-family: var(--mono); font-size: 0.85em; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 0.4rem 0; }
+.share-result ul { margin: 0.4rem 0; padding-left: 1.2rem; }
+.share-result code { font-family: var(--mono); }

@@ -7,11 +7,11 @@
   "scripts": {
     "wasm": "scripts/build-wasm.sh",
     "docs": "node scripts/build-docs.mjs --strict",
-    "prepare-site": "node scripts/bundle-games.mjs && node scripts/build-docs.mjs --strict",
+    "prepare-site": "node scripts/bundle-games.mjs && node scripts/bundle-gallery.mjs && node scripts/build-docs.mjs --strict",
     "dev": "npm run prepare-site && vite",
     "build": "npm run prepare-site && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "npm run prepare-site && node test/files.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
+    "test": "npm run prepare-site && node test/files.mjs && node test/remote.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

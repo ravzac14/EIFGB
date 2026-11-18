@@ -26,9 +26,24 @@ export function normalize(raw: Map<string, string>): Files | string {
   return files;
 }
 
-async function fromZip(file: File, into: Map<string, string>) {
-  const unzipped = unzipSync(new Uint8Array(await file.arrayBuffer()), { filter: (f) => TEXT.test(f.name) });
+function unzipInto(bytes: Uint8Array, into: Map<string, string>) {
+  const unzipped = unzipSync(bytes, { filter: (f) => TEXT.test(f.name) });
   for (const [name, data] of Object.entries(unzipped)) into.set(name, strFromU8(data));
+}
+
+async function fromZip(file: File, into: Map<string, string>) {
+  unzipInto(new Uint8Array(await file.arrayBuffer()), into);
+}
+
+/** From the bytes of a zip (e.g. downloaded from a link). */
+export function fromZipBytes(bytes: Uint8Array): Files | string {
+  const raw = new Map<string, string>();
+  try {
+    unzipInto(bytes, raw);
+  } catch {
+    return "That isn't a zip file that can be opened.";
+  }
+  return normalize(raw);
 }
 
 /** From an `<input type=file>` (with or without `webkitdirectory`). */

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gallery</title>
+<meta name="description" content="Games made with EIFGB, to play in your browser, and how to share your own.">
+<link rel="stylesheet" href="./src/style.css">
+<link rel="stylesheet" href="./src/home.css">
+</head>
+<body>
+<header class="wrap">
+  <nav class="top ui"><a href="./">Home</a><a href="./docs/">Guide</a><a href="./docs/sharing.html">Sharing</a></nav>
+  <h1>Gallery</h1>
+  <p class="dim">Games people have made with EIFGB. They're hosted by their authors and play right here.</p>
+</header>
+<main class="wrap">
+  <section>
+    <div class="filters ui">
+      <input id="search" type="search" placeholder="Search titles, authors and stories" aria-label="Search the gallery">
+      <div id="tags" class="tags" role="group" aria-label="Filter by tag"></div>
+    </div>
+    <ul id="games" class="games"><li class="dim">Loading…</li></ul>
+  </section>
+  <section>
+    <h2>Share your game</h2>
+    <p>Put your game online (a GitHub repository or a gist works well; <a href="./docs/sharing.html">here's how</a>), paste its link here, and you'll get a link anyone can play it from.</p>
+    <form id="share" class="share">
+      <input id="share-url" type="url" required placeholder="https://github.com/you/your-game" aria-label="Your game's link">
+      <button class="primary" type="submit">Check it</button>
+    </form>
+    <div id="share-result" class="share-result" role="status"></div>
+    <p class="dim ui">To be listed in the gallery, add your game to <code>web/gallery.yaml</code> with a pull request. The <a href="./docs/sharing.html#getting-into-the-gallery">sharing guide</a> explains how.</p>
+  </section>
+</main>
+<footer class="wrap dim ui">
+  <p><button id="settings-open" class="link" type="button">Text and colours</button></p>
+</footer>
+<dialog id="settings"></dialog>
+<script type="module" src="./src/gallery.ts"></script>
+</body>
+</html>

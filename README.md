@@ -1578,6 +1578,8 @@ your patterns to it.
   section and field, the scripting API and sandbox rules, and the
   **Parser behavior** section, which shows how the game answers typos,
   ambiguous commands and things it doesn't understand.
+- **[Sharing your game](docs/SHARING.md)**: a link anyone can play your
+  game from, in their browser, and getting it into the gallery.
 
 ## For contributors
 

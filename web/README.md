@@ -47,6 +47,16 @@ need no JavaScript.
   player. Choices show as buttons; up and down arrows recall commands.
   Games with mistakes show the same errors as `eifgb check`.
 
+## Sharing
+
+- `play.html?game=<url>` plays a game from a link (`src/remote.ts`): a raw
+  `game.yaml` (its `scripts:` are fetched from beside it), a folder, a
+  zip, a GitHub repository, folder or file page, or a gist.
+- `gallery.html` (`src/gallery.ts`) lists `gallery.yaml`, with search and
+  tags, and *Share your game* checks a link and gives its play link.
+  `scripts/bundle-gallery.mjs` checks every entry at build time.
+- `docs/SHARING.md` (the Sharing docs page) is the guide for authors.
+
 ## Saves
 
 Everything is kept in the browser's local storage (`src/store.ts`):

@@ -27,6 +27,7 @@ const PAGES = [
   { src: "docs/ADVANCED.md", page: "advanced.html", nav: "Advanced" },
   { src: "spec/FORMAT.md", page: "format.html", nav: "Format reference" },
   { src: "docs/SHARING.md", page: "sharing.html", nav: "Sharing" },
+  { src: "CHANGELOG.md", page: "changelog.html", nav: "Changelog" },
 ];
 const EXAMPLES = {
   midnight_snack: "The game from the README tutorial.",

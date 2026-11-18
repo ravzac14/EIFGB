@@ -13,11 +13,12 @@ const title = async (p) => {
 };
 try {
   const results = {};
-  for (const p of ["/", "/play.html", "/gallery.html", "/editor.html", "/docs/", "/docs", "/docs/scripting.html", "/docs/docs/"]) results[p] = await title(p);
+  for (const p of ["/", "/play.html", "/gallery.html", "/editor.html", "/docs/changelog.html", "/docs/", "/docs", "/docs/scripting.html", "/docs/docs/"]) results[p] = await title(p);
   console.log(results);
-  assert.equal(results["/"], "200 EIFGB Games");
+  assert.equal(results["/"], "200 Interactive Fiction Game Builder/Player");
   assert.equal(results["/gallery.html"], "200 Gallery");
   assert.equal(results["/editor.html"], "200 Editor");
+  assert.equal(results["/docs/changelog.html"], "200 Changelog · EIFGB");
   assert.match(results["/docs/"], /^200 Guide · EIFGB$/);
   assert.match(results["/docs"], /^200 Guide · EIFGB$/);
   // Without the slash, it redirects, so the docs' relative links work.

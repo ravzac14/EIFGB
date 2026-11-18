@@ -19,4 +19,6 @@ jobs:
       - run: cargo test --workspace
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Check the example games
-        run: for g in spec/examples/*/game.yaml; do ./target/debug/eifgb check "$g"; done
+        run: |
+          cargo build -p eifgb-cli
+          for g in spec/examples/*/game.yaml; do ./target/debug/eifgb check "$g"; done

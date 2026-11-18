@@ -5,7 +5,7 @@
   "description": "EIFGB on the web: play, load and (later) edit games in the browser",
   "type": "module",
   "scripts": {
-    "wasm": "scripts/build-wasm.sh",
+    "wasm": "bash scripts/build-wasm.sh",
     "docs": "node scripts/build-docs.mjs --strict",
     "prepare-site": "node scripts/bundle-games.mjs && node scripts/bundle-gallery.mjs && node scripts/build-docs.mjs --strict",
     "dev": "npm run prepare-site && vite",

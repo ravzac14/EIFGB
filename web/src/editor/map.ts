@@ -7,7 +7,14 @@ import type { Direction, Exit, Model } from "./model.ts";
 import { OPPOSITE } from "./model.ts";
 import type { Point, Positions } from "./layout.ts";
 
-export type Selection = null | { kind: "room"; id: string } | { kind: "exit"; room: string; dir: Direction };
+export type Selection =
+  | null
+  | { kind: "room"; id: string }
+  | { kind: "exit"; room: string; dir: Direction }
+  | { kind: "thing"; id: string };
+
+/** The drag-and-drop type for things dragged from the details panel. */
+export const THING_DRAG = "application/x-eifgb-thing";
 
 export interface MapActions {
   select(sel: Selection): void;
@@ -17,6 +24,8 @@ export interface MapActions {
   /** Clicked a handle, or dragged it into empty space (`at`). */
   addRoomBeside(from: string, dir: Direction, at?: Point): void;
   addRoomAt(at: Point): void;
+  /** A thing dragged from the details panel, dropped on a room. */
+  dropThing(id: string, room: string): void;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -102,6 +111,37 @@ export class MapView {
     svg("path", { d: "M0,0 L10,5 L0,10 z" }, marker);
     this.root = svg("g", {}, svgEl);
     this.background();
+    this.dropTarget();
+  }
+
+  /** Things dragged from the details panel can be dropped on a room. */
+  private dropTarget() {
+    let over: string | null = null;
+    const mark = (id: string | null) => {
+      if (id === over) return;
+      this.root.querySelector(".drop-target")?.classList.remove("drop-target");
+      over = id;
+      if (id) this.root.querySelector(`[data-room="${CSS.escape(id)}"]`)?.classList.add("drop-target");
+    };
+    this.svgEl.addEventListener("dragover", (e) => {
+      if (!e.dataTransfer?.types.includes(THING_DRAG)) return;
+      const room = this.roomAt(this.toMap(e.clientX, e.clientY));
+      mark(room);
+      if (room) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }
+    });
+    this.svgEl.addEventListener("dragleave", () => mark(null));
+    this.svgEl.addEventListener("drop", (e) => {
+      const id = e.dataTransfer?.getData(THING_DRAG);
+      const room = this.roomAt(this.toMap(e.clientX, e.clientY));
+      mark(null);
+      if (id && room) {
+        e.preventDefault();
+        this.actions.dropThing(id, room);
+      }
+    });
   }
 
   // ----------------------------------------------------------- viewing
@@ -320,11 +360,13 @@ export class MapView {
     g.dataset.room = id;
     svg("rect", { x: -W / 2, y: -H / 2, width: W, height: H, rx: 10 }, g);
     const name = room.name.length > 20 ? `${room.name.slice(0, 19)}…` : room.name;
-    const t = svg("text", { x: 0, y: room.dark ? -6 : 0 }, g);
+    const things = this.model!.contents(id).length;
+    const notes = [room.dark ? "dark" : "", things ? `${things} thing${things > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ");
+    const t = svg("text", { x: 0, y: notes ? -6 : 0 }, g);
     t.textContent = name;
-    if (room.dark) {
+    if (notes) {
       const s = svg("text", { class: "sub", x: 0, y: 11 }, g);
-      s.textContent = "dark";
+      s.textContent = notes;
     }
     if (this.model!.start() === id) {
       const s = svg("text", { class: "start", x: -W / 2 + 8, y: -H / 2 + 10, "text-anchor": "start" }, g);

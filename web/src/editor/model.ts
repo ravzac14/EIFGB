@@ -120,6 +120,38 @@ export function carryOver(original: string, base: string, next: string): string 
   return out.join("\n");
 }
 
+/** An object, as the editor shows it. Doors are objects too, but live on the map's lines. */
+export interface Thing {
+  id: string;
+  name: string;
+  /** Where it starts: a room, a container or supporter, `player`, or null (nowhere yet). */
+  in: string | null;
+  traits: string[];
+  description: string;
+  synonyms: string[];
+  adjectives: string[];
+  hidden: boolean;
+  /** `"search mat"` rules, as written. */
+  revealedBy: string[];
+  open: boolean;
+  locked: boolean;
+  lit: boolean;
+  key: string | null;
+  size: number | null;
+  capacity: number | null;
+}
+
+/** Kinds of thing a newcomer can start from. */
+export const KINDS = {
+  carry: { name: "new thing", traits: ["portable"] },
+  scenery: { name: "new feature", traits: ["scenery"] },
+  container: { name: "box", traits: ["container", "openable"] },
+  supporter: { name: "table", traits: ["supporter", "scenery"] },
+  key: { name: "key", traits: ["portable"] },
+  light: { name: "lamp", traits: ["portable", "light_source"] },
+} as const;
+export type Kind = keyof typeof KINDS;
+
 export class Model {
   doc: Document;
   private original: string;
@@ -262,6 +294,185 @@ export class Model {
   /** What's placed in a room (objects and characters), for warnings when deleting it. */
   thingsIn(room: string): string[] {
     return ["objects", "characters"].flatMap((s) => this.keys(s).filter((id) => str(this.get([s, id, "in"])) === room));
+  }
+
+  // --------------------------------------------------------- objects
+
+  objectIds(): string[] {
+    return this.keys("objects");
+  }
+
+  thing(id: string): Thing | null {
+    const m = this.map(["objects", id]);
+    if (!m) return null;
+    const p = ["objects", id];
+    const list = (k: string) => {
+      const v = this.doc.getIn([...p, k], true);
+      if (isSeq(v)) return v.items.map((i) => String(isScalar(i) ? i.value : i));
+      const s = str(v);
+      return s ? [s] : [];
+    };
+    const state = (k: string) => this.get([...p, "state", k]) === true;
+    const num = (k: string) => {
+      const v = this.get([...p, k]);
+      return typeof v === "number" ? v : null;
+    };
+    return {
+      id,
+      name: str(m.get("name")) ?? id,
+      in: str(m.get("in")) ?? null,
+      traits: this.traits(p),
+      description: str(m.get("description")) ?? "",
+      synonyms: list("synonyms"),
+      adjectives: list("adjectives"),
+      hidden: state("hidden"),
+      revealedBy: list("revealed_by"),
+      open: state("open"),
+      locked: state("locked"),
+      lit: state("lit"),
+      key: str(m.get("unlocks_with")) ?? null,
+      size: num("size"),
+      capacity: num("capacity"),
+    };
+  }
+
+  /** Objects that aren't doors. */
+  things(): Thing[] {
+    return this.objectIds()
+      .map((id) => this.thing(id))
+      .filter((t): t is Thing => t !== null && !t.traits.includes("door"));
+  }
+
+  /** What starts directly in or on `place` (a room, a thing, or `player`). */
+  contents(place: string | null): Thing[] {
+    return this.things().filter((t) => t.in === place);
+  }
+
+  /** Whether things can go in or on `id`: rooms, the player, containers and supporters. */
+  canHold(id: string): boolean {
+    if (id === "player" || this.room(id)) return true;
+    const t = this.traits(["objects", id]);
+    return t.includes("container") || t.includes("supporter");
+  }
+
+  /** The room a thing is in, however deep (or "player", or null). */
+  roomOf(id: string): string | null {
+    let at: string | null = id;
+    for (let i = 0; i < 100 && at; i++) {
+      if (at === "player" || this.room(at)) return at;
+      at = this.thing(at)?.in ?? null;
+    }
+    return null;
+  }
+
+  /**
+   * Moves a thing to a room, into or onto another thing, to `player`, or to
+   * nowhere (null). False if that can't hold things, or is inside it.
+   */
+  moveThing(id: string, to: string | null): boolean {
+    if (to !== null) {
+      if (to === id || !this.canHold(to)) return false;
+      for (let at: string | null = to, i = 0; at && i < 100; i++) {
+        if (at === id) return false; // into something it contains
+        at = this.thing(at)?.in ?? null;
+      }
+    }
+    this.set(["objects", id, "in"], to ?? undefined);
+    return true;
+  }
+
+  addThing(kind: Kind, place: string | null, name?: string): string {
+    const k = KINDS[kind];
+    const n = name ?? k.name;
+    const id = this.freshId(slug(n, "thing"));
+    if (!this.map(["objects"])) this.doc.setIn(["objects"], this.doc.createNode({}));
+    const fields: Record<string, unknown> = { name: n };
+    if (place) fields.in = place;
+    const node = this.doc.createNode({ ...fields, traits: [...k.traits] }) as YAMLMap;
+    (node.get("traits", true) as unknown as YAMLSeq).flow = true;
+    this.doc.setIn(["objects", id], node);
+    return id;
+  }
+
+  /** Sets a list field (synonyms, adjectives) from text like "rug, mat". */
+  setList(path: (string | number)[], items: string[]) {
+    const clean = items.map((s) => s.trim()).filter(Boolean);
+    if (!clean.length) return this.set(path, undefined);
+    const seq = this.doc.createNode(clean) as YAMLSeq;
+    seq.flow = true;
+    this.doc.setIn(path, seq);
+  }
+
+  setTrait(id: string, trait: string, on: boolean) {
+    this.setTraits(["objects", id], on ? [trait] : [], on ? [] : [trait]);
+    // Things that depend on it go with it.
+    if (!on && trait === "openable") {
+      this.setTraits(["objects", id], [], ["lockable"]);
+      this.set(["objects", id, "state", "open"], undefined);
+      this.set(["objects", id, "state", "locked"], undefined);
+    }
+    if (!on && trait === "lockable") this.set(["objects", id, "state", "locked"], undefined);
+    if (!on && trait === "light_source") this.set(["objects", id, "state", "lit"], undefined);
+    if (on && trait === "lockable") this.setTraits(["objects", id], ["openable"], []);
+    if (this.traits(["objects", id]).length === 0) this.set(["objects", id, "traits"], undefined);
+  }
+
+  /** "Can the player pick it up?": yes (portable), no and it's part of the room (scenery), or no. */
+  setPortability(id: string, how: "portable" | "scenery" | "fixed") {
+    this.setTraits(["objects", id], how === "fixed" ? [] : [how], ["portable", "scenery"].filter((t) => t !== how));
+    if (this.traits(["objects", id]).length === 0) this.set(["objects", id, "traits"], undefined);
+  }
+
+  setState(id: string, key: string, on: boolean) {
+    this.set(["objects", id, "state", key], on || undefined);
+    this.tidyState(["objects", id]);
+  }
+
+  /** Renames a thing's ID, and what refers to it: `in:`, keys, and reveal rules. */
+  renameThing(old: string, next: string): string | null {
+    next = slug(next, "thing");
+    if (next === old) return old;
+    if (this.allIds().has(next)) return null;
+    const objects = this.map(["objects"]);
+    const pair = objects?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
+    if (!pair) return null;
+    pair.key = new Scalar(next);
+    this.retarget(old, next);
+    return next;
+  }
+
+  /** Points `in:`, `unlocks_with` and `revealed_by` rules at `next` (or drops them, for null). */
+  private retarget(old: string, next: string | null) {
+    for (const s of ["objects", "characters"]) {
+      for (const id of this.keys(s)) {
+        const m = this.map([s, id]);
+        if (!m) continue;
+        for (const k of ["in", "unlocks_with"]) {
+          const v = m.get(k, true);
+          if (isScalar(v) && v.value === old) {
+            if (next === null) m.delete(k);
+            else v.value = next;
+          }
+        }
+        // revealed_by: "search mat", or a list of them.
+        const fix = (rule: unknown) => {
+          if (!isScalar(rule) || typeof rule.value !== "string") return;
+          const words = rule.value.trim().split(/\s+/);
+          if (words.length === 2 && words[1] === old && next !== null) rule.value = `${words[0]} ${next}`;
+        };
+        const r = m.get("revealed_by", true);
+        if (isSeq(r)) r.items.forEach(fix);
+        else fix(r);
+      }
+    }
+  }
+
+  /** Deletes a thing; whatever was in or on it goes where it was. */
+  deleteThing(id: string) {
+    const where = this.thing(id)?.in ?? null;
+    for (const t of this.contents(id)) this.set(["objects", t.id, "in"], where ?? undefined);
+    this.retarget(id, null);
+    this.doc.deleteIn(["objects", id]);
   }
 
   // ---------------------------------------------------------- writing

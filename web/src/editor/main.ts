@@ -75,6 +75,7 @@ function load(yaml: string, map?: string) {
   }
   if (selection?.kind === "room" && !model?.room(selection.id)) selection = null;
   if (selection?.kind === "exit" && !model?.exit(selection.room, selection.dir)) selection = null;
+  if (selection?.kind === "thing" && !model?.thing(selection.id)) selection = null;
   redraw();
   syncYaml(yaml);
   scheduleCheck();
@@ -168,6 +169,11 @@ function redraw() {
     change,
     select,
     addRoomBeside: (from, dir) => addBeside(from, dir),
+    focusName,
+    notice: (text) => {
+      $("saved").textContent = text;
+      $("saved").classList.add("err");
+    },
     deleteRoom: (id) => {
       selection = null;
       change((m) => {
@@ -183,6 +189,10 @@ function select(sel: Selection) {
   selection = sel;
   redraw();
   if (sel?.kind === "room") mapView.reveal(sel.id);
+  if (sel?.kind === "thing" && model) {
+    const room = model.roomOf(sel.id);
+    if (room && room !== "player") mapView.reveal(room);
+  }
 }
 
 /** A new room `dir` of `from`, joined both ways. */
@@ -275,6 +285,7 @@ function goTo(path: string) {
       if (e) return select({ kind: "exit", room: r, dir: e.dir });
     }
   }
+  if (parts[0] === "objects" && parts[1] && model?.thing(parts[1])) return select({ kind: "thing", id: parts[1] });
   showInFile(parts[1] ? `${parts[1]}:` : parts[0] ?? "");
 }
 
@@ -364,7 +375,14 @@ document.addEventListener("keydown", (e) => {
     doRedo();
   } else if ((e.key === "Delete" || e.key === "Backspace") && !typing && model && selection) {
     e.preventDefault();
-    if (selection.kind === "room") {
+    if (selection.kind === "thing") {
+      const t = model.thing(selection.id);
+      if (t && confirm(`Delete ${t.name}?`)) {
+        const id = selection.id;
+        selection = t.in && model.room(t.in) ? { kind: "room", id: t.in } : null;
+        change((m) => m.deleteThing(id));
+      }
+    } else if (selection.kind === "room") {
       const r = model.room(selection.id);
       if (r && confirm(`Delete ${r.name}, and the ways into it?`)) {
         const id = selection.id;
@@ -399,6 +417,11 @@ mapView = new MapView(document.getElementById("map") as unknown as SVGSVGElement
   },
   addRoomBeside: (from, dir, at) => void addBeside(from, dir, at),
   addRoomAt: addAt,
+  dropThing: (id, room) => {
+    change((m) => m.moveThing(id, room));
+    selection = { kind: "thing", id };
+    redraw();
+  },
 });
 
 // ------------------------------------------------------- start screen

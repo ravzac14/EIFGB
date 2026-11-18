@@ -50,8 +50,8 @@ need no JavaScript.
 ## The editor
 
 `editor.html` (`src/editor/`) draws a game's map and writes every change
-into its `game.yaml`. This first part covers rooms, exits and doors;
-objects, characters and scripts come next.
+into its `game.yaml`. It covers rooms, exits and doors, and objects and
+containers; characters and scripts come next.
 
 - `model.ts`: the game file as a YAML document (the `yaml` library), with
   the edits the editor makes: rooms, exits, doors, renaming an ID along
@@ -64,8 +64,13 @@ objects, characters and scripts come next.
   onto a room to connect them, drag rooms and the background, scroll to
   zoom. Lines are one per route (an arrow when it's one way), with doors on
   them.
-- `inspector.ts`: the details panel, for the game, a room, a way out and a
-  door.
+- `inspector.ts`: the details panel, for the game, a room, a way out, a
+  door and a thing. A room lists what's in it as a tree: drag a thing into
+  a container or onto a surface, or onto another room on the map. A
+  thing's form puts its traits in plain words ("Can the player pick it
+  up?", "Opens and closes", "Hidden until the player finds it" with what
+  reveals it). An ID made from a name follows the name until it's set by
+  hand.
 - `main.ts`: projects (kept with *your games* in the browser), undo and
   redo, live checking with the WebAssembly compiler (click a problem to go
   to it), the *Game file* tab (edit the YAML; the map follows), Play (from

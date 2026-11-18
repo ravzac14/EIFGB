@@ -85,6 +85,57 @@ assert.equal(slug("Dark Cellar!"), "dark_cellar");
 assert.equal(slug("1st floor"), "room_1st_floor");
 console.log("ok   editor model");
 
+// ------------------------------------------------------------- objects
+{
+  const s = new Model(example("midnight_snack"));
+  assert.deepEqual(s.contents("kitchen").map((t) => t.id), ["mat", "small_key", "pie"], "doors aren't things");
+  const key = s.thing("small_key");
+  assert.ok(key.hidden && key.revealedBy[0] === "search mat" && key.traits.includes("portable"));
+  assert.equal(s.roomOf("small_key"), "kitchen");
+
+  const g = new Model(NEW_GAME);
+  const box = g.addThing("container", "first_room", "wooden box");
+  const coin = g.addThing("carry", box, "gold coin");
+  const table = g.addThing("supporter", "first_room");
+  assert.equal(g.roomOf(coin), "first_room");
+  assert.match(g.toString(), /wooden_box:\n\s+name: wooden box\n\s+in: first_room\n\s+traits: \[container, openable\]/);
+  // Moving: onto a table, to the player, nowhere; never into itself or what it holds, or into something that can't hold things.
+  assert.ok(g.moveThing(box, table));
+  assert.equal(g.moveThing(table, coin), false, "a coin can't hold things");
+  assert.equal(g.moveThing(table, box), false, "the table is under the box");
+  assert.ok(g.moveThing(coin, "player"));
+  assert.ok(g.moveThing(coin, null));
+  assert.equal(g.thing(coin).in, null);
+  assert.ok(g.moveThing(coin, box));
+  assert.deepEqual(errors(g.toString()), []);
+
+  // Traits that go together come and go together.
+  g.setTrait(box, "lockable", true);
+  assert.ok(g.thing(box).traits.includes("openable"));
+  g.setState(box, "locked", true);
+  g.setTrait(box, "openable", false);
+  assert.ok(!g.thing(box).traits.includes("lockable") && !g.thing(box).locked);
+  g.setPortability(table, "portable");
+  assert.deepEqual(g.thing(table).traits, ["supporter", "portable"]);
+  g.setPortability(table, "fixed");
+  assert.deepEqual(g.thing(table).traits, ["supporter"]);
+  g.setList(["objects", coin, "synonyms"], ["coin", " money ", ""]);
+  assert.match(g.toString(), /synonyms: \[coin, money\]/);
+  assert.deepEqual(errors(g.toString()), []);
+
+  // Renaming a key, a hidden thing's revealer, and deleting a holder.
+  const k = new Model(example("midnight_snack"));
+  assert.equal(k.renameThing("small_key", "brass key"), "brass_key");
+  assert.equal(k.door("pantry_door").key, "brass_key");
+  assert.equal(k.renameThing("mat", "rug"), "rug");
+  assert.deepEqual(k.thing("brass_key").revealedBy, ["search rug"]);
+  assert.deepEqual(errors(k.toString()), []);
+  g.deleteThing(box);
+  assert.equal(g.thing(coin).in, table, "the coin falls where the box was");
+  assert.deepEqual(errors(g.toString()), []);
+}
+console.log("ok   editor objects");
+
 // ------------------------------------------------------------- layout
 const { layout, readMap, writeMap, directionBetween, CELL } = await import("../src/editor/layout.ts");
 const fang = new Model(example("blackfang"));

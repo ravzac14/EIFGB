@@ -107,3 +107,19 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .inspector .tips { padding-left: 1.1rem; font-size: 0.85em; color: var(--dim); }
 .inspector .tips li { margin: 0.3rem 0; }
 .inspector .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.6rem; }
+
+/* Things */
+.inspector .tree { border: 1px dashed transparent; border-radius: 8px; padding: 0.15rem; }
+.inspector .tree.over { border-color: var(--sel); }
+.inspector .things { list-style: none; margin: 0; padding: 0; }
+.inspector .things.nested { padding-left: 1.1rem; border-left: 1px solid var(--line); margin-left: 0.45rem; }
+.inspector .thing { display: flex; gap: 0.45rem; align-items: center; padding: 0.3rem 0.45rem; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+.inspector .thing:hover { background: var(--panel); }
+.inspector .thing.selected { border-color: var(--sel); background: var(--panel); }
+.inspector .thing.over { border-color: var(--sel); border-style: dashed; }
+.inspector .thing .icon { color: var(--dim); width: 1em; text-align: center; }
+.inspector .thing .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector .thing .tag { color: var(--dim); font-size: 0.8em; }
+.inspector .add.two { grid-template-columns: 1fr auto; }
+.inspector .radio.column { flex-direction: column; gap: 0; }
+.inspector .indent { padding-left: 1.4rem; }

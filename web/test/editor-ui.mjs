@@ -140,6 +140,103 @@ assert.match(yaml(), new RegExp(`new_room:[\\s\\S]*southeast: ${eastRoom}`));
 assert.match(yaml(), new RegExp(`${eastRoom}:[\\s\\S]*northwest: new_room`));
 assert.equal($("#inspector .kind").textContent, "Way out", "the new way is selected");
 
+// ------------------------------------------------------------- things
+const transfer = () => {
+  const data = {};
+  return { types: [], setData(k, v) { data[k] = v; this.types.push(k); }, getData: (k) => data[k] ?? "", effectAllowed: "", dropEffect: "" };
+};
+const drag = (from, to, x = 0, y = 0) => {
+  const dt = transfer();
+  const ev = (type) => {
+    const e = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+    Object.defineProperty(e, "dataTransfer", { value: dt });
+    return e;
+  };
+  from.dispatchEvent(ev("dragstart"));
+  to.dispatchEvent(ev("dragover"));
+  to.dispatchEvent(ev("drop"));
+};
+const addThing = (kind) => {
+  const row = [...document.querySelectorAll("#inspector .add.two")].at(-1);
+  const sel = row.querySelector("select");
+  sel.value = kind;
+  sel.dispatchEvent(new Event("change"));
+  row.querySelector("button").click();
+  const name = document.activeElement;
+  return name;
+};
+// Typing, then leaving the field (which is when an automatic ID follows the name).
+const typeName = (input, text) => {
+  input.value = text;
+  input.dispatchEvent(new Event("input"));
+  input.dispatchEvent(new Event("change"));
+};
+
+// In the first room: a chest and a coin.
+press($('#map [data-room="first_room"]'));
+typeName(addThing("container"), "old chest");
+assert.equal($("#inspector .kind").textContent, "Thing");
+assert.match(yaml(), /\n  old_chest:\n\s+name: old chest/, "the ID followed the name");
+assert.equal($("#inspector h2").textContent, "old chest");
+press($('#map [data-room="first_room"]'));
+typeName(addThing("carry"), "gold coin");
+press($('#map [data-room="first_room"]'));
+const rows = () => [...document.querySelectorAll("#inspector .thing")];
+assert.deepEqual(rows().map((r) => r.querySelector(".name").textContent), ["old chest", "gold coin"]);
+assert.match([...document.querySelectorAll('#map [data-room="first_room"] text')].map((t) => t.textContent).join(" "), /2 things/);
+
+// Drag the coin into the chest: nested under it.
+drag(rows()[1], rows()[0]);
+assert.match(yaml(), /gold_coin:\n\s+name: gold coin\n\s+in: old_chest/);
+assert.equal(document.querySelectorAll("#inspector .things.nested .thing").length, 1);
+// Dropping the chest on the coin would put it inside itself: refused, with a message.
+drag(rows()[0], rows()[1]);
+assert.match(yaml(), /old_chest:\n\s+name: old chest\n\s+in: first_room/);
+assert.match($("#saved").textContent, /can't go there/);
+
+// Drop the chest on another room on the map: it moves, with the coin inside.
+const [, ex, ey] = $(`#map [data-room="${eastRoom}"]`).getAttribute("transform").match(/translate\((-?[\d.]+) (-?[\d.]+)\)/).map(Number);
+drag(rows()[0], $("#map"), ex, ey);
+assert.match(yaml(), new RegExp(`old_chest:\\n\\s+name: old chest\\n\\s+in: ${eastRoom}`));
+assert.match(yaml(), /gold_coin:\n\s+name: gold coin\n\s+in: old_chest/);
+assert.equal($("#inspector .kind").textContent, "Thing", "the dropped thing is selected");
+
+// Edit the coin: hidden until the chest is searched; the chest locks with a key.
+press($(`#map [data-room="${eastRoom}"]`));
+const coinRow = rows().find((r) => r.textContent.includes("gold coin"));
+coinRow.click();
+const hiddenBox = [...document.querySelectorAll("#inspector label.check")].find((l) => l.textContent.startsWith("Hidden until")).querySelector("input");
+hiddenBox.checked = true;
+hiddenBox.dispatchEvent(new Event("change"));
+const [verbSel, whatSel] = [...document.querySelectorAll("#inspector .add.two select")];
+whatSel.value = "old_chest";
+whatSel.dispatchEvent(new Event("change"));
+assert.match(yaml(), /state: \{hidden: true\}\n\s+revealed_by: search old_chest/);
+void verbSel;
+// Where-it-starts offers rooms, the player, and holders not inside it.
+const where = [...document.querySelectorAll("#inspector select")].find((s) => s.ariaLabel === "Where it starts");
+assert.ok([...where.options].some((o) => o.value === "player"));
+assert.ok([...where.options].some((o) => o.value === "old_chest"));
+where.value = "player";
+where.dispatchEvent(new Event("change"));
+assert.match(yaml(), /gold_coin:\n\s+name: gold coin\n\s+in: player/);
+$("#undo").click();
+assert.match(yaml(), /in: old_chest/);
+
+// It all compiles.
+await tick(1500);
+assert.doesNotMatch($("#panel-problems").textContent, /Error/);
+
+// An ID set by hand stays put when the name changes.
+coinRow.click();
+const named = [...document.querySelectorAll("#inspector input[type=text]")];
+const idBox = named.find((i) => i.ariaLabel === "Thing ID");
+idBox.value = "treasure";
+[...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Rename").click();
+assert.match(yaml(), /\n  treasure:\n\s+name: gold coin/);
+typeName(document.querySelector("#inspector input[type=text]"), "silver coin");
+assert.match(yaml(), /\n  treasure:\n\s+name: silver coin/);
+
 assert.deepEqual(errors, []);
 console.log("ok   editor page");
 await GlobalRegistrator.unregister();

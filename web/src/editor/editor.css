@@ -123,3 +123,11 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .inspector .add.two { grid-template-columns: 1fr auto; }
 .inspector .radio.column { flex-direction: column; gap: 0; }
 .inspector .indent { padding-left: 1.4rem; }
+
+/* Characters on the map */
+#map .person rect { fill: var(--panel); stroke: var(--room-line); stroke-width: 1.2; }
+#map .person text { fill: var(--fg); font: 600 10.5px var(--sans); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+#map .person { cursor: pointer; }
+#map .person.hostile rect { stroke: var(--bad); stroke-width: 1.6; }
+#map .person.selected rect { stroke: var(--sel); stroke-width: 2.5; }
+#map .ghost { opacity: 0.6; pointer-events: none; }

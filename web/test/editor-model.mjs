@@ -136,6 +136,56 @@ console.log("ok   editor model");
 }
 console.log("ok   editor objects");
 
+// --------------------------------------------------- characters, factions
+{
+  const b = new Model(example("blackfang"));
+  assert.deepEqual(b.factionIds(), ["wolves", "goblins", "undead"]);
+  const wolves = b.faction("wolves");
+  assert.ok(wolves.members.includes("alpha"));
+  assert.ok(b.hostile(b.character("skeleton")), "a guard is hostile");
+
+  const g = new Model(NEW_GAME);
+  const shop = g.addCharacter("merchant", "first_room", "Old Meg");
+  assert.equal(shop, "old_meg");
+  const wolf = g.addCharacter("hunter", "first_room");
+  assert.equal(g.get(["player", "health"]), 10, "enemies give the player health");
+  assert.equal(g.behaviorOf(g.character(wolf)), "hunter");
+  const coin = g.addThing("carry", shop, "brass coin");
+  assert.equal(g.roomOf(coin), "first_room", "carried by someone in the room");
+  g.set(["objects", coin, "price"], 3);
+  assert.deepEqual(errors(g.toString()), []);
+
+  // Sides: wolves hate goblins and the player.
+  const w = g.addFaction("Wolves");
+  const gob = g.addFaction("goblins");
+  g.set(["characters", wolf, "faction"], w);
+  g.setHostile(w, gob, true);
+  g.setHostile(w, "player", true);
+  assert.deepEqual(g.faction(w).hostileTo, [gob, "player"]);
+  assert.match(g.toString(), /wolves:\n\s+hostile_to: \[goblins, player\]/);
+  assert.deepEqual(errors(g.toString()), []);
+  // Renaming a side follows its members and enemies; deleting removes them.
+  assert.equal(g.renameFaction(gob, "orcs"), "orcs");
+  assert.deepEqual(g.faction(w).hostileTo, ["orcs", "player"]);
+  assert.equal(g.renameFaction("orcs", "player"), null);
+  assert.equal(g.renameFaction(w, "pack"), "pack");
+  assert.equal(g.character(wolf).faction, "pack");
+  g.deleteFaction("orcs");
+  assert.deepEqual(g.faction("pack").hostileTo, ["player"]);
+  assert.deepEqual(errors(g.toString()), []);
+  g.deleteFaction("pack");
+  assert.equal(g.character(wolf).faction, null);
+  assert.doesNotMatch(g.toString(), /factions:/);
+
+  // Renaming a character keeps its belongings; deleting one leaves them in its room.
+  assert.equal(g.renameCharacter(shop, "meg"), "meg");
+  assert.equal(g.thing(coin).in, "meg");
+  g.deleteCharacter("meg");
+  assert.equal(g.thing(coin).in, "first_room");
+  assert.deepEqual(errors(g.toString()), []);
+}
+console.log("ok   editor characters");
+
 // ------------------------------------------------------------- layout
 const { layout, readMap, writeMap, directionBetween, CELL } = await import("../src/editor/layout.ts");
 const fang = new Model(example("blackfang"));

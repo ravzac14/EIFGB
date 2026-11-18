@@ -1,8 +1,11 @@
 // The details panel: forms for whatever is selected on the map (the game
 // itself when nothing is), in plain words.
 
-import { DIRECTIONS, KINDS, OPPOSITE, slug, type Direction, type Exit, type Kind, type Model, type Thing } from "./model.ts";
-import { THING_DRAG, type Selection } from "./map.ts";
+import {
+  BEHAVIORS, DIRECTIONS, KINDS, OPPOSITE, PEOPLE, slug,
+  type Behavior, type Direction, type Exit, type Kind, type Model, type Person, type Thing,
+} from "./model.ts";
+import { THING_DRAG, factionHue, type Selection } from "./map.ts";
 
 export interface InspectorContext {
   model: Model;
@@ -85,6 +88,8 @@ export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   if (s?.kind === "room" && ctx.model.room(s.id)) return roomPanel(panel, ctx, s.id);
   if (s?.kind === "exit" && ctx.model.exit(s.room, s.dir)) return exitPanel(panel, ctx, s.room, s.dir);
   if (s?.kind === "thing" && ctx.model.thing(s.id)) return thingPanel(panel, ctx, s.id);
+  if (s?.kind === "character" && ctx.model.character(s.id)) return characterPanel(panel, ctx, s.id);
+  if (s?.kind === "faction" && ctx.model.faction(s.id)) return factionPanel(panel, ctx, s.id);
   gamePanel(panel, ctx);
 }
 
@@ -120,6 +125,10 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
     ...(m.contents(null).length
       ? [el("h3", { textContent: "Not placed anywhere yet" }), help("Scripts can bring these into the game."), thingTree(ctx, null, "")]
       : []),
+    el("h3", { textContent: "Sides" }),
+    help("Groups of characters that fight together, and who they attack on sight."),
+    sidesList(ctx),
+    addSideRow(ctx),
     el("h3", { textContent: "Drawing the map" }),
     el(
       "ul",
@@ -215,6 +224,9 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     el("h3", { textContent: "In this room" }),
     thingTree(ctx, id, "Nothing here yet."),
     addThingRow(ctx, id),
+    el("h3", { textContent: "People and creatures" }),
+    peopleList(ctx, m.peopleIn(id), "Nobody here yet."),
+    addPersonRow(ctx, id),
   );
 
   // Advanced: the ID, and deleting.
@@ -370,7 +382,7 @@ function doorForm(panel: HTMLElement, ctx: InspectorContext, id: string) {
         (v) => ctx.change((x) => x.set(["objects", id, "unlocks_with"], v || undefined)),
         "Key",
       ),
-      help(keys.length ? "Things the player can carry." : "There's nothing the player can carry yet. Objects come in the next part of the editor; until then, add a key in the game file."),
+      help(keys.length ? "Things the player can carry." : "There's nothing the player can carry yet. Add a key to a room (choose “A key” in its list), then pick it here."),
     );
   }
   panel.append(
@@ -548,6 +560,8 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     return el("label", {}, r, text);
   };
 
+  const holder = t.in ? m.character(t.in) : null;
+  const forSale = holder && m.behaviorOf(holder) === "merchant";
   panel.append(
     el("p", { class: "kind", textContent: "Thing" }),
     el("h2", { textContent: t.name }),
@@ -560,6 +574,9 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
         if (next) ctx.select({ kind: "thing", id: next });
       },
     }),
+    ...(forSale
+      ? numField(ctx, ["objects", id, "price"], `Price (${holder.name} sells it)`, m.get(["objects", id, "price"]), "In the player's money. Empty: not for sale.")
+      : []),
     ...field("Description", t.description, (v) => ctx.change((x) => x.set(["objects", id, "description"], v || undefined), { coalesce: `tdesc:${id}`, redraw: false }), {
       multiline: true,
       placeholder: "What the player sees when they examine it.",
@@ -661,6 +678,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
         help: "Help players tell similar things apart: TAKE THE GOLD COIN.",
       }),
       ...num("Size", "size", t.size, "How big it is, from 1 (the default)."),
+      ...(has("portable") ? num("Damage, as a weapon", "damage", typeof m.get(["objects", id, "damage"]) === "number" ? (m.get(["objects", id, "damage"]) as number) : null, "How hard it hits when the player attacks WITH it.") : []),
       ...(has("container") || has("supporter") ? num("Room for", "capacity", t.capacity, "How much fits in or on it, counting sizes. Empty means no limit.") : []),
       el("label", { textContent: "ID" }),
       el(
@@ -704,4 +722,360 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 export function idFollows(id: string, name: string, fallback: string): boolean {
   const base = slug(name, fallback);
   return id === base || new RegExp(`^${base}_\\d+$`).test(id);
+}
+
+// ------------------------------------------------------- characters
+
+const PERSON_LABEL: Record<Person, string> = {
+  talker: "Someone to talk to",
+  merchant: "A shopkeeper",
+  wanderer: "Someone who wanders",
+  follower: "A companion who follows you",
+  hunter: "An enemy who hunts you",
+  guard: "A guard who blocks the way",
+  still: "Someone who stays put",
+};
+
+const BEHAVIOR_TEXT: Record<Behavior, [string, string]> = {
+  stationary: ["Stays put", "Doesn't move or start fights."],
+  conversationalist: ["Stays put, to talk to", "Never moves, so the player always knows where to find them."],
+  wanderer: ["Wanders about", "Moves to a neighbouring room now and then."],
+  merchant: ["Buys and sells", "Trades with the player: BUY, SELL, haggling. Wanders, but never walks off mid-sale."],
+  hunter: ["Hunts the player", "Attacks the player on sight, and heads towards them."],
+  guard: ["Guards this room", "Attacks the player here, and otherwise stays put."],
+  follower: ["Follows the player", "Goes wherever the player goes."],
+  defender: ["Keeps to themselves", "Never starts a fight, but fights back at once."],
+};
+
+function personLabel(m: Model, id: string) {
+  const c = m.character(id)!;
+  return `${c.name}${m.hostile(c) ? " ⚔" : ""}`;
+}
+
+function peopleList(ctx: InspectorContext, people: { id: string }[], empty: string): HTMLElement {
+  const m = ctx.model;
+  const ul = el("ul", { class: "things" });
+  for (const p of people) {
+    const c = m.character(p.id)!;
+    const selected = ctx.selection?.kind === "character" && ctx.selection.id === c.id;
+    const dot = el("span", { class: "icon", textContent: "●", ariaHidden: "true" });
+    if (c.faction) dot.style.color = `hsl(${factionHue(c.faction)} 60% 50%)`;
+    const row = el(
+      "div",
+      { class: `thing${selected ? " selected" : ""}`, draggable: true, title: "Click to edit; drag onto a room on the map to move" },
+      dot,
+      el("span", { class: "name", textContent: personLabel(m, c.id) }),
+      el("span", { class: "tag", textContent: BEHAVIOR_TEXT[m.behaviorOf(c)][0].toLowerCase() }),
+    );
+    row.addEventListener("click", () => ctx.select({ kind: "character", id: c.id }));
+    row.addEventListener("dragstart", (e) => {
+      e.dataTransfer?.setData(THING_DRAG, c.id);
+      e.dataTransfer?.setData("text/plain", c.name);
+    });
+    ul.append(el("li", {}, row));
+  }
+  if (!people.length && empty) ul.append(el("li", { class: "help", textContent: empty }));
+  return ul;
+}
+
+function addPersonRow(ctx: InspectorContext, room: string | null): HTMLElement {
+  let kind: Person = "talker";
+  const kinds = select((Object.keys(PEOPLE) as Person[]).map((k) => [k, PERSON_LABEL[k]]), kind, (v) => (kind = v as Person), "Kind of character");
+  const add = button("Add", () => {
+    let id = "";
+    ctx.change((x) => {
+      id = x.addCharacter(kind, room);
+    });
+    ctx.select({ kind: "character", id });
+    ctx.focusName();
+  });
+  return el("div", { class: "add two" }, kinds, add);
+}
+
+/** A whole-number field at `path`; empty removes it. */
+function numField(ctx: InspectorContext, path: (string | number)[], label: string, value: unknown, helpText: string, placeholder = "") {
+  const i = el("input", { type: "text", inputMode: "numeric", value: typeof value === "number" ? String(value) : "", placeholder }) as HTMLInputElement;
+  i.addEventListener("input", () => {
+    const n = Number.parseInt(i.value, 10);
+    ctx.change((x) => x.set(path, Number.isFinite(n) && n >= 0 ? n : undefined), { coalesce: path.join("."), redraw: false });
+  });
+  return [el("label", { textContent: label }), i, help(helpText)];
+}
+
+/** A checkbox for a true/false field with a default. */
+function boolField(ctx: InspectorContext, path: (string | number)[], label: string, byDefault: boolean, helpText?: string) {
+  const c = check(label, ctx.model.bool(path, byDefault), (v) => ctx.change((x) => x.setBool(path, v, byDefault)));
+  return helpText ? [c, help(helpText)] : [c];
+}
+
+function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
+  const m = ctx.model;
+  const c = m.character(id)!;
+  const p = ["characters", id];
+  const behavior = m.behaviorOf(c);
+  const get = (k: string) => m.get([...p, k]);
+
+  const where = select(
+    [...m.rooms().map((r): [string, string] => [r.id, r.name]), ["", "Nowhere yet (a script brings them in)"]],
+    c.in ?? "",
+    (v) => ctx.change((x) => x.moveCharacter(id, v || null)),
+    "Where they start",
+  );
+  const behaviors = el("div", { class: "radio column" });
+  for (const b of BEHAVIORS) {
+    const r = el("input", { type: "radio", name: `behavior-${id}`, value: b, checked: behavior === b });
+    r.addEventListener("change", () => ctx.change((x) => x.set([...p, "behavior"], b)));
+    behaviors.append(el("label", { title: BEHAVIOR_TEXT[b][1] }, r, BEHAVIOR_TEXT[b][0]));
+  }
+
+  panel.append(
+    el("p", { class: "kind", textContent: "Character" }),
+    el("h2", { textContent: personLabel(m, id) }),
+    ...field("Name", c.name, (v) => ctx.change((x) => x.set([...p, "name"], v || id), { coalesce: `cname:${id}`, redraw: false }), {
+      help: "What players call them: TALK TO THE OLD WOMAN.",
+      onchange: (v) => {
+        if (!idFollows(id, c.name, "character") || slug(v, "character") === id) return;
+        let next: string | null = null;
+        ctx.change((x) => (next = x.renameCharacter(id, x.freshId(slug(v, "character")))), { coalesce: `cname:${id}` });
+        if (next) ctx.select({ kind: "character", id: next });
+      },
+    }),
+    ...field("Description", c.description, (v) => ctx.change((x) => x.set([...p, "description"], v || undefined), { coalesce: `cdesc:${id}`, redraw: false }), {
+      multiline: true,
+      placeholder: "What the player sees when they look at them.",
+    }),
+    ...field("Other words for them", c.synonyms.join(", "), (v) => ctx.change((x) => x.setList([...p, "synonyms"], v.split(",")), { coalesce: `csyn:${id}`, redraw: false }), {
+      placeholder: "woman, crone",
+    }),
+    el("label", { textContent: "Where they start" }),
+    where,
+    el("h3", { textContent: "What they do" }),
+    behaviors,
+    help(BEHAVIOR_TEXT[behavior][1]),
+  );
+
+  // What their behaviour needs.
+  if (behavior === "wanderer" || behavior === "merchant" || behavior === "hunter") {
+    panel.append(...numField(ctx, [...p, "wander"], "How often they move on (percent of turns)", get("wander"), "", behavior === "wanderer" ? "50" : "25"));
+  }
+  if (behavior === "hunter" || behavior === "follower") {
+    panel.append(...numField(ctx, [...p, "range"], "Notices the player this many rooms away", get("range"), "Empty: anywhere."));
+  }
+  if (behavior === "wanderer" || behavior === "merchant" || behavior === "hunter") {
+    const area = m.list([...p, "area"]);
+    const box = el("div", { class: "radio column" });
+    for (const r of m.rooms()) {
+      box.append(
+        check(r.name, area.includes(r.id), (v) =>
+          ctx.change((x) => x.setList([...p, "area"], v ? [...area, r.id] : area.filter((a) => a !== r.id))),
+        ),
+      );
+    }
+    panel.append(el("label", { textContent: "Keeps to these rooms" }), box, help("None ticked: anywhere."));
+  }
+  if (behavior === "merchant") {
+    panel.append(
+      el("h3", { textContent: "Trading" }),
+      ...numField(ctx, [...p, "money"], "Their money", get("money"), "Empty: they can always pay."),
+      ...numField(ctx, [...p, "buys_at"], "Pays this percent of the price for what they buy", get("buys_at"), "", "50"),
+      ...numField(ctx, [...p, "haggle"], "Goes this far below their prices when haggling (percent)", get("haggle"), "Empty or 0: no haggling."),
+      help("Things they carry are for sale: give each a price."),
+    );
+  }
+
+  // Talking.
+  const choices = m.choiceIds();
+  panel.append(el("h3", { textContent: "Talking" }));
+  if (choices.length) {
+    panel.append(
+      el("label", { textContent: "TALK TO them starts" }),
+      select([["", "Nothing to say"], ...choices.map((ch): [string, string] => [ch, ch])], c.talk ?? "", (v) => ctx.change((x) => x.set([...p, "talk"], v || undefined)), "Conversation"),
+    );
+  } else {
+    panel.append(help("Conversations are written as choices, in the game file for now; the editor's next part makes them here."));
+  }
+
+  // Their side.
+  const sides = m.factionIds();
+  const side = select(
+    [["", "None"], ...sides.map((f): [string, string] => [f, f]), ["__new", "A new side…"]],
+    c.faction ?? "",
+    (v) => {
+      if (v === "__new") {
+        const name = prompt("Name the new side (wolves, the town guard…)");
+        if (!name?.trim()) return ctx.change(() => {});
+        let f = "";
+        ctx.change((x) => {
+          f = x.addFaction(name);
+          x.set([...p, "faction"], f);
+        });
+        return;
+      }
+      ctx.change((x) => x.set([...p, "faction"], v || undefined));
+    },
+    "Side",
+  );
+  panel.append(el("h3", { textContent: "Side" }), side);
+  if (c.faction && m.faction(c.faction)) panel.append(el("div", { class: "actions" }, button(`Edit the ${c.faction}`, () => ctx.select({ kind: "faction", id: c.faction! }))));
+
+  // Fighting.
+  panel.append(
+    el("h3", { textContent: "Fighting" }),
+    ...numField(ctx, [...p, "health"], "Health", c.health, "Empty: they can't be hurt by fighting."),
+    ...numField(ctx, [...p, "damage"], "Damage per hit", c.damage, "", "1"),
+    ...boolField(ctx, [...p, "fights_back"], "Fights back when attacked", true),
+    ...numField(ctx, [...p, "patience"], "Puts up with this many attacks first", get("patience"), "", ["hunter", "guard", "defender"].includes(behavior) ? "0" : "2"),
+    ...boolField(ctx, [...p, "pacifist"], "Never fights at all", behavior === "merchant" || behavior === "conversationalist"),
+    ...boolField(ctx, [...p, "invincible"], "Can't be hurt (the story needs them)", false),
+  );
+
+  // What they carry.
+  panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
+
+  // More.
+  const idInput = el("input", { type: "text", value: id, ariaLabel: "Character ID" }) as HTMLInputElement;
+  const msg = help("");
+  const fears = m.list([...p, "fears"]);
+  panel.append(
+    el(
+      "details",
+      {},
+      el("summary", { textContent: "More" }),
+      ...boolField(ctx, [...p, "obeys"], "Takes orders from the player", false, "TELL REX TO FETCH."),
+      ...boolField(ctx, [...p, "nameable"], "The player can name them", false, "CALL THE DOG REX."),
+      ...boolField(ctx, [...p, "sees_in_dark"], "Sees in the dark", false),
+      ...boolField(ctx, [...p, "tracker"], "Follows the player's tracks", false),
+      ...boolField(ctx, [...p, "corpse"], "Leaves a body when defeated", true),
+      check("Afraid of fire", fears.includes("fire"), (v) => ctx.change((x) => x.setList([...p, "fears"], v ? [...fears, "fire"] : fears.filter((f) => f !== "fire")))),
+      ...numField(ctx, [...p, "morale"], "Runs away below this percent of their health", get("morale"), "Empty: never runs."),
+      el("label", { textContent: "ID" }),
+      el(
+        "div",
+        { class: "row" },
+        idInput,
+        button("Rename", () => {
+          let next: string | null = null;
+          ctx.change((x) => {
+            next = x.renameCharacter(id, idInput.value);
+          });
+          if (next) ctx.select({ kind: "character", id: next });
+          else msg.textContent = "That ID is already used by something else.";
+        }),
+      ),
+      help("How scripts and the game file refer to them. Renaming updates what they carry, but not Lua scripts."),
+      msg,
+      el(
+        "div",
+        { class: "actions" },
+        button(
+          "Delete this character",
+          () => {
+            if (!confirm(`Delete ${c.name}? What they carry is left where they were.`)) return;
+            const back = c.in && m.room(c.in) ? ({ kind: "room", id: c.in } as const) : null;
+            ctx.change((x) => x.deleteCharacter(id));
+            ctx.select(back);
+          },
+          "danger",
+        ),
+      ),
+    ),
+  );
+}
+
+// ------------------------------------------------------------ sides
+
+function sidesList(ctx: InspectorContext): HTMLElement {
+  const m = ctx.model;
+  const ul = el("ul", { class: "things" });
+  for (const f of m.factions()) {
+    const dot = el("span", { class: "icon", textContent: "●", ariaHidden: "true" });
+    dot.style.color = `hsl(${factionHue(f.id)} 60% 50%)`;
+    const enemies = f.hostileTo.map((h) => (h === "player" ? "the player" : h));
+    const row = el(
+      "div",
+      { class: "thing" },
+      dot,
+      el("span", { class: "name", textContent: f.id }),
+      el("span", { class: "tag", textContent: enemies.length ? `attack ${enemies.join(", ")}` : `${f.members.length} member${f.members.length === 1 ? "" : "s"}` }),
+    );
+    row.addEventListener("click", () => ctx.select({ kind: "faction", id: f.id }));
+    ul.append(el("li", {}, row));
+  }
+  if (!m.factionIds().length) ul.append(el("li", { class: "help", textContent: "No sides yet." }));
+  return ul;
+}
+
+function addSideRow(ctx: InspectorContext): HTMLElement {
+  const name = el("input", { type: "text", placeholder: "wolves, the town guard…", ariaLabel: "New side's name" }) as HTMLInputElement;
+  const add = button("Add a side", () => {
+    if (!name.value.trim()) return name.focus();
+    let id = "";
+    ctx.change((x) => {
+      id = x.addFaction(name.value);
+    });
+    ctx.select({ kind: "faction", id });
+  });
+  return el("div", { class: "add two" }, name, add);
+}
+
+function factionPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
+  const m = ctx.model;
+  const f = m.faction(id)!;
+  const p = ["factions", id];
+  const others = m.factionIds().filter((x) => x !== id);
+  const attackedBy = m.factions().filter((x) => x.hostileTo.includes(id)).map((x) => x.id);
+  const fears = m.list([...p, "fears"]);
+
+  const nameInput = el("input", { type: "text", value: id, ariaLabel: "Side's name" }) as HTMLInputElement;
+  const msg = help("");
+  panel.append(
+    el("p", { class: "kind", textContent: "Side" }),
+    el("h2", { textContent: id }),
+    el("label", { textContent: "Name" }),
+    el(
+      "div",
+      { class: "row" },
+      nameInput,
+      button("Rename", () => {
+        let next: string | null = null;
+        ctx.change((x) => {
+          next = x.renameFaction(id, nameInput.value);
+        });
+        if (next) ctx.select({ kind: "faction", id: next });
+        else msg.textContent = "That name is taken.";
+      }),
+    ),
+    msg,
+    el("h3", { textContent: "Attacks on sight" }),
+    check("The player", f.hostileTo.includes("player"), (v) => ctx.change((x) => x.setHostile(id, "player", v))),
+    ...others.map((o) => check(`The ${o}`, f.hostileTo.includes(o), (v) => ctx.change((x) => x.setHostile(id, o, v)))),
+  );
+  if (!others.length) panel.append(help("Add another side to set them against each other."));
+  if (attackedBy.length) panel.append(help(`Attacked on sight by the ${attackedBy.join(" and the ")}.`));
+
+  panel.append(el("h3", { textContent: "Members" }), peopleList(ctx, f.members.map((x) => ({ id: x })), "Nobody yet. Choose this side on a character."));
+  panel.append(
+    el("h3", { textContent: "Habits" }),
+    ...boolField(ctx, [...p, "eats_corpses"], "Eats bodies left lying around", false),
+    ...boolField(ctx, [...p, "sees_in_dark"], "Sees in the dark", false),
+    check("Afraid of fire", fears.includes("fire"), (v) => ctx.change((x) => x.setList([...p, "fears"], v ? [...fears, "fire"] : fears.filter((q) => q !== "fire")))),
+    ...numField(ctx, [...p, "morale"], "Members run away below this percent of their health", m.get([...p, "morale"]), "Empty: they never run."),
+    ...numField(ctx, [...p, "patience"], "Turns on the player after this many members are upset", m.get([...p, "patience"]), "", "2"),
+    ...field("Their tracks look like", String(m.get([...p, "prints"]) ?? ""), (v) => ctx.change((x) => x.set([...p, "prints"], v || undefined), { coalesce: `prints:${id}`, redraw: false }), {
+      placeholder: "paw prints",
+    }),
+    el(
+      "div",
+      { class: "actions" },
+      button(
+        "Delete this side",
+        () => {
+          if (!confirm(`Delete the side “${id}”? Its members stay, on no side.`)) return;
+          ctx.change((x) => x.deleteFaction(id));
+          ctx.select(null);
+        },
+        "danger",
+      ),
+    ),
+  );
 }

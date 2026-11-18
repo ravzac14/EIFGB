@@ -76,6 +76,8 @@ function load(yaml: string, map?: string) {
   if (selection?.kind === "room" && !model?.room(selection.id)) selection = null;
   if (selection?.kind === "exit" && !model?.exit(selection.room, selection.dir)) selection = null;
   if (selection?.kind === "thing" && !model?.thing(selection.id)) selection = null;
+  if (selection?.kind === "character" && !model?.character(selection.id)) selection = null;
+  if (selection?.kind === "faction" && !model?.faction(selection.id)) selection = null;
   redraw();
   syncYaml(yaml);
   scheduleCheck();
@@ -189,7 +191,7 @@ function select(sel: Selection) {
   selection = sel;
   redraw();
   if (sel?.kind === "room") mapView.reveal(sel.id);
-  if (sel?.kind === "thing" && model) {
+  if ((sel?.kind === "thing" || sel?.kind === "character") && model) {
     const room = model.roomOf(sel.id);
     if (room && room !== "player") mapView.reveal(room);
   }
@@ -221,9 +223,10 @@ function addAt(at: Point) {
   focusName();
 }
 
-/** A new room's name field, selected, ready to type over. */
+/** A new room's (or thing's) Name field, selected, ready to type over. */
 function focusName() {
-  const input = $("inspector").querySelector<HTMLInputElement>("input[type=text]");
+  const label = [...$("inspector").querySelectorAll("label")].find((l) => l.textContent === "Name");
+  const input = (label?.htmlFor && document.getElementById(label.htmlFor)) as HTMLInputElement | null;
   input?.focus();
   input?.select();
 }
@@ -286,6 +289,8 @@ function goTo(path: string) {
     }
   }
   if (parts[0] === "objects" && parts[1] && model?.thing(parts[1])) return select({ kind: "thing", id: parts[1] });
+  if (parts[0] === "characters" && parts[1] && model?.character(parts[1])) return select({ kind: "character", id: parts[1] });
+  if (parts[0] === "factions" && parts[1] && model?.faction(parts[1])) return select({ kind: "faction", id: parts[1] });
   showInFile(parts[1] ? `${parts[1]}:` : parts[0] ?? "");
 }
 
@@ -375,7 +380,20 @@ document.addEventListener("keydown", (e) => {
     doRedo();
   } else if ((e.key === "Delete" || e.key === "Backspace") && !typing && model && selection) {
     e.preventDefault();
-    if (selection.kind === "thing") {
+    if (selection.kind === "character") {
+      const c = model.character(selection.id);
+      if (c && confirm(`Delete ${c.name}? What they carry is left where they were.`)) {
+        const id = selection.id;
+        selection = c.in && model.room(c.in) ? { kind: "room", id: c.in } : null;
+        change((m) => m.deleteCharacter(id));
+      }
+    } else if (selection.kind === "faction") {
+      const id = selection.id;
+      if (confirm(`Delete the side “${id}”? Its members stay, on no side.`)) {
+        selection = null;
+        change((m) => m.deleteFaction(id));
+      }
+    } else if (selection.kind === "thing") {
       const t = model.thing(selection.id);
       if (t && confirm(`Delete ${t.name}?`)) {
         const id = selection.id;
@@ -418,8 +436,18 @@ mapView = new MapView(document.getElementById("map") as unknown as SVGSVGElement
   addRoomBeside: (from, dir, at) => void addBeside(from, dir, at),
   addRoomAt: addAt,
   dropThing: (id, room) => {
-    change((m) => m.moveThing(id, room));
-    selection = { kind: "thing", id };
+    if (model?.character(id)) {
+      change((m) => m.moveCharacter(id, room));
+      selection = { kind: "character", id };
+    } else {
+      change((m) => m.moveThing(id, room));
+      selection = { kind: "thing", id };
+    }
+    redraw();
+  },
+  moveCharacter: (id, room) => {
+    change((m) => m.moveCharacter(id, room));
+    selection = { kind: "character", id };
     redraw();
   },
 });

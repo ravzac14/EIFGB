@@ -12,6 +12,7 @@ GlobalRegistrator.register({ url: pathToFileURL(`${web}public/editor.html`).href
 // Things a test DOM leaves out.
 Element.prototype.setPointerCapture ??= () => {};
 window.confirm = () => true;
+window.prompt = () => "wolves";
 window.open = () => null;
 globalThis.CSS ??= { escape: (s) => s };
 const errors = [];
@@ -156,8 +157,9 @@ const drag = (from, to, x = 0, y = 0) => {
   to.dispatchEvent(ev("dragover"));
   to.dispatchEvent(ev("drop"));
 };
+// The Add row that offers this kind (things and people have separate rows).
 const addThing = (kind) => {
-  const row = [...document.querySelectorAll("#inspector .add.two")].at(-1);
+  const row = [...document.querySelectorAll("#inspector .add.two")].find((r) => [...r.querySelectorAll("option")].some((o) => o.value === kind));
   const sel = row.querySelector("select");
   sel.value = kind;
   sel.dispatchEvent(new Event("change"));
@@ -236,6 +238,71 @@ idBox.value = "treasure";
 assert.match(yaml(), /\n  treasure:\n\s+name: gold coin/);
 typeName(document.querySelector("#inspector input[type=text]"), "silver coin");
 assert.match(yaml(), /\n  treasure:\n\s+name: silver coin/);
+
+// ------------------------------------------------------- characters
+const addPerson = (kind) => {
+  const rows = [...document.querySelectorAll("#inspector .add.two")];
+  const row = rows.find((r) => [...r.querySelectorAll("option")].some((o) => o.value === kind));
+  const sel = row.querySelector("select");
+  sel.value = kind;
+  sel.dispatchEvent(new Event("change"));
+  row.querySelector("button").click();
+  return document.activeElement;
+};
+press($(`#map [data-room="${eastRoom}"]`));
+typeName(addPerson("hunter"), "grey wolf");
+assert.equal($("#inspector .kind").textContent, "Character");
+assert.match(yaml(), /\n  grey_wolf:\n\s+name: grey wolf\n\s+in: \w+\n\s+behavior: hunter\n\s+health: 5\n\s+damage: 1/);
+assert.match(yaml(), /intro: Your story begins here.\n\nplayer:\n  health: 10\n\nrooms:/, "the player can fight back; the section goes after game");
+const pill = () => [...document.querySelectorAll("#map .person")].find((g) => g.textContent.includes("grey wolf"));
+assert.ok(pill().classList.contains("hostile"));
+
+// A side, from the character's Side list ("A new side…" asks for its name).
+const sideSel = [...document.querySelectorAll("#inspector select")].find((s) => s.ariaLabel === "Side");
+sideSel.value = "__new";
+sideSel.dispatchEvent(new Event("change"));
+assert.match(yaml(), /factions:\n\s+wolves: \{\}/);
+assert.match(yaml(), /grey_wolf:[\s\S]*faction: wolves/);
+[...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Edit the wolves").click();
+assert.equal($("#inspector .kind").textContent, "Side");
+const playerBox = [...document.querySelectorAll("#inspector label.check")].find((l) => l.textContent === "The player").querySelector("input");
+playerBox.checked = true;
+playerBox.dispatchEvent(new Event("change"));
+assert.match(yaml(), /wolves:\n\s+hostile_to: \[player\]/);
+assert.match($("#inspector").textContent, /grey wolf/, "members are listed");
+
+// Drag the wolf's pill to the first room.
+const [, fx, fy] = $('#map [data-room="first_room"]').getAttribute("transform").match(/translate\((-?[\d.]+) (-?[\d.]+)\)/).map(Number);
+pointer(pill(), "pointerdown", ex, ey + 40);
+pointer(pill(), "pointermove", fx, fy);
+pointer(pill(), "pointerup", fx, fy);
+assert.match(yaml(), /grey_wolf:\n\s+name: grey wolf\n\s+in: first_room/);
+assert.equal($("#inspector .kind").textContent, "Character");
+
+// A shopkeeper, with something for sale.
+press($('#map [data-room="first_room"]'));
+typeName(addPerson("merchant"), "Old Meg");
+const sale = [...document.querySelectorAll("#inspector .add.two")].at(-1);
+sale.querySelector("button").click();
+typeName(document.activeElement, "lantern oil");
+const price = [...document.querySelectorAll("#inspector label")].find((l) => l.textContent.startsWith("Price")).nextElementSibling;
+price.value = "5";
+price.dispatchEvent(new Event("input"));
+assert.match(yaml(), /lantern_oil:\n\s+name: lantern oil\n\s+in: old_meg\n\s+traits: \[portable\]\n\s+price: 5/);
+
+// Fighting settings with defaults: unticking "Fights back" writes false; ticking it again removes it.
+press($('#map [data-room="first_room"]'));
+[...document.querySelectorAll("#inspector .thing")].find((r) => r.textContent.includes("grey wolf")).click();
+const fights = () => [...document.querySelectorAll("#inspector label.check")].find((l) => l.textContent === "Fights back when attacked").querySelector("input");
+fights().checked = false;
+fights().dispatchEvent(new Event("change"));
+assert.match(yaml(), /fights_back: false/);
+fights().checked = true;
+fights().dispatchEvent(new Event("change"));
+assert.doesNotMatch(yaml(), /fights_back/);
+
+await tick(1500);
+assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
 
 assert.deepEqual(errors, []);
 console.log("ok   editor page");

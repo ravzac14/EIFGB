@@ -152,6 +152,43 @@ export const KINDS = {
 } as const;
 export type Kind = keyof typeof KINDS;
 
+export const BEHAVIORS = ["stationary", "conversationalist", "wanderer", "merchant", "hunter", "guard", "follower", "defender"] as const;
+export type Behavior = (typeof BEHAVIORS)[number];
+
+/** A character, as the editor shows it. */
+export interface Character {
+  id: string;
+  name: string;
+  in: string | null;
+  description: string;
+  synonyms: string[];
+  /** As written; null means the default (stationary, or conversationalist with `talk`). */
+  behavior: string | null;
+  faction: string | null;
+  talk: string | null;
+  health: number | null;
+  damage: number | null;
+}
+
+/** People a newcomer can start from. */
+export const PEOPLE = {
+  talker: { name: "stranger", fields: { behavior: "conversationalist" } },
+  merchant: { name: "shopkeeper", fields: { behavior: "merchant" } },
+  wanderer: { name: "traveller", fields: { behavior: "wanderer" } },
+  follower: { name: "companion", fields: { behavior: "follower" } },
+  hunter: { name: "wolf", fields: { behavior: "hunter", health: 5, damage: 1 } },
+  guard: { name: "guard", fields: { behavior: "guard", health: 8, damage: 2 } },
+  still: { name: "person", fields: {} },
+} as const;
+export type Person = keyof typeof PEOPLE;
+
+export interface Faction {
+  id: string;
+  /** Other factions, and/or `player`. */
+  hostileTo: string[];
+  members: string[];
+}
+
 export class Model {
   doc: Document;
   private original: string;
@@ -180,6 +217,11 @@ export class Model {
   private keys(section: string): string[] {
     const m = this.map([section]);
     return m ? m.items.map((p) => String(isScalar(p.key) ? p.key.value : p.key)) : [];
+  }
+
+  /** Dialogues and menus, from `choices`. */
+  choiceIds(): string[] {
+    return this.keys("choices");
   }
 
   roomIds(): string[] {
@@ -350,7 +392,7 @@ export class Model {
 
   /** Whether things can go in or on `id`: rooms, the player, containers and supporters. */
   canHold(id: string): boolean {
-    if (id === "player" || this.room(id)) return true;
+    if (id === "player" || this.room(id) || this.character(id)) return true;
     const t = this.traits(["objects", id]);
     return t.includes("container") || t.includes("supporter");
   }
@@ -360,7 +402,7 @@ export class Model {
     let at: string | null = id;
     for (let i = 0; i < 100 && at; i++) {
       if (at === "player" || this.room(at)) return at;
-      at = this.thing(at)?.in ?? null;
+      at = this.thing(at)?.in ?? this.character(at)?.in ?? null;
     }
     return null;
   }
@@ -475,6 +517,183 @@ export class Model {
     this.doc.deleteIn(["objects", id]);
   }
 
+  // ------------------------------------------------------ characters
+
+  characterIds(): string[] {
+    return this.keys("characters");
+  }
+
+  character(id: string): Character | null {
+    const m = this.map(["characters", id]);
+    if (!m) return null;
+    const num = (k: string) => {
+      const v = this.get(["characters", id, k]);
+      return typeof v === "number" ? v : null;
+    };
+    const syn = this.doc.getIn(["characters", id, "synonyms"], true);
+    return {
+      id,
+      name: str(m.get("name")) ?? id,
+      in: str(m.get("in")) ?? null,
+      description: str(m.get("description")) ?? "",
+      synonyms: isSeq(syn) ? syn.items.map((i) => String(isScalar(i) ? i.value : i)) : [],
+      behavior: str(m.get("behavior")) ?? null,
+      faction: str(m.get("faction")) ?? null,
+      talk: str(m.get("talk")) ?? null,
+      health: num("health"),
+      damage: num("damage"),
+    };
+  }
+
+  characters(): Character[] {
+    return this.characterIds()
+      .map((id) => this.character(id))
+      .filter((c): c is Character => c !== null);
+  }
+
+  /** The behaviour that applies, defaults included. */
+  behaviorOf(c: Character): Behavior {
+    const b = c.behavior ?? (c.talk ? "conversationalist" : "stationary");
+    return (BEHAVIORS as readonly string[]).includes(b) ? (b as Behavior) : "stationary";
+  }
+
+  /** Whether a character will attack the player: by behaviour, or by its faction. */
+  hostile(c: Character): boolean {
+    const b = this.behaviorOf(c);
+    if (b === "hunter" || b === "guard") return true;
+    return !!c.faction && this.faction(c.faction)?.hostileTo.includes("player") === true;
+  }
+
+  /** Characters who start in `room`. */
+  peopleIn(room: string): Character[] {
+    return this.characters().filter((c) => c.in === room);
+  }
+
+  addCharacter(kind: Person, room: string | null, name?: string): string {
+    const k = PEOPLE[kind];
+    const n = name ?? k.name;
+    const id = this.freshId(slug(n, "character"));
+    if (!this.map(["characters"])) this.doc.setIn(["characters"], this.doc.createNode({}));
+    this.doc.setIn(["characters", id], this.doc.createNode({ name: n, ...(room ? { in: room } : {}), ...k.fields }));
+    // Enemies need the player to have health to fight with.
+    if ((kind === "hunter" || kind === "guard") && this.get(["player", "health"]) === undefined) {
+      if (!this.map(["player"])) this.addSection("player", { health: 10 }, ["game", "settings", "vars"]);
+      else this.set(["player", "health"], 10);
+    }
+    return id;
+  }
+
+  /** Moves a character to a room (or nowhere). */
+  moveCharacter(id: string, room: string | null) {
+    this.set(["characters", id, "in"], room ?? undefined);
+  }
+
+  renameCharacter(old: string, next: string): string | null {
+    next = slug(next, "character");
+    if (next === old) return old;
+    if (this.allIds().has(next)) return null;
+    const pair = this.map(["characters"])?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
+    if (!pair) return null;
+    pair.key = new Scalar(next);
+    // What it carries.
+    for (const o of this.objectIds()) {
+      const v = this.doc.getIn(["objects", o, "in"], true);
+      if (isScalar(v) && v.value === old) v.value = next;
+    }
+    return next;
+  }
+
+  /** Deletes a character; what it carries is left in its room. */
+  deleteCharacter(id: string) {
+    const room = this.character(id)?.in ?? null;
+    for (const o of this.objectIds()) if (str(this.get(["objects", o, "in"])) === id) this.set(["objects", o, "in"], room ?? undefined);
+    this.doc.deleteIn(["characters", id]);
+  }
+
+  // -------------------------------------------------------- factions
+
+  factionIds(): string[] {
+    return this.keys("factions");
+  }
+
+  faction(id: string): Faction | null {
+    if (!this.doc.hasIn(["factions", id])) return null;
+    const h = this.doc.getIn(["factions", id, "hostile_to"], true);
+    return {
+      id,
+      hostileTo: isSeq(h) ? h.items.map((i) => String(isScalar(i) ? i.value : i)) : [],
+      members: this.characters().filter((c) => c.faction === id).map((c) => c.id),
+    };
+  }
+
+  factions(): Faction[] {
+    return this.factionIds()
+      .map((id) => this.faction(id))
+      .filter((f): f is Faction => f !== null);
+  }
+
+  addFaction(name: string): string {
+    let id = slug(name, "faction");
+    const used = new Set(this.factionIds());
+    if (used.has(id)) for (let i = 2; ; i++) if (!used.has(`${id}_${i}`)) { id = `${id}_${i}`; break; }
+    if (!this.map(["factions"])) this.doc.setIn(["factions"], this.doc.createNode({}));
+    this.doc.setIn(["factions", id], this.doc.createNode({}));
+    return id;
+  }
+
+  /** `a` attacks `b` (another faction, or "player") on sight, or stops. */
+  setHostile(a: string, b: string, on: boolean) {
+    const now = this.faction(a)?.hostileTo ?? [];
+    const next = on ? [...new Set([...now, b])] : now.filter((x) => x !== b);
+    if (!this.map(["factions", a])) this.doc.setIn(["factions", a], this.doc.createNode({}));
+    this.setList(["factions", a, "hostile_to"], next);
+  }
+
+  /** Every place a faction is named: members, hostility, disguises, eaten_by. */
+  private factionRefs(fn: (node: unknown, parent: YAMLMap | YAMLSeq, key: unknown) => void) {
+    for (const s of ["characters", "objects"]) {
+      for (const id of this.keys(s)) {
+        const m = this.map([s, id]);
+        if (!m) continue;
+        for (const k of ["faction", "disguise"]) if (m.has(k)) fn(m.get(k, true), m, k);
+        const e = m.get("eaten_by", true);
+        if (isSeq(e)) [...e.items].forEach((x, i) => fn(x, e, i));
+      }
+    }
+    for (const f of this.factionIds()) {
+      const h = this.doc.getIn(["factions", f, "hostile_to"], true);
+      if (isSeq(h)) [...h.items].forEach((x, i) => fn(x, h, i));
+    }
+  }
+
+  renameFaction(old: string, next: string): string | null {
+    next = slug(next, "faction");
+    if (next === old) return old;
+    if (this.factionIds().includes(next) || next === "player") return null;
+    const pair = this.map(["factions"])?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
+    if (!pair) return null;
+    pair.key = new Scalar(next);
+    this.factionRefs((n) => {
+      if (isScalar(n) && n.value === old) n.value = next;
+    });
+    return next;
+  }
+
+  deleteFaction(id: string) {
+    this.doc.deleteIn(["factions", id]);
+    // Remove references, from the end of lists so indexes stay right.
+    const drop: [YAMLMap | YAMLSeq, unknown][] = [];
+    this.factionRefs((n, parent, key) => {
+      if (isScalar(n) && n.value === id) drop.push([parent, key]);
+    });
+    for (const [parent, key] of drop.reverse()) parent.delete(key);
+    for (const f of this.factionIds()) {
+      const h = this.doc.getIn(["factions", f, "hostile_to"], true);
+      if (isSeq(h) && !h.items.length) this.doc.deleteIn(["factions", f, "hostile_to"]);
+    }
+    if (!this.factionIds().length) this.doc.deleteIn(["factions"]);
+  }
+
   // ---------------------------------------------------------- writing
 
   /** Sets a value, or removes it when `value` is undefined (and tidies empty maps away). */
@@ -498,6 +717,38 @@ export class Model {
       }
     }
     this.doc.setIn(path, this.doc.createNode(value));
+  }
+
+  /** A list of words at `path` (`[a, b]`, or a single word), or []. */
+  list(path: (string | number)[]): string[] {
+    const v = this.doc.getIn(path, true);
+    if (isSeq(v)) return v.items.map((i) => String(isScalar(i) ? i.value : i));
+    const s = str(v);
+    return s ? [s] : [];
+  }
+
+  /** Adds a top-level section after the last of `after` that exists (or at the end). */
+  addSection(key: string, value: unknown, after: string[]) {
+    const root = this.doc.contents;
+    if (!isMap(root)) return this.doc.setIn([key], this.doc.createNode(value));
+    const at = Math.max(-1, ...after.map((k) => root.items.findIndex((p) => (isScalar(p.key) ? p.key.value : p.key) === k)));
+    const pair = this.doc.createPair(key, value);
+    if (isMap(pair.value)) pair.value.flow = false;
+    // A blank line before it, like the sections around it.
+    (pair.key as Scalar).spaceBefore = true;
+    root.items.splice(at + 1, 0, pair as Pair);
+  }
+
+  /** A true/false field with a default: the default is written by leaving it out. */
+  setBool(path: (string | number)[], value: boolean, byDefault: boolean) {
+    if (value === byDefault) this.set(path, undefined);
+    else this.doc.setIn(path, value);
+  }
+
+  /** A true/false field, its default applied. */
+  bool(path: (string | number)[], byDefault: boolean): boolean {
+    const v = this.get(path);
+    return typeof v === "boolean" ? v : byDefault;
   }
 
   /** A new ID not used by anything else. */

@@ -11,7 +11,9 @@ export type Selection =
   | null
   | { kind: "room"; id: string }
   | { kind: "exit"; room: string; dir: Direction }
-  | { kind: "thing"; id: string };
+  | { kind: "thing"; id: string }
+  | { kind: "character"; id: string }
+  | { kind: "faction"; id: string };
 
 /** The drag-and-drop type for things dragged from the details panel. */
 export const THING_DRAG = "application/x-eifgb-thing";
@@ -24,8 +26,17 @@ export interface MapActions {
   /** Clicked a handle, or dragged it into empty space (`at`). */
   addRoomBeside(from: string, dir: Direction, at?: Point): void;
   addRoomAt(at: Point): void;
-  /** A thing dragged from the details panel, dropped on a room. */
+  /** A thing or character dragged from the details panel, dropped on a room. */
   dropThing(id: string, room: string): void;
+  /** A character's pill dragged to another room. */
+  moveCharacter(id: string, room: string): void;
+}
+
+/** A side's colour: the same hue every time for the same name. */
+export function factionHue(id: string): number {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return h;
 }
 
 const NS = "http://www.w3.org/2000/svg";
@@ -239,12 +250,15 @@ export class MapView {
     const roomLayer = svg("g", {}, this.root);
     this.drawLinks();
     for (const id of model.roomIds()) this.drawRoom(roomLayer, id);
+    this.peopleLayer = svg("g", {}, this.root);
+    for (const id of model.roomIds()) this.drawPeople(this.peopleLayer, id);
     this.handleLayer = svg("g", {}, this.root);
     if (selection?.kind === "room") this.drawHandles(this.handleLayer, selection.id);
     this.apply();
   }
 
   private linkLayer: SVGGElement | null = null;
+  private peopleLayer: SVGGElement | null = null;
   private handleLayer: SVGGElement | null = null;
 
   private drawLinks() {
@@ -395,6 +409,8 @@ export class MapView {
       g.setAttribute("transform", `translate(${p.x} ${p.y})`);
       this.handleLayer?.replaceChildren();
       this.drawLinks();
+      this.peopleLayer?.replaceChildren();
+      for (const r of this.model!.roomIds()) this.drawPeople(this.peopleLayer!, r);
     });
     // Select on release: selecting redraws the map, which would end a drag.
     g.addEventListener("pointerup", () => {
@@ -409,6 +425,69 @@ export class MapView {
         this.actions.moveRoom(id, to);
       }
       if (!selected || d.moved) this.actions.select({ kind: "room", id });
+    });
+  }
+
+  /** Characters as small pills under their room: tinted by side, enemies marked. */
+  private drawPeople(layer: SVGGElement, room: string) {
+    const p = this.positions.get(room);
+    if (!p || !this.model) return;
+    const people = this.model.peopleIn(room);
+    const shown = people.slice(0, 3);
+    const widths = shown.map((c) => Math.min(12, c.name.length) * 6.2 + (this.model!.hostile(c) ? 26 : 16));
+    const extra = people.length - shown.length;
+    const total = widths.reduce((a, b) => a + b, 0) + (shown.length - 1) * 4 + (extra ? 30 : 0);
+    let x = p.x - total / 2;
+    const y = p.y + H / 2 + 6;
+    shown.forEach((c, i) => {
+      const w = widths[i];
+      const selected = this.selection?.kind === "character" && this.selection.id === c.id;
+      const hostile = this.model!.hostile(c);
+      const hue = c.faction ? factionHue(c.faction) : null;
+      const g = svg("g", { class: `person${selected ? " selected" : ""}${hostile ? " hostile" : ""}` }, layer);
+      const rect = svg("rect", { x, y, width: w, height: 18, rx: 9 }, g);
+      if (hue !== null) rect.setAttribute("style", `fill: hsl(${hue} 65% 55% / 0.28)`);
+      const label = (hostile ? "⚔ " : "") + (c.name.length > 12 ? `${c.name.slice(0, 11)}…` : c.name);
+      const t = svg("text", { x: x + w / 2, y: y + 9.5 }, g);
+      t.textContent = label;
+      const title = svg("title", {}, g);
+      title.textContent = `${c.name}: ${this.model!.behaviorOf(c)}${c.faction ? `, ${c.faction}` : ""}${hostile ? " (attacks the player)" : ""}`;
+      this.dragPerson(g, c.id, room);
+      x += w + 4;
+    });
+    if (extra) {
+      const t = svg("text", { class: "label", x: x + 14, y: y + 9.5 }, layer);
+      t.textContent = `+${extra}`;
+    }
+  }
+
+  /** Click a pill to select it; drag it to another room to move them. */
+  private dragPerson(g: SVGGElement, id: string, room: string) {
+    let down: { x: number; y: number } | null = null;
+    let ghost: SVGGElement | null = null;
+    g.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      g.setPointerCapture(e.pointerId);
+      down = { x: e.clientX, y: e.clientY };
+    });
+    g.addEventListener("pointermove", (e) => {
+      if (!down) return;
+      if (!ghost && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4) return;
+      ghost ??= g.cloneNode(true) as SVGGElement;
+      ghost.classList.add("ghost");
+      this.root.append(ghost);
+      const a = this.toMap(down.x, down.y);
+      const b = this.toMap(e.clientX, e.clientY);
+      ghost.setAttribute("transform", `translate(${b.x - a.x} ${b.y - a.y})`);
+    });
+    g.addEventListener("pointerup", (e) => {
+      const moved = !!ghost;
+      ghost?.remove();
+      ghost = null;
+      down = null;
+      if (!moved) return this.actions.select({ kind: "character", id });
+      const to = this.roomAt(this.toMap(e.clientX, e.clientY));
+      if (to && to !== room) this.actions.moveCharacter(id, to);
     });
   }
 

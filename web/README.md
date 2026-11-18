@@ -23,7 +23,20 @@ npm run build     # the finished site, in dist/
 ```
 
 `npm run dev` and `npm run build` first copy the example games from
-`spec/examples` into `public/games/` (also not committed).
+`spec/examples` into `public/games/`, and build the docs into
+`public/docs/` (neither is committed). `npm run docs` rebuilds just the
+docs.
+
+## Docs
+
+`scripts/build-docs.mjs` turns `README.md` (the guide), `docs/SCRIPTING.md`,
+`docs/ADVANCED.md`, `spec/FORMAT.md` and `docs/IDEAS.md` into pages under
+`docs/`, with a contents sidebar, and makes a page per example game showing
+its files with a Play button. Links between the documents become links
+between the pages, and links to `spec/examples/<id>/` go to that game's
+page. The build fails if a link points at a heading that doesn't exist, or
+at a file that has no page. Code is highlighted at build time; the pages
+need no JavaScript.
 
 ## Pages
 

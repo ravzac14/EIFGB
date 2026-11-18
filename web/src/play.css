@@ -46,3 +46,4 @@
 .slots li { border-top: 1px solid var(--line); padding: 0.5rem 0; }
 .slots .when { color: var(--dim); font-size: 0.85em; display: block; }
 .slots .row { margin: 0.3rem 0 0; }
+.bar .help { align-self: center; text-decoration: none; }

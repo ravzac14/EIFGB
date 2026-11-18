@@ -13,9 +13,9 @@ You lift the corner of the mat. Underneath is a small key, which you take.
 You unlock the pantry door with the small key.
 ```
 
-> **Status: early.** Everything runs from the command line for now. A web
-> player and an online editor are planned. The file format may still change
-> before 1.0.
+> **Status: early.** Games run from the command line, and in the browser
+> with the web player (in `web/`). An online editor is on its way. The file
+> format may still change before 1.0.
 
 - [Quick start](#quick-start)
 - [Tutorial: Midnight Snack](#tutorial-midnight-snack)

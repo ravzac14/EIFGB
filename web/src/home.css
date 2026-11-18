@@ -14,3 +14,7 @@ h2 { font-size: 1.2rem; margin: 2rem 0 0.8rem; font-family: var(--sans); }
 .drop .row { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
 .drop .msg { color: var(--err); font-family: var(--sans); font-size: 0.9em; min-height: 1.2em; }
 footer { margin: 3rem auto 2rem; }
+.top { display: flex; gap: 1rem; justify-content: flex-end; padding-top: 0.8rem; }
+.top a { text-decoration: none; }
+.learn { padding-left: 1.2rem; }
+.learn li { margin: 0.35rem 0; }

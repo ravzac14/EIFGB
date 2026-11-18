@@ -3,5 +3,6 @@
 # Built by web/scripts/build-wasm.sh
 /web/public/wasm/
 /web/public/games/
+/web/public/docs/
 /web/node_modules/
 /web/dist/

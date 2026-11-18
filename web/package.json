@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "wasm": "scripts/build-wasm.sh",
-    "games": "node scripts/bundle-games.mjs",
-    "dev": "npm run games && vite",
-    "build": "npm run games && tsc --noEmit && vite build",
+    "docs": "node scripts/build-docs.mjs --strict",
+    "prepare-site": "node scripts/bundle-games.mjs && node scripts/build-docs.mjs --strict",
+    "dev": "npm run prepare-site && vite",
+    "build": "npm run prepare-site && tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "node test/files.mjs && node test/walkthroughs.mjs"
   },
@@ -17,6 +18,9 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "github-slugger": "^2.0.0",
+    "highlight.js": "^11.12.0",
+    "marked": "^16.4.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.8"
   }

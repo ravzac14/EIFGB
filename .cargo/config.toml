@@ -1,0 +1,12 @@
+# The browser build: `cargo build -p eifgb-web --release --target wasm32-unknown-emscripten`
+# (or `web/scripts/build-wasm.sh`, which also copies the result into web/).
+[target.wasm32-unknown-emscripten]
+rustflags = [
+  "-C", "link-arg=-sEXPORTED_FUNCTIONS=_eifgb_load,_eifgb_check,_eifgb_input,_eifgb_save,_eifgb_restore",
+  "-C", "link-arg=-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString",
+  "-C", "link-arg=-sMODULARIZE=1",
+  "-C", "link-arg=-sEXPORT_ES6=1",
+  "-C", "link-arg=-sEXPORT_NAME=createEifgb",
+  "-C", "link-arg=-sALLOW_MEMORY_GROWTH=1",
+  "-C", "link-arg=-sENVIRONMENT=web,worker,node",
+]

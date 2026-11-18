@@ -1,2 +1,4 @@
 /target
 *.story.json
+# Built by web/scripts/build-wasm.sh
+/web/src/wasm/

@@ -1,0 +1,16 @@
+[package]
+name = "eifgb-web"
+description = "The engine, compiler and Lua for the browser (wasm32-unknown-emscripten)"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "eifgb-web"
+path = "src/main.rs"
+
+[dependencies]
+eifgb-compiler.workspace = true
+eifgb-engine.workspace = true
+eifgb-lua.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,126 @@
+//! The browser bridge. Built for `wasm32-unknown-emscripten`, it exports a
+//! handful of C functions that take and return UTF-8 strings (JSON), so the
+//! page can compile a game, play it, and save and restore it.
+//!
+//! One game runs at a time. Each returned string stays valid until the next
+//! call; JavaScript copies it straight away (`UTF8ToString`).
+
+use eifgb_compiler::{compile, MemFiles, Severity};
+use eifgb_engine::Game;
+use eifgb_lua::LuaHost;
+use serde_json::{json, Value};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::ffi::{c_char, CStr, CString};
+
+thread_local! {
+    static GAME: RefCell<Option<Game<LuaHost>>> = const { RefCell::new(None) };
+    static RETURNED: RefCell<CString> = RefCell::new(CString::default());
+}
+
+fn arg(p: *const c_char) -> String {
+    if p.is_null() {
+        return String::new();
+    }
+    // SAFETY: the page passes NUL-terminated strings it allocated for the call.
+    unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
+}
+
+fn give(v: Value) -> *const c_char {
+    let s = CString::new(v.to_string()).unwrap_or_default();
+    RETURNED.with(|r| {
+        *r.borrow_mut() = s;
+        r.borrow().as_ptr()
+    })
+}
+
+fn output(o: eifgb_engine::Output) -> Value {
+    serde_json::to_value(o).unwrap_or(Value::Null)
+}
+
+/// Compiles a project and starts it. `files` is a JSON object of
+/// project-relative paths to file contents; `entry` is usually `game.yaml`.
+/// Returns `{ diagnostics: [{severity, path, message}], output? }`, with
+/// `output` (the opening) only when it compiled and started.
+fn load(files: &str, entry: &str, seed: u64) -> Value {
+    let files: BTreeMap<String, String> = match serde_json::from_str(files) {
+        Ok(f) => f,
+        Err(e) => return json!({ "diagnostics": [{ "severity": "error", "path": "", "message": format!("bad files: {e}") }] }),
+    };
+    let entry = if entry.is_empty() { "game.yaml" } else { entry };
+    let out = compile(&MemFiles(files), entry);
+    let diagnostics: Vec<Value> = out
+        .diagnostics
+        .iter()
+        .map(|d| {
+            let sev = match d.severity {
+                Severity::Error => "error",
+                Severity::Warning => "warning",
+            };
+            json!({ "severity": sev, "path": d.path, "message": d.message })
+        })
+        .collect();
+    let Some(story) = out.story else { return json!({ "diagnostics": diagnostics }) };
+    let started = LuaHost::new().and_then(|h| Game::new(story, h, seed));
+    match started {
+        Ok(mut g) => {
+            let opening = output(g.start());
+            GAME.with(|cell| *cell.borrow_mut() = Some(g));
+            json!({ "diagnostics": diagnostics, "output": opening })
+        }
+        Err(e) => {
+            let mut diagnostics = diagnostics;
+            diagnostics.push(json!({ "severity": "error", "path": "", "message": e.to_string() }));
+            json!({ "diagnostics": diagnostics })
+        }
+    }
+}
+
+fn with_game(f: impl FnOnce(&mut Game<LuaHost>) -> Value) -> Value {
+    GAME.with(|cell| match cell.borrow_mut().as_mut() {
+        Some(g) => f(g),
+        None => json!({ "error": "no game is running" }),
+    })
+}
+
+/// Compile and start; see [`load`]. The page picks the seed (e.g. from the clock).
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_load(files: *const c_char, entry: *const c_char, seed: f64) -> *const c_char {
+    give(load(&arg(files), &arg(entry), seed as u64))
+}
+
+/// Compile only, for the editor's live check: `{ diagnostics }`.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_check(files: *const c_char, entry: *const c_char) -> *const c_char {
+    let files: BTreeMap<String, String> = serde_json::from_str(&arg(files)).unwrap_or_default();
+    let entry = arg(entry);
+    let out = compile(&MemFiles(files), if entry.is_empty() { "game.yaml" } else { &entry });
+    let diagnostics: Vec<Value> = out
+        .diagnostics
+        .iter()
+        .map(|d| json!({ "severity": if d.severity == Severity::Error { "error" } else { "warning" }, "path": d.path, "message": d.message }))
+        .collect();
+    give(json!({ "diagnostics": diagnostics }))
+}
+
+/// One line of player input: the game's output as JSON.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_input(line: *const c_char) -> *const c_char {
+    let line = arg(line);
+    give(with_game(|g| output(g.input(&line))))
+}
+
+/// The whole game state, for autosaves and save slots.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_save() -> *const c_char {
+    give(with_game(|g| Value::String(g.world().save())))
+}
+
+/// Restores a save made by SAVE or [`eifgb_save`]: the output as JSON.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_restore(save: *const c_char) -> *const c_char {
+    let save = arg(save);
+    give(with_game(|g| output(g.restore(&save))))
+}
+
+fn main() {}

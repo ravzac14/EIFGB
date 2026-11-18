@@ -13,7 +13,10 @@
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --legible: "Atkinson Hyperlegible", system-ui, sans-serif;
   --text: 1.125rem;
+  --leading: 1.6;
+  --measure: 42rem;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -29,6 +32,36 @@
 :root[data-theme="sepia"] {
   --bg: #f1e5cc; --panel: #e8d9ba; --fg: #3b2f1e; --dim: #7a6a50; --line: #d2bf98; --accent: #8a3d0e;
 }
+/* Terminal: phosphor on black, everything in monospace. */
+:root[data-theme="terminal"], :root[data-theme="amber"] {
+  --bg: #070a07; --panel: #0e140e; --fg: #6dff8a; --dim: #3fae5a; --line: #1d3a24;
+  --accent: #b6ffc4; --err: #ff7070; --warn: #ffd166;
+  --serif: var(--mono); --sans: var(--mono); --legible: var(--mono);
+  --glow: rgb(109 255 138 / 0.35);
+  color-scheme: dark;
+}
+:root[data-theme="amber"] {
+  --bg: #0b0802; --panel: #151005; --fg: #ffb000; --dim: #b47c00; --line: #3a2a08; --accent: #ffd27a;
+  --glow: rgb(255 176 0 / 0.35);
+}
+:root:is([data-theme="terminal"], [data-theme="amber"]) body { text-shadow: 0 0 6px var(--glow); }
+/* Faint scan lines over the whole screen. */
+:root:is([data-theme="terminal"], [data-theme="amber"]) body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 10;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgb(0 0 0 / 0.18) 2px 3px);
+}
+/* High contrast: white on black, yellow links, strong outlines. */
+:root[data-theme="contrast"] {
+  --bg: #000; --panel: #000; --fg: #fff; --dim: #dcdcdc; --line: #fff;
+  --accent: #ffd400; --err: #ff9b9b; --warn: #ffd400;
+  color-scheme: dark;
+}
+:root[data-theme="contrast"] a { text-decoration-thickness: 2px; }
+:root[data-theme="contrast"] :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+:root[data-theme="contrast"] button { border-width: 2px; }
+:root[data-spacing="relaxed"] { --leading: 1.95; }
+:root[data-width="narrow"] { --measure: 34rem; }
+:root[data-width="wide"] { --measure: 54rem; }
 :root[data-size="small"] { --text: 1rem; }
 :root[data-size="large"] { --text: 1.3rem; }
 
@@ -40,9 +73,10 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: var(--text) / 1.6 var(--serif);
+  font: var(--text) / var(--leading) var(--serif);
 }
 :root[data-face="sans"] body { font-family: var(--sans); }
+:root[data-face="legible"] body { font-family: var(--legible); }
 a { color: var(--accent); }
 button, input, select { font: inherit; color: inherit; }
 button {
@@ -58,7 +92,7 @@ button:hover { border-color: var(--dim); }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 button.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wrap { max-width: 42rem; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 0 16px; }
 .dim { color: var(--dim); }
 .ui { font-family: var(--sans); font-size: 0.85em; }
 

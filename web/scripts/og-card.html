@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- The link-preview image (public/og.png), 1200×630. To redraw it after a change:
+     msedge --headless=new --screenshot=<web>\public\og.png --window-size=1200,630 <this file> -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #fbf8f1; color: #23211d;
+    font-family: "Palatino Linotype", Palatino, Georgia, serif;
+    display: grid; grid-template-columns: 1fr 470px; align-items: center; gap: 56px;
+    padding: 0 72px; box-sizing: border-box;
+  }
+  h1 { font-size: 64px; line-height: 1.05; margin: 0 0 22px; letter-spacing: -0.01em; }
+  p { font: 28px/1.45 "Segoe UI", system-ui, sans-serif; color: #6f6a60; margin: 0; }
+  .mark { display: inline-block; width: 56px; height: 56px; margin-bottom: 26px; }
+  .screen {
+    background: #23211d; color: #fbf8f1; border-radius: 22px; padding: 34px 36px;
+    font: 23px/1.55 Consolas, "Courier New", monospace; box-shadow: 0 18px 50px rgb(0 0 0 / 0.18);
+  }
+  .screen .cmd { color: #e3a35c; }
+  .screen .room { font-weight: bold; }
+  .cursor { display: inline-block; width: 13px; height: 24px; background: #fbf8f1; vertical-align: -4px; }
+</style>
+</head>
+<body>
+  <div>
+    <svg class="mark" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#23211d"/><path d="M14 20 L28 32 L14 44" fill="none" stroke="#e3a35c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><rect x="33" y="40" width="17" height="6" rx="2" fill="#fbf8f1"/></svg>
+    <h1>Interactive Fiction Game Builder/Player</h1>
+    <p>Make text adventures by drawing a map, and play them in your browser.</p>
+  </div>
+  <div class="screen">
+    <div class="room">Study</div>
+    <div>A heavy desk sits under the window.</div>
+    <br>
+    <div class="cmd">&gt; open the drawer</div>
+    <div>In the desk drawer you can see a brass key.</div>
+    <br>
+    <div class="cmd">&gt; take key<span class="cursor"></span></div>
+  </div>
+</body>
+</html>

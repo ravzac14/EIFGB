@@ -35,28 +35,34 @@ function remove(key: string) {
 
 // ------------------------------------------------------------- settings
 
-export type Theme = "auto" | "light" | "dark" | "sepia";
+export type Theme = "auto" | "light" | "dark" | "sepia" | "terminal" | "amber" | "contrast";
 export type Size = "small" | "medium" | "large";
-export type Face = "serif" | "sans";
+export type Face = "serif" | "sans" | "legible";
+export type Spacing = "normal" | "relaxed";
+export type Width = "narrow" | "medium" | "wide";
 export interface Settings {
   theme: Theme;
   size: Size;
   face: Face;
+  spacing: Spacing;
+  width: Width;
 }
-const DEFAULTS: Settings = { theme: "auto", size: "medium", face: "serif" };
+const DEFAULTS: Settings = { theme: "auto", size: "medium", face: "serif", spacing: "normal", width: "medium" };
 
 export const settings = {
   get: (): Settings => ({ ...DEFAULTS, ...read<Partial<Settings>>("settings", {}) }),
   set: (s: Settings) => write("settings", s),
 };
 
-/** Applies the settings to the page: `<html data-theme data-size data-face>`. */
+/** Applies the settings to the page: `<html data-theme data-size data-face data-spacing data-width>`. */
 export function applySettings(s = settings.get()) {
   const html = document.documentElement;
   if (s.theme === "auto") delete html.dataset.theme;
   else html.dataset.theme = s.theme;
   html.dataset.size = s.size;
   html.dataset.face = s.face;
+  html.dataset.spacing = s.spacing;
+  html.dataset.width = s.width;
 }
 
 // ------------------------------------------------------- your own games

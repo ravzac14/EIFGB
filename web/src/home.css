@@ -33,3 +33,22 @@ footer { margin: 3rem auto 2rem; }
 .share-result ul { margin: 0.4rem 0; padding-left: 1.2rem; }
 .share-result code { font-family: var(--mono); }
 .safety { margin: -0.8rem 0 1.5rem; padding: 0.45rem 0.8rem; border-left: 3px solid var(--warn); background: var(--panel); border-radius: 0 6px 6px 0; }
+
+/* The demo game at the top */
+.demo { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0.4rem 1.1rem 0.6rem; margin-top: 0.5rem; }
+.demo h2 { margin: 0.8rem 0 0.4rem; }
+.demo-log { max-height: 18rem; overflow-y: auto; }
+.demo-log p { margin: 0 0 0.55em; white-space: pre-wrap; }
+.demo-log .room, .demo-log .title { font-weight: bold; margin-top: 0.9em; }
+.demo-log .notice, .demo-log .banner { color: var(--dim); font-style: italic; }
+.demo-log .banner { display: none; }
+.demo-log .ending { font-weight: bold; }
+.demo-log .cmd { color: var(--accent); margin-top: 0.9em; }
+.demo-log .cmd::before { content: "> "; }
+.demo-log .error { color: var(--err); }
+.demo-prompt { display: flex; gap: 0.5em; align-items: baseline; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.demo-prompt .caret { color: var(--accent); }
+.demo-prompt input { flex: 1; min-width: 0; font-size: max(16px, 1em); background: transparent; border: 0; outline: none; padding: 0.25em 0; }
+.demo-hint { margin: 0.3rem 0 0.2rem; }
+.demo-hint code { font-family: var(--mono); }
+.demo .after { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.3rem 0 0.4rem; font-family: var(--sans); font-size: 0.9em; }

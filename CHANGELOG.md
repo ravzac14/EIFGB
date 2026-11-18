@@ -8,6 +8,12 @@ behave will be called out here.
 
 - The home page's heading is now *Interactive Fiction Game Builder/Player*.
 - This changelog, on the website.
+- A tiny game to try at the top of the home page: you're locked in a study.
+- New looks in *Text and colours*: Terminal (green or amber, with a soft
+  glow and scan lines) and High contrast. A *Very legible* typeface
+  (Atkinson Hyperlegible), roomier line spacing, and narrow, medium or wide
+  columns. They apply to the player, the editor and the docs.
+- The site has an icon, and links to it show a preview card when shared.
 
 ## 2026-11-17: the website
 

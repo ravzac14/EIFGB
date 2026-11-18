@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Interactive Fiction Game Builder/Player</title>
 <meta name="description" content="Play interactive fiction made with EIFGB, or load your own game.">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Interactive Fiction Game Builder/Player">
+<meta property="og:title" content="Interactive Fiction Game Builder/Player">
+<meta property="og:description" content="Make text adventures by drawing a map, and play them in your browser.">
+<meta property="og:url" content="https://ravzac14.github.io/EIFGB/">
+<meta property="og:image" content="https://ravzac14.github.io/EIFGB/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="./src/style.css">
 <link rel="stylesheet" href="./src/home.css">
 </head>
@@ -15,6 +23,19 @@
   <p class="dim">Interactive fiction you can play right here. Type what you want to do; the story answers.</p>
 </header>
 <main class="wrap">
+  <section class="demo" aria-labelledby="demo-title">
+    <h2 id="demo-title">Try it: you're locked in</h2>
+    <div id="demo-log" class="demo-log" aria-live="polite">
+      <p class="notice">The door clicked shut behind you. There must be a way out.</p>
+      <p class="room">Study</p>
+      <p>A cramped study. A heavy desk sits under the window, and the only door is to the north.</p>
+    </div>
+    <form id="demo-form" class="demo-prompt">
+      <label for="demo-line" class="caret">&gt;</label>
+      <input id="demo-line" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" placeholder="Type a command: look at the desk">
+    </form>
+    <p class="dim ui demo-hint">Stuck? Try <code>examine desk</code>, <code>open drawer</code>, <code>take key</code>…</p>
+  </section>
   <section>
     <h2>Games to play</h2>
     <ul id="examples" class="games"><li class="dim">Loading…</li></ul>

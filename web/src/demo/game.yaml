@@ -1,0 +1,54 @@
+# The little game at the top of the home page: four commands to win.
+format: eifgb/0.1
+
+game:
+  id: locked_in
+  title: "Locked In"
+  version: "1.0"
+  start: study
+  intro: The door clicked shut behind you. There must be a way out.
+
+rooms:
+  study:
+    name: Study
+    description: A cramped study. A heavy desk sits under the window, and the only door is to the north.
+    exits:
+      north: { to: hall, through: study_door }
+  hall:
+    name: Hallway
+    description: Fresh air at last.
+    on:
+      enter: end_game("out")
+
+objects:
+  study_door:
+    name: study door
+    synonyms: [door]
+    in: study
+    traits: [door, openable, lockable, scenery]
+    state: { locked: true }
+    unlocks_with: brass_key
+    description: Solid oak, with a small brass keyhole.
+  desk:
+    name: heavy desk
+    synonyms: [desk]
+    in: study
+    traits: [scenery]
+    description: An old desk with a single drawer.
+  drawer:
+    name: desk drawer
+    synonyms: [drawer]
+    in: study
+    traits: [scenery, container, openable]
+    description: A shallow drawer.
+  brass_key:
+    name: brass key
+    synonyms: [key]
+    in: drawer
+    traits: [portable]
+    description: Small and bright.
+
+endings:
+  out:
+    kind: win
+    text: "You're out. That's interactive fiction: you type, and the story answers."

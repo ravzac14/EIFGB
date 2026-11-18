@@ -2,7 +2,7 @@
 // tutorials, the format reference and the ideas list, plus a page for each
 // example game showing its files. Links between the documents are rewritten
 // to the pages, and every link to a heading is checked.
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Marked } from "marked";
@@ -70,8 +70,18 @@ const NAV = (current) =>
   PAGES.map((p) => `<a href="${p.page}"${p.page === current ? ' aria-current="page"' : ""}>${esc(p.nav)}</a>`).join("") +
   `<a href="examples.html"${current.startsWith("example") ? ' aria-current="page"' : ""}>Examples</a>`;
 
-// Applies the player's "Text and colours" choice before the page paints.
-const THEME = `<script>try{var s=JSON.parse(localStorage.getItem("eifgb:settings")||"{}"),h=document.documentElement;if(s.theme&&s.theme!=="auto")h.dataset.theme=s.theme;if(s.size)h.dataset.size=s.size}catch(e){}</script>`;
+// Applies the player's "Text and colours" choices before the page paints.
+const THEME = `<script>try{var s=JSON.parse(localStorage.getItem("eifgb:settings")||"{}"),h=document.documentElement;if(s.theme&&s.theme!=="auto")h.dataset.theme=s.theme;["size","face","spacing","width"].forEach(function(k){if(s[k])h.dataset[k]=s[k]})}catch(e){}</script>`;
+
+/** Where the site lives, for link previews (which need full addresses). */
+const SITE = "https://ravzac14.github.io/EIFGB/";
+const preview = (title, page) => `<meta property="og:type" content="website">
+<meta property="og:site_name" content="Interactive Fiction Game Builder/Player">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="Make and play interactive fiction in your browser.">
+<meta property="og:url" content="${SITE}docs/${page}">
+<meta property="og:image" content="${SITE}og.png">
+<meta name="twitter:card" content="summary_large_image">`;
 
 function layout({ title, page, toc, body, foot = "" }) {
   const contents = toc.length
@@ -87,6 +97,8 @@ function layout({ title, page, toc, body, foot = "" }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} · EIFGB</title>
 ${THEME}
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+${preview(title, page)}
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -246,10 +258,21 @@ for (const l of links) {
   if (l.hash && !anchors.get(l.page)?.has(l.hash)) warnings.push(`${l.from}: link ${l.href} points at a heading that doesn't exist`);
 }
 
-// The stylesheet: the site's shared look plus the docs' own.
+// The legible typeface, served with the docs.
+const fonts = join(web, "node_modules/@fontsource/atkinson-hyperlegible/files");
+mkdirSync(join(out, "fonts"), { recursive: true });
+const faces = [400, 700]
+  .map((w) => {
+    const file = `atkinson-hyperlegible-latin-${w}-normal.woff2`;
+    copyFileSync(join(fonts, file), join(out, "fonts", file));
+    return `@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: ${w}; font-display: swap; src: url(fonts/${file}) format("woff2"); }`;
+  })
+  .join("\n");
+
+// The stylesheet: the typeface, the site's shared look, and the docs' own.
 writeFileSync(
   join(out, "site.css"),
-  readFileSync(join(web, "src/style.css"), "utf8") + "\n" + readFileSync(join(web, "src/docs.css"), "utf8"),
+  `${faces}\n${readFileSync(join(web, "src/style.css"), "utf8")}\n${readFileSync(join(web, "src/docs.css"), "utf8")}`,
 );
 
 for (const w of warnings) console.warn(`warning: ${w}`);

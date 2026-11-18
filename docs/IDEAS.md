@@ -82,3 +82,52 @@ in the game.
   its position in `map.yaml` (`kitchen: [x, y, w, h]`); lines, handles and
   drop targets use each room's own size.
 - Effort: small.
+
+### More editor ideas
+
+- **Play inside the editor:** a play panel beside the map, so testing
+  doesn't mean switching tabs; optionally "start from this room".
+- **Colours for rooms or regions** on the map (with resizable rooms above).
+- **Starter templates:** "a small house", "a dungeon with a locked door",
+  to start a new game from.
+- **A blueprint theme** for the map: white lines on blue, so map work feels
+  different from playing.
+
+## The player
+
+### A map you fill in as you go
+
+A Map button in the player showing the rooms the player has visited and the
+ways between them, drawn like the editor's map.
+
+- Builds on: the editor's layout (`web/src/editor/layout.ts`, `map.yaml`)
+  and the save state (visited rooms).
+- Effort: medium. Recommended next.
+
+### Themes chosen by the game
+
+An author sets the look of their game, which players can still override:
+`presentation: { theme: terminal, accent: "#c33" }` in `game.yaml`.
+
+- Builds on: the player's themes and settings.
+- Shape: a new optional `presentation` section (web-only hints the engine
+  ignores); the player applies it unless the player picked a theme
+  themselves. Needs a decision on putting presentation in the game file.
+- Effort: small.
+
+### Smaller ideas
+
+- **Tap a word to act on it:** names of things in the text become tappable
+  (EXAMINE), with quick buttons for LOOK, INVENTORY and the compass. Needs
+  the engine to mark which words are things.
+- **Parchment theme:** paper texture, and a drop capital on each room's
+  first line.
+- **Typewriter reveal:** text appears letter by letter; off by default,
+  any key skips.
+- **Endings collected:** "You've found 2 of 3 endings" on the home page
+  card, as a reason to replay.
+- **Download a transcript** of a play-through.
+
+## The website
+
+- **A featured game** at the top of the gallery.

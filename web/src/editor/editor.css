@@ -6,6 +6,8 @@
   :root:not([data-theme]) { --room: #2a2825; --room-line: #5c564c; --sel: #6fa3ff; --link: #8d877b; --door: #e3a35c; --bad: #ff6b7f; }
 }
 :root[data-theme="dark"] { --room: #2a2825; --room-line: #5c564c; --sel: #6fa3ff; --link: #8d877b; --door: #e3a35c; --bad: #ff6b7f; }
+:root:is([data-theme="terminal"], [data-theme="amber"]) { --room: var(--panel); --room-line: var(--dim); --sel: var(--accent); --link: var(--dim); --door: var(--accent); --bad: #ff7070; }
+:root[data-theme="contrast"] { --room: #000; --room-line: #fff; --sel: #00e0ff; --link: #fff; --door: #ffd400; --bad: #ff6b6b; }
 :root[data-theme="sepia"] { --room: #f7ecd6; --room-line: #b59f78; }
 
 body.editor { font-family: var(--sans); font-size: 0.95rem; }

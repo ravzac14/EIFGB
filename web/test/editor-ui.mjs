@@ -2,6 +2,7 @@
 // draws rooms and exits by clicking the map, adds a door from the details
 // panel, undoes and redoes, edits the file text, and checks the YAML that
 // comes out compiles. Run: node test/editor-ui.mjs
+import "./vite-imports.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { pathToFileURL, fileURLToPath } from "node:url";

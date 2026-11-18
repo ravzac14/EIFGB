@@ -116,6 +116,21 @@ files round-trip exactly, and edited ones compile), and
   `scripts/bundle-gallery.mjs` checks every entry at build time.
 - `docs/SHARING.md` (the Sharing docs page) is the guide for authors.
 
+## Looks
+
+*Text and colours* (`src/settings-ui.ts`, stored by `src/store.ts`) sets
+`data-theme`, `data-size`, `data-face`, `data-spacing` and `data-width` on
+`<html>`; every page's CSS reads them (`src/style.css` has the themes:
+light, dark, sepia, terminal, amber, contrast). The docs apply them before
+painting with a small inline script. The legible typeface is the
+`@fontsource/atkinson-hyperlegible` package, served with the site.
+
+The home page's demo game is `src/demo/game.yaml`; the engine loads the
+first time someone clicks into it. Its opening is also written into
+`index.html` so it shows at once, and `test/home-demo.mjs` checks the two
+match. `public/og.png`, the link-preview image, is drawn from
+`scripts/og-card.html` (instructions inside).
+
 ## Saves
 
 Everything is kept in the browser's local storage (`src/store.ts`):

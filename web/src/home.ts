@@ -1,6 +1,6 @@
 // The home page: bundled games, and loading your own.
 import { fromDrop, fromFileList } from "./files.ts";
-import type { Files } from "./engine.ts";
+import { loadEngine, type Engine, type Files, type Output } from "./engine.ts";
 import { hashFiles, localGames, savesFor } from "./store.ts";
 import { settingsDialog } from "./settings-ui.ts";
 
@@ -109,3 +109,55 @@ drop.addEventListener("drop", (e) => {
 
 showExamples();
 showLocal();
+demo();
+
+// ------------------------------------------------------------- the demo
+
+/**
+ * The little game at the top. The engine (about 2 MB) loads the first time
+ * someone clicks into it, so visitors who don't, don't pay for it.
+ */
+function demo() {
+  const log = $("demo-log");
+  const line = $<HTMLInputElement>("demo-line");
+  const form = $<HTMLFormElement>("demo-form");
+  let engine: Promise<Engine> | null = null;
+  const show = (o: Output) => {
+    for (const l of o.lines) log.append(el("p", { className: l.kind === "text" ? "" : l.kind, textContent: l.text }));
+    log.scrollTop = log.scrollHeight;
+    if (o.ended) {
+      form.hidden = true;
+      $("demo-form").insertAdjacentElement(
+        "afterend",
+        el(
+          "div",
+          { className: "after" },
+          el("a", { href: "#examples", textContent: "Play a full game ↓" }),
+          el("a", { href: "./editor.html", textContent: "Make your own" }),
+        ),
+      );
+    }
+  };
+  const start = () =>
+    (engine ??= (async () => {
+      const [e, yaml] = await Promise.all([loadEngine(new URL("./wasm/", location.href)), import("./demo/game.yaml?raw").then((m) => m.default)]);
+      const loaded = e.load({ "game.yaml": yaml });
+      // The opening is already on the page; the engine takes over from here.
+      if (!loaded.output) log.append(el("p", { className: "error", textContent: "The demo couldn't start." }));
+      return e;
+    })());
+  line.addEventListener("focus", () => void start(), { once: true });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = line.value.trim();
+    if (!text) return;
+    line.value = "";
+    log.append(el("p", { className: "cmd", textContent: text }));
+    try {
+      show((await start()).input(text));
+    } catch {
+      log.append(el("p", { className: "error", textContent: "The game couldn't load. Try again in a moment." }));
+      engine = null;
+    }
+  });
+}

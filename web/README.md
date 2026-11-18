@@ -17,7 +17,7 @@ cd web && npm install
 
 ```sh
 npm run wasm      # builds the engine into public/wasm/ (not committed)
-npm test          # file loading, and every example played to a win in WebAssembly
+npm test          # file loading, every example played to a win, and dev-server page paths
 npm run dev       # a local server with live reload; open the address it prints
 npm run build     # the finished site, in dist/
 ```

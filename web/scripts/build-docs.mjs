@@ -153,7 +153,10 @@ mkdirSync(out, { recursive: true });
 
 PAGES.forEach((p, i) => {
   const md = readFileSync(join(root, p.src), "utf8");
-  const { body, toc, title } = render(p.src, md, p.page);
+  const r = render(p.src, md, p.page);
+  const { body, toc } = r;
+  // The README's heading is just "EIFGB": name the tab after its menu entry.
+  const title = r.title === "EIFGB" ? p.nav : r.title;
   const prev = PAGES[i - 1];
   const next = PAGES[i + 1];
   const foot = `<nav class="pager">${prev ? `<a href="${prev.page}">← ${esc(prev.nav)}</a>` : "<span></span>"}${

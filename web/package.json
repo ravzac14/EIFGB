@@ -11,7 +11,7 @@
     "dev": "npm run prepare-site && vite",
     "build": "npm run prepare-site && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node test/files.mjs && node test/walkthroughs.mjs"
+    "test": "npm run prepare-site && node test/files.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

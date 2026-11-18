@@ -5,5 +5,6 @@
 /web/public/games/
 /web/public/docs/
 /web/public/gallery.json
+/web/public/verbs.json
 /web/node_modules/
 /web/dist/

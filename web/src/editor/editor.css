@@ -131,3 +131,33 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 #map .person.hostile rect { stroke: var(--bad); stroke-width: 1.6; }
 #map .person.selected rect { stroke: var(--sel); stroke-width: 2.5; }
 #map .ghost { opacity: 0.6; pointer-events: none; }
+
+/* Scripts and the story */
+.inspector textarea.code { font-family: var(--mono); font-size: 0.8rem; line-height: 1.45; min-height: 0; tab-size: 2; white-space: pre; }
+.inspector .script { border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.6rem; margin: 0.5rem 0; }
+.inspector .script-head { display: flex; gap: 0.5rem; align-items: baseline; margin-bottom: 0.35rem; }
+.inspector .script-head strong { flex: 1; font-size: 0.85em; }
+.inspector .script-head code { font-size: 0.75em; }
+.inspector button.small { padding: 0.1em 0.45em; font-size: 0.75em; }
+.inspector button.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; font-size: inherit; }
+.inspector .problem { font-size: 0.8em; margin: 0.3rem 0 0; }
+.inspector .problem.error { color: var(--err); }
+.inspector .problem.warning { color: var(--warn); }
+.inspector .add.three { grid-template-columns: 1fr 1fr auto; }
+.inspector .api { padding-left: 1rem; font-size: 0.8em; }
+.inspector .api code { font-family: var(--mono); }
+.inspector details.group { margin-top: 0.8rem; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+.inspector details.group > summary { font-weight: 700; color: var(--fg); font-size: 0.9rem; }
+.inspector .thing.bad .name { color: var(--err); }
+.inspector .var { display: grid; grid-template-columns: auto 1fr auto; gap: 0.4rem; align-items: center; margin: 0.3rem 0; }
+.inspector .var code { font-family: var(--mono); font-size: 0.8em; }
+.inspector .node { border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem; margin: 0.7rem 0; }
+.inspector .node.start { border-color: var(--accent); }
+.inspector .node-head { display: flex; gap: 0.4rem; align-items: center; }
+.inspector .node-head .node-name { font-weight: 700; flex: 1; }
+.inspector ol.options { list-style: none; padding: 0; margin: 0.3rem 0; }
+.inspector ol.options li { border-left: 3px solid var(--line); padding-left: 0.5rem; margin: 0.4rem 0; }
+.inspector .option { display: grid; grid-template-columns: 1fr auto auto; gap: 0.3rem; }
+.inspector .option select { width: auto; max-width: 9rem; }
+.file-row { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; }
+.file-row span { font-size: 0.85em; }

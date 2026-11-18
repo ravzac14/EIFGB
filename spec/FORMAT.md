@@ -158,6 +158,7 @@ A handler can be a block of statements or a single expression.
 - Reading an undefined global is an error, not `nil`, so a misspelled function name fails loudly.
 - **Story state lives only in `vars` and in entity state.** Script globals are for functions. That rule is what makes save, restore and undo possible: saving is just serializing `vars` and entity state.
 - On the server, scripts are only parsed and checked during compilation, never executed. They run on the player's machine. *(Optional later: a sandboxed automated playtest.)*
+- **Checking:** `eifgb check` (and the web editor's checker) loads the script files, then compiles every Lua snippet (handlers, `when`, `do`, and `${…}` in text) the way it will be at play time, without running it. A syntax error is reported at the snippet's source path: `error: rooms.cellar.on.enter: Lua syntax error, line 2: ')' expected near <eof>`.
 
 ## Timers
 

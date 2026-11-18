@@ -216,7 +216,7 @@ whatSel.dispatchEvent(new Event("change"));
 assert.match(yaml(), /state: \{hidden: true\}\n\s+revealed_by: search old_chest/);
 void verbSel;
 // Where-it-starts offers rooms, the player, and holders not inside it.
-const where = [...document.querySelectorAll("#inspector select")].find((s) => s.ariaLabel === "Where it starts");
+const where = [...document.querySelectorAll("#inspector select")].find((s) => s.getAttribute("aria-label") === "Where it starts");
 assert.ok([...where.options].some((o) => o.value === "player"));
 assert.ok([...where.options].some((o) => o.value === "old_chest"));
 where.value = "player";
@@ -232,7 +232,7 @@ assert.doesNotMatch($("#panel-problems").textContent, /Error/);
 // An ID set by hand stays put when the name changes.
 coinRow.click();
 const named = [...document.querySelectorAll("#inspector input[type=text]")];
-const idBox = named.find((i) => i.ariaLabel === "Thing ID");
+const idBox = named.find((i) => i.getAttribute("aria-label") === "Thing ID");
 idBox.value = "treasure";
 [...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Rename").click();
 assert.match(yaml(), /\n  treasure:\n\s+name: gold coin/);
@@ -258,7 +258,7 @@ const pill = () => [...document.querySelectorAll("#map .person")].find((g) => g.
 assert.ok(pill().classList.contains("hostile"));
 
 // A side, from the character's Side list ("A new side…" asks for its name).
-const sideSel = [...document.querySelectorAll("#inspector select")].find((s) => s.ariaLabel === "Side");
+const sideSel = [...document.querySelectorAll("#inspector select")].find((s) => s.getAttribute("aria-label") === "Side");
 sideSel.value = "__new";
 sideSel.dispatchEvent(new Event("change"));
 assert.match(yaml(), /factions:\n\s+wolves: \{\}/);
@@ -300,6 +300,104 @@ assert.match(yaml(), /fights_back: false/);
 fights().checked = true;
 fights().dispatchEvent(new Event("change"));
 assert.doesNotMatch(yaml(), /fights_back/);
+
+await tick(1500);
+assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
+
+// ------------------------------------------------------------ story
+const projectFiles = () => JSON.parse(localStorage.getItem(`eifgb:local:${new URLSearchParams(location.search).get("project")}`)).files;
+const buttonIn = (text, root = document.querySelector("#inspector")) => [...root.querySelectorAll("button")].find((b) => b.textContent === text);
+const inputIn = (label) => [...document.querySelectorAll("#inspector input")].find((i) => i.getAttribute("aria-label") === label);
+const selectIn = (label) => [...document.querySelectorAll("#inspector select")].find((s) => s.getAttribute("aria-label") === label);
+const choose = (sel, value) => {
+  sel.value = value;
+  sel.dispatchEvent(new Event("change"));
+};
+const deselect = () => {
+  const svg = $("#map");
+  svg.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1 }));
+  svg.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
+};
+
+// An ending, and a timer that ends the game with it.
+deselect();
+inputIn("New ending's name").value = "escaped";
+buttonIn("Add an ending").click();
+assert.equal($("#inspector .kind").textContent, "Ending");
+assert.match(yaml(), /endings:\n\s+escaped:\n\s+kind: win\n\s+text: You did it./);
+deselect();
+buttonIn("Add a timer").click();
+assert.equal($("#inspector .kind").textContent, "Timer");
+choose(selectIn("Ending"), "escaped");
+assert.match(yaml(), /timers:\n\s+timer:\n\s+after: 5\n\s+say: Something happens.\n\s+end: escaped/);
+
+// A room script; a syntax error shows under it; fixing it clears that.
+press($('#map [data-room="first_room"]'));
+buttonIn("Add a script").click();
+assert.match(yaml(), /first_room:[\s\S]*?on:\n\s+enter: say\("Something happens."\)/);
+const code = () => [...document.querySelectorAll("#inspector textarea.code")][0];
+code().value = 'say("hi"';
+code().dispatchEvent(new Event("input"));
+await tick(1500);
+assert.match($("#inspector .script").textContent, /Lua syntax error/);
+code().value = 'say("Welcome.")\nscore(1)';
+code().dispatchEvent(new Event("input"));
+assert.match(yaml(), /enter: \|\n\s+say\("Welcome."\)\n\s+score\(1\)/);
+await tick(1500);
+assert.doesNotMatch($("#inspector .script").textContent, /Lua syntax error/);
+
+// A conversation, from a character's Talking list.
+[...document.querySelectorAll("#inspector .thing")].find((r) => r.textContent.includes("Old Meg")).click();
+choose(selectIn("Conversation"), "__new");
+assert.equal($("#inspector .kind").textContent, "Conversation or menu");
+assert.match(yaml(), /old_meg:[\s\S]*talk: talk_with_old_meg/);
+assert.match(yaml(), /choices:\n\s+talk_with_old_meg:\n\s+start: start\n\s+nodes:\n\s+start:\n\s+text: What do you say\?\n\s+options:\n\s+- text: Goodbye.\n\s+end: true/);
+buttonIn("+ Add a part").click();
+buttonIn("+ Add a reply").click();
+const reply = [...document.querySelectorAll("#inspector .option input")].at(1);
+reply.value = "Ask about the oil.";
+reply.dispatchEvent(new Event("input"));
+choose([...document.querySelectorAll("#inspector .option select")].at(1), "node");
+assert.match(yaml(), /- text: Ask about the oil.\n\s+goto: node/);
+
+// A variable, and a verb.
+deselect();
+const [vname, vvalue] = [...document.querySelectorAll("#inspector .add.three input")];
+vname.value = "gold";
+vvalue.value = "5";
+[...document.querySelectorAll("#inspector .add.three")].find((r) => r.contains(vname)).querySelector("button").click();
+assert.match(yaml(), /vars:\n  gold: 5\n/);
+inputIn("New verb").value = "ring";
+buttonIn("Add a verb").click();
+assert.equal($("#inspector .kind").textContent, "Verb");
+assert.match(yaml(), /verbs:\n\s+ring:\n\s+patterns: \["ring \{target\}"\]/);
+
+// A script file: listed in scripts:, opened in the Files tab; a mistake in it leads back to it.
+deselect();
+inputIn("New script file's name").value = "helpers";
+buttonIn("Add a file").click();
+assert.ok(projectFiles()["scripts/helpers.lua"].includes("function greet"));
+assert.match(yaml(), /version: "1.0"[\s\S]*?\n\nscripts:\n  - scripts\/helpers.lua\n/);
+assert.equal($("#file").value, "scripts/helpers.lua");
+$("#yaml").value = "function greet( end";
+$("#yaml").dispatchEvent(new Event("input"));
+await tick(700);
+assert.equal(projectFiles()["scripts/helpers.lua"], "function greet( end");
+await tick(1500);
+const lua = [...document.querySelectorAll("#panel-problems li")].find((li) => li.textContent.includes("helpers.lua"));
+assert.ok(lua, $("#panel-problems").textContent);
+$("#file").value = "game.yaml";
+$("#file").dispatchEvent(new Event("change"));
+lua.click();
+assert.equal($("#file").value, "scripts/helpers.lua", "the problem opens the file");
+// Undo takes the edit back, then the file away.
+$("#undo").click();
+assert.ok(projectFiles()["scripts/helpers.lua"].includes("function greet"));
+$("#undo").click();
+assert.equal(projectFiles()["scripts/helpers.lua"], undefined);
+assert.doesNotMatch(yaml(), /scripts:/);
+$("#redo").click();
+assert.ok(projectFiles()["scripts/helpers.lua"]);
 
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);

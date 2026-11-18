@@ -15,8 +15,8 @@ You unlock the pantry door with the small key.
 
 > **Status: early.** Games run from the command line, and in the browser
 > with the web player (in `web/`), where a visual editor draws your map of
-> rooms, exits and doors, and places your objects and characters; scripts
-> and conversations are coming to it.
+> rooms, exits and doors, places your objects and characters, and edits
+> scripts, timers, endings and conversations.
 > The file format may still change before 1.0.
 
 - [Quick start](#quick-start)
@@ -1392,7 +1392,7 @@ player.health + 5`), saved and undone with everything else.
 
 | Command | What it does |
 |---|---|
-| `eifgb check <game.yaml>` | Validates the game and lists errors and warnings. Exits non-zero on errors. |
+| `eifgb check <game.yaml>` | Validates the game and lists errors and warnings, including Lua syntax errors in any script. Exits non-zero on errors. |
 | `eifgb play <game.yaml>` | Plays the game in the terminal. |
 | `eifgb build <game.yaml> [-o out.json] [--pretty]` | Compiles the game to a story file (JSON), the format players will load. |
 

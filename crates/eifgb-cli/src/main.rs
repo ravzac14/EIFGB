@@ -65,17 +65,32 @@ pub(crate) fn run_compile(game: &Path) -> Result<Output, String> {
 /// Loads the story's script files the way `play` does, so that `check`
 /// and `build` catch errors that would otherwise only show at start-up:
 /// Lua syntax errors, and top-level code that isn't a function.
+/// It also compiles every handler and template snippet, so a syntax error
+/// in one shows now rather than when it first runs.
 fn check_scripts(story: &eifgb_engine::ir::Story) -> bool {
     use eifgb_engine::ScriptHost;
-    let result = eifgb_lua::LuaHost::new().and_then(|mut host| host.load(story));
-    match result {
-        Ok(()) => true,
+    let mut host = match eifgb_lua::LuaHost::new() {
+        Ok(h) => h,
         Err(e) => {
             eprintln!("error: {e}");
-            eprintln!("1 error(s), 0 warning(s)");
-            false
+            return false;
         }
+    };
+    if let Err(e) = host.load(story) {
+        eprintln!("error: {e}");
+        eprintln!("1 error(s), 0 warning(s)");
+        return false;
     }
+    let mut codes = Vec::new();
+    eifgb_compiler::visit_code(story, &mut |c| codes.push(c.clone()));
+    let errors = host.syntax_errors(&codes);
+    for (origin, msg) in &errors {
+        eprintln!("error: {origin}: Lua syntax error, {msg}");
+    }
+    if !errors.is_empty() {
+        eprintln!("{} error(s), 0 warning(s)", errors.len());
+    }
+    errors.is_empty()
 }
 
 fn main() -> ExitCode {

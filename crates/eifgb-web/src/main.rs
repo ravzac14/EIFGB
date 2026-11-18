@@ -62,6 +62,11 @@ fn load(files: &str, entry: &str, seed: u64) -> Value {
         })
         .collect();
     let Some(story) = out.story else { return json!({ "diagnostics": diagnostics }) };
+    let mut diagnostics = diagnostics;
+    diagnostics.extend(script_errors(&story));
+    if diagnostics.iter().any(|d| d["severity"] == "error") {
+        return json!({ "diagnostics": diagnostics });
+    }
     let m = &story.meta;
     let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version });
     let started = LuaHost::new().and_then(|h| Game::new(story, h, seed));
@@ -72,11 +77,29 @@ fn load(files: &str, entry: &str, seed: u64) -> Value {
             json!({ "diagnostics": diagnostics, "meta": meta, "output": opening })
         }
         Err(e) => {
-            let mut diagnostics = diagnostics;
             diagnostics.push(json!({ "severity": "error", "path": "", "message": e.to_string() }));
             json!({ "diagnostics": diagnostics })
         }
     }
+}
+
+/// Script files that fail to load, and Lua syntax errors in any snippet,
+/// as error diagnostics at the snippet's source path.
+fn script_errors(story: &eifgb_engine::ir::Story) -> Vec<Value> {
+    use eifgb_engine::ScriptHost;
+    let mut host = match LuaHost::new() {
+        Ok(h) => h,
+        Err(e) => return vec![json!({ "severity": "error", "path": "", "message": e.to_string() })],
+    };
+    if let Err(e) = host.load(story) {
+        return vec![json!({ "severity": "error", "path": "scripts", "message": e.to_string() })];
+    }
+    let mut codes = Vec::new();
+    eifgb_compiler::visit_code(story, &mut |c| codes.push(c.clone()));
+    host.syntax_errors(&codes)
+        .into_iter()
+        .map(|(origin, msg)| json!({ "severity": "error", "path": origin, "message": format!("Lua syntax error, {msg}") }))
+        .collect()
 }
 
 fn with_game(f: impl FnOnce(&mut Game<LuaHost>) -> Value) -> Value {
@@ -98,11 +121,14 @@ pub extern "C" fn eifgb_check(files: *const c_char, entry: *const c_char) -> *co
     let files: BTreeMap<String, String> = serde_json::from_str(&arg(files)).unwrap_or_default();
     let entry = arg(entry);
     let out = compile(&MemFiles(files), if entry.is_empty() { "game.yaml" } else { &entry });
-    let diagnostics: Vec<Value> = out
+    let mut diagnostics: Vec<Value> = out
         .diagnostics
         .iter()
         .map(|d| json!({ "severity": if d.severity == Severity::Error { "error" } else { "warning" }, "path": d.path, "message": d.message }))
         .collect();
+    if let Some(story) = &out.story {
+        diagnostics.extend(script_errors(story));
+    }
     give(json!({ "diagnostics": diagnostics }))
 }
 

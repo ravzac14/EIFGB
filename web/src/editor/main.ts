@@ -7,7 +7,7 @@ import { loadEngine, type Diagnostic, type Engine, type Files } from "../engine.
 import { fromFileList } from "../files.ts";
 import { localGames, type LocalGame } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
-import { Model, NEW_GAME, type Direction } from "./model.ts";
+import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
 import { MAP_FILE, besideRoom, layout, readMap, writeMap, type Point, type Positions } from "./layout.ts";
 import { MapView, type Selection } from "./map.ts";
 import { renderInspector } from "./inspector.ts";
@@ -35,15 +35,25 @@ let selection: Selection = null;
 let problems: Diagnostic[] = [];
 let mapView: MapView;
 
+/** Every file of the project at one moment: what undo goes back to. */
 interface Snapshot {
-  yaml: string;
-  map: string;
+  files: Files;
 }
 const undo: Snapshot[] = [];
 const redo: Snapshot[] = [];
 let lastCoalesce: { key: string; at: number } | null = null;
 
-const snapshot = (): Snapshot => ({ yaml: model ? model.toString() : project.files["game.yaml"], map: mapText() });
+const snapshot = (): Snapshot => ({
+  files: { ...project.files, "game.yaml": model ? model.toString() : project.files["game.yaml"], ...(model ? { [MAP_FILE]: mapText() } : {}) },
+});
+const sameFiles = (a: Files, b: Files) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].every((k) => a[k] === b[k]);
+};
+/** The standard verbs, for the script picker (loaded at start). */
+let verbs: { id: string; example: string }[] = [];
+/** The file open in the Files tab. */
+let currentFile = "game.yaml";
 const mapText = () => (model ? writeMap(positions, model.roomIds()) : (project.files[MAP_FILE] ?? ""));
 
 function newKey() {
@@ -78,6 +88,9 @@ function load(yaml: string, map?: string) {
   if (selection?.kind === "thing" && !model?.thing(selection.id)) selection = null;
   if (selection?.kind === "character" && !model?.character(selection.id)) selection = null;
   if (selection?.kind === "faction" && !model?.faction(selection.id)) selection = null;
+  for (const [kind, section] of [["ending", "endings"], ["timer", "timers"], ["choice", "choices"], ["verb", "verbs"]] as const) {
+    if (selection?.kind === kind && !model?.ids(section).includes(selection.id)) selection = null;
+  }
   redraw();
   syncYaml(yaml);
   scheduleCheck();
@@ -98,7 +111,7 @@ function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: bool
   const before = snapshot();
   fn(model);
   const after = snapshot();
-  if (after.yaml !== before.yaml || after.map !== before.map) {
+  if (!sameFiles(before.files, after.files)) {
     const now = Date.now();
     const merge = opts.coalesce && lastCoalesce?.key === opts.coalesce && now - lastCoalesce.at < 2000;
     if (!merge) undo.push(before);
@@ -107,7 +120,7 @@ function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: bool
     // New rooms need places on the map.
     positions = layout(model, positions);
     save();
-    syncYaml(after.yaml);
+    syncYaml(after.files["game.yaml"]);
     scheduleCheck();
   }
   if (opts.redraw === false) drawMap();
@@ -115,8 +128,9 @@ function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: bool
 }
 
 function restore(s: Snapshot) {
-  project = { ...project, files: { ...project.files, "game.yaml": s.yaml, [MAP_FILE]: s.map } };
-  load(s.yaml, s.map);
+  project = { ...project, files: { ...s.files } };
+  load(s.files["game.yaml"] ?? "", s.files[MAP_FILE]);
+  if (currentFile !== "game.yaml") openFile(project.files[currentFile] === undefined ? "game.yaml" : currentFile);
   save();
 }
 
@@ -184,7 +198,50 @@ function redraw() {
       });
     },
     showInFile,
+    problems,
+    verbs,
+    openFile,
+    addScriptFile,
   });
+}
+
+/** A new Lua file under scripts/, listed in the game's `scripts:`. */
+function addScriptFile(name: string): string | null {
+  const path = `scripts/${slug(name, "script")}.lua`;
+  if (project.files[path] !== undefined) {
+    $("saved").textContent = `There's already a ${path}.`;
+    return null;
+  }
+  change((m) => {
+    project = {
+      ...project,
+      files: { ...project.files, [path]: `-- Functions for your scripts. Only functions go here: code\n-- outside them can't run.\n\nfunction greet(who)\n  say("Hello, " .. who .. ".")\nend\n` },
+    };
+    const list = m.list(["scripts"]);
+    if (list.length) m.setList(["scripts"], [...list, path]);
+    else m.addSection("scripts", [path], ["game", "settings"]);
+  });
+  return path;
+}
+
+/** Shows a file in the Files tab: game.yaml, or a script. */
+function openFile(path: string) {
+  currentFile = project.files[path] === undefined ? "game.yaml" : path;
+  const pick = $<HTMLSelectElement>("file");
+  pick.replaceChildren(
+    ...Object.keys(project.files)
+      .filter((f) => f === "game.yaml" || f.endsWith(".lua"))
+      .sort((a, b) => (a === "game.yaml" ? -1 : b === "game.yaml" ? 1 : a.localeCompare(b)))
+      .map((f) => Object.assign(document.createElement("option"), { value: f, textContent: f, selected: f === currentFile })),
+  );
+  $<HTMLTextAreaElement>("yaml").value = currentFile === "game.yaml" ? (model?.toString() ?? project.files["game.yaml"]) : project.files[currentFile];
+  $("yaml").setAttribute("aria-label", currentFile);
+  $("yaml-msg").textContent = "";
+  $("file-help").textContent =
+    currentFile === "game.yaml"
+      ? "This is your game's file. Changes on the map show up here, and changes here show up on the map."
+      : "A Lua file for your scripts' shared functions. Problems in it show in the Problems tab.";
+  showTab("yaml");
 }
 
 function select(sel: Selection) {
@@ -247,9 +304,30 @@ function scheduleCheck() {
       problems = [{ severity: "error", path: "", message: `The checker couldn't run: ${e}` }];
     }
     showProblems();
-    drawMap();
+    refreshPanel();
   }, 350);
 }
+
+/**
+ * Shows new problems in the details panel, without taking the cursor from a
+ * field being typed in: then it waits until the cursor leaves the panel.
+ */
+let panelStale = false;
+function refreshPanel() {
+  if ($("inspector").contains(document.activeElement)) {
+    panelStale = true;
+    drawMap();
+  } else redraw();
+}
+$("inspector").addEventListener("focusout", (e) => {
+  if (!panelStale || $("inspector").contains(e.relatedTarget as Node | null)) return;
+  panelStale = false;
+  // After the click that moved focus has done its work.
+  setTimeout(() => {
+    if (!$("inspector").contains(document.activeElement)) redraw();
+    else panelStale = true;
+  }, 0);
+});
 
 function showProblems() {
   const panel = $("panel-problems");
@@ -291,6 +369,17 @@ function goTo(path: string) {
   if (parts[0] === "objects" && parts[1] && model?.thing(parts[1])) return select({ kind: "thing", id: parts[1] });
   if (parts[0] === "characters" && parts[1] && model?.character(parts[1])) return select({ kind: "character", id: parts[1] });
   if (parts[0] === "factions" && parts[1] && model?.faction(parts[1])) return select({ kind: "faction", id: parts[1] });
+  for (const [kind, section] of [["ending", "endings"], ["timer", "timers"], ["choice", "choices"], ["verb", "verbs"]] as const) {
+    if (parts[0] === section && parts[1] && model?.ids(section).includes(parts[1])) return select({ kind, id: parts[1] });
+  }
+  if (parts[0] === "on") return select(null);
+  if (parts[0] === "scripts") {
+    // "scripts[0]", or a load error naming the file.
+    const files = model?.list(["scripts"]) ?? [];
+    const named = files.find((f) => problems.some((d) => d.path === path && d.message.includes(f)));
+    const at = parts[1] ? files[Number(parts[1])] : undefined;
+    return openFile(named ?? at ?? files[0] ?? "game.yaml");
+  }
   showInFile(parts[1] ? `${parts[1]}:` : parts[0] ?? "");
 }
 
@@ -302,6 +391,7 @@ function showTab(which: "problems" | "yaml") {
 }
 
 function showInFile(find: string) {
+  if (currentFile !== "game.yaml") openFile("game.yaml");
   showTab("yaml");
   const ta = $<HTMLTextAreaElement>("yaml");
   const at = ta.value.search(new RegExp(`^\\s*${find.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "m"));
@@ -315,7 +405,7 @@ function showInFile(find: string) {
 
 let typingYaml = false;
 function syncYaml(text: string) {
-  if (!typingYaml) $<HTMLTextAreaElement>("yaml").value = text;
+  if (!typingYaml && currentFile === "game.yaml") $<HTMLTextAreaElement>("yaml").value = text;
 }
 
 let yamlTimer = 0;
@@ -324,6 +414,19 @@ $("yaml").addEventListener("input", () => {
   clearTimeout(yamlTimer);
   yamlTimer = window.setTimeout(() => {
     const text = $<HTMLTextAreaElement>("yaml").value;
+    if (currentFile !== "game.yaml") {
+      // A script file: kept as typed; the checker says if it's broken.
+      const before = snapshot();
+      project = { ...project, files: { ...project.files, [currentFile]: text } };
+      if (!sameFiles(before.files, snapshot().files)) {
+        undo.push(before);
+        redo.length = 0;
+        save();
+        scheduleCheck();
+      }
+      typingYaml = false;
+      return;
+    }
     try {
       const next = new Model(text);
       const before = snapshot();
@@ -343,7 +446,8 @@ $("yaml").addEventListener("input", () => {
   }, 600);
 });
 $("tab-problems").addEventListener("click", () => showTab("problems"));
-$("tab-yaml").addEventListener("click", () => showTab("yaml"));
+$("tab-yaml").addEventListener("click", () => openFile(currentFile));
+$("file").addEventListener("change", () => openFile($<HTMLSelectElement>("file").value));
 
 // ------------------------------------------------------------ toolbar
 
@@ -392,6 +496,13 @@ document.addEventListener("keydown", (e) => {
       if (confirm(`Delete the side “${id}”? Its members stay, on no side.`)) {
         selection = null;
         change((m) => m.deleteFaction(id));
+      }
+    } else if (selection.kind === "ending" || selection.kind === "timer" || selection.kind === "choice" || selection.kind === "verb") {
+      const { kind, id } = selection;
+      const section = kind === "choice" ? "choices" : `${kind}s`;
+      if (confirm(`Delete the ${kind === "choice" ? "conversation" : kind} “${id}”?`)) {
+        selection = null;
+        change((m) => m.deleteEntry(section, id));
       }
     } else if (selection.kind === "thing") {
       const t = model.thing(selection.id);
@@ -508,6 +619,17 @@ async function startScreen() {
   $("pick-files").addEventListener("click", () => files.click());
   for (const input of [folder, files]) input.addEventListener("change", () => input.files?.length && take(input.files));
 }
+
+// The standard verbs, for the script picker.
+fetch("./verbs.json")
+  .then((r) => r.json())
+  .then((v) => {
+    verbs = v;
+    if (model) redraw();
+  })
+  .catch(() => {
+    verbs = ["take", "drop", "open", "close", "examine", "search", "push", "pull", "eat", "wear", "talk", "give", "attack", "unlock", "put_in"].map((id) => ({ id, example: id }));
+  });
 
 const key = new URLSearchParams(location.search).get("project") ?? new URLSearchParams(location.search).get("local");
 const existing = key ? localGames.get(key) : null;

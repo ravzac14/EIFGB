@@ -189,6 +189,40 @@ export interface Faction {
   members: string[];
 }
 
+export interface Handler {
+  /** As written: `before_take`, `enter`, `after_eat`… */
+  event: string;
+  code: string;
+}
+
+export interface ChoiceOption {
+  text: string;
+  when: string;
+  say: string;
+  do: string;
+  goto: string;
+  end: boolean;
+}
+export interface ChoiceNode {
+  id: string;
+  text: string;
+  do: string;
+  goto: string;
+  options: ChoiceOption[];
+}
+export interface Choice {
+  id: string;
+  start: string;
+  nodes: ChoiceNode[];
+}
+
+export const EVENTS = {
+  game: ["start", "turn", "parse_failed", "died"],
+  room: ["enter", "leave", "turn"],
+  character: ["defeated"],
+  thing: [] as string[],
+} as const;
+
 export class Model {
   doc: Document;
   private original: string;
@@ -692,6 +726,220 @@ export class Model {
       if (isSeq(h) && !h.items.length) this.doc.deleteIn(["factions", f, "hostile_to"]);
     }
     if (!this.factionIds().length) this.doc.deleteIn(["factions"]);
+  }
+
+  // ----------------------------------------------------------- scripts
+
+  /** IDs in a top-level section: timers, endings, choices, verbs, vars… */
+  ids(section: string): string[] {
+    return this.keys(section);
+  }
+
+  /** Handlers under `on:` at `owner` (e.g. ["objects", "pie"], or [] for game-wide). */
+  handlers(owner: string[]): Handler[] {
+    const m = this.map([...owner, "on"]);
+    if (!m) return [];
+    return m.items.map((p) => ({ event: String(isScalar(p.key) ? p.key.value : p.key), code: str(p.value) ?? "" }));
+  }
+
+  /** Sets a handler's code; empty code removes it. A multi-line script is written as a block. */
+  setHandler(owner: string[], event: string, code: string) {
+    const path = [...owner, "on", event];
+    if (!code.trim()) {
+      this.set(path, undefined);
+      if (!owner.length && !this.map(["on"])?.items.length) this.doc.deleteIn(["on"]);
+      return;
+    }
+    if (!owner.length && !this.map(["on"])) this.addSection("on", {}, ["timers", "choices", "endings", "characters", "objects", "rooms"]);
+    const node = this.doc.getIn(path, true);
+    const text = code.includes("\n") && !code.endsWith("\n") ? `${code}\n` : code;
+    if (isScalar(node)) {
+      node.value = text;
+      node.type = text.includes("\n") ? Scalar.BLOCK_LITERAL : undefined;
+      return;
+    }
+    const s = new Scalar(text);
+    if (text.includes("\n")) s.type = Scalar.BLOCK_LITERAL;
+    this.doc.setIn(path, s);
+  }
+
+  /** Renames a handler (keeps its place and code). */
+  renameHandler(owner: string[], from: string, to: string): boolean {
+    const m = this.map([...owner, "on"]);
+    if (!m || m.has(to)) return false;
+    const pair = m.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === from) as Pair | undefined;
+    if (!pair) return false;
+    pair.key = new Scalar(to);
+    return true;
+  }
+
+  /** A top-level section's new entry, with a fresh key, the section added if needed. */
+  private addEntry(section: string, base: string, value: unknown, after: string[]): string {
+    const used = new Set(this.keys(section));
+    let id = slug(base, section.replace(/s$/, ""));
+    if (used.has(id)) for (let i = 2; ; i++) if (!used.has(`${id}_${i}`)) { id = `${id}_${i}`; break; }
+    if (!this.map([section])) this.addSection(section, {}, after);
+    this.doc.setIn([section, id], this.doc.createNode(value));
+    return id;
+  }
+
+  addEnding(name: string, kind: "win" | "loss" | "neutral" = "win"): string {
+    return this.addEntry("endings", name, { kind, text: kind === "win" ? "You did it." : "The story ends here." }, ["timers", "choices", "characters", "objects", "rooms"]);
+  }
+
+  addTimer(name = "timer"): string {
+    return this.addEntry("timers", name, { after: 5, say: "Something happens." }, ["characters", "objects", "rooms"]);
+  }
+
+  addVerb(word: string): string {
+    const id = slug(word, "verb");
+    const added = this.addEntry("verbs", id, { patterns: [`${id.replace(/_/g, " ")} {target}`], default: "Nothing happens." }, ["characters", "objects", "rooms"]);
+    this.setPatterns(added, this.list(["verbs", added, "patterns"]));
+    return added;
+  }
+
+  /** A verb's patterns, written like the examples: ["ring {target}", "ring {target} with {tool}"]. */
+  setPatterns(verb: string, patterns: string[]) {
+    const clean = patterns.map((s) => s.trim()).filter(Boolean);
+    const seq = this.doc.createNode(clean.map((s) => Object.assign(new Scalar(s), { type: Scalar.QUOTE_DOUBLE }))) as YAMLSeq;
+    seq.flow = true;
+    this.doc.setIn(["verbs", verb, "patterns"], seq);
+  }
+
+  addVar(name: string, value: unknown): string {
+    return this.addEntry("vars", name, value, ["settings", "game"]);
+  }
+
+  /** Deletes an ending, timer, choice, verb or variable, and the references to it the editor can see. */
+  deleteEntry(section: string, id: string) {
+    this.doc.deleteIn([section, id]);
+    if (!this.keys(section).length) this.doc.deleteIn([section]);
+    if (section === "endings") for (const t of this.keys("timers")) if (str(this.get(["timers", t, "end"])) === id) this.doc.deleteIn(["timers", t, "end"]);
+    if (section === "choices") for (const c of this.characterIds()) if (str(this.get(["characters", c, "talk"])) === id) this.doc.deleteIn(["characters", c, "talk"]);
+  }
+
+  /** Renames an ending, timer, choice or verb, and the references the editor can see (not Lua). */
+  renameEntry(section: string, old: string, next: string): string | null {
+    next = slug(next, section.replace(/s$/, ""));
+    if (next === old) return old;
+    if (this.keys(section).includes(next)) return null;
+    const pair = this.map([section])?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
+    if (!pair) return null;
+    pair.key = new Scalar(next);
+    const swap = (path: (string | number)[]) => {
+      const n = this.doc.getIn(path, true);
+      if (isScalar(n) && n.value === old) n.value = next;
+    };
+    if (section === "endings") for (const t of this.keys("timers")) swap(["timers", t, "end"]);
+    if (section === "choices") for (const c of this.characterIds()) swap(["characters", c, "talk"]);
+    return next;
+  }
+
+  // ----------------------------------------------------------- choices
+
+  choice(id: string): Choice | null {
+    const m = this.map(["choices", id]);
+    if (!m) return null;
+    const nodes = this.map(["choices", id, "nodes"]);
+    const s = (v: unknown) => str(v) ?? "";
+    return {
+      id,
+      start: s(m.get("start")),
+      nodes: (nodes?.items ?? []).map((p) => {
+        const nid = String(isScalar(p.key) ? p.key.value : p.key);
+        const n = isMap(p.value) ? p.value : null;
+        const opts = n?.get("options", true);
+        return {
+          id: nid,
+          text: s(n?.get("text")),
+          do: s(n?.get("do")),
+          goto: s(n?.get("goto")),
+          options: isSeq(opts)
+            ? opts.items.map((o) => {
+                const om = isMap(o) ? o : null;
+                return { text: s(om?.get("text")), when: s(om?.get("when")), say: s(om?.get("say")), do: s(om?.get("do")), goto: s(om?.get("goto")), end: om?.get("end") === true };
+              })
+            : [],
+        };
+      }),
+    };
+  }
+
+  addChoice(name: string): string {
+    return this.addEntry(
+      "choices",
+      name,
+      { start: "start", nodes: { start: { text: "What do you say?", options: [{ text: "Goodbye.", end: true }] } } },
+      ["characters", "objects", "rooms"],
+    );
+  }
+
+  addNode(choice: string): string {
+    const used = new Set(this.choice(choice)?.nodes.map((n) => n.id) ?? []);
+    let id = "node";
+    for (let i = 2; used.has(id); i++) id = `node_${i}`;
+    this.doc.setIn(["choices", choice, "nodes", id], this.doc.createNode({ text: "", options: [{ text: "Back.", goto: this.choice(choice)?.start || "start" }] }));
+    return id;
+  }
+
+  renameNode(choice: string, old: string, next: string): string | null {
+    next = slug(next, "node");
+    const c = this.choice(choice);
+    if (!c || next === old) return old;
+    if (c.nodes.some((n) => n.id === next)) return null;
+    const pair = this.map(["choices", choice, "nodes"])?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
+    if (!pair) return null;
+    pair.key = new Scalar(next);
+    const swap = (path: (string | number)[]) => {
+      const n = this.doc.getIn(path, true);
+      if (isScalar(n) && n.value === old) n.value = next;
+    };
+    swap(["choices", choice, "start"]);
+    for (const n of this.choice(choice)!.nodes) {
+      swap(["choices", choice, "nodes", n.id, "goto"]);
+      n.options.forEach((_, i) => swap(["choices", choice, "nodes", n.id, "options", i, "goto"]));
+    }
+    return next;
+  }
+
+  deleteNode(choice: string, id: string) {
+    this.doc.deleteIn(["choices", choice, "nodes", id]);
+    const c = this.choice(choice);
+    if (!c) return;
+    // Ways into it end the conversation instead.
+    for (const n of c.nodes) {
+      if (n.goto === id) this.doc.deleteIn(["choices", choice, "nodes", n.id, "goto"]);
+      n.options.forEach((o, i) => {
+        if (o.goto === id) {
+          this.doc.deleteIn(["choices", choice, "nodes", n.id, "options", i, "goto"]);
+          this.doc.setIn(["choices", choice, "nodes", n.id, "options", i, "end"], true);
+        }
+      });
+    }
+    if (c.start === id && c.nodes[0]) this.set(["choices", choice, "start"], c.nodes[0].id);
+  }
+
+  addOption(choice: string, node: string) {
+    const path = ["choices", choice, "nodes", node, "options"];
+    const seq = this.doc.getIn(path, true);
+    const item = this.doc.createNode({ text: "Something to say.", end: true });
+    if (isSeq(seq)) seq.items.push(item);
+    else this.doc.setIn(path, this.doc.createNode([{ text: "Something to say.", end: true }]));
+  }
+
+  removeOption(choice: string, node: string, i: number) {
+    const path = ["choices", choice, "nodes", node, "options"];
+    this.doc.deleteIn([...path, i]);
+    const seq = this.doc.getIn(path, true);
+    if (isSeq(seq) && !seq.items.length) this.doc.deleteIn(path);
+  }
+
+  /** Where an option leads: another node, the end, or (empty) back to this node's text. */
+  setOptionNext(choice: string, node: string, i: number, next: { goto?: string; end?: boolean }) {
+    const p = ["choices", choice, "nodes", node, "options", i];
+    this.set([...p, "goto"], next.goto || undefined);
+    if (next.end) this.doc.setIn([...p, "end"], true);
+    else this.set([...p, "end"], undefined);
   }
 
   // ---------------------------------------------------------- writing

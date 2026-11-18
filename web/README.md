@@ -51,8 +51,8 @@ need no JavaScript.
 
 `editor.html` (`src/editor/`) draws a game's map and writes every change
 into its `game.yaml`. It covers rooms, exits and doors, objects and
-containers, and characters and their sides (factions); scripts, timers,
-endings and conversations come next.
+containers, characters and their sides (factions), and scripts, timers,
+endings, conversations, custom verbs, variables and script files.
 
 - `model.ts`: the game file as a YAML document (the `yaml` library), with
   the edits the editor makes: rooms, exits, doors, renaming an ID along
@@ -78,10 +78,22 @@ endings and conversations come next.
   money and haggling), conversation, side, fighting, what they carry (with
   prices for a shopkeeper's stock) and more. Sides are listed in the game
   panel; a side's form sets who it attacks on sight and its habits.
+- `story.ts`: scripts and the story's moving parts. Rooms, things,
+  characters and the game have a Scripts section: each handler with a
+  plain-words label ("Before TAKE", "When the player comes in"), its Lua,
+  and its problems under it; add one by choosing when (an event, or
+  before / instead of / after a verb). The game panel lists endings,
+  timers, conversations and menus, your own verbs, variables and script
+  files, each with its own form. A conversation is edited as parts, each
+  with what's said and the player's replies, and where each reply leads.
+- `ui.ts`: the shared form builders, and the context every panel gets.
 - `main.ts`: projects (kept with *your games* in the browser), undo and
   redo, live checking with the WebAssembly compiler (click a problem to go
   to it), the *Game file* tab (edit the YAML; the map follows), Play (from
-  the start, in a new tab) and Download (a zip).
+  the start, in a new tab) and Download (a zip). Undo covers every file. The
+*Files* tab edits `game.yaml` or any script file. Problems refresh the
+details panel when the cursor isn't in it, so typing is never
+interrupted.
 
 `test/editor-model.mjs` checks the model against the examples (untouched
 files round-trip exactly, and edited ones compile), and

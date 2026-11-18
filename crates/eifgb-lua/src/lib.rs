@@ -109,6 +109,29 @@ impl LuaHost {
         })
     }
 
+    /// Lua syntax errors in `codes`, without running anything: each snippet
+    /// is compiled the way it will be at play time. Returns `(origin,
+    /// message)` pairs, the message without the origin prefix.
+    pub fn syntax_errors<'a>(&mut self, codes: impl IntoIterator<Item = &'a Code>) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for code in codes {
+            if let Err(e) = self.compile(code) {
+                let msg = match e {
+                    mlua::Error::SyntaxError { message, .. } => message,
+                    other => other.to_string(),
+                };
+                let prefix = format!("{}:", code.origin);
+                // "objects.pie.on.take:2: ')' expected" → "line 2: ')' expected"
+                let msg = match msg.strip_prefix(&prefix).and_then(|m| m.split_once(':')) {
+                    Some((line, rest)) => format!("line {line}:{rest}"),
+                    None => msg,
+                };
+                out.push((code.origin.clone(), msg));
+            }
+        }
+        out
+    }
+
     /// Compiles a snippet, trying it as an expression first (`return <src>`)
     /// and then as statements. Line 1 of the wrapper is line 1 of the
     /// snippet, so line numbers in errors stay right.

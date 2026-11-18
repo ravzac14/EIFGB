@@ -5,82 +5,12 @@ import {
   BEHAVIORS, DIRECTIONS, KINDS, OPPOSITE, PEOPLE, slug,
   type Behavior, type Direction, type Exit, type Kind, type Model, type Person, type Thing,
 } from "./model.ts";
-import { THING_DRAG, factionHue, type Selection } from "./map.ts";
+import { THING_DRAG, factionHue } from "./map.ts";
+import { choicePanel, endingPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
+import { boolField, button, cap, check, el, field, help, idFollows, numField, roomName, select, type InspectorContext } from "./ui.ts";
 
-export interface InspectorContext {
-  model: Model;
-  selection: Selection;
-  /**
-   * Makes an edit. `coalesce` merges typing in one field into one undo step;
-   * `redraw: false` leaves the panel alone (so a field being typed in keeps focus).
-   */
-  change(fn: (m: Model) => void, opts?: { coalesce?: string; redraw?: boolean }): void;
-  select(sel: Selection): void;
-  /** Adds a room `dir` of `from`, connected both ways; returns its ID. */
-  addRoomBeside(from: string, dir: Direction): string;
-  deleteRoom(id: string): void;
-  /** Opens the game file at this text. */
-  showInFile(find: string): void;
-  /** Puts the cursor in the panel's first text field, selected. */
-  focusName(): void;
-  /** A short message in the top bar (a refused drop, say). */
-  notice(text: string): void;
-}
+export type { InspectorContext } from "./ui.ts";
 
-type Kids = (Node | string)[];
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: Kids) {
-  const e = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (k === "class") e.className = String(v);
-    else if (k.startsWith("on") && typeof v === "function") e.addEventListener(k.slice(2), v as EventListener);
-    else if (v !== undefined && v !== false) (e as unknown as Record<string, unknown>)[k] = v;
-  }
-  e.append(...kids);
-  return e;
-}
-const button = (text: string, onclick: () => void, cls = "") => el("button", { type: "button", textContent: text, class: cls, onclick });
-const help = (text: string) => el("p", { class: "help", textContent: text });
-let fieldCount = 0;
-
-/** A labelled text field (or textarea) that edits as you type. */
-function field(
-  label: string,
-  value: string,
-  oninput: (v: string) => void,
-  opts: { multiline?: boolean; placeholder?: string; help?: string; onchange?: (v: string) => void } = {},
-) {
-  const id = `f${++fieldCount}`;
-  const input = opts.multiline
-    ? el("textarea", { id, value, placeholder: opts.placeholder ?? "" })
-    : el("input", { id, type: "text", value, placeholder: opts.placeholder ?? "" });
-  input.addEventListener("input", () => oninput((input as HTMLInputElement).value));
-  if (opts.onchange) input.addEventListener("change", () => opts.onchange!((input as HTMLInputElement).value));
-  const out: HTMLElement[] = [el("label", { htmlFor: id, textContent: label }), input];
-  if (opts.help) out.push(help(opts.help));
-  return out;
-}
-
-function check(label: string, checked: boolean, onchange: (v: boolean) => void) {
-  const box = el("input", { type: "checkbox", checked });
-  box.addEventListener("change", () => onchange((box as HTMLInputElement).checked));
-  return el("label", { class: "check" }, box, label);
-}
-
-function select(options: [string, string][], value: string, onchange: (v: string) => void, label?: string) {
-  const s = el("select", label ? { ariaLabel: label } : {}) as HTMLSelectElement;
-  for (const [v, t] of options) {
-    const o = document.createElement("option");
-    o.value = v;
-    o.textContent = t;
-    o.selected = v === value;
-    s.append(o);
-  }
-  s.addEventListener("change", () => onchange(s.value));
-  return s;
-}
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const roomName = (m: Model, id?: string) => (id ? (m.room(id)?.name ?? id) : "nowhere");
 
 export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   panel.replaceChildren();
@@ -90,6 +20,10 @@ export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   if (s?.kind === "thing" && ctx.model.thing(s.id)) return thingPanel(panel, ctx, s.id);
   if (s?.kind === "character" && ctx.model.character(s.id)) return characterPanel(panel, ctx, s.id);
   if (s?.kind === "faction" && ctx.model.faction(s.id)) return factionPanel(panel, ctx, s.id);
+  if (s?.kind === "ending" && ctx.model.ids("endings").includes(s.id)) return endingPanel(panel, ctx, s.id);
+  if (s?.kind === "timer" && ctx.model.ids("timers").includes(s.id)) return timerPanel(panel, ctx, s.id);
+  if (s?.kind === "choice" && ctx.model.choice(s.id)) return choicePanel(panel, ctx, s.id);
+  if (s?.kind === "verb" && ctx.model.ids("verbs").includes(s.id)) return verbPanel(panel, ctx, s.id);
   gamePanel(panel, ctx);
 }
 
@@ -129,6 +63,10 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
     help("Groups of characters that fight together, and who they attack on sight."),
     sidesList(ctx),
     addSideRow(ctx),
+  );
+  storySections(panel, ctx);
+  scriptsSection(panel, ctx, [], "game");
+  panel.append(
     el("h3", { textContent: "Drawing the map" }),
     el(
       "ul",
@@ -228,6 +166,7 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     peopleList(ctx, m.peopleIn(id), "Nobody here yet."),
     addPersonRow(ctx, id),
   );
+  scriptsSection(panel, ctx, ["rooms", id], "room");
 
   // Advanced: the ID, and deleting.
   const idInput = el("input", { type: "text", value: id, ariaLabel: "Room ID" }) as HTMLInputElement;
@@ -657,6 +596,8 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     }
   }
 
+  scriptsSection(panel, ctx, ["objects", id], "thing");
+
   // More: adjectives, size, the ID, deleting.
   const num = (label: string, key: string, value: number | null, helpText: string) => {
     const i = el("input", { type: "text", inputMode: "numeric", value: value === null ? "" : String(value), placeholder: "none" }) as HTMLInputElement;
@@ -715,14 +656,6 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   );
 }
 
-/**
- * Whether an ID was made from a name and never changed by hand: "new_room"
- * for "New room", or "new_room_2". Such IDs follow the name when it changes.
- */
-export function idFollows(id: string, name: string, fallback: string): boolean {
-  const base = slug(name, fallback);
-  return id === base || new RegExp(`^${base}_\\d+$`).test(id);
-}
 
 // ------------------------------------------------------- characters
 
@@ -792,21 +725,7 @@ function addPersonRow(ctx: InspectorContext, room: string | null): HTMLElement {
   return el("div", { class: "add two" }, kinds, add);
 }
 
-/** A whole-number field at `path`; empty removes it. */
-function numField(ctx: InspectorContext, path: (string | number)[], label: string, value: unknown, helpText: string, placeholder = "") {
-  const i = el("input", { type: "text", inputMode: "numeric", value: typeof value === "number" ? String(value) : "", placeholder }) as HTMLInputElement;
-  i.addEventListener("input", () => {
-    const n = Number.parseInt(i.value, 10);
-    ctx.change((x) => x.set(path, Number.isFinite(n) && n >= 0 ? n : undefined), { coalesce: path.join("."), redraw: false });
-  });
-  return [el("label", { textContent: label }), i, help(helpText)];
-}
 
-/** A checkbox for a true/false field with a default. */
-function boolField(ctx: InspectorContext, path: (string | number)[], label: string, byDefault: boolean, helpText?: string) {
-  const c = check(label, ctx.model.bool(path, byDefault), (v) => ctx.change((x) => x.setBool(path, v, byDefault)));
-  return helpText ? [c, help(helpText)] : [c];
-}
 
 function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   const m = ctx.model;
@@ -885,15 +804,25 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // Talking.
   const choices = m.choiceIds();
-  panel.append(el("h3", { textContent: "Talking" }));
-  if (choices.length) {
-    panel.append(
-      el("label", { textContent: "TALK TO them starts" }),
-      select([["", "Nothing to say"], ...choices.map((ch): [string, string] => [ch, ch])], c.talk ?? "", (v) => ctx.change((x) => x.set([...p, "talk"], v || undefined)), "Conversation"),
-    );
-  } else {
-    panel.append(help("Conversations are written as choices, in the game file for now; the editor's next part makes them here."));
-  }
+  panel.append(
+    el("h3", { textContent: "Talking" }),
+    el("label", { textContent: "TALK TO them starts" }),
+    select(
+      [["", "Nothing to say"], ...choices.map((ch): [string, string] => [ch, ch.replace(/_/g, " ")]), ["__new", "A new conversation…"]],
+      c.talk ?? "",
+      (v) => {
+        if (v !== "__new") return ctx.change((x) => x.set([...p, "talk"], v || undefined));
+        let ch = "";
+        ctx.change((x) => {
+          ch = x.addChoice(`talk with ${c.name}`);
+          x.set([...p, "talk"], ch);
+        });
+        ctx.select({ kind: "choice", id: ch });
+      },
+      "Conversation",
+    ),
+  );
+  if (c.talk && m.choice(c.talk)) panel.append(el("div", { class: "actions" }, button("Edit the conversation", () => ctx.select({ kind: "choice", id: c.talk! }))));
 
   // Their side.
   const sides = m.factionIds();
@@ -931,6 +860,8 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // What they carry.
   panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
+
+  scriptsSection(panel, ctx, p, "character");
 
   // More.
   const idInput = el("input", { type: "text", value: id, ariaLabel: "Character ID" }) as HTMLInputElement;

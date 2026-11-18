@@ -3353,3 +3353,31 @@ fn water_and_sand_put_fires_out_and_are_used_up() {
     assert_says(&mut g, "throw sand at hay", "the fire hisses out");
     assert_says(&mut g, "pour torch on hay", "won't put out a fire");
 }
+
+// --------------------------------------------------------- syntax checks
+
+#[test]
+fn syntax_errors_in_snippets_are_found_without_running_them() {
+    let src = r#"format: eifgb/0.1
+game: { id: s, title: S, version: "1", start: a }
+rooms:
+  a:
+    name: A
+    description: "Fine ${1 +}"
+    on:
+      enter: |
+        say("one")
+        say("two"
+      leave: say("fine")
+"#;
+    let story = compile_str(src).story.unwrap();
+    let mut codes = Vec::new();
+    eifgb_compiler::visit_code(&story, &mut |c| codes.push(c.clone()));
+    let mut host = LuaHost::new().unwrap();
+    let errors = host.syntax_errors(&codes);
+    let origins: Vec<&str> = errors.iter().map(|(o, _)| o.as_str()).collect();
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert!(origins.iter().any(|o| o.starts_with("rooms.a.description")), "{errors:?}");
+    let enter = errors.iter().find(|(o, _)| o == "rooms.a.on.enter").expect("the enter handler");
+    assert!(enter.1.starts_with("line 3:") || enter.1.starts_with("line 2:"), "{}", enter.1);
+}

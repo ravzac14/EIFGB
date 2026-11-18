@@ -13,7 +13,11 @@ export type Selection =
   | { kind: "exit"; room: string; dir: Direction }
   | { kind: "thing"; id: string }
   | { kind: "character"; id: string }
-  | { kind: "faction"; id: string };
+  | { kind: "faction"; id: string }
+  | { kind: "ending"; id: string }
+  | { kind: "timer"; id: string }
+  | { kind: "choice"; id: string }
+  | { kind: "verb"; id: string };
 
 /** The drag-and-drop type for things dragged from the details panel. */
 export const THING_DRAG = "application/x-eifgb-thing";

@@ -186,6 +186,64 @@ console.log("ok   editor objects");
 }
 console.log("ok   editor characters");
 
+// ------------------------------------------- scripts, timers, endings, choices
+{
+  // Handlers: existing ones read; one-liners plain, several lines as a block.
+  const s = new Model(example("midnight_snack"));
+  assert.deepEqual(s.handlers(["objects", "pie"]).map((h) => h.event), ["before_take", "before_eat", "after_eat"]);
+  s.setHandler(["objects", "apple"], "after_eat", 'end_game("fed")\nscore(1)');
+  assert.match(s.toString(), /after_eat: \|\n\s+end_game\("fed"\)\n\s+score\(1\)\n/);
+  s.setHandler(["rooms", "pantry"], "enter", 'say("It smells of apples.")');
+  assert.match(s.toString(), /pantry:[\s\S]*on:\n\s+enter: say\("It smells of apples."\)/);
+  s.setHandler([], "start", 'say("Hello.")');
+  assert.match(s.toString(), /\non:\n  start: say\("Hello."\)/);
+  assert.deepEqual(errors(s.toString()), []);
+  assert.ok(s.renameHandler(["rooms", "pantry"], "enter", "leave"));
+  s.setHandler([], "start", "");
+  assert.doesNotMatch(s.toString(), /\non:\n/, "an empty game-wide on: goes away");
+  assert.deepEqual(errors(s.toString()), []);
+
+  // Endings and timers: renaming an ending follows its timers.
+  const g = new Model(NEW_GAME);
+  const won = g.addEnding("Escaped");
+  const t = g.addTimer("storm");
+  g.set(["timers", t, "end"], won);
+  assert.deepEqual(errors(g.toString()), []);
+  assert.equal(g.renameEntry("endings", won, "free"), "free");
+  assert.equal(g.get(["timers", t, "end"]), "free");
+  g.addVar("gold", 0);
+  g.setHandler(["rooms", "first_room"], "enter", "vars.gold = vars.gold + 1");
+  assert.deepEqual(errors(g.toString()), []);
+
+  // A conversation: nodes, options, where each goes; renaming and deleting nodes.
+  const c = g.addChoice("Chat with Meg");
+  assert.equal(c, "chat_with_meg");
+  const meg = g.addCharacter("talker", "first_room", "Meg");
+  g.set(["characters", meg, "talk"], c);
+  const n = g.addNode(c);
+  g.addOption(c, "start");
+  g.set(["choices", c, "nodes", "start", "options", 1, "text"], "Ask about the weather.");
+  g.setOptionNext(c, "start", 1, { goto: n });
+  g.set(["choices", c, "nodes", n, "text"], '"Stormy," she says.');
+  assert.deepEqual(errors(g.toString()), [], g.toString());
+  assert.equal(g.renameNode(c, n, "weather"), "weather");
+  assert.equal(g.choice(c).nodes[0].options[1].goto, "weather");
+  g.deleteNode(c, "weather");
+  assert.ok(g.choice(c).nodes[0].options[1].end, "a link into a deleted node ends the talk");
+  assert.equal(g.renameEntry("choices", c, "meg_talk"), "meg_talk");
+  assert.equal(g.character(meg).talk, "meg_talk");
+  assert.deepEqual(errors(g.toString()), []);
+  g.deleteEntry("choices", "meg_talk");
+  assert.equal(g.character(meg).talk, null);
+
+  // A custom verb.
+  const v = g.addVerb("ring");
+  assert.match(g.toString(), /verbs:\n\s+ring:\n\s+patterns: \["ring \{target\}"\]\n\s+default: Nothing happens./);
+  assert.deepEqual(errors(g.toString()).filter((e) => !/talk/.test(e.message)), []);
+  void v;
+}
+console.log("ok   editor scripts");
+
 // ------------------------------------------------------------- layout
 const { layout, readMap, writeMap, directionBetween, CELL } = await import("../src/editor/layout.ts");
 const fang = new Model(example("blackfang"));

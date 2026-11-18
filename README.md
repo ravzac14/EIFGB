@@ -14,8 +14,9 @@ You unlock the pantry door with the small key.
 ```
 
 > **Status: early.** Games run from the command line, and in the browser
-> with the web player (in `web/`). An online editor is on its way. The file
-> format may still change before 1.0.
+> with the web player (in `web/`), where a visual editor draws your map of
+> rooms, exits and doors; objects, characters and scripts are coming to it.
+> The file format may still change before 1.0.
 
 - [Quick start](#quick-start)
 - [Tutorial: Midnight Snack](#tutorial-midnight-snack)

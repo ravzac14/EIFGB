@@ -25,7 +25,13 @@ export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
       label.style.minWidth = "6rem";
       const select = document.createElement("select");
       select.id = label.htmlFor = `setting-${key}`;
-      for (const [value, text] of CHOICES[key]) select.append(new Option(text, value, false, s[key] === value));
+      for (const [value, text] of CHOICES[key]) {
+        const o = document.createElement("option");
+        o.value = value;
+        o.textContent = text;
+        o.selected = s[key] === value;
+        select.append(o);
+      }
       select.addEventListener("change", () => {
         const next = { ...settings.get(), [key]: select.value };
         settings.set(next);

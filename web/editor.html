@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor</title>
+<link rel="stylesheet" href="./src/style.css">
+<link rel="stylesheet" href="./src/editor/editor.css">
+</head>
+<body class="editor">
+<header class="bar ui">
+  <a href="./" class="back">← Games</a>
+  <span id="title" class="title">Editor</span>
+  <span id="saved" class="saved dim" role="status"></span>
+  <span class="tools" id="tools" hidden>
+    <button id="undo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
+    <button id="redo" type="button" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+    <button id="download" type="button" title="Download the game as a zip">Download</button>
+    <button id="play" class="primary" type="button" title="Play the game from the start, in a new tab">Play</button>
+  </span>
+  <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
+</header>
+
+<main id="start" class="start wrap" hidden>
+  <h1>Make a game</h1>
+  <p class="dim">Build your game's map by drawing it: rooms, the ways between them, and doors. Everything you do is written into your game's file, which you can see and edit too.</p>
+  <section>
+    <h2>Start something new</h2>
+    <button id="new-game" class="primary" type="button">New game</button>
+  </section>
+  <section>
+    <h2>Your games</h2>
+    <ul id="mine" class="picks"></ul>
+  </section>
+  <section>
+    <h2>Change a copy of an example</h2>
+    <ul id="examples" class="picks"><li class="dim">Loading…</li></ul>
+  </section>
+  <section>
+    <h2>Open a game from your computer</h2>
+    <p class="row">
+      <button id="pick-folder" type="button">Choose a folder</button>
+      <button id="pick-files" type="button">Choose files or a zip</button>
+    </p>
+    <input id="folder" type="file" webkitdirectory hidden>
+    <input id="files" type="file" multiple accept=".yaml,.yml,.lua,.zip" hidden>
+    <p id="open-msg" class="err ui" role="status"></p>
+  </section>
+</main>
+
+<div id="workspace" class="workspace" hidden>
+  <section class="canvas" aria-label="Map">
+    <svg id="map" role="application" aria-label="The map of rooms. Click a room to select it."></svg>
+    <div class="map-tools ui">
+      <button id="add-room" type="button">+ Room</button>
+      <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+      <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+      <button id="fit" type="button">Fit</button>
+    </div>
+    <p id="map-hint" class="map-hint ui"></p>
+  </section>
+  <aside id="inspector" class="inspector ui" aria-label="Details"></aside>
+  <section class="drawer ui">
+    <div class="tabs" role="tablist">
+      <button id="tab-problems" role="tab" type="button" aria-selected="true">Problems</button>
+      <button id="tab-yaml" role="tab" type="button" aria-selected="false">Game file</button>
+    </div>
+    <div id="panel-problems" class="panel" role="tabpanel"></div>
+    <div id="panel-yaml" class="panel" role="tabpanel" hidden>
+      <p class="dim">This is your game's file, <code>game.yaml</code>. Changes on the map show up here, and changes here show up on the map.</p>
+      <textarea id="yaml" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="game.yaml"></textarea>
+      <p id="yaml-msg" class="err" role="status"></p>
+    </div>
+  </section>
+</div>
+<dialog id="settings"></dialog>
+<script type="module" src="./src/editor/main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+/* The editor: a map, a details panel, and a drawer for problems and the file. */
+:root {
+  --room: #fffdf8; --room-line: #b9ad95; --sel: #2f6fd6; --link: #8f8676; --door: #8a4b14; --bad: #c0283c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { --room: #2a2825; --room-line: #5c564c; --sel: #6fa3ff; --link: #8d877b; --door: #e3a35c; --bad: #ff6b7f; }
+}
+:root[data-theme="dark"] { --room: #2a2825; --room-line: #5c564c; --sel: #6fa3ff; --link: #8d877b; --door: #e3a35c; --bad: #ff6b7f; }
+:root[data-theme="sepia"] { --room: #f7ecd6; --room-line: #b59f78; }
+
+body.editor { font-family: var(--sans); font-size: 0.95rem; }
+.bar { position: sticky; top: 0; z-index: 3; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; padding: 0.45rem 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bar .back { text-decoration: none; }
+.bar .title { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .saved { flex: 1; font-size: 0.85em; }
+.bar .tools { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.err { color: var(--err); }
+
+/* Start screen */
+.start h1 { margin: 1.5rem 0 0.4rem; }
+.start h2 { font-size: 1.05rem; margin: 1.6rem 0 0.6rem; }
+.picks { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.picks li { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.8rem; }
+.picks .name { font-weight: 600; flex: 1; min-width: 8rem; }
+.row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Workspace */
+.workspace {
+  display: grid; height: calc(100dvh - 2.9rem);
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "canvas inspector" "drawer inspector";
+}
+.canvas { grid-area: canvas; position: relative; overflow: hidden; background: var(--bg); background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 24px 24px; }
+#map { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; }
+.map-tools { position: absolute; top: 0.6rem; left: 0.6rem; display: flex; gap: 0.3rem; }
+.map-hint { position: absolute; bottom: 0.4rem; left: 0.8rem; right: 0.8rem; margin: 0; color: var(--dim); font-size: 0.8rem; pointer-events: none; }
+.inspector { grid-area: inspector; overflow: auto; border-left: 1px solid var(--line); padding: 0.9rem 1rem 2rem; background: var(--bg); }
+.drawer { grid-area: drawer; border-top: 1px solid var(--line); background: var(--bg); }
+.tabs { display: flex; gap: 0.2rem; padding: 0.3rem 0.6rem 0; }
+.tabs button { border-radius: 6px 6px 0 0; border-bottom: 0; background: transparent; }
+.tabs button[aria-selected="true"] { background: var(--panel); font-weight: 600; }
+.panel { background: var(--panel); padding: 0.5rem 0.8rem; max-height: 30vh; overflow: auto; }
+.panel p { margin: 0.2rem 0 0.4rem; font-size: 0.85em; }
+#panel-yaml { max-height: 45vh; }
+#yaml { width: 100%; height: 34vh; font-family: var(--mono); font-size: 0.8rem; line-height: 1.45; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; resize: vertical; tab-size: 2; }
+.problems { list-style: none; margin: 0; padding: 0; }
+.problems li { padding: 0.25rem 0; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 0.85em; }
+.problems li:hover { color: var(--accent); }
+.problems .sev { font-weight: 700; margin-right: 0.4em; }
+.problems .error .sev { color: var(--err); }
+.problems .warning .sev { color: var(--warn); }
+.problems code { font-family: var(--mono); font-size: 0.95em; margin-right: 0.4em; color: var(--dim); }
+.ok-msg { color: var(--dim); font-size: 0.85em; }
+
+@media (max-width: 52rem) {
+  .workspace { height: auto; grid-template-columns: 1fr; grid-template-rows: 58vh auto auto; grid-template-areas: "canvas" "inspector" "drawer"; }
+  .inspector { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* Map drawing */
+#map .room rect { fill: var(--room); stroke: var(--room-line); stroke-width: 1.5; }
+#map .room text { fill: var(--fg); font: 600 13px var(--sans); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+#map .room .sub { font-weight: 400; font-size: 10.5px; fill: var(--dim); }
+#map .room { cursor: grab; }
+#map .room.selected rect { stroke: var(--sel); stroke-width: 3; }
+#map .room.bad rect { stroke: var(--bad); stroke-dasharray: 5 3; }
+#map .room.selected.bad rect { stroke-dasharray: none; }
+#map .room .start { fill: var(--accent); font-size: 10px; font-weight: 700; }
+#map .link line, #map .stub line { stroke: var(--link); stroke-width: 2.5; }
+#map .link .hit, #map .stub .hit { stroke: transparent; stroke-width: 16; cursor: pointer; }
+#map .link.selected line:not(.hit), #map .stub.selected line:not(.hit) { stroke: var(--sel); stroke-width: 3.5; }
+#map .link.advanced line:not(.hit) { stroke-dasharray: 6 4; }
+#map .label { fill: var(--dim); font: 600 10px var(--sans); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+#map .door rect { fill: var(--door); stroke: var(--bg); stroke-width: 1.5; }
+#map .door.locked rect { fill: var(--bad); }
+#map .door text { fill: var(--bg); font: 700 9px var(--sans); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+#map .stub circle { fill: var(--bg); stroke: var(--link); stroke-width: 2; }
+#map .stub text { fill: var(--link); font: 700 11px var(--sans); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+#map marker path { fill: var(--link); }
+#map .handle circle { fill: var(--sel); opacity: 0.85; cursor: crosshair; }
+#map .handle:hover circle { opacity: 1; }
+#map .handle text { fill: #fff; font: 700 13px var(--sans); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+#map .rubber { stroke: var(--sel); stroke-width: 2.5; stroke-dasharray: 6 4; pointer-events: none; }
+#map .drop-target rect { stroke: var(--sel); stroke-width: 3; }
+
+/* Details panel */
+.inspector h2 { font-size: 1.05rem; margin: 0 0 0.2rem; }
+.inspector h3 { font-size: 0.9rem; margin: 1.3rem 0 0.4rem; }
+.inspector .kind { color: var(--dim); font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+.inspector label { display: block; font-weight: 600; font-size: 0.85em; margin: 0.8rem 0 0.25rem; }
+.inspector label.check { display: flex; gap: 0.45rem; align-items: center; font-weight: 400; margin: 0.5rem 0; }
+.inspector input[type="text"], .inspector textarea, .inspector select { width: 100%; padding: 0.35em 0.5em; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.inspector textarea { min-height: 6rem; resize: vertical; font-family: var(--serif); line-height: 1.5; }
+.inspector .help { color: var(--dim); font-size: 0.8em; margin: 0.25rem 0 0; }
+.inspector .exits { list-style: none; padding: 0; margin: 0.3rem 0; }
+.inspector .exits li { display: flex; gap: 0.4rem; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+.inspector .exits .what { flex: 1; min-width: 0; }
+.inspector .exits .dir { font-weight: 600; text-transform: capitalize; }
+.inspector .add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.35rem; margin-top: 0.5rem; }
+.inspector .radio { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+.inspector .radio label { display: flex; gap: 0.3rem; align-items: center; font-weight: 400; margin: 0.2rem 0; }
+.inspector .danger { color: var(--err); border-color: var(--err); background: transparent; }
+.inspector details { margin-top: 1.4rem; }
+.inspector details summary { cursor: pointer; color: var(--dim); font-size: 0.85em; }
+.inspector .note { background: var(--panel); border-left: 3px solid var(--accent); padding: 0.4rem 0.6rem; border-radius: 0 6px 6px 0; font-size: 0.85em; margin: 0.6rem 0; }
+.inspector .tips { padding-left: 1.1rem; font-size: 0.85em; color: var(--dim); }
+.inspector .tips li { margin: 0.3rem 0; }
+.inspector .actions { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.6rem; }

@@ -346,6 +346,11 @@ async function main() {
     return;
   }
   saves = savesFor(src.key);
+  // The editor's Play button: always from the beginning.
+  if (new URLSearchParams(location.search).has("fresh")) {
+    saves.clearAuto();
+    window.history.replaceState(null, "", location.href.replace(/[?&]fresh=1/, ""));
+  }
   from = src.from ?? null;
   if (!begin()) return;
   document.title = meta.title;

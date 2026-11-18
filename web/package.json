@@ -11,13 +11,14 @@
     "dev": "npm run prepare-site && vite",
     "build": "npm run prepare-site && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "npm run prepare-site && node test/files.mjs && node test/remote.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
+    "test": "npm run prepare-site && node test/files.mjs && node test/remote.mjs && node test/editor-model.mjs && node test/editor-ui.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^15.11.7",
     "github-slugger": "^2.0.0",
     "highlight.js": "^11.12.0",
     "marked": "^16.4.2",

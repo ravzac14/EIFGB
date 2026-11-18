@@ -56,7 +56,8 @@ function showLocal() {
         showLocal();
       });
       const when = new Date(g.added).toLocaleDateString();
-      return card(g.title, `./play.html?local=${g.key}`, `added ${when}`, "", `local:${g.key}`, [remove]);
+      const edit = Object.assign(document.createElement("a"), { href: `./editor.html?project=${g.key}`, textContent: "Edit" });
+      return card(g.title, `./play.html?local=${g.key}`, `changed ${when}`, "", `local:${g.key}`, [edit, remove]);
     }),
   );
 }

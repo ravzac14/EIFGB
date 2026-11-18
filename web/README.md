@@ -47,6 +47,34 @@ need no JavaScript.
   player. Choices show as buttons; up and down arrows recall commands.
   Games with mistakes show the same errors as `eifgb check`.
 
+## The editor
+
+`editor.html` (`src/editor/`) draws a game's map and writes every change
+into its `game.yaml`. This first part covers rooms, exits and doors;
+objects, characters and scripts come next.
+
+- `model.ts`: the game file as a YAML document (the `yaml` library), with
+  the edits the editor makes: rooms, exits, doors, renaming an ID along
+  with everything that refers to it. Lines an edit doesn't touch are kept
+  exactly as the author wrote them (`carryOver`).
+- `layout.ts`: where rooms sit. Positions the author drags are kept in
+  `map.yaml` beside `game.yaml` (the game never reads it); other rooms are
+  placed by compass direction from the start room.
+- `map.ts`: the SVG map. Click a room's + to add a room that way, drag a +
+  onto a room to connect them, drag rooms and the background, scroll to
+  zoom. Lines are one per route (an arrow when it's one way), with doors on
+  them.
+- `inspector.ts`: the details panel, for the game, a room, a way out and a
+  door.
+- `main.ts`: projects (kept with *your games* in the browser), undo and
+  redo, live checking with the WebAssembly compiler (click a problem to go
+  to it), the *Game file* tab (edit the YAML; the map follows), Play (from
+  the start, in a new tab) and Download (a zip).
+
+`test/editor-model.mjs` checks the model against the examples (untouched
+files round-trip exactly, and edited ones compile), and
+`test/editor-ui.mjs` drives the page in a simulated browser (happy-dom).
+
 ## Sharing
 
 - `play.html?game=<url>` plays a game from a link (`src/remote.ts`): a raw

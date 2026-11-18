@@ -44,6 +44,7 @@ export default defineConfig({
         home: resolve(import.meta.dirname, "index.html"),
         play: resolve(import.meta.dirname, "play.html"),
         gallery: resolve(import.meta.dirname, "gallery.html"),
+        editor: resolve(import.meta.dirname, "editor.html"),
       },
     },
   },

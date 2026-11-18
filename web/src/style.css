@@ -33,7 +33,7 @@
 :root[data-size="large"] { --text: 1.3rem; }
 
 * { box-sizing: border-box; }
-/* \`hidden\` always hides, even on elements whose class sets a display. */
+/* `hidden` always hides, even on elements whose class sets a display. */
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {

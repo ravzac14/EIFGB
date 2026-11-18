@@ -30,7 +30,7 @@ docs.
 ## Docs
 
 `scripts/build-docs.mjs` turns `README.md` (the guide), `docs/SCRIPTING.md`,
-`docs/ADVANCED.md`, `spec/FORMAT.md` and `docs/IDEAS.md` into pages under
+`docs/ADVANCED.md` and `spec/FORMAT.md` into pages under
 `docs/`, with a contents sidebar, and makes a page per example game showing
 its files with a Play button. Links between the documents become links
 between the pages, and links to `spec/examples/<id>/` go to that game's

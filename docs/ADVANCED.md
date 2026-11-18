@@ -671,8 +671,9 @@ tests too.
   the player on their own, and have the player SHOUT from inside the
   closed barrel to bring both packs to the crossroads. Or add a shrine
   bell that rings every 15 actions, with `noise: { at: shrine, loudness: 3 }`.
-- **More tricks:** [IDEAS.md](IDEAS.md) lists features we'd like to add
-  next, such as taming, haggling and throwing.
+- **More tricks:** [Tricks players can find](../README.md#tricks-players-can-find)
+  lists everything else your creatures and players can do, such as taming,
+  haggling, throwing, traps and fire.
 - **Revenge:** a `defeated` handler on the young wolf that sets
   `vars.alpha_angry`, and an alpha `act` that ignores its wounds when
   it's angry.

@@ -26,7 +26,6 @@ const PAGES = [
   { src: "docs/SCRIPTING.md", page: "scripting.html", nav: "Scripting" },
   { src: "docs/ADVANCED.md", page: "advanced.html", nav: "Advanced" },
   { src: "spec/FORMAT.md", page: "format.html", nav: "Format reference" },
-  { src: "docs/IDEAS.md", page: "ideas.html", nav: "Ideas" },
 ];
 const EXAMPLES = {
   midnight_snack: "The game from the README tutorial.",

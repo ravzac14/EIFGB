@@ -3,66 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EIFGB Player</title>
-<style>
-  :root { --bg: #fbf8f1; --fg: #222; --dim: #777; --err: #b00020; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #1b1a18; --fg: #e8e4da; --dim: #999; --err: #ff6b7f; } }
-  body { background: var(--bg); color: var(--fg); font: 18px/1.55 Georgia, serif; margin: 0; }
-  main { max-width: 40rem; margin: 0 auto; padding: 1.5rem 16px 6rem; }
-  #log p { margin: 0 0 .6em; white-space: pre-wrap; }
-  .banner { font-size: 1.6em; font-weight: bold; text-align: center; margin: 1em 0; }
-  .title { font-weight: bold; margin-top: 1.2em !important; }
-  .notice { color: var(--dim); font-style: italic; }
-  .choice { padding-left: 1.5em; }
-  .ending { font-weight: bold; text-align: center; margin-top: 1.5em !important; }
-  .error { color: var(--err); font-family: monospace; }
-  .cmd { color: var(--dim); margin-top: 1em !important; }
-  form { display: flex; gap: .5em; align-items: baseline; }
-  input { flex: 1; font: inherit; background: transparent; color: inherit; border: 0; border-bottom: 1px solid var(--dim); outline: none; }
-</style>
+<title>EIFGB Games</title>
+<meta name="description" content="Play interactive fiction made with EIFGB, or load your own game.">
+<link rel="stylesheet" href="./src/style.css">
+<link rel="stylesheet" href="./src/home.css">
 </head>
 <body>
-<main>
-  <div id="log" aria-live="polite"><p class="notice">Loading…</p></div>
-  <form id="prompt"><span>&gt;</span><input id="line" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Command"></form>
+<header class="wrap">
+  <h1>EIFGB</h1>
+  <p class="dim">Interactive fiction you can play right here. Type what you want to do; the story answers.</p>
+</header>
+<main class="wrap">
+  <section>
+    <h2>Games to play</h2>
+    <ul id="examples" class="games"><li class="dim">Loading…</li></ul>
+  </section>
+  <section>
+    <h2>Play your own game</h2>
+    <div id="drop" class="drop" tabindex="0">
+      <p>Drop a game folder, a <code>.zip</code>, or a <code>game.yaml</code> here.</p>
+      <p class="row">
+        <button id="pick-folder" class="primary" type="button">Choose a folder</button>
+        <button id="pick-files" type="button">Choose files or a zip</button>
+      </p>
+      <input id="folder" type="file" webkitdirectory hidden>
+      <input id="files" type="file" multiple accept=".yaml,.yml,.lua,.zip" hidden>
+      <p id="drop-msg" class="msg" role="status"></p>
+    </div>
+    <ul id="local" class="games"></ul>
+  </section>
 </main>
-<script type="module">
-  // Phase 1: a bare page proving the engine runs in the browser.
-  // Serve the repository root (python3 -m http.server 8765) and open
-  // http://localhost:8765/web/ (add ?example=lighthouse for another game).
-  import { loadEngine } from "./src/engine.js";
-
-  const log = document.getElementById("log");
-  const line = document.getElementById("line");
-  const say = (text, cls = "") => {
-    const p = document.createElement("p");
-    p.textContent = text;
-    if (cls) p.className = cls;
-    log.append(p);
-    p.scrollIntoView({ block: "end" });
-  };
-  const show = (out) => {
-    for (const l of out.lines) say(l.text, l.kind === "text" ? "" : l.kind);
-    if (out.ended || out.quit_requested) line.disabled = true;
-  };
-
-  // Phase 1 loads single-file examples only; scripts come with the player in phase 2.
-  const game = new URLSearchParams(location.search).get("example") ?? "midnight_snack";
-  const yaml = await (await fetch(`../spec/examples/${game}/game.yaml`)).text();
-  const engine = await loadEngine();
-  log.replaceChildren();
-  const started = engine.load({ "game.yaml": yaml });
-  for (const d of started.diagnostics) say(`${d.severity}: ${d.path}: ${d.message}`, "error");
-  if (started.output) show(started.output);
-
-  document.getElementById("prompt").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const text = line.value;
-    line.value = "";
-    say(`> ${text}`, "cmd");
-    show(engine.input(text));
-  });
-  line.focus();
-</script>
+<footer class="wrap dim ui">
+  <p><button id="settings-open" class="link" type="button">Text and colours</button></p>
+</footer>
+<dialog id="settings"></dialog>
+<script type="module" src="./src/home.ts"></script>
 </body>
 </html>

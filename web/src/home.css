@@ -1,0 +1,16 @@
+header h1 { margin: 2rem 0 0.2rem; font-size: 2.2rem; letter-spacing: 0.02em; }
+header p { margin: 0 0 1.5rem; }
+h2 { font-size: 1.2rem; margin: 2rem 0 0.8rem; font-family: var(--sans); }
+.games { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.8rem; }
+.games li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.9rem 1rem; }
+.games a.title { font-weight: bold; font-size: 1.15em; text-decoration: none; }
+.games a.title:hover { text-decoration: underline; }
+.games .about { font-family: var(--sans); font-size: 0.8em; color: var(--dim); margin-left: 0.4em; }
+.games p { margin: 0.3rem 0 0; }
+.games .actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.drop { border: 2px dashed var(--line); border-radius: 10px; padding: 1rem; text-align: center; }
+.drop.over { border-color: var(--accent); background: var(--panel); }
+.drop p { margin: 0.4rem 0; }
+.drop .row { display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; }
+.drop .msg { color: var(--err); font-family: var(--sans); font-size: 0.9em; min-height: 1.2em; }
+footer { margin: 3rem auto 2rem; }

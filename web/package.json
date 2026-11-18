@@ -1,0 +1,23 @@
+{
+  "name": "eifgb-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "EIFGB on the web: play, load and (later) edit games in the browser",
+  "type": "module",
+  "scripts": {
+    "wasm": "scripts/build-wasm.sh",
+    "games": "node scripts/bundle-games.mjs",
+    "dev": "npm run games && vite",
+    "build": "npm run games && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node test/files.mjs && node test/walkthroughs.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.3.8"
+  }
+}

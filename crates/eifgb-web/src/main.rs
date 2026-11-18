@@ -40,8 +40,9 @@ fn output(o: eifgb_engine::Output) -> Value {
 
 /// Compiles a project and starts it. `files` is a JSON object of
 /// project-relative paths to file contents; `entry` is usually `game.yaml`.
-/// Returns `{ diagnostics: [{severity, path, message}], output? }`, with
-/// `output` (the opening) only when it compiled and started.
+/// Returns `{ diagnostics: [{severity, path, message}], meta?, output? }`,
+/// with `meta` (id, title, author, version) and `output` (the opening)
+/// only when it compiled and started.
 fn load(files: &str, entry: &str, seed: u64) -> Value {
     let files: BTreeMap<String, String> = match serde_json::from_str(files) {
         Ok(f) => f,
@@ -61,12 +62,14 @@ fn load(files: &str, entry: &str, seed: u64) -> Value {
         })
         .collect();
     let Some(story) = out.story else { return json!({ "diagnostics": diagnostics }) };
+    let m = &story.meta;
+    let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version });
     let started = LuaHost::new().and_then(|h| Game::new(story, h, seed));
     match started {
         Ok(mut g) => {
             let opening = output(g.start());
             GAME.with(|cell| *cell.borrow_mut() = Some(g));
-            json!({ "diagnostics": diagnostics, "output": opening })
+            json!({ "diagnostics": diagnostics, "meta": meta, "output": opening })
         }
         Err(e) => {
             let mut diagnostics = diagnostics;

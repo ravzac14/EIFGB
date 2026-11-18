@@ -1,0 +1,47 @@
+// Copies the example games from spec/examples into public/games/: one
+// <id>.json of {path: text} per game, and index.json listing them.
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
+
+const root = fileURLToPath(new URL("../../", import.meta.url));
+const examples = join(root, "spec/examples");
+const out = fileURLToPath(new URL("../public/games/", import.meta.url));
+
+// Shown first, in this order, with where each comes from.
+const ORDER = {
+  midnight_snack: "The README tutorial",
+  lighthouse: "A sampler of every feature",
+  campfire: "The scripting tutorial",
+  blackfang: "The advanced tutorial",
+};
+
+function project(dir) {
+  const files = {};
+  const walk = (d) => {
+    for (const name of readdirSync(d)) {
+      const p = join(d, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.(ya?ml|lua)$/.test(name)) files[relative(dir, p).split("\\").join("/")] = readFileSync(p, "utf8");
+    }
+  };
+  walk(dir);
+  return files;
+}
+
+mkdirSync(out, { recursive: true });
+const index = [];
+for (const name of readdirSync(examples)) {
+  const dir = join(examples, name);
+  if (!statSync(join(dir, "game.yaml"), { throwIfNoEntry: false })) continue;
+  const files = project(dir);
+  const game = parse(files["game.yaml"]).game ?? {};
+  const intro = typeof game.intro === "string" ? game.intro.replace(/\s+/g, " ").trim() : "";
+  writeFileSync(join(out, `${name}.json`), JSON.stringify(files));
+  index.push({ id: name, title: game.title ?? name, author: game.author ?? null, about: ORDER[name] ?? null, blurb: intro });
+}
+const rank = (id) => (id in ORDER ? Object.keys(ORDER).indexOf(id) : 99);
+index.sort((a, b) => rank(a.id) - rank(b.id) || a.title.localeCompare(b.title));
+writeFileSync(join(out, "index.json"), JSON.stringify(index, null, 2));
+console.log(`bundled ${index.length} games into public/games/`);

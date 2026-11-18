@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<title>Play</title>
+<link rel="stylesheet" href="./src/style.css">
+<link rel="stylesheet" href="./src/play.css">
+</head>
+<body>
+<header class="bar ui">
+  <a href="./" class="back" aria-label="All games">← Games</a>
+  <span id="title" class="title"></span>
+  <span id="status" class="status" aria-live="off"></span>
+  <span class="tools">
+    <button id="saves-open" type="button" disabled>Saves</button>
+    <button id="restart" type="button" disabled>Restart</button>
+    <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
+  </span>
+</header>
+<main class="wrap">
+  <div id="log" class="log" aria-live="polite"><p class="notice">Loading the game…</p></div>
+  <div id="after" class="after ui"></div>
+  <form id="prompt" class="prompt" hidden>
+    <label for="line" class="caret">&gt;</label>
+    <input id="line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="What do you do?">
+  </form>
+</main>
+<dialog id="saves"></dialog>
+<dialog id="settings"></dialog>
+<script type="module" src="./src/play.ts"></script>
+</body>
+</html>

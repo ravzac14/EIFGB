@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadEngine } from "../src/engine.js";
+import { loadEngine } from "../src/engine.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const examples = join(root, "spec/examples");
@@ -21,7 +21,7 @@ function project(dir) {
   return files;
 }
 
-const engine = await loadEngine();
+const engine = await loadEngine(new URL("../public/wasm/", import.meta.url));
 let failed = 0;
 for (const name of readdirSync(examples)) {
   const dir = join(examples, name);

@@ -1,4 +1,7 @@
 /target
 *.story.json
 # Built by web/scripts/build-wasm.sh
-/web/src/wasm/
+/web/public/wasm/
+/web/public/games/
+/web/node_modules/
+/web/dist/

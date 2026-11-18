@@ -1,39 +1,55 @@
 # EIFGB on the web
 
-The engine, compiler and Lua, compiled to WebAssembly, and the pages that
-use them. The bridge is the `eifgb-web` crate (`crates/eifgb-web`);
-`src/engine.js` wraps it for JavaScript.
+The engine, compiler and Lua, compiled to WebAssembly, and the site that
+uses them: a home page of games, and a player. The bridge is the
+`eifgb-web` crate (`crates/eifgb-web`); `src/engine.ts` wraps it.
 
-## Building
-
-One-time setup:
+## Setting up (once)
 
 ```sh
 rustup target add wasm32-unknown-emscripten
 git clone https://github.com/emscripten-core/emsdk.git ~/emsdk
 ~/emsdk/emsdk install latest && ~/emsdk/emsdk activate latest
+cd web && npm install
 ```
 
-Then build the engine into `web/src/wasm/` (not committed):
+## Building and trying it
 
 ```sh
-web/scripts/build-wasm.sh
+npm run wasm      # builds the engine into public/wasm/ (not committed)
+npm test          # file loading, and every example played to a win in WebAssembly
+npm run dev       # a local server with live reload; open the address it prints
+npm run build     # the finished site, in dist/
 ```
 
-## Trying it
+`npm run dev` and `npm run build` first copy the example games from
+`spec/examples` into `public/games/` (also not committed).
 
-```sh
-node web/test/walkthroughs.mjs      # plays every example to a win
-python3 -m http.server 8765         # from the repository root
-```
+## Pages
 
-and open <http://localhost:8765/web/> (or `?example=blackfang`).
+- `index.html` (`src/home.ts`): the bundled games, and *Play your own
+  game*: drop or choose a folder, a zip, or a `game.yaml`. Loaded games are
+  kept in this browser and listed there.
+- `play.html?example=<id>` or `play.html?local=<key>` (`src/play.ts`): the
+  player. Choices show as buttons; up and down arrows recall commands.
+  Games with mistakes show the same errors as `eifgb check`.
 
-## The engine API (`src/engine.js`)
+## Saves
 
-- `loadEngine()`: loads the WebAssembly; resolves to an engine.
+Everything is kept in the browser's local storage (`src/store.ts`):
+
+- **Autosave:** after every command. Coming back to a game carries on
+  where you were; *Restart* begins again. Finishing a game clears it.
+- **Slots:** typing SAVE, or *Saves → Save*, keeps a named save; RESTORE
+  opens the Saves dialog.
+- **Files:** any slot can be downloaded as a `.eifgb-save.json` file, and
+  loaded back on another device (*Load a save file…*).
+
+## The engine API (`src/engine.ts`)
+
+- `loadEngine(base)`: loads the WebAssembly from the folder at `base`.
 - `engine.load(files, entry, seed)`: compiles `files` (`{path: text}`) and
-  starts the game: `{ diagnostics, output? }`.
+  starts the game: `{ diagnostics, meta?, output? }`.
 - `engine.check(files, entry)`: compiles only: `{ diagnostics }`.
 - `engine.input(line)`: one command: the output (`lines`, `status`,
   `options`, `ended`, `save`, `restore_requested`, `quit_requested`).

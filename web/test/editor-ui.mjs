@@ -34,6 +34,12 @@ const clickButton = (text) => {
   b.click();
 };
 
+// The start screen shows only itself: no map, and no game buttons yet.
+const css = readFileSync(`${web}src/style.css`, "utf8");
+assert.match(css, /\[hidden\] \{ display: none !important; \}/);
+assert.equal($("#workspace").hidden, true);
+assert.equal($("#tools").hidden, true);
+
 // A new game: one room, on the map.
 $("#new-game").click();
 await tick();

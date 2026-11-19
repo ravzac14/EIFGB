@@ -225,7 +225,23 @@ pub struct Meta {
     pub ai_fallback: bool,
     #[serde(default)]
     pub settings: Settings,
+    /// How the game looks on the website (its colour theme and accent).
+    /// Only the web player reads it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<Presentation>,
 }
+
+/// The website's look for a game, from the source's `presentation:` section.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Presentation {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+}
+
+/// The website's colour themes a game can choose.
+pub const THEMES: [&str; 6] = ["light", "dark", "sepia", "terminal", "amber", "contrast"];
 
 /// Game-wide switches from the source's `settings:` section.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

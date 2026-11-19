@@ -18,6 +18,9 @@ pub struct Source {
     pub game: Game,
     #[serde(default)]
     pub settings: Settings,
+    /// How the game looks on the website. The engine ignores it.
+    #[serde(default)]
+    pub presentation: Option<Presentation>,
     #[serde(default)]
     pub scripts: Vec<String>,
     #[serde(default)]
@@ -70,6 +73,17 @@ pub struct Game {
 
 fn default_language() -> String {
     "en".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Presentation {
+    /// One of the website's colour themes.
+    #[serde(default)]
+    pub theme: Option<String>,
+    /// A colour for links, the prompt and highlights: "#c33".
+    #[serde(default)]
+    pub accent: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

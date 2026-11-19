@@ -28,6 +28,7 @@ stay interchangeable.
 |--------------|---------|
 | `format`     | Format version, e.g. `eifgb/0.1`. Required. |
 | `game`       | Metadata, start room, intro text, max score. |
+| `presentation` | The website's look: `theme` (one of `light`, `dark`, `sepia`, `terminal`, `amber`, `contrast`) and `accent` (`#rgb` or `#rrggbb`). Mistakes are warnings, and dropped. Carried in the IR as `meta.presentation`; the engine ignores it, and the web player applies it while the player's own colours are on "auto". |
 | `settings`   | Game-wide switches. For now just `describe_state` (default `true`). |
 | `vars`       | Global story state (scalars, lists, maps). |
 | `player`     | Player description, carrying capacity, `health`, `damage` and `money`. |

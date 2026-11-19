@@ -42,6 +42,12 @@ export interface Meta {
   title: string;
   author: string | null;
   version: string;
+  /** The game's own look (`presentation:` in game.yaml), if it chose one. */
+  presentation?: Presentation | null;
+}
+export interface Presentation {
+  theme?: string;
+  accent?: string;
 }
 export type Files = Record<string, string>;
 export interface Loaded {

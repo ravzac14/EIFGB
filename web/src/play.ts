@@ -1,7 +1,7 @@
 // The player: loads a game (bundled, or one you loaded), plays it, keeps an
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
-import { localGames, mapPanel, savesFor, type SaveFile, type Slot } from "./store.ts";
+import { localGames, mapPanel, savesFor, setGameLook, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
 import { fetchGame, resolve } from "./remote.ts";
@@ -208,6 +208,7 @@ function begin(): boolean {
     return false;
   }
   meta = loaded.meta;
+  setGameLook(meta.presentation);
   if (from) {
     const p = say(`This game comes from ${from}, not from this site. `, "notice");
     p.append(el("a", { href: SAFETY, target: "_blank", rel: "noopener", textContent: "Is that safe?" }));

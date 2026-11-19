@@ -68,7 +68,7 @@ fn load(files: &str, entry: &str, seed: u64) -> Value {
         return json!({ "diagnostics": diagnostics });
     }
     let m = &story.meta;
-    let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version });
+    let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version, "presentation": m.presentation });
     let started = LuaHost::new().and_then(|h| Game::new(story, h, seed));
     match started {
         Ok(mut g) => {

@@ -1,5 +1,5 @@
 // The "Text and colours" dialog, shared by every page.
-import { applySettings, settings, type Settings } from "./store.ts";
+import { applySettings, getGameLook, settings, type Settings } from "./store.ts";
 // A typeface made for legibility, served with the site (not from a font service).
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
@@ -38,10 +38,16 @@ export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
       label.style.minWidth = "6rem";
       const select = document.createElement("select");
       select.id = label.htmlFor = `setting-${key}`;
+      const look = getGameLook();
       for (const [value, text] of CHOICES[key]) {
         const o = document.createElement("option");
         o.value = value;
         o.textContent = text;
+        // Playing a game with its own look: "auto" means the game's choice.
+        if (key === "theme" && value === "auto" && look) {
+          const named = CHOICES.theme.find(([v]) => v === look.theme)?.[1];
+          o.textContent = named ? `The game's own (${named})` : "The game's own";
+        }
         o.selected = s[key] === value;
         select.append(o);
       }

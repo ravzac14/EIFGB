@@ -51,17 +51,6 @@ Nothing waiting here right now.
 
 ## The player
 
-### Themes chosen by the game
-
-An author sets the look of their game, which players can still override:
-`presentation: { theme: terminal, accent: "#c33" }` in `game.yaml`.
-
-- Builds on: the player's themes and settings.
-- Shape: a new optional `presentation` section (web-only hints the engine
-  ignores); the player applies it unless the player picked a theme
-  themselves. Needs a decision on putting presentation in the game file.
-- Effort: small.
-
 ### Smaller ideas
 
 - **Parchment theme:** paper texture, and a drop capital on each room's

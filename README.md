@@ -1576,7 +1576,7 @@ end-of-turn event.
 
 ## Cheat sheet
 
-**Top-level sections:** `format`, `game`, `settings`, `vars`, `player`, `rooms`,
+**Top-level sections:** `format`, `game`, `settings`, `presentation`, `vars`, `player`, `rooms`,
 `objects`, `characters`, `verbs`, `choices`, `on`, `endings`, `timers`,
 `messages`, `scripts`.
 
@@ -1604,6 +1604,14 @@ top level. See [Characters](#characters-npcs-and-enemies).
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including
 your own fields. See [States and descriptions](#states-and-descriptions).
+
+**Presentation:** how your game looks on the website.
+`presentation: { theme: terminal, accent: "#c33" }` picks one of the
+site's colour themes (`light`, `dark`, `sepia`, `terminal`, `amber`,
+`contrast`) and a highlight colour for links and the prompt. Players see
+it unless they've picked their own colours with Aa, where it shows as
+"The game's own". The terminal player ignores it. The editor sets both
+under "How it looks".
 
 **Hidden things:** `state: { hidden: true }` plus `revealed_by: search mat`
 (or a list) reveals it when the player does that. SEARCH and verbs with no

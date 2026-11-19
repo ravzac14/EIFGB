@@ -29,6 +29,46 @@ export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
 
 // ------------------------------------------------------------- the game
 
+/** The game's look on the website: `presentation: { theme, accent }`. */
+function lookFields(ctx: InspectorContext): HTMLElement[] {
+  const m = ctx.model;
+  const theme = m.get(["presentation", "theme"]);
+  const accent = m.get(["presentation", "accent"]);
+  const setLook = (key: "theme" | "accent", v: string | undefined) =>
+    ctx.change((x) => {
+      x.set(["presentation", key], v || undefined);
+      // Nothing left: no empty `presentation: {}`.
+      if (x.get(["presentation"]) !== undefined && !x.get(["presentation", "theme"]) && !x.get(["presentation", "accent"])) x.set(["presentation"], undefined);
+    });
+  const colour = el("input", { type: "color", ariaLabel: "Highlight colour" }) as HTMLInputElement;
+  colour.value = typeof accent === "string" && /^#[0-9a-f]{6}$/i.test(accent) ? accent : typeof accent === "string" && /^#[0-9a-f]{3}$/i.test(accent) ? `#${[...accent.slice(1)].map((c) => c + c).join("")}` : "#8a4b14";
+  colour.addEventListener("change", () => setLook("accent", colour.value));
+  return [
+    el("label", { textContent: "How it looks" }),
+    select(
+      [
+        ["", "As each player likes it"],
+        ["light", "Light"],
+        ["dark", "Dark"],
+        ["sepia", "Sepia"],
+        ["terminal", "Terminal (green)"],
+        ["amber", "Terminal (amber)"],
+        ["contrast", "High contrast"],
+      ],
+      typeof theme === "string" ? theme : "",
+      (v) => setLook("theme", v),
+      "Colours",
+    ),
+    el(
+      "div",
+      { class: "row" },
+      el("label", { class: "check" }, colour, " Highlight colour"),
+      ...(typeof accent === "string" ? [button("Use the usual colour", () => setLook("accent", undefined))] : []),
+    ),
+    help("Players see the game this way unless they pick their own colours with Aa."),
+  ];
+}
+
 function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
   const m = ctx.model;
   const str = (p: string[]) => {
@@ -53,6 +93,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
       (v) => ctx.change((x) => x.set(["game", "start"], v)),
       "Starting room",
     ),
+    ...lookFields(ctx),
     el("h3", { textContent: "Carried at the start" }),
     thingTree(ctx, "player", "Nothing yet. Drag things here, or add one."),
     addThingRow(ctx, "player"),

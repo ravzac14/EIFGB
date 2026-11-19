@@ -568,3 +568,20 @@ fn traps_are_checked() {
     let out = with("characters:\n  w: { name: w, in: hall, trap: { holds: 2 } }\n");
     assert!(format!("{:?}", out.diagnostics).contains("only objects can have 'trap'"), "{:#?}", out.diagnostics);
 }
+
+#[test]
+fn presentation_is_passed_on_and_checked() {
+    let out = with("presentation: { theme: terminal, accent: \"#c33\" }\n");
+    let p = out.story.as_ref().unwrap().meta.presentation.clone().unwrap();
+    assert_eq!((p.theme.as_deref(), p.accent.as_deref()), (Some("terminal"), Some("#c33")));
+    assert!(warnings(&out).is_empty(), "{:#?}", warnings(&out));
+
+    // Mistakes are warnings, and left out: the game still plays.
+    let out = with("presentation: { theme: termnal, accent: red }\n");
+    let p = out.story.as_ref().unwrap().meta.presentation.clone().unwrap();
+    assert_eq!((p.theme, p.accent), (None, None));
+    let w = warnings(&out);
+    assert!(w.iter().any(|w| w.contains("unknown theme 'termnal'") && w.contains("terminal")), "{w:#?}");
+    assert!(w.iter().any(|w| w.contains("'red' isn't a colour")), "{w:#?}");
+    assert_error(&with("presentation: { font: comic }\n"), "font");
+}

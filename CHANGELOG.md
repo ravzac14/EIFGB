@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- Games can choose their look on the website: `presentation: { theme:
+  terminal, accent: "#c33" }`, or "How it looks" in the editor. Players
+  see it unless they've picked their own colours.
 - In the editor, drag a selected room's corner to make its box bigger or
   smaller, so a great hall looks bigger than a closet. It's only for
   picturing the map (it's kept in `map.yaml`), and the player's map draws

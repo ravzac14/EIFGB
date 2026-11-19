@@ -224,6 +224,7 @@ impl<'a> Lowerer<'a> {
         }
         let scripts = self.load_scripts(&s.scripts);
 
+        let presentation = s.presentation.as_ref().map(|p| self.presentation(p));
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
         let story = Story {
             ir_version: IR_VERSION,
@@ -242,6 +243,7 @@ impl<'a> Lowerer<'a> {
                     voice: s.player.voice.unwrap_or(2),
                     track_life: s.settings.track_life.unwrap_or(30),
                 },
+                presentation,
             },
             intro,
             vars: s.vars.into_iter().collect(),
@@ -1406,6 +1408,27 @@ impl<'a> Lowerer<'a> {
     }
 
     // ------------------------------------------------------------- scripts
+
+    /// The `presentation:` section: unknown themes and colours that aren't
+    /// `#rgb` or `#rrggbb` are warned about and left out.
+    fn presentation(&mut self, p: &src::Presentation) -> Presentation {
+        let theme = p.theme.clone().filter(|t| {
+            let ok = THEMES.contains(&t.as_str());
+            if !ok {
+                let hint = did_you_mean(t, THEMES.iter().copied());
+                self.d.warn("presentation.theme", format!("unknown theme '{t}'{hint}; the themes are {}", THEMES.join(", ")));
+            }
+            ok
+        });
+        let accent = p.accent.clone().filter(|a| {
+            let hex = a.strip_prefix('#').filter(|h| (h.len() == 3 || h.len() == 6) && h.chars().all(|c| c.is_ascii_hexdigit()));
+            if hex.is_none() {
+                self.d.warn("presentation.accent", format!("'{a}' isn't a colour like \"#c33\" or \"#cc3333\""));
+            }
+            hex.is_some()
+        });
+        Presentation { theme, accent }
+    }
 
     fn load_scripts(&mut self, paths: &[String]) -> Vec<Script> {
         let mut out = Vec::new();

@@ -54,11 +54,28 @@ export const settings = {
   set: (s: Settings) => write("settings", s),
 };
 
+/**
+ * The look the game being played asked for (`presentation:`), if any. It
+ * applies while the player's own colours are left on "auto".
+ */
+let gameLook: { theme?: string; accent?: string } | null = null;
+export function setGameLook(look: { theme?: string; accent?: string } | null | undefined) {
+  gameLook = look?.theme || look?.accent ? look : null;
+  applySettings();
+}
+export function getGameLook() {
+  return gameLook;
+}
+
 /** Applies the settings to the page: `<html data-theme data-size data-face data-spacing data-width>`. */
 export function applySettings(s = settings.get()) {
   const html = document.documentElement;
-  if (s.theme === "auto") delete html.dataset.theme;
-  else html.dataset.theme = s.theme;
+  const own = s.theme === "auto" ? gameLook : null;
+  const theme = s.theme === "auto" ? own?.theme : s.theme;
+  if (theme) html.dataset.theme = theme;
+  else delete html.dataset.theme;
+  if (own?.accent) html.style.setProperty("--accent", own.accent);
+  else html.style.removeProperty("--accent");
   html.dataset.size = s.size;
   html.dataset.face = s.face;
   html.dataset.spacing = s.spacing;

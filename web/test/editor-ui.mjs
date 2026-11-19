@@ -261,6 +261,25 @@ box("Up high").checked = false;
 box("Up high").dispatchEvent(new Event("change"));
 assert.doesNotMatch(yaml(), /high: true/);
 
+// The game's look: a theme and a highlight colour, and back to none.
+pointer($("#map"), "pointerdown", 5, 5);
+pointer($("#map"), "pointerup", 5, 5);
+const looks = () => [...document.querySelectorAll("#inspector select")].find((x) => x.getAttribute("aria-label") === "Colours");
+looks().value = "terminal";
+looks().dispatchEvent(new Event("change"));
+assert.match(yaml(), /presentation:\n\s+theme: terminal/);
+const colour = $('#inspector input[type=color]');
+colour.value = "#cc3333";
+colour.dispatchEvent(new Event("change"));
+assert.match(yaml(), /presentation:\n\s+theme: terminal\n\s+accent: "#cc3333"/);
+clickButton("Use the usual colour");
+assert.doesNotMatch(yaml(), /accent/);
+looks().value = "";
+looks().dispatchEvent(new Event("change"));
+assert.doesNotMatch(yaml(), /presentation/);
+looks().value = "sepia";
+looks().dispatchEvent(new Event("change"));
+
 // It all compiles.
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/);

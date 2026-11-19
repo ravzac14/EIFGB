@@ -3476,3 +3476,28 @@ fn things_up_high_need_something_to_stand_on() {
     assert_says(&mut g, "x key", "brass key");
     assert_says(&mut g, "drop key", "Dropped.");
 }
+
+// ------------------------------------------------------------------ barter
+
+#[test]
+fn bartering_one_thing_for_another() {
+    // The peddler pays half price (8 for the ring) and haggles 25%: the
+    // lamp (8) goes for 6 or more, the rope (12) for 9 or more.
+    let src = SHOP.replace(
+        "  map: { name: map, in: peddler, traits: [portable], price: 4 }\n",
+        "  map: { name: map, in: peddler, traits: [portable], price: 4 }\n  ring: { name: silver ring, synonyms: [ring], in: player, traits: [portable], price: 16 }\n  button: { name: button, in: player, traits: [portable], price: 2 }\n  pebble: { name: pebble, in: player, traits: [portable] }\n",
+    );
+    let mut g = game(compile_str(&src).story.unwrap());
+    assert_eq!(say(&mut g, "trade ring for rope"), "The peddler shakes their head: the silver ring isn't worth the rope. Something more, perhaps?");
+    assert_eq!(say(&mut g, "trade pebble for map"), "The peddler isn't interested in the pebble.");
+    assert_eq!(say(&mut g, "trade ring for apple"), "I don't know the word \"apple\".");
+    assert_eq!(say(&mut g, "swap the ring for the lamp"), "You hand over the silver ring, and the peddler gives you the brass lamp for it.");
+    assert_says(&mut g, "i", "brass lamp");
+    assert!(!say(&mut g, "i").contains("ring"));
+    // Money doesn't change hands.
+    assert_says(&mut g, "i", "You have 20 coins.");
+    assert_eq!(say(&mut g, "trade ring for map"), "You're not carrying the silver ring.");
+    // Lowball swaps cost patience, like lowball offers.
+    say(&mut g, "trade button for rope");
+    assert_eq!(say(&mut g, "trade button for rope"), "The peddler looks insulted, and won't trade with you any more.");
+}

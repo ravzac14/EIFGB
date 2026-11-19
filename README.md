@@ -1405,6 +1405,16 @@ You sell the brass lamp to the peddler for 4 coins.
   > offer 6 coins for the lamp
   The peddler grumbles, but sells you the brass lamp for 6 coins.
   ```
+- **Barter:** TRADE RING FOR LAMP (also SWAP, EXCHANGE, BARTER) swaps
+  something the player carries for something the merchant sells, with no
+  money changing hands. The merchant values the ring at what it would pay
+  for it (`buys_at`), and the swap goes through if that's at least the
+  least it would take for the lamp (its price, less `haggle` percent): "You
+  hand over the silver ring, and the peddler gives you the brass lamp for
+  it." If not, "The peddler shakes their head: the silver ring isn't worth
+  the rope. Something more, perhaps?", which costs patience like a
+  lowball offer (except with a merchant who doesn't haggle). Things without
+  a `price` are worth nothing to a merchant.
 - **Currency:** prices read "8 coins". To call it something else, reword
   `money.amount` under `messages:`.
 
@@ -1540,6 +1550,7 @@ same thing; `…` is where the name of a thing or person goes.
 | SELL … | SELL … TO …, SELL … FOR 5 | Sells something, at their price or yours. |
 | OFFER 5 FOR … | BID 5 FOR …, HAGGLE FOR … | Makes an offer; they may come back with another. |
 | ACCEPT | | Takes their counter-offer. |
+| TRADE … FOR … | SWAP … FOR …, BARTER … FOR … | Swaps something you carry for something they sell. |
 
 #### The game itself
 

@@ -107,6 +107,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Accept, _) => self.accept(ctx),
             (A::Give, Some(t)) => self.give_action(t, cmd.tool, ctx),
             (A::Bribe, Some(t)) => self.bribe_action(t, cmd.text.as_deref(), ctx),
+            (A::Trade, Some(t)) => self.trade(t, cmd.tool, ctx),
             (A::PushTo, Some(t)) => self.push_to(t, cmd, ctx),
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),

@@ -430,6 +430,13 @@ verbs:
   accept:
     action: accept
     patterns: ["accept", "accept offer", "accept the offer", "accept deal", "accept the deal", "deal", "agree", "shake on it"]
+  trade:
+    action: trade
+    patterns:
+      - "trade {target} for {tool}"
+      - "swap {target} for {tool}"
+      - "exchange {target} for {tool}"
+      - "barter {target} for {tool}"
   wares:
     action: wares
     patterns: ["wares", "list wares", "browse", "shop", "trade", "trade with {target}", "browse {target}"]
@@ -759,6 +766,9 @@ messages:
   sell.no_merchant: "There's nobody here to sell to."
   sell.not_held: "You're not carrying ${the(args.target)}."
   sell.worthless: "${The(args.merchant)} isn't interested in ${the(args.target)}."
+  trade.done: "You hand over ${the(args.target)}, and ${the(args.merchant)} gives you ${the(args.tool)} for it."
+  trade.more: "${The(args.merchant)} shakes their head: ${the(args.target)} isn't worth ${the(args.tool)}. Something more, perhaps?"
+  trade.for_what: "What do you want for ${the(args.target)}?"
   sell.merchant_poor: "${The(args.merchant)} can't afford ${the(args.target)}."
   sell.done: "You sell ${the(args.target)} to ${the(args.merchant)} for ${args.price}."
   sell.offer: "${The(args.merchant)} offers ${args.price} for ${the(args.target)}. SELL it again or ACCEPT to take that, or ask for more, like \"sell ${the(args.target)} for ${args.example}\"."

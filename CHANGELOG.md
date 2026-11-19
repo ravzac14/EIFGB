@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- Barter: TRADE RING FOR LAMP swaps something you carry for something a
+  merchant sells, no money needed, if it's worth enough to them. See
+  [Trading](README.md#trading).
 - Pushing and climbing: `pushable` things are too heavy to carry but can
   be pushed into the next room (PUSH CRATE NORTH), and `high: true`
   things are out of reach until the player stands on something (CLIMB ON

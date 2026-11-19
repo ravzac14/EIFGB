@@ -35,15 +35,7 @@ Everything from the first list has now been built:
 
 ## The world
 
-### Barter
-
-TRADE LAMP FOR ROPE with a merchant, using item prices and haggling
-patience instead of coins.
-
-- Builds on: prices, haggling, patience.
-- Shape: TRADE X FOR Y: accepted when X's resale value covers Y's price
-  less the merchant's haggle; counters ask for "something more".
-- Effort: small.
+Nothing waiting here right now.
 
 ## The editor
 

@@ -1096,6 +1096,56 @@ impl<H: ScriptHost> Game<H> {
         false
     }
 
+    /// TRADE X FOR Y: barter, with no money changing hands. The merchant
+    /// values X at what it would pay for it (`buys_at`), and takes it for Y
+    /// if that's at least the least it would take for Y (its price, less
+    /// `haggle` percent). Otherwise it wants something more, which costs a
+    /// point of patience, as a lowball offer does.
+    pub(crate) fn trade(&mut self, t: EntityId, wanted: Option<EntityId>, ctx: &Ctx) -> bool {
+        let Some(wanted) = wanted else {
+            self.msg("trade.for_what", ctx);
+            return false;
+        };
+        if self.world.location(t) != Some(PLAYER) {
+            self.msg("sell.not_held", ctx);
+            return false;
+        }
+        let Some((seller, price)) = self.seller_of(wanted, None, &ctx.clone().entity("target", wanted)) else { return false };
+        let ctx = ctx.clone().entity("merchant", seller);
+        let (buys_at, haggle) = self.world.def(seller).npc.as_ref().map_or((0, 0), |n| (n.buys_at, n.haggle));
+        let worth = self.world.def(t).price.map_or(0, i64::from) * i64::from(buys_at) / 100;
+        if worth <= 0 {
+            self.msg("sell.worthless", &ctx);
+            return false;
+        }
+        let floor = (price * i64::from(100 - haggle.min(100)) + 99) / 100;
+        if worth >= floor {
+            // Handed over first, so its room is free for what comes back.
+            self.world.unset(t, "worn");
+            let _ = self.world.move_to(t, Some(seller));
+            if self.purchase(wanted, seller, 0, "trade.done", &ctx) {
+                self.world.unset(seller, "_deal");
+                return true;
+            }
+            let _ = self.world.move_to(t, Some(PLAYER));
+            return false;
+        }
+        let patience = match self.world.get(seller, "patience") {
+            Some(Value::Int(i)) => *i,
+            _ => 0,
+        };
+        if patience <= 0 && haggle > 0 {
+            self.world.set(seller, "_refuses", Value::Bool(true));
+            self.msg("offer.insulted", &ctx);
+            return false;
+        }
+        if haggle > 0 {
+            self.world.set(seller, "patience", Value::Int(patience - 1));
+        }
+        self.msg("trade.more", &ctx);
+        false
+    }
+
     /// SELL X (TO M) (FOR N). A merchant who haggles names its price first,
     /// so the player knows they can ask for more; SELL X again (or ACCEPT)
     /// takes it. FOR N asks for a price: anything up to `haggle` percent

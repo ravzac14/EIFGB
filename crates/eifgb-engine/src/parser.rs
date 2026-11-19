@@ -561,7 +561,9 @@ impl Grammar {
         // the jar" need it to know what "all" means.
         let tool = match c.caps.tool {
             Some(span) => {
-                let ids = self.resolve(world, &toks[span.0..span.1], None, None).map_err(|e| fail(e, span))?;
+                // TRADE X FOR Y: Y is something a merchant is selling.
+                let for_sale = action.filter(|a| *a == BuiltinAction::Trade);
+                let ids = self.resolve(world, &toks[span.0..span.1], for_sale, None).map_err(|e| fail(e, span))?;
                 if ids.len() != 1 {
                     return Err(Parsed::Fail(Failure::NoAll));
                 }
@@ -599,8 +601,8 @@ impl Grammar {
         for v in victims {
             scope.extend(world.contents(v).into_iter().filter(|&i| !world.is_hidden(i)));
         }
-        // What merchants here are selling can be looked at and bought.
-        if matches!(action, Some(BuiltinAction::Buy | BuiltinAction::Examine | BuiltinAction::Offer)) {
+        // What merchants here are selling can be looked at, bought and traded for.
+        if matches!(action, Some(BuiltinAction::Buy | BuiltinAction::Examine | BuiltinAction::Offer | BuiltinAction::Trade)) {
             for m in world.merchants_here() {
                 scope.extend(world.contents(m).into_iter().filter(|&i| world.def(i).price.is_some()));
             }

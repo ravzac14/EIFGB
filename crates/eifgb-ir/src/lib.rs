@@ -1001,6 +1001,8 @@ pub enum BuiltinAction {
     DisarmTrap,
     /// Push something `pushable` into the next room, and follow it.
     PushTo,
+    /// Swap something you carry for something a merchant sells.
+    Trade,
 }
 
 impl BuiltinAction {

@@ -1741,6 +1741,10 @@ your patterns to it.
   ambiguous commands and things it doesn't understand.
 - **[Sharing your game](docs/SHARING.md)**: a link anyone can play your
   game from, in their browser, and getting it into the gallery.
+- **[Writing games with an AI assistant](docs/AI.md)**: the format in
+  brief, with a complete checked example, for an AI model or coding agent
+  helping you write a game. The website also has
+  [`llms.txt`](web/llms.txt) and every docs page as Markdown.
 
 ## For contributors
 

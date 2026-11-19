@@ -3501,3 +3501,26 @@ fn bartering_one_thing_for_another() {
     say(&mut g, "trade button for rope");
     assert_eq!(say(&mut g, "trade button for rope"), "The peddler looks insulted, and won't trade with you any more.");
 }
+
+// ------------------------------------------------- the guide for AI assistants
+
+/// The complete example in docs/AI.md compiles with no warnings, and its
+/// walkthrough wins it: the guide is checked, so it can't drift.
+#[test]
+fn the_ai_guides_example_compiles_and_wins() {
+    let doc = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/AI.md")).unwrap();
+    let section = &doc[doc.find("## A complete example").expect("the example section")..];
+    let block = |fence: &str| {
+        let start = section.find(fence).unwrap_or_else(|| panic!("a {fence} block")) + fence.len();
+        section[start..start + section[start..].find("\n```").unwrap()].trim().to_string()
+    };
+    let out = compile_str(&block("```yaml\n"));
+    let warnings: Vec<String> = out.warnings().map(|d| d.to_string()).collect();
+    assert!(warnings.is_empty(), "{warnings:#?}");
+    let mut g = game(out.story.expect("it compiles"));
+    let mut last = String::new();
+    for cmd in block("```text\n").lines() {
+        last = say(&mut g, cmd);
+    }
+    assert!(last.contains("You have won"), "{last}");
+}

@@ -1,7 +1,12 @@
 // Builds the documentation pages into public/docs/: the README, the
-// tutorials, the format reference and the ideas list, plus a page for each
-// example game showing its files. Links between the documents are rewritten
-// to the pages, and every link to a heading is checked.
+// tutorials, the format reference, the guide for AI assistants and the
+// changelog, plus a page for each example game showing its files. Links
+// between the documents are rewritten to the pages, and every link to a
+// heading is checked.
+//
+// For AI assistants and other tools, every page is also written as Markdown
+// beside its HTML (index.md…), and the site root gets llms.txt (what's
+// here, and where), llms-full.txt (all of it in one file) and sitemap.xml.
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,12 +27,13 @@ const out = join(web, "public/docs");
 
 /** The documents, in reading order: source path → page. */
 const PAGES = [
-  { src: "README.md", page: "index.html", nav: "Guide" },
-  { src: "docs/SCRIPTING.md", page: "scripting.html", nav: "Scripting" },
-  { src: "docs/ADVANCED.md", page: "advanced.html", nav: "Advanced" },
-  { src: "spec/FORMAT.md", page: "format.html", nav: "Format reference" },
-  { src: "docs/SHARING.md", page: "sharing.html", nav: "Sharing" },
-  { src: "CHANGELOG.md", page: "changelog.html", nav: "Changelog" },
+  { src: "README.md", page: "index.html", nav: "Guide", about: "The guide: a step-by-step tutorial (Midnight Snack), states, containers, timers, characters, the commands every game understands, and a cheat sheet." },
+  { src: "docs/SCRIPTING.md", page: "scripting.html", nav: "Scripting", about: "Tutorial: Lua scripting, handlers, state, timers, darkness and a character to talk to (Campfire)." },
+  { src: "docs/ADVANCED.md", page: "advanced.html", nav: "Advanced", about: "Tutorial: factions, hunters, corpses and scavengers, a guard, and other ways through (Blackfang Pass)." },
+  { src: "spec/FORMAT.md", page: "format.html", nav: "Format reference", about: "The source format in full: every section, field, rule and message key." },
+  { src: "docs/SHARING.md", page: "sharing.html", nav: "Sharing", about: "Sharing games by link, the gallery, and what running someone else's game can and can't do." },
+  { src: "docs/AI.md", page: "ai.html", nav: "For AI", about: "For language models and coding agents: the format in brief, the rules that trip up first drafts, a complete checked example, and how to check and play a game." },
+  { src: "CHANGELOG.md", page: "changelog.html", nav: "Changelog", about: "What's new, newest first." },
 ];
 const EXAMPLES = {
   midnight_snack: "The game from the README tutorial.",
@@ -58,8 +64,8 @@ function rewrite(href, from) {
   const target = posix.normalize(posix.join(posix.dirname(from), path));
   const page = PAGES.find((p) => p.src === target);
   if (page) return { href: page.page + (hash ? `#${hash}` : ""), page: page.page, hash };
-  // The site's own pages (web/gallery.html → ../gallery.html).
-  const site = target.match(/^web\/([\w-]+\.html)$/);
+  // The site's own pages and files (web/gallery.html → ../gallery.html).
+  const site = target.match(/^web\/([\w-]+\.(?:html|txt|xml))$/);
   if (site) return { href: `../${site[1]}` };
   const ex = target.match(/^spec\/examples\/([\w-]+)(\/|$)/);
   if (ex) return { href: `example-${ex[1]}.html` };
@@ -99,6 +105,7 @@ function layout({ title, page, toc, body, foot = "" }) {
 ${THEME}
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 ${preview(title, page)}
+<link rel="alternate" type="text/markdown" href="${page.replace(/\.html$/, ".md")}" title="This page as Markdown">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -217,7 +224,7 @@ for (const id of readdirSync(examplesDir).sort((a, b) => Object.keys(EXAMPLES).i
   const yamlText = readFileSync(join(dir, "game.yaml"), "utf8");
   const title = yamlText.match(/^\s*title:\s*"?([^"\n]+)"?/m)?.[1] ?? id;
   const about = EXAMPLES[id] ?? "";
-  list.push({ id, title, about });
+  list.push({ id, title, about, files: fs.map((f) => ({ name: f, text: readFileSync(join(dir, f), "utf8") })) });
   const sections = fs
     .map((f) => {
       const text = readFileSync(join(dir, f), "utf8");
@@ -253,6 +260,100 @@ writeFileSync(
   }),
 );
 
+// ------------------------------------------------- for AI assistants
+
+const REPO = "https://github.com/ravzac14/EIFGB/blob/main/";
+const mdName = (page) => page.replace(/\.html$/, ".md");
+
+/** A link in Markdown copied from `from`: to the other Markdown pages, or to the repository. */
+function mdLink(href, from) {
+  const r = rewrite(href, from);
+  if (!r) return REPO + posix.normalize(posix.join(posix.dirname(from), href));
+  if (r.external) return href;
+  if (r.page) return mdName(r.page) + (r.hash ? `#${r.hash}` : "");
+  return r.href.replace(/^(example-[\w-]+)\.html$/, "$1.md");
+}
+
+/** Rewrites a Markdown document's links, leaving code blocks alone. */
+function mdLinks(markdown, from) {
+  let fence = false;
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      if (fence) return line;
+      return line.replace(/\]\(([^)\s]+)\)/g, (_, href) => `](${mdLink(href, from)})`);
+    })
+    .join("\n");
+}
+
+const markdownPages = PAGES.map((p) => {
+  const text = mdLinks(readFileSync(join(root, p.src), "utf8"), p.src);
+  writeFileSync(join(out, mdName(p.page)), text);
+  return { ...p, md: mdName(p.page), text };
+});
+const fence = (f) => (f.endsWith(".lua") ? "lua" : /\.ya?ml$/.test(f) ? "yaml" : "text");
+const exampleMarkdown = list.map((g) => {
+  const text = `# ${g.title}
+
+${g.about} The game's files, exactly as written (\`spec/examples/${g.id}/\` in the repository). Play it at ${SITE}play.html?example=${g.id}
+
+${g.files
+  .map((f) => `## ${f.name === "walkthrough.txt" ? "Walkthrough (the solution)" : `\`${f.name}\``}\n\n\`\`\`${fence(f.name)}\n${f.text.trimEnd()}\n\`\`\``)
+  .join("\n\n")}
+`;
+  writeFileSync(join(out, `example-${g.id}.md`), text);
+  return { ...g, md: `example-${g.id}.md`, text };
+});
+writeFileSync(
+  join(out, "examples.md"),
+  `# Example games\n\n${exampleMarkdown.map((g) => `- [${g.title}](${g.md}): ${g.about}`).join("\n")}\n`,
+);
+
+// llms.txt (https://llmstxt.org): what this is, and where everything is.
+const pageLine = (p) => `- [${p.page === "ai.html" ? "Writing games with an AI assistant" : p.nav}](${SITE}docs/${p.md}): ${p.about}`;
+const ai = markdownPages.find((p) => p.page === "ai.html");
+const llms = `# Interactive Fiction Game Builder/Player (EIFGB)
+
+> Make and play parser-based interactive fiction (text adventures). A game is a YAML file, with Lua for anything special; a Rust engine compiles and plays it, on the command line or in the browser (as WebAssembly) on this site, which also has a visual editor.
+
+- A game is a \`game.yaml\` (plus any \`.lua\` files it lists). Start with the guide for AI assistants below: it has the format in brief and a complete, checked example.
+- Check a game with \`eifgb check game.yaml\`, and play a list of commands with \`eifgb play game.yaml --commands walkthrough.txt\`. The \`eifgb\` command is built from the source: https://github.com/ravzac14/EIFGB
+- Any public \`game.yaml\` (or a GitHub folder, gist or zip) plays in the browser at ${SITE}play.html?game=<its address>
+- Every docs page here is Markdown at the addresses below (and HTML without the .md). All of them in one file: ${SITE}llms-full.txt
+
+## Start here
+
+${pageLine(ai)}
+
+## Docs
+
+${markdownPages.filter((p) => p !== ai && p.page !== "changelog.html").map(pageLine).join("\n")}
+
+## Examples
+
+${exampleMarkdown.map((g) => `- [${g.title}](${SITE}docs/${g.md}): ${g.about} Every file, and its walkthrough.`).join("\n")}
+
+## Optional
+
+${pageLine(markdownPages.find((p) => p.page === "changelog.html"))}
+- [Source code](https://github.com/ravzac14/EIFGB): the engine, compiler, command-line tool and this website.
+`;
+const pub = join(web, "public");
+writeFileSync(join(pub, "llms.txt"), llms);
+const full = [ai, ...markdownPages.filter((p) => p !== ai)]
+  .map((p) => `<!-- ${SITE}docs/${p.md} -->\n\n${p.text.trim()}`)
+  .concat(exampleMarkdown.map((g) => `<!-- ${SITE}docs/${g.md} -->\n\n${g.text.trim()}`))
+  .join("\n\n---\n\n");
+writeFileSync(join(pub, "llms-full.txt"), `${full}\n`);
+
+// sitemap.xml: every page worth finding.
+const urls = ["", "gallery.html", "editor.html", ...PAGES.map((p) => `docs/${p.page}`), "docs/examples.html", ...list.map((g) => `docs/example-${g.id}.html`)];
+writeFileSync(
+  join(pub, "sitemap.xml"),
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`,
+);
+
 // ------------------------------------------------------------ checking
 
 for (const l of links) {
@@ -277,5 +378,5 @@ writeFileSync(
 );
 
 for (const w of warnings) console.warn(`warning: ${w}`);
-console.log(`built ${PAGES.length + list.length + 1} docs pages into public/docs/`);
+console.log(`built ${PAGES.length + list.length + 1} docs pages into public/docs/ (with Markdown copies), and llms.txt, llms-full.txt and sitemap.xml`);
 if (warnings.length && process.argv.includes("--strict")) process.exit(1);

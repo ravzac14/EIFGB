@@ -6,5 +6,8 @@
 /web/public/docs/
 /web/public/gallery.json
 /web/public/verbs.json
+/web/public/llms.txt
+/web/public/llms-full.txt
+/web/public/sitemap.xml
 /web/node_modules/
 /web/dist/

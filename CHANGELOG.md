@@ -6,6 +6,11 @@ behave will be called out here.
 
 ## Unreleased
 
+- For AI assistants: a guide to writing games with one (format, common
+  mistakes, a complete checked example), every docs page as Markdown next
+  to its HTML, and `llms.txt`, `llms-full.txt` and `sitemap.xml` at the
+  site's root.
+
 - Send feedback from anywhere on the site: report something broken or
   confusing, or an idea for playing, the editor or the website. It says
   which page (or which game, room and turn) you were on and which version

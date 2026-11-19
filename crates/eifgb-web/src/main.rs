@@ -68,7 +68,7 @@ fn load(files: &str, entry: &str, seed: u64) -> Value {
         return json!({ "diagnostics": diagnostics });
     }
     let m = &story.meta;
-    let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version, "presentation": m.presentation, "endings": story.endings.iter().map(|e| e.key.clone()).collect::<Vec<_>>() });
+    let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version, "presentation": m.presentation, "endings": story.endings.iter().map(|e| e.key.clone()).collect::<Vec<_>>(), "stdlib": m.stdlib, "ir": story.ir_version, "engine": env!("CARGO_PKG_VERSION") });
     let started = LuaHost::new().and_then(|h| Game::new(story, h, seed));
     match started {
         Ok(mut g) => {

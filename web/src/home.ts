@@ -3,6 +3,7 @@ import { fromDrop, fromFileList } from "./files.ts";
 import { loadEngine, type Engine, type Files, type Output } from "./engine.ts";
 import { endingsText, hashFiles, localGames, savesFor } from "./store.ts";
 import { settingsDialog } from "./settings-ui.ts";
+import { feedbackButton } from "./feedback.ts";
 
 interface Example {
   id: string;
@@ -14,6 +15,7 @@ interface Example {
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
+feedbackButton($("feedback-open"));
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: (Node | string)[]) {
   const e = Object.assign(document.createElement(tag), props);

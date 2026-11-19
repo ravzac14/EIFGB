@@ -113,3 +113,16 @@ dialog h3 { margin: 1.2rem 0 0.3rem; font-size: 1rem; }
 dialog .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0.6rem 0; }
 dialog input[type="text"] { flex: 1; min-width: 8rem; padding: 0.35em 0.5em; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 dialog .close { float: right; }
+
+/* Feedback, in a dialog on every page or on its own page. */
+.feedback { display: grid; gap: 0.35rem; font-family: var(--sans); font-size: 0.95rem; max-width: 36rem; }
+.feedback label { font-weight: 600; margin-top: 0.5rem; }
+.feedback label.check { font-weight: normal; display: flex; gap: 0.5em; align-items: baseline; }
+.feedback textarea, .feedback input[type=text], .feedback select { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.4em 0.5em; }
+.feedback textarea { resize: vertical; min-height: 6em; }
+.feedback details { margin-top: 0.6rem; }
+.feedback summary { cursor: pointer; color: var(--accent); }
+.feedback-context { max-height: 14rem; overflow: auto; font: 0.75rem/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem; margin: 0.4rem 0 0; }
+.feedback .row { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.feedback p { margin: 0.3rem 0 0; }
+dialog#feedback { width: min(36rem, calc(100vw - 32px)); }

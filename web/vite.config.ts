@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
-import { existsSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -29,6 +30,26 @@ function publicIndexes(): Plugin {
   };
 }
 
+/**
+ * What build of the site this is, for feedback reports: the commit (from
+ * GitHub Actions, or the local checkout), when it was built, and the
+ * engine's version from Cargo.toml.
+ */
+function buildInfo() {
+  let commit = process.env.GITHUB_SHA?.slice(0, 7) ?? "";
+  if (!commit) {
+    try {
+      commit = execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+      if (execSync("git status --porcelain", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()) commit += "+changes";
+    } catch {
+      commit = "unknown";
+    }
+  }
+  const cargo = readFileSync(resolve(import.meta.dirname, "../Cargo.toml"), "utf8");
+  const engine = cargo.match(/\[workspace\.package\][^[]*?version\s*=\s*"([^"]+)"/)?.[1] ?? "unknown";
+  return { commit, built: new Date().toISOString().slice(0, 10), engine };
+}
+
 // Relative paths everywhere, so the site works from any folder: a GitHub
 // Pages project site (/<repo>/), a custom domain, or a local server.
 export default defineConfig({
@@ -37,6 +58,7 @@ export default defineConfig({
   // home page served at the wrong address.
   appType: "mpa",
   plugins: [publicIndexes()],
+  define: { __BUILD__: JSON.stringify(buildInfo()) },
   build: {
     target: "es2022",
     rollupOptions: {
@@ -45,6 +67,7 @@ export default defineConfig({
         play: resolve(import.meta.dirname, "play.html"),
         gallery: resolve(import.meta.dirname, "gallery.html"),
         editor: resolve(import.meta.dirname, "editor.html"),
+        feedback: resolve(import.meta.dirname, "feedback.html"),
       },
     },
   },

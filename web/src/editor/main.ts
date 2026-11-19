@@ -7,6 +7,7 @@ import { loadEngine, type Diagnostic, type Engine, type Files } from "../engine.
 import { fromFileList } from "../files.ts";
 import { localGames, type LocalGame } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
+import { feedbackButton, feedbackContext } from "../feedback.ts";
 import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
 import { MAP_FILE, besideRoom, layout, readMap, writeMap, type Point, type Positions } from "./layout.ts";
 import { MapView, type Selection } from "./map.ts";
@@ -14,6 +15,15 @@ import { renderInspector } from "./inspector.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
+feedbackButton($("feedback-open"));
+feedbackContext({
+  info: () => ({
+    editing: model ? `${model.title()} (${model.roomIds().length} rooms)` : "nothing yet (the start screen)",
+    selected: selection ? `${selection.kind} ${"id" in selection ? selection.id : `${selection.room} ${selection.dir}`}` : "the game",
+    problems: problems.length ? problems.slice(0, 5).map((d) => `${d.severity} ${d.path}: ${d.message}`).join(" | ") : "none",
+    files: project ? Object.keys(project.files).join(", ") : "",
+  }),
+});
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: (Node | string)[]) {
   const e = Object.assign(document.createElement(tag), props);

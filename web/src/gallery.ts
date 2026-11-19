@@ -1,5 +1,6 @@
 // The Gallery page: games from gallery.yaml, and making a share link.
 import { settingsDialog } from "./settings-ui.ts";
+import { feedbackButton } from "./feedback.ts";
 import { endingsText, savesFor } from "./store.ts";
 import { fetchGame, resolve } from "./remote.ts";
 import { loadEngine } from "./engine.ts";
@@ -15,6 +16,7 @@ interface Game {
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
+feedbackButton($("feedback-open"));
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: (Node | string)[]) {
   const e = Object.assign(document.createElement(tag), props);

@@ -105,6 +105,7 @@ ${preview(title, page)}
 <header class="bar">
   <a href="../" class="brand">EIFGB</a>
   <nav class="nav">${NAV(page)}</nav>
+  <a href="../feedback.html?from=docs/${page}" class="feedback">Feedback</a>
   <a href="../" class="play">Play games</a>
 </header>
 <div class="layout${toc.length ? "" : " wide"}">

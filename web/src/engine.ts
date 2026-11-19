@@ -48,6 +48,10 @@ export interface Meta {
   presentation?: Presentation | null;
   /** Every ending's key, from `endings:`. */
   endings?: string[];
+  /** The standard library version the game was built with, the IR version and the engine's. */
+  stdlib?: number;
+  ir?: number;
+  engine?: string;
 }
 export interface Presentation {
   theme?: string;

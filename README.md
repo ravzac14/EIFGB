@@ -1761,3 +1761,9 @@ Run the tests with `cargo test --workspace` and lint with
 `cargo clippy --workspace --all-targets`. Every example that has a
 `walkthrough.txt` is played to a win by the test suite, so the tutorial
 above stays in sync with the engine.
+
+**Feedback from the website** goes to a Google Form: the site posts each
+report to the form named in `web/src/feedback-config.ts` (its pre-filled
+link, with the answers TYPE, MESSAGE, CONTACT, PAGE, VERSIONS and
+CONTEXT), and the answers collect in the form's spreadsheet. With no link
+there, the feedback form offers to copy the report instead.

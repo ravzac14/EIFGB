@@ -4,6 +4,7 @@ import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type O
 import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
+import { feedbackButton, feedbackContext } from "./feedback.ts";
 import { fetchGame, resolve } from "./remote.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -13,6 +14,25 @@ const form = $<HTMLFormElement>("prompt");
 const line = $<HTMLInputElement>("line");
 const savesDialog = $<HTMLDialogElement>("saves");
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
+feedbackButton($("feedback-open"));
+feedbackContext({
+  info: () => ({
+    game: meta ? `${meta.title}${meta.author ? ` by ${meta.author}` : ""}` : "not loaded",
+    from: from ?? (gameKey.split(":")[0] || ""),
+    where: last ? `${last.status.room || "?"}, turn ${last.status.turns}${last.status.max_score !== null ? `, score ${last.status.score}/${last.status.max_score}` : ""}` : "",
+    state: over ? "the game has ended" : last?.options.length ? "choosing from a list" : "playing",
+    map: mapBox.hidden ? "closed" : "open",
+  }),
+  versions: () => (meta ? { game: `${meta.id} ${meta.version}`, "game built with": `stdlib v${meta.stdlib ?? "?"}, IR ${meta.ir ?? "?"}, engine ${meta.engine ?? "?"}` } : {}),
+  // The last lines of the story, commands marked with ">".
+  log: () =>
+    [...log.children]
+      .filter((e) => !e.classList.contains("diagnostics"))
+      .map((e) => (e.classList.contains("cmd") ? `> ${e.textContent}` : (e.textContent ?? "")).trim().slice(0, 300))
+      .filter(Boolean)
+      .slice(-20)
+      .join("\n"),
+});
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...kids: (Node | string)[]) {
   const e = Object.assign(document.createElement(tag), props);

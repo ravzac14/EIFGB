@@ -6,6 +6,11 @@ behave will be called out here.
 
 ## Unreleased
 
+- Send feedback from anywhere on the site: report something broken or
+  confusing, or an idea for playing, the editor or the website. It says
+  which page (or which game, room and turn) you were on and which version
+  of the site you're seeing, and shows everything it sends first.
+
 - Download a transcript of your game, as a text file, from Saves or when
   the game ends.
 - Endings found: a game's card on the home page and in the gallery says

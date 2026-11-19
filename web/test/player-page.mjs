@@ -49,4 +49,13 @@ const text = await file.text();
 assert.match(text, /^Midnight Snack/);
 assert.match(text, new RegExp(`\\n> ${steps[0]}\\n`));
 assert.match(text, /\n> .+\n[^>\n]/, "each command is followed by its reply");
+
+// Feedback from the play page: where they are in the game, and its last lines.
+HTMLDialogElement.prototype.showModal ??= function () { this.open = true; };
+$("#feedback-open").click();
+const sentAlong = $("#feedback .feedback-context").textContent;
+assert.match(sentAlong, /game: Midnight Snack/);
+assert.match(sentAlong, /where: Pantry, turn \d+/);
+assert.match(sentAlong, /state: the game has ended/);
+assert.match(sentAlong, /last lines of the game:[^]*> eat it/);
 console.log("ok   player page");

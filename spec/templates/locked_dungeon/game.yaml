@@ -83,6 +83,20 @@ characters:
     health: 10
     damage: 2
 
+# HINT shows the next step for the first puzzle here whose `when` is
+# true: a nudge first, the answer last.
+hints:
+  get_key:
+    when: not world.iron_key:is_in(player)
+    steps:
+      - The iron door needs a key. Who might have one?
+      - Walking in would wake the guard. Is there a quieter way to move?
+      - SNEAK EAST into the guard room, then STEAL KEY FROM GUARD.
+  open_door:
+    when: not world.iron_door.open
+    steps:
+      - UNLOCK DOOR and OPEN DOOR in the corridor, then go NORTH.
+
 endings:
   free:
     kind: win

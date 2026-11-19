@@ -45,6 +45,8 @@ pub struct Source {
     pub timers: IndexMap<String, Timer>,
     #[serde(default)]
     pub factions: IndexMap<String, Faction>,
+    #[serde(default)]
+    pub hints: IndexMap<String, Hint>,
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, String>,
@@ -508,6 +510,16 @@ pub struct Faction {
     /// on them (as themselves, or in its disguise). Defaults to 2.
     #[serde(default)]
     pub patience: Option<u32>,
+}
+
+/// A puzzle's hints: `steps` from a nudge to the answer, offered while
+/// `when` (Lua) is true.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Hint {
+    #[serde(default)]
+    pub when: Option<String>,
+    pub steps: Vec<String>,
 }
 
 /// Something that happens after a number of actions.

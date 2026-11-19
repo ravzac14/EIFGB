@@ -82,6 +82,19 @@ pub struct Story {
     pub timers: Vec<Timer>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub factions: Vec<Faction>,
+    /// Hints for HINT, in the order they're offered.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hints: Vec<Hint>,
+}
+
+/// A puzzle's hints, from a nudge to the answer. HINT shows the next one
+/// for the first puzzle whose `when` is true (no `when`: always).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Hint {
+    pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    pub steps: Vec<Text>,
 }
 
 /// A side in a fight. Hunters and guards attack whoever their faction is
@@ -1026,6 +1039,8 @@ pub enum BuiltinAction {
     PushTo,
     /// Swap something you carry for something a merchant sells.
     Trade,
+    /// The next hint for the puzzle the player is on.
+    Hint,
 }
 
 impl BuiltinAction {
@@ -1039,6 +1054,7 @@ impl BuiltinAction {
                 | BuiltinAction::Restore
                 | BuiltinAction::Restart
                 | BuiltinAction::Help
+                | BuiltinAction::Hint
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )

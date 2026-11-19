@@ -41,6 +41,7 @@ stay interchangeable.
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
 | `timers`     | Things that happen after a number of actions. See **Timers**. |
 | `factions`   | Sides for characters: `hostile_to` (factions and/or `player`) and `eats_corpses`. See **Characters**. |
+| `hints`      | Hints for HINT, by puzzle: `steps` (a non-empty list of text, a nudge first and the answer last) and an optional Lua `when`. HINT (verb `hint`: hint, hints, clue; out of the game, so it takes no turn) shows the next step of the first puzzle, in order, whose `when` is true (or that has none): `[hint.show]` with `args.hint`, `args.n` and `args.of`; when every step has been shown, the last repeats. None true `[hint.none]`; no `hints:` at all `[hint.none_in_game]`. How many steps of each have been shown is kept in the player's private `_hints` state, so it's saved and undone. |
 
 IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `died`, `enter`, `leave`, `defeated`), because handlers are keyed by both.
 

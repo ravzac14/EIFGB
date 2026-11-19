@@ -858,6 +858,35 @@ Scripts can also use `start_timer("bell")`, `stop_timer("bell")` and
 `timer_left("bell")`. `timer_left` gives the number of actions left,
 counting the current one, or `nil` if the timer isn't running.
 
+## Hints
+
+Hints help players who are stuck, one step at a time. List them by
+puzzle, with a nudge first and the answer last:
+
+```yaml
+hints:
+  find_key:
+    when: world.small_key.hidden       # offered while this is true
+    steps:
+      - The pantry door needs a key. Where might one be hidden?
+      - Have a closer look at the mat.
+      - SEARCH THE MAT.
+  open_door:
+    when: not world.pantry_door.open
+    steps:
+      - UNLOCK DOOR, then OPEN DOOR.
+```
+
+HINT shows the next step of the **first** puzzle in the list whose `when`
+is true (a puzzle without `when` is always offered): "(Hint 1 of 3) The
+pantry door needs a key…". Typing HINT again gives the next step, and once
+they've all been shown, the last one repeats. So put puzzles in the order
+players meet them, and write each `when` to be true from when the puzzle
+can be found until it's solved. Hints take no turn, and are saved with the
+game. Steps are text, so `${…}` works in them.
+
+The editor's starter templates all have hints to copy from.
+
 ## Characters: NPCs and enemies
 
 Characters take a turn after every action the player takes (the same
@@ -1562,7 +1591,8 @@ same thing; `…` is where the name of a thing or person goes.
 | SAVE / RESTORE | LOAD | Saves your place, or goes back to a save. |
 | RESTART | | Starts the game again. |
 | SCORE | | Shows your score, if the game keeps one. |
-| HELP | HINT | A short guide to playing. |
+| HELP | | A short guide to playing. |
+| HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
 | QUIT | Q | Stops playing. |
 
 Some verbs exist so that players can try them and authors can respond:

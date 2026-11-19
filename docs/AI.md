@@ -103,6 +103,10 @@ unknown section or field is an error, not ignored, so a typo is caught.
   Players answer by typing the option's number.
 - **Timers:** under `timers:`, `after: N` (or `every: N`) actions, with
   `say`, `do` (Lua), `when` and `end` (an ending ID).
+- **Hints:** under `hints:`, one entry per puzzle in the order players
+  meet them, each with `steps` (a list of text, nudge first, answer last)
+  and a Lua `when` that's true while the puzzle is unsolved. HINT shows the
+  next step of the first one whose `when` is true.
 
 The standard commands (LOOK, TAKE, OPEN, PUT … IN, UNLOCK … WITH, TALK
 TO, the directions, and many more) work in every game without any setup.

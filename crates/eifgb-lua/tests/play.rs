@@ -3589,3 +3589,74 @@ fn listing_exits_can_be_turned_off() {
     // …except where a room asks for them.
     assert_says(&mut g, "n", "Known exits: south.");
 }
+
+// ---------------------------------------------------------------- hints
+
+const HINTS: &str = "
+format: eifgb/0.1
+game: { id: hints, title: Hints, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { north: { to: yard, through: gate } } }
+  yard: { name: Yard }
+objects:
+  gate: { name: gate, in: hall, traits: [door, openable, lockable, scenery], state: { locked: true }, unlocks_with: key }
+  mat: { name: mat, in: hall, traits: [scenery] }
+  key: { name: key, in: hall, traits: [portable], state: { hidden: true }, revealed_by: search mat }
+hints:
+  find_key:
+    when: world.key.hidden
+    steps:
+      - The gate needs a key.
+      - Things get lost under mats.
+      - SEARCH MAT.
+  open_gate:
+    when: here == world.hall
+    steps: ['Unlock the gate with ${the(world.key)}.']
+";
+
+#[test]
+fn hints_step_from_a_nudge_to_the_answer() {
+    let mut g = game(compile_str(HINTS).story.unwrap());
+    assert_eq!(say(&mut g, "hint"), "(Hint 1 of 3) The gate needs a key.");
+    assert_eq!(say(&mut g, "hint"), "(Hint 2 of 3) Things get lost under mats.");
+    assert_eq!(say(&mut g, "hints"), "(Hint 3 of 3) SEARCH MAT.");
+    // All shown: the answer again.
+    assert_eq!(say(&mut g, "hint"), "(Hint 3 of 3) SEARCH MAT.");
+    // A hint takes no turn.
+    assert_eq!(g.input("hint").status.turns, 0);
+    // Solved: on to the next puzzle, with a single step (no numbering).
+    say(&mut g, "search mat");
+    assert_eq!(say(&mut g, "hint"), "Unlock the gate with the key.");
+    say(&mut g, "take key");
+    say(&mut g, "unlock gate");
+    say(&mut g, "open gate");
+    say(&mut g, "n");
+    assert_eq!(say(&mut g, "hint"), "You don't need a hint right now. Try looking around, and examining anything interesting.");
+    // How far the hints have got is saved with the game.
+    let mut g = game(compile_str(HINTS).story.unwrap());
+    say(&mut g, "hint");
+    say(&mut g, "hint");
+    let save = g.input("save").save.unwrap();
+    let mut h = game(compile_str(HINTS).story.unwrap());
+    h.restore(&save);
+    assert_eq!(say(&mut h, "hint"), "(Hint 3 of 3) SEARCH MAT.");
+}
+
+#[test]
+fn a_game_without_hints_says_so_and_help_still_helps() {
+    let mut g = game(compile_str(&HINTS[..HINTS.find("hints:").unwrap()]).story.unwrap());
+    assert!(say(&mut g, "hint").starts_with("This game doesn't have hints."));
+    assert!(say(&mut g, "help").starts_with("Type short commands"));
+}
+
+#[test]
+fn hint_mistakes_are_reported() {
+    let out = compile_str(&HINTS.replace("steps: ['Unlock the gate with ${the(world.key)}.']", "steps: []"));
+    assert!(out.diagnostics.iter().any(|d| d.path == "hints.open_gate.steps"), "{:#?}", out.diagnostics);
+    // The checker finds Lua mistakes in hints, as everywhere else.
+    let story = compile_str(&HINTS.replace("when: here == world.hall", "when: here ==== world.hall")).story.unwrap();
+    let mut codes = Vec::new();
+    eifgb_compiler::visit_code(&story, &mut |c| codes.push(c.clone()));
+    let errors = LuaHost::new().unwrap().syntax_errors(&codes);
+    assert!(errors.iter().any(|(o, _)| o == "hints.open_gate.when"), "{errors:?}");
+}

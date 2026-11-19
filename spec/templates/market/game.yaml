@@ -82,6 +82,15 @@ choices:
         text: '"Poor thing hasn''t eaten all day. The baker does a good loaf."'
         goto: greet
 
+# HINT shows the next step for the first puzzle here whose `when` is
+# true: a nudge first, the answer last.
+hints:
+  help_child:
+    steps:
+      - The old woman might know what the child needs.
+      - The baker sells bread. You have enough money for a loaf.
+      - BUY BREAD from the baker, then GIVE BREAD TO CHILD.
+
 endings:
   kindness:
     kind: win

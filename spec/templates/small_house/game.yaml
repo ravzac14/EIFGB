@@ -94,6 +94,21 @@ objects:
     revealed_by: search sofa
     description: Your house keys, on a ring with a little plastic duck.
 
+# HINT shows the next step for the first puzzle here whose `when` is
+# true: a nudge first, the answer last.
+hints:
+  find_keys:
+    when: world.keys.hidden
+    steps:
+      - Where do things go missing in a house?
+      - Things often slip down the back of a sofa.
+      - SEARCH SOFA, in the living room.
+  get_out:
+    when: not world.front_door.open
+    steps:
+      - Your keys open the front door, in the hallway.
+      - TAKE KEYS, then UNLOCK DOOR and OPEN DOOR in the hallway.
+
 endings:
   out_the_door:
     kind: win

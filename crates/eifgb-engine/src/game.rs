@@ -469,10 +469,48 @@ impl<H: ScriptHost> Game<H> {
             }
             BuiltinAction::Score => self.msg("score.report", &ctx),
             BuiltinAction::Help => self.msg("help.text", &ctx),
+            BuiltinAction::Hint => self.hint(),
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }
         true
+    }
+
+    /// HINT: the next step for the first puzzle whose `when` is true. How
+    /// many steps have been shown is kept with the game (`_hints` on the
+    /// player), so it's saved; once they're all shown, the last repeats.
+    fn hint(&mut self) {
+        let hints = self.world.story().hints.clone();
+        if hints.is_empty() {
+            return self.msg("hint.none_in_game", &Ctx::new());
+        }
+        let mut current = None;
+        for h in &hints {
+            if h.when.as_ref().is_none_or(|w| self.run(w, &Ctx::new()).truthy()) {
+                current = Some(h);
+                break;
+            }
+        }
+        let Some(h) = current else {
+            return self.msg("hint.none", &Ctx::new());
+        };
+        let mut shown = match self.world.get(PLAYER, "_hints") {
+            Some(Value::Map(m)) => m.clone(),
+            _ => Default::default(),
+        };
+        let n = match shown.get(&h.key) {
+            Some(Value::Int(n)) => (*n).max(0) as usize,
+            _ => 0,
+        };
+        let step = n.min(h.steps.len() - 1);
+        let text = self.render_str(&h.steps[step], &Ctx::new());
+        let ctx = Ctx::new()
+            .text("hint", text)
+            .value("n", Value::Int(step as i64 + 1))
+            .value("of", Value::Int(h.steps.len() as i64));
+        self.msg("hint.show", &ctx);
+        shown.insert(h.key.clone(), Value::Int((step + 1) as i64));
+        self.world.set(PLAYER, "_hints", Value::Map(shown));
     }
 
     fn command_ctx(&self, verb: &Verb, target: Option<EntityId>, cmd: &Command) -> Ctx {

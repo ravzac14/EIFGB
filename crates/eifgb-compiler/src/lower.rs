@@ -224,6 +224,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         let scripts = self.load_scripts(&s.scripts);
+        let hints = self.lower_hints(&s.hints);
 
         let presentation = s.presentation.as_ref().map(|p| self.presentation(p));
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
@@ -260,6 +261,7 @@ impl<'a> Lowerer<'a> {
             categories: stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             timers,
             factions,
+            hints,
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -1219,6 +1221,26 @@ impl<'a> Lowerer<'a> {
         Some(ActionRule { verbs, category, target })
     }
 
+    // --------------------------------------------------------------- hints
+
+    fn lower_hints(&mut self, raw: &indexmap::IndexMap<String, src::Hint>) -> Vec<Hint> {
+        let mut out = Vec::new();
+        for (key, h) in raw {
+            let path = format!("hints.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&path, e);
+            }
+            if h.steps.is_empty() {
+                self.d.error(format!("{path}.steps"), "a hint needs at least one step");
+                continue;
+            }
+            let when = h.when.as_deref().map(|w| self.code(w, &format!("{path}.when")));
+            let steps = h.steps.iter().enumerate().map(|(i, s)| self.text(s, &format!("{path}.steps[{i}]"))).collect();
+            out.push(Hint { key: key.clone(), when, steps });
+        }
+        out
+    }
+
     // -------------------------------------------------------------- timers
 
     fn lower_timers(&mut self, raw: &indexmap::IndexMap<String, src::Timer>, endings: &[Ending]) -> Vec<Timer> {
@@ -1601,6 +1623,14 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
         opt_text(&t.say, f);
         if let Some(r) = &t.run {
             f(r);
+        }
+    }
+    for h in &story.hints {
+        if let Some(w) = &h.when {
+            f(w);
+        }
+        for s in &h.steps {
+            text(s, f);
         }
     }
 }

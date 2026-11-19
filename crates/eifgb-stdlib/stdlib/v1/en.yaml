@@ -172,7 +172,10 @@ verbs:
     patterns: ["restart"]
   help:
     action: help
-    patterns: ["help", "hint", "hints"]
+    patterns: ["help"]
+  hint:
+    action: hint
+    patterns: ["hint", "hints", "clue", "give me a hint"]
   push_to:
     action: push_to
     patterns:
@@ -1009,7 +1012,10 @@ messages:
   restore.done: "[Restored.]"
   restore.none: "There's no saved game."
   restore.failed: "That save couldn't be restored: ${args.reason}"
-  help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, and SAVE and RESTORE keep your place."
+  hint.show: "${if args.of > 1}(Hint ${args.n} of ${args.of}) ${end}${args.hint}"
+  hint.none: "You don't need a hint right now. Try looking around, and examining anything interesting."
+  hint.none_in_game: "This game doesn't have hints. Try examining everything, and searching anything that looks interesting."
+  help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, SAVE and RESTORE keep your place, and HINT helps if you're stuck."
   ending.win: "*** You have won ***"
   ending.loss: "*** You have lost ***"
   ending.neutral: "*** The End ***"

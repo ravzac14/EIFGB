@@ -562,6 +562,8 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   );
   if (has("light_source")) panel.append(el("div", { class: "indent" }, state("Starts lit", "lit", t.lit)));
   panel.append(...trait("Burns", "flammable"), ...trait("Can be smashed", "destructible"));
+  if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
+  panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
 
   // Hidden until found.
   panel.append(el("h3", { textContent: "Hidden" }), state("Hidden until the player finds it", "hidden", t.hidden));

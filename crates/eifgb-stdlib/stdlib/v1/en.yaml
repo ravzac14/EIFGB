@@ -25,7 +25,7 @@ verbs:
     patterns: ["inventory", "i", "inv"]
   go:
     action: go
-    patterns: ["go {direction}", "walk {direction}", "{direction}"]
+    patterns: ["go {direction}", "walk {direction}", "climb {direction}", "{direction}"]
   # Verb keys must not clash with event names (start, turn, parse_failed,
   # enter, leave), because handlers use both. Hence `go_through`, not `enter`.
   go_through:
@@ -44,9 +44,14 @@ verbs:
       - "climb into {target}"
       - "climb on {target}"
       - "climb onto {target}"
+      - "climb up on {target}"
+      - "climb up onto {target}"
+      - "climb {target}"
       - "sit on {target}"
       - "sit in {target}"
       - "stand on {target}"
+      - "step on {target}"
+      - "step onto {target}"
       - "lie on {target}"
       - "lie in {target}"
       - "hide in {target}"
@@ -168,6 +173,17 @@ verbs:
   help:
     action: help
     patterns: ["help", "hint", "hints"]
+  push_to:
+    action: push_to
+    patterns:
+      - "push {target} {direction}"
+      - "shove {target} {direction}"
+      - "pull {target} {direction}"
+      - "drag {target} {direction}"
+      - "move {target} {direction}"
+      - "roll {target} {direction}"
+      - "slide {target} {direction}"
+      - "heave {target} {direction}"
   # Verbs with no built-in behaviour. They exist so players can try them and
   # authors can hook into them with handlers, revealed_by or categories.
   push:
@@ -887,6 +903,7 @@ messages:
   take.done: "Taken."
   take.already: "You already have ${the(args.target)}."
   take.fixed: "${The(args.target)} won't budge."
+  take.pushable: "${The(args.target)} is too heavy to carry, but you could push it somewhere: PUSH IT NORTH, say."
   take.scenery: "That's hardly portable."
   take.person: "${The(args.target)} wouldn't care for that."
   take.self: "You can't take yourself."
@@ -934,6 +951,13 @@ messages:
   look.enclosed: "You're shut inside ${the(args.target)}."
   # transparent containers
   reach.closed: "You can't reach ${the(args.target)}: ${the(args.holder)} is closed."
+  reach.high: "${The(args.target)} is up out of reach. You'd need something to stand on."
+  # pushing things into the next room
+  push.done: "You push ${the(args.target)} ${args.direction}."
+  push.cant: "You can't push ${the(args.target)} anywhere."
+  push.carried: "You're carrying ${the(args.target)}; just take it with you."
+  push.on_it: "You'd have to get off ${the(args.target)} first."
+  push.stuck: "${The(args.target)} would have to be on the floor to push it anywhere."
   # doors and containers
   open.done: "You open ${the(args.target)}."
   open.already: "${The(args.target)} is already open."

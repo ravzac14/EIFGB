@@ -107,6 +107,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Accept, _) => self.accept(ctx),
             (A::Give, Some(t)) => self.give_action(t, cmd.tool, ctx),
             (A::Bribe, Some(t)) => self.bribe_action(t, cmd.text.as_deref(), ctx),
+            (A::PushTo, Some(t)) => self.push_to(t, cmd, ctx),
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
             (A::Tracks, _) => self.tracks_action(),
@@ -421,6 +422,33 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
+    /// PUSH CRATE NORTH: something `pushable`, standing in the room, goes
+    /// into the next room, and the player with it. Going works just as GO
+    /// does (doors, blocked ways); if the player doesn't get there, neither
+    /// does the thing.
+    fn push_to(&mut self, t: EntityId, cmd: &Command, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        let key = if !self.world.has(t, Trait::Pushable) {
+            Some("push.cant")
+        } else if self.world.is_within(t, PLAYER) {
+            Some("push.carried")
+        } else if self.world.is_within(PLAYER, t) {
+            Some("push.on_it")
+        } else if self.world.location(t) != Some(here) {
+            Some("push.stuck")
+        } else {
+            None
+        };
+        if let Some(k) = key {
+            self.msg(k, ctx);
+            return false;
+        }
+        self.pushing = Some(t);
+        let moved = self.go(cmd, ctx);
+        self.pushing = None;
+        moved
+    }
+
     /// GO THROUGH, ENTER and the like: leave by the exit that uses this door.
     fn enter(&mut self, t: EntityId, ctx: &Ctx) -> bool {
         if self.world.has(t, Trait::Enterable) {
@@ -520,6 +548,13 @@ impl<H: ScriptHost> Game<H> {
         self.room_event(here, "leave");
         if self.world.move_to(PLAYER, Some(to)).is_err() {
             return false;
+        }
+        // Pushing something: it goes first, and the player follows it in.
+        if let Some(t) = self.pushing.take()
+            && self.world.move_to(t, Some(to)).is_ok()
+        {
+            let d = self.grammar.direction_word(exit.direction);
+            self.msg("push.done", &Ctx::new().entity("target", t).text("direction", d));
         }
         self.world.leave_tracks(PLAYER, here, exit.direction);
         // Having come through a door, the player knows it's there, even if
@@ -848,6 +883,8 @@ impl<H: ScriptHost> Game<H> {
         } else if w.def(t).kind == EntityKind::Room || w.has(t, Trait::Scenery) {
             Some("take.scenery")
         // A body can be carried off, if it isn't too heavy.
+        } else if !w.has(t, Trait::Portable) && !w.is_dead(t) && w.has(t, Trait::Pushable) {
+            Some("take.pushable")
         } else if !w.has(t, Trait::Portable) && !w.is_dead(t) {
             Some("take.fixed")
         } else if w.is_within(PLAYER, t) {

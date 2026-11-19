@@ -226,6 +226,20 @@ assert.match(yaml(), /gold_coin:\n\s+name: gold coin\n\s+in: player/);
 $("#undo").click();
 assert.match(yaml(), /in: old_chest/);
 
+// The chest can be pushed between rooms, and put up high.
+press($(`#map [data-room="${eastRoom}"]`));
+rows().find((r) => r.textContent.includes("old chest")).click();
+const box = (start) => [...document.querySelectorAll("#inspector label.check")].find((l) => l.textContent.startsWith(start)).querySelector("input");
+box("Can be pushed").checked = true;
+box("Can be pushed").dispatchEvent(new Event("change"));
+assert.match(yaml(), /old_chest:[^]*?pushable/);
+box("Up high").checked = true;
+box("Up high").dispatchEvent(new Event("change"));
+assert.match(yaml(), /old_chest:[^]*?high: true/);
+box("Up high").checked = false;
+box("Up high").dispatchEvent(new Event("change"));
+assert.doesNotMatch(yaml(), /high: true/);
+
 // It all compiles.
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/);

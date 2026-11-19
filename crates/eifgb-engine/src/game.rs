@@ -91,6 +91,9 @@ pub struct Game<H: ScriptHost> {
     pub(crate) no_turn: bool,
     /// Set while the player SNEAKs, so arriving doesn't wake anyone.
     pub(crate) sneaking: bool,
+    /// Set while the player PUSHes something into the next room: it goes
+    /// with them, if they get there.
+    pub(crate) pushing: Option<EntityId>,
     /// Rooms the player is listening to this turn (EAVESDROP).
     pub(crate) listening: Vec<EntityId>,
     /// The turn the player last heard a fight next door, so it's said once per turn.
@@ -117,6 +120,7 @@ impl<H: ScriptHost> Game<H> {
             no_turn: false,
             heard_nearby: None,
             sneaking: false,
+            pushing: None,
             listening: Vec::new(),
             out: Output::default(),
             end_requested: None,
@@ -518,6 +522,11 @@ impl<H: ScriptHost> Game<H> {
             for thing in target.into_iter().chain(cmd.tool) {
                 if let Some(holder) = self.world.blocked_reach(thing) {
                     self.msg("reach.closed", &Ctx::new().entity("target", thing).entity("holder", holder));
+                    return;
+                }
+                // Up high: out of reach from the floor.
+                if self.world.out_of_reach_high(thing) {
+                    self.msg("reach.high", &Ctx::new().entity("target", thing));
                     return;
                 }
             }

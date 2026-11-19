@@ -330,6 +330,10 @@ pub struct Entity {
     /// The player can give it a name (CALL THE DOG REX).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub nameable: bool,
+    /// Objects: up out of reach (a high shelf, and whatever is on it),
+    /// unless the player is standing on something.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub high: bool,
     /// What its tracks look like ("paw prints"). Characters only; None means
     /// its faction's, or "footprints".
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -609,10 +613,12 @@ pub enum Trait {
     Flammable,
     /// Can be smashed, and burns away completely if it's flammable too.
     Destructible,
+    /// Too heavy to carry, but can be pushed into the next room (PUSH CRATE NORTH).
+    Pushable,
 }
 
 impl Trait {
-    pub const ALL: [Trait; 14] = [
+    pub const ALL: [Trait; 15] = [
         Trait::Portable,
         Trait::Scenery,
         Trait::Container,
@@ -627,6 +633,7 @@ impl Trait {
         Trait::Transparent,
         Trait::Flammable,
         Trait::Destructible,
+        Trait::Pushable,
     ];
 
     pub fn key(self) -> &'static str {
@@ -645,6 +652,7 @@ impl Trait {
             Trait::Transparent => "transparent",
             Trait::Flammable => "flammable",
             Trait::Destructible => "destructible",
+            Trait::Pushable => "pushable",
         }
     }
 
@@ -991,6 +999,8 @@ pub enum BuiltinAction {
     SetTrap,
     /// Make a trap safe.
     DisarmTrap,
+    /// Push something `pushable` into the next room, and follow it.
+    PushTo,
 }
 
 impl BuiltinAction {

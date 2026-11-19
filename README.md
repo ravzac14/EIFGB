@@ -662,7 +662,8 @@ objects:
 | `transparent` | A closed container whose contents can be seen but not reached: "You can't reach the jewel: the glass case is closed." This applies to every verb that touches things, including your own and KICK, PULL and the other try-it verbs, and their handlers don't run. EXAMINE, SEARCH and LISTEN work through the glass, and so does any verb you mark `reach: false`. |
 | `flammable` | Can be set alight (SET IT ALIGHT, BURN, LIGHT, with something burning in hand). See [Tricks players can find](#tricks-players-can-find). |
 | `destructible` | Can be smashed (HIT, SMASH, BREAK), spilling what's in it, and burns away completely if it's `flammable` too. `destructable` is accepted as well. |
-| `enterable` | The player can get in it (a container) or on it (a supporter): GET IN, CLIMB INTO, SIT ON, LIE ON, then GET OUT, GET OFF or STAND UP. |
+| `enterable` | The player can get in it (a container) or on it (a supporter): GET IN, CLIMB INTO, SIT ON, STAND ON, CLIMB ON, LIE ON, then GET OUT, GET OFF or STAND UP. |
+| `pushable` | Too heavy to carry, but can be pushed into the next room: PUSH CRATE NORTH (or SHOVE, DRAG, PULL, ROLL, SLIDE, MOVE). See [Pushing and climbing](#pushing-and-climbing). |
 
 What players can do and see:
 
@@ -755,6 +756,58 @@ The boulder is too big to carry.
 > take sack
 You're carrying too much already.
 ```
+
+### Pushing and climbing
+
+Something big and heavy can be `pushable`: the player can't pick it up,
+but can push it into the next room, and follows it in. And anything can be
+`high: true`, out of reach until the player stands on something.
+Together they make the classic puzzle: push the crate under the shelf,
+climb on, and take the key.
+
+```yaml
+rooms:
+  shed: { name: Shed, exits: { north: { to: barn, through: shed_door } } }
+  barn: { name: Barn, exits: { south: { to: shed, through: shed_door } } }
+objects:
+  shed_door: { name: shed door, in: shed, traits: [door, openable, scenery] }
+  crate: { name: wooden crate, synonyms: [crate], in: shed, traits: [supporter, enterable, pushable] }
+  shelf: { name: high shelf, synonyms: [shelf], in: barn, high: true, traits: [supporter, scenery] }
+  key:   { name: brass key, in: shelf, traits: [portable] }
+```
+
+```
+> take crate
+The wooden crate is too heavy to carry, but you could push it somewhere: PUSH IT NORTH, say.
+
+> push crate north
+(first opening the shed door)
+You push the wooden crate north.
+Barn
+...
+
+> take key
+The brass key is up out of reach. You'd need something to stand on.
+
+> climb on crate
+You get onto the wooden crate.
+
+> take key
+Taken.
+```
+
+- **Pushing** goes just like walking: a closed door is opened on the way,
+  and a locked door, a blocked exit or a `when` that fails stops it, with
+  the crate left where it was. The thing has to be standing in the room
+  (not on or in something else), and the player can't be on it. PUSH
+  CRATE with no direction is the ordinary PUSH, for your own handlers.
+- **Up high:** a `high` thing, and everything on or in it, can be seen
+  and examined, but nothing that needs to touch it works ("The brass key
+  is up out of reach."), including your own verbs and handlers, until the
+  player is on a supporter: CLIMB ON THE CRATE, STAND ON THE CHAIR. What
+  the player carries is always in reach.
+- Messages to reword: `push.done`, `push.cant`, `push.carried`,
+  `push.on_it`, `push.stuck`, `take.pushable` and `reach.high`.
 
 ## Timed events
 
@@ -1425,9 +1478,9 @@ same thing; `…` is where the name of a thing or person goes.
 | LOOK | L, LOOK AROUND | Describes where you are. |
 | EXAMINE … | X …, LOOK AT … | Describes a thing or person. |
 | SEARCH … | LOOK IN …, LOOK UNDER …, LOOK BEHIND … | Looks closely, and can turn up hidden things. |
-| N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT | NORTH, GO NORTH, … | Goes that way. |
+| N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT | NORTH, GO NORTH, CLIMB UP, … | Goes that way. |
 | GO THROUGH … | ENTER … | Goes through a door. |
-| GET IN … | SIT ON …, CLIMB INTO … | Gets into or onto something `enterable`. |
+| GET IN … | SIT ON …, STAND ON …, CLIMB ON …, CLIMB INTO … | Gets into or onto something `enterable`. Standing on something reaches things up high. |
 | GET OUT | STAND UP | Gets out again. |
 | PEEK NORTH | LOOK NORTH, PEEK THROUGH … | Looks into the next room without going in. |
 | EAVESDROP | EAVESDROP NORTH, LISTEN NORTH, LISTEN AT … | Listens through a wall or door. |
@@ -1441,6 +1494,7 @@ same thing; `…` is where the name of a thing or person goes.
 |---|---|---|
 | TAKE … | GET …, PICK UP …, TAKE … FROM … | Picks something up. |
 | DROP … | PUT DOWN … | Puts down something you carry. |
+| PUSH … NORTH | SHOVE, DRAG, PULL, ROLL, SLIDE, MOVE … NORTH | Pushes something heavy into the next room, and follows it. |
 | PUT … IN … / PUT … ON … | INSERT … INTO …, PLACE … ON … | Puts a thing into a container or onto a surface. |
 | EMPTY … | EMPTY … INTO …, EMPTY … ONTO … | Tips out what's inside. |
 | OPEN … / CLOSE … | SHUT … | Opens or closes a door or container. |
@@ -1517,7 +1571,8 @@ end-of-turn event.
 
 **Traits:** `portable`, `scenery`, `container`, `supporter`, `openable`,
 `lockable`, `door`, `wearable`, `edible`, `light_source`, `enterable`,
-`transparent`, `flammable`, `destructible`. `open` is shorthand for `state: { open: true }`. Things can
+`transparent`, `flammable`, `destructible`, `pushable`. `high: true`
+puts a thing out of reach unless the player stands on something. `open` is shorthand for `state: { open: true }`. Things can
 also have a `size` (default 1) and a `capacity`; see
 [Containers and supporters](#containers-and-supporters). The player's
 carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`

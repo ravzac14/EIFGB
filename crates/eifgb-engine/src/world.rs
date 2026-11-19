@@ -305,6 +305,30 @@ impl World {
         None
     }
 
+    /// Whether `id` is up `high` (or on or in something that is), and the
+    /// player, not standing on anything, can't reach it. Whatever the
+    /// player carries, or is in or on, is always in reach.
+    pub fn out_of_reach_high(&self, id: EntityId) -> bool {
+        if self.is_within(id, PLAYER) || self.is_within(PLAYER, id) {
+            return false;
+        }
+        let mut cur = Some(id);
+        let mut high = false;
+        while let Some(c) = cur {
+            if self.def(c).kind == EntityKind::Room {
+                break;
+            }
+            high |= self.def(c).high;
+            cur = self.location(c);
+        }
+        high && !self.standing_on_something()
+    }
+
+    /// Whether the player is up on a supporter (a crate, a chair, a table).
+    pub fn standing_on_something(&self) -> bool {
+        self.location(PLAYER).is_some_and(|h| self.def(h).kind != EntityKind::Room && self.has(h, Trait::Supporter))
+    }
+
     /// Everything the player can currently refer to: what's around them up
     /// to their [`World::ceiling`] (descending into containers they can see
     /// into, and supporters), the room's doors, the player and what they

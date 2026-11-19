@@ -325,6 +325,9 @@ pub struct Thing {
     /// The player can name it: CALL THE DOG REX.
     #[serde(default)]
     pub nameable: bool,
+    /// Objects: up out of reach unless the player stands on something.
+    #[serde(default)]
+    pub high: bool,
     /// What its tracks look like ("paw prints").
     #[serde(default)]
     pub prints: Option<String>,

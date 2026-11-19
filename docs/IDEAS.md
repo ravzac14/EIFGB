@@ -45,16 +45,6 @@ patience instead of coins.
   less the merchant's haggle; counters ask for "something more".
 - Effort: small.
 
-### Pushing and climbing
-
-PUSH CRATE NORTH to drag heavy things between rooms, STAND ON CRATE to
-reach a high shelf.
-
-- Builds on: weight, supporters, enterable things.
-- Shape: PUSH X <direction> for heavy `pushable` things; `high: true`
-  things out of reach unless the player is on something.
-- Effort: medium.
-
 ## The editor
 
 ### Resizable rooms

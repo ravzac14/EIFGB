@@ -3417,3 +3417,62 @@ rooms:
     let enter = errors.iter().find(|(o, _)| o == "rooms.a.on.enter").expect("the enter handler");
     assert!(enter.1.starts_with("line 3:") || enter.1.starts_with("line 2:"), "{}", enter.1);
 }
+
+// ------------------------------------------------------- pushing and climbing
+
+const PUSHING: &str = r#"format: eifgb/0.1
+game: { id: p, title: Pushing, version: "1", start: shed }
+rooms:
+  shed: { name: Shed, exits: { north: { to: barn, through: shed_door }, east: { to: vault, through: vault_door } } }
+  barn: { name: Barn, exits: { south: { to: shed, through: shed_door } } }
+  vault: { name: Vault, exits: { west: { to: shed, through: vault_door } } }
+objects:
+  crate: { name: wooden crate, synonyms: [crate], in: shed, traits: [supporter, enterable, pushable] }
+  shed_door: { name: shed door, in: shed, traits: [door, openable, scenery] }
+  vault_door: { name: vault door, in: shed, traits: [door, openable, lockable, scenery], state: { locked: true } }
+  shelf: { name: high shelf, synonyms: [shelf], in: barn, high: true, traits: [supporter, scenery] }
+  key: { name: brass key, in: shelf, traits: [portable] }
+  hook: { name: hook, in: barn, traits: [scenery], high: true, on: { pull: say("Click.") } }
+  pebble: { name: pebble, in: shed, traits: [portable] }
+"#;
+
+#[test]
+fn pushing_something_heavy_into_the_next_room() {
+    let mut g = game(compile_str(PUSHING).story.unwrap());
+    assert_says(&mut g, "take crate", "too heavy to carry, but you could push it");
+    assert_says(&mut g, "push crate", "Nothing obvious happens.");
+    assert_says(&mut g, "push crate south", "can't go that way");
+    // A locked door stops it, and the crate stays put.
+    assert_says(&mut g, "push crate east", "locked");
+    assert_says(&mut g, "look", "You can see a wooden crate");
+    // A shut door is opened on the way, then the crate goes through, and the player after it.
+    let out = say(&mut g, "push crate north");
+    assert!(out.contains("You push the wooden crate north.\nBarn") && out.contains("wooden crate"), "{out}");
+    assert_says(&mut g, "s", "Shed");
+    assert!(!say(&mut g, "look").contains("crate"));
+    assert_says(&mut g, "push pebble north", "You can't push the pebble anywhere.");
+    // UNDO puts it back.
+    say(&mut g, "n");
+    assert_says(&mut g, "drag crate south", "You push the wooden crate south.");
+    say(&mut g, "undo");
+    assert_says(&mut g, "look", "Barn");
+    assert_says(&mut g, "look", "wooden crate");
+}
+
+#[test]
+fn things_up_high_need_something_to_stand_on() {
+    let mut g = game(compile_str(PUSHING).story.unwrap());
+    say(&mut g, "push crate north");
+    // Seen, but not reached: the key on the shelf, and the hook.
+    assert_says(&mut g, "x key", "brass key");
+    assert_says(&mut g, "take key", "The brass key is up out of reach. You'd need something to stand on.");
+    assert_says(&mut g, "pull hook", "up out of reach");
+    assert_says(&mut g, "climb crate", "wooden crate");
+    assert_says(&mut g, "push crate south", "You'd have to get off the wooden crate first.");
+    assert_says(&mut g, "take key", "Taken.");
+    assert_says(&mut g, "pull hook", "Click.");
+    // Once carried, it's in reach anywhere.
+    say(&mut g, "get off");
+    assert_says(&mut g, "x key", "brass key");
+    assert_says(&mut g, "drop key", "Dropped.");
+}

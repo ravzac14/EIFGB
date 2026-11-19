@@ -6,6 +6,12 @@ behave will be called out here.
 
 ## Unreleased
 
+- Pushing and climbing: `pushable` things are too heavy to carry but can
+  be pushed into the next room (PUSH CRATE NORTH), and `high: true`
+  things are out of reach until the player stands on something (CLIMB ON
+  THE CRATE). See [Pushing and climbing](README.md#pushing-and-climbing).
+  CLIMB UP and CLIMB DOWN now go up and down.
+
 - Light shows through open ways between rooms: in a dark room next to a
   lit one, "Light spills in from the north."; in a lit room next to a dark
   one, "It's dark to the north."

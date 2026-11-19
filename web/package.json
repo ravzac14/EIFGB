@@ -11,7 +11,7 @@
     "dev": "npm run prepare-site && vite",
     "build": "npm run prepare-site && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "npm run prepare-site && node test/files.mjs && node test/ai-files.mjs && node test/remote.mjs && node test/editor-model.mjs && node test/editor-ui.mjs && node test/home-demo.mjs && node test/player-map.mjs && node test/game-look.mjs && node test/endings.mjs && node test/player-page.mjs && node test/feedback.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
+    "test": "npm run prepare-site && node test/files.mjs && node test/ai-files.mjs && node test/remote.mjs && node test/editor-model.mjs && node test/editor-ui.mjs && node test/starters.mjs && node test/home-demo.mjs && node test/player-map.mjs && node test/game-look.mjs && node test/endings.mjs && node test/player-page.mjs && node test/feedback.mjs && node test/walkthroughs.mjs && node test/dev-server.mjs"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible": "^5.3.0",

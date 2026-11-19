@@ -1,0 +1,8 @@
+# Winning playthrough of Market Day.
+talk to woman
+1
+2
+n
+buy bread
+s
+give bread to child

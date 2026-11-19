@@ -1,0 +1,89 @@
+# Starter: a dungeon with a locked door. Escape your cell, steal the key
+# from a sleeping guard, and get through the iron door to freedom.
+# Rename things, rewrite the descriptions, and add rooms to make it yours.
+format: eifgb/0.1
+
+game:
+  id: locked_dungeon
+  title: "The Locked Door"
+  version: "1.0"
+  start: cell
+  intro: |
+    You wake on cold straw. Somebody forgot to bolt your cell door, and
+    from down the corridor comes the sound of snoring.
+
+rooms:
+  cell:
+    name: Your Cell
+    description: |
+      Damp stone walls and a heap of old straw. The cell door hangs open
+      to the east.
+    exits:
+      east: corridor
+
+  corridor:
+    name: Corridor
+    description: |
+      A low corridor lit by a sputtering torch. A heavy iron door is set in
+      the north wall. Your cell is west, and the snoring comes from the
+      guard room to the east.
+    exits:
+      west: cell
+      east: guard_room
+      north:
+        to: stairs
+        through: iron_door
+
+  guard_room:
+    name: Guard Room
+    description: A cramped room with a table, a stool, and a guard.
+    exits:
+      west: corridor
+
+  stairs:
+    name: Stone Stairs
+    description: Stairs winding up towards daylight.
+    exits:
+      south: corridor
+    on:
+      enter: end_game("free")
+
+objects:
+  straw:
+    name: straw
+    in: cell
+    traits: [scenery]
+    description: Old, damp, and full of things you'd rather not think about.
+
+  iron_door:
+    name: iron door
+    synonyms: [door]
+    in: corridor
+    traits: [door, openable, lockable, scenery]
+    state: { locked: true }
+    unlocks_with: iron_key
+    description: Iron bands, rivets, and a big keyhole.
+
+  iron_key:
+    name: iron key
+    synonyms: [key]
+    # Carried by the guard: the player has to take it from him.
+    in: guard
+    traits: [portable]
+    description: A heavy iron key.
+
+characters:
+  guard:
+    name: guard
+    in: guard_room
+    description: A big man, slumped on his stool. A key hangs from his belt.
+    # Asleep: walking in wakes him, but SNEAK doesn't, and sleepers can be
+    # robbed (STEAL KEY FROM GUARD).
+    state: { asleep: true }
+    health: 10
+    damage: 2
+
+endings:
+  free:
+    kind: win
+    text: You climb towards the light, and out into the morning. Free!

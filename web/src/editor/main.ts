@@ -649,6 +649,29 @@ async function startScreen() {
     if (!localGames.put(g)) return void ($("open-msg").textContent = "There's no room left in this browser's storage.");
     open(g);
   });
+  // Starter templates: small games to start from instead of a blank one.
+  fetch("./games/templates.json")
+    .then((r) => r.json())
+    .then((starters: { id: string; title: string; about: string; files: Files }[]) => {
+      $("starters").append(
+        ...starters.map((t) =>
+          el(
+            "li",
+            {},
+            el("span", { className: "name", textContent: t.title }),
+            el("span", { className: "dim", textContent: t.about }),
+            button("Start from this", () => {
+              const g: LocalGame = { key: newKey(), title: t.title, files: { ...t.files }, added: Date.now() };
+              if (!localGames.put(g)) return void ($("open-msg").textContent = "There's no room left in this browser's storage.");
+              open(g);
+            }),
+          ),
+        ),
+      );
+    })
+    .catch(() => {
+      /* the blank game is still there */
+    });
   try {
     const list: { id: string; title: string; about: string | null }[] = await (await fetch("./games/index.json")).json();
     $("examples").replaceChildren(

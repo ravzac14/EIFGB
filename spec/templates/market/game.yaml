@@ -1,0 +1,88 @@
+# Starter: a village market. Someone to talk to, someone to buy from, and
+# someone to help. Rename things, rewrite the descriptions, and add rooms
+# and characters to make it yours.
+format: eifgb/0.1
+
+game:
+  id: market
+  title: "Market Day"
+  version: "1.0"
+  start: square
+  intro: It's market day, and you have a few coins in your pocket.
+
+player:
+  money: 5
+
+rooms:
+  square:
+    name: Market Square
+    description: |
+      Stalls and shouting and the smell of hay. The bakery is north.
+    exits:
+      north: bakery
+
+  bakery:
+    name: Bakery
+    description: Warm, and smelling wonderfully of fresh bread.
+    exits:
+      south: square
+
+objects:
+  bread:
+    name: loaf of bread
+    synonyms: [bread, loaf]
+    # Carried by the baker, with a price: he sells it.
+    in: baker
+    traits: [portable, edible]
+    price: 4
+    description: Crusty and still warm.
+    on:
+      # Runs after the player gives the bread to someone.
+      after_give: |
+        if args.tool == world.child then
+          end_game("kindness")
+        end
+
+characters:
+  baker:
+    name: baker
+    in: bakery
+    description: Floury to the elbows, and cheerful about it.
+    # Merchants sell what they carry that has a price (BUY, WARES, OFFER).
+    behavior: merchant
+    wander: 0
+
+  old_woman:
+    name: old woman
+    synonyms: [woman]
+    in: square
+    description: She sits on an upturned crate, watching everybody.
+    # TALK TO WOMAN opens this conversation, below.
+    talk: woman_talk
+
+  child:
+    name: hungry child
+    synonyms: [child, kid]
+    in: square
+    description: Thin, and staring hard at the bakery.
+    likes: [bread]
+
+choices:
+  woman_talk:
+    start: greet
+    nodes:
+      greet:
+        text: '"Busy today," says the old woman.'
+        options:
+          - text: "Ask about the child"
+            goto: child
+          - text: "Say goodbye"
+            end: true
+      child:
+        text: '"Poor thing hasn''t eaten all day. The baker does a good loaf."'
+        goto: greet
+
+endings:
+  kindness:
+    kind: win
+    text: The child's face lights up. Some market days are better than others.

@@ -1,0 +1,100 @@
+# Starter: a small house. Five rooms, a locked front door, and keys to find.
+# Rename things, rewrite the descriptions, and add rooms to make it yours.
+format: eifgb/0.1
+
+game:
+  id: small_house
+  title: "A Small House"
+  version: "1.0"
+  start: bedroom
+  intro: |
+    You're late. You're always late. And now you can't find your keys.
+
+rooms:
+  bedroom:
+    name: Bedroom
+    description: |
+      Your bedroom, still dim with the curtains drawn. The bed is unmade.
+      The hallway is south.
+    exits:
+      south: hallway
+
+  hallway:
+    name: Hallway
+    description: |
+      A narrow hallway with a coat hook by the front door. The kitchen is
+      west, the living room east, and your bedroom north.
+    exits:
+      north: bedroom
+      west: kitchen
+      east: living_room
+      south:
+        to: front_garden
+        through: front_door
+
+  kitchen:
+    name: Kitchen
+    description: A tidy kitchen that smells of yesterday's coffee.
+    exits:
+      east: hallway
+
+  living_room:
+    name: Living Room
+    description: |
+      A cosy room with a saggy old sofa in front of the television.
+    exits:
+      west: hallway
+
+  front_garden:
+    name: Front Garden
+    description: Sunshine, birdsong, and the road into town.
+    exits:
+      north: hallway
+    on:
+      # Arriving here ends the game. end_game names an ending, below.
+      enter: end_game("out_the_door")
+
+objects:
+  bed:
+    name: bed
+    in: bedroom
+    traits: [scenery]
+    description: Unmade, and still warm. No keys under the pillow.
+
+  front_door:
+    name: front door
+    synonyms: [door]
+    in: hallway
+    traits: [door, openable, lockable, scenery]
+    state: { locked: true }
+    unlocks_with: keys
+    description: Your front door, locked.
+
+  toast:
+    name: slice of toast
+    synonyms: [toast]
+    in: kitchen
+    traits: [portable, edible]
+    description: Cold, but it'll do.
+
+  sofa:
+    name: sofa
+    synonyms: [couch, cushions]
+    in: living_room
+    traits: [scenery]
+    description: Things go missing down the back of this sofa all the time.
+
+  keys:
+    name: ring of keys
+    synonyms: [keys, key, ring, house keys]
+    in: living_room
+    traits: [portable]
+    # Hidden until the player searches the sofa.
+    state: { hidden: true }
+    revealed_by: search sofa
+    description: Your house keys, on a ring with a little plastic duck.
+
+endings:
+  out_the_door:
+    kind: win
+    text: You lock the door behind you and hurry off. Only a little late, today.

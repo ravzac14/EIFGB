@@ -1,0 +1,10 @@
+# Where the editor draws each room on its map, the size of any room made
+# bigger or smaller, and room colours. The game never reads this file.
+rooms:
+  bedroom: [210, 0]
+  hallway: [210, 130]
+  kitchen: [0, 130]
+  living_room: [420, 130]
+  front_garden: [210, 260]
+colours:
+  front_garden: green

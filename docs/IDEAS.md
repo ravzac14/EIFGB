@@ -39,10 +39,7 @@ Nothing waiting here right now.
 
 ## The editor
 
-### More editor ideas
-
-- **Starter templates:** "a small house", "a dungeon with a locked door",
-  to start a new game from.
+Nothing waiting here right now.
 
 ## The player
 

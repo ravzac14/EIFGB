@@ -46,6 +46,20 @@ index.sort((a, b) => rank(a.id) - rank(b.id) || a.title.localeCompare(b.title));
 writeFileSync(join(out, "index.json"), JSON.stringify(index, null, 2));
 console.log(`bundled ${index.length} games into public/games/`);
 
+// The editor's starter templates, from spec/templates, in one file:
+// [{id, title, about, files}], in this order.
+const STARTERS = {
+  small_house: "Five rooms, a locked front door, and keys to find.",
+  locked_dungeon: "A cell, a sleeping guard with the key, and an iron door to escape through.",
+  market: "Someone to talk to, a baker to buy from, and someone to help.",
+};
+const starters = Object.entries(STARTERS).map(([id, about]) => {
+  const files = project(join(root, "spec/templates", id));
+  return { id, title: parse(files["game.yaml"]).game.title, about, files };
+});
+writeFileSync(join(out, "templates.json"), JSON.stringify(starters));
+console.log(`bundled ${starters.length} starter templates into public/games/templates.json`);
+
 // The standard verbs, for the editor's script picker: id and an example.
 const stdlib = parse(readFileSync(join(root, "crates/eifgb-stdlib/stdlib/v1/en.yaml"), "utf8"));
 const META = new Set(["inventory", "score", "undo", "save", "restore", "restart", "help", "again", "quit", "health", "wait", "wares"]);

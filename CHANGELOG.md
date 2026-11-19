@@ -6,6 +6,12 @@ behave will be called out here.
 
 ## Unreleased
 
+- Starter templates in the editor: start a new game from "A Small House"
+  (five rooms, a locked front door and keys to find), "The Locked Door"
+  (a dungeon cell, a sleeping guard and an iron door) or "Market Day"
+  (someone to talk to, a baker, and someone to help), instead of a blank
+  room. Each is a small, finished game to change into your own.
+
 - The editor's "+ Room" button is now "Add component", for anything a game
   can have: a room (added straight away, as before), an object or a
   character (it asks which room first), a door, a side, an ending, a

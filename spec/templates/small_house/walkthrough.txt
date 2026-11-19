@@ -1,0 +1,9 @@
+# Winning playthrough of A Small House.
+s
+e
+search sofa
+take keys
+w
+unlock door
+open door
+s

@@ -24,6 +24,10 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .picks { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
 .picks li { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.8rem; }
 .picks .name { font-weight: 600; flex: 1; min-width: 8rem; }
+#starters li { display: grid; grid-template-columns: 1fr auto; column-gap: 0.8rem; row-gap: 0.1rem; }
+#starters .name { grid-column: 1; }
+#starters .dim { grid-column: 1; font-size: 0.92em; }
+#starters button { grid-column: 2; grid-row: 1 / span 2; }
 .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 /* Workspace */

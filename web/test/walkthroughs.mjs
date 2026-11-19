@@ -1,4 +1,4 @@
-// Plays every example game's walkthrough through the WebAssembly build,
+// Plays every example game's and starter template's walkthrough through the WebAssembly build,
 // and checks each one ends in a win. Run: node web/test/walkthroughs.mjs
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { loadEngine } from "../src/engine.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const examples = join(root, "spec/examples");
+const folders = ["spec/examples", "spec/templates"].map((f) => join(root, f));
 
 function project(dir) {
   const files = {};
@@ -23,8 +23,8 @@ function project(dir) {
 
 const engine = await loadEngine(new URL("../public/wasm/", import.meta.url));
 let failed = 0;
-for (const name of readdirSync(examples)) {
-  const dir = join(examples, name);
+for (const dir of folders.flatMap((f) => readdirSync(f).map((n) => join(f, n)))) {
+  const name = relative(root, dir).split("\\").join("/");
   const started = engine.load(project(dir), "game.yaml", 1);
   const errors = started.diagnostics.filter((d) => d.severity === "error");
   if (!started.output) {

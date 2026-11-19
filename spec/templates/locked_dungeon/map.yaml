@@ -1,0 +1,11 @@
+# Where the editor draws each room on its map, the size of any room made
+# bigger or smaller, and room colours. The game never reads this file.
+rooms:
+  cell: [0, 130]
+  corridor: [210, 130]
+  guard_room: [420, 130]
+  stairs: [210, 0]
+colours:
+  cell: grey
+  guard_room: red
+  stairs: green

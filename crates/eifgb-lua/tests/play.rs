@@ -41,11 +41,11 @@ fn assert_says(g: &mut Game<LuaHost>, input: &str, needle: &str) {
 
 // --------------------------------------------------------- the lighthouse
 
-/// Every example game with a walkthrough.txt must play through to a win
-/// without script errors. This keeps the README tutorial honest.
-#[test]
-fn every_example_walkthrough_wins() {
-    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples");
+/// Every example game and starter template with a walkthrough.txt must play
+/// through to a win without warnings or script errors. This keeps the README
+/// tutorial honest, and the editor's starters working.
+fn walkthroughs_win(folder: &str) -> usize {
+    let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec").join(folder);
     let mut played = 0;
     for entry in std::fs::read_dir(&examples).unwrap() {
         let dir = entry.unwrap().path();
@@ -66,7 +66,17 @@ fn every_example_walkthrough_wins() {
         assert_eq!(last.ended, Some(EndingKind::Win), "{}\n{}", dir.display(), last.text());
         played += 1;
     }
-    assert!(played >= 4, "expected the lighthouse, midnight_snack, campfire and blackfang walkthroughs");
+    played
+}
+
+#[test]
+fn every_example_walkthrough_wins() {
+    assert!(walkthroughs_win("examples") >= 4, "expected the lighthouse, midnight_snack, campfire and blackfang walkthroughs");
+}
+
+#[test]
+fn every_starter_template_wins() {
+    assert!(walkthroughs_win("templates") >= 3, "expected the small house, locked dungeon and market templates");
 }
 
 #[test]

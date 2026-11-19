@@ -1,0 +1,8 @@
+# Winning playthrough of The Locked Door.
+e
+sneak east
+steal key from guard
+w
+unlock door
+open door
+n

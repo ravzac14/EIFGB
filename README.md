@@ -1765,6 +1765,7 @@ crates/
 spec/
   FORMAT.md        format reference and design notes
   examples/        example games; each walkthrough.txt is played by the tests
+  templates/       the editor's starter games (also played to a win by the tests)
 ```
 
 Run the tests with `cargo test --workspace` and lint with

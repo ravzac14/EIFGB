@@ -1,0 +1,7 @@
+# Where the editor draws each room on its map, the size of any room made
+# bigger or smaller, and room colours. The game never reads this file.
+rooms:
+  square: [0, 130]
+  bakery: [0, 0]
+colours:
+  bakery: orange

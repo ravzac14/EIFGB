@@ -41,7 +41,7 @@ assert.equal(document.querySelectorAll("#map .room").length, 4);
 const key = new URLSearchParams(location.search).get("project");
 const saved = JSON.parse(localStorage.getItem(`eifgb:local:${key}`));
 assert.equal(saved.title, "The Locked Door");
-assert.deepEqual(Object.keys(saved.files).sort(), ["game.yaml", "map.yaml"]);
+assert.deepEqual(Object.keys(saved.files).sort(), ["game.yaml", "map.yaml", "walkthrough.txt"]);
 assert.match(saved.files["map.yaml"], /guard_room: red/);
 assert.match(document.querySelector('#map [data-room="stairs"]').getAttribute("style") ?? "", /--tint/);
 

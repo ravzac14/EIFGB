@@ -156,3 +156,14 @@ Everything is kept in the browser's local storage (`src/store.ts`):
   `options`, `ended`, `save`, `restore_requested`, `quit_requested`).
 - `engine.save()` / `engine.restore(save)`: the whole game state as a
   string, and putting it back.
+
+## Walkthroughs in the editor
+
+`eifgb_check` also plays `walkthrough.txt`, when a project has one and it
+compiles without errors: on a game of its own (seed 1), so the game being
+played isn't disturbed. It returns `walkthrough: { result, steps, line?,
+problem? }`, and a warning at path `walkthrough.txt` when the result isn't
+a win. Test play (`src/editor/testplay.ts`) uses seed 1 too, records the
+commands typed in a game started from the start room, and saves them with
+**Save as walkthrough**. The starter templates and examples bring their
+walkthroughs with them. `test/walkthrough-check.mjs` covers both sides.

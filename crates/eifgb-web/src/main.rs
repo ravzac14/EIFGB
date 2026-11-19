@@ -115,11 +115,13 @@ pub extern "C" fn eifgb_load(files: *const c_char, entry: *const c_char, seed: f
     give(load(&arg(files), &arg(entry), seed as u64))
 }
 
-/// Compile only, for the editor's live check: `{ diagnostics }`.
+/// The editor's live check: `{ diagnostics, walkthrough? }`. Compiles, and plays
+/// `walkthrough.txt` if there is one (see [`walkthrough`]).
 #[unsafe(no_mangle)]
 pub extern "C" fn eifgb_check(files: *const c_char, entry: *const c_char) -> *const c_char {
     let files: BTreeMap<String, String> = serde_json::from_str(&arg(files)).unwrap_or_default();
     let entry = arg(entry);
+    let walkthrough_file = files.get(WALKTHROUGH).cloned();
     let out = compile(&MemFiles(files), if entry.is_empty() { "game.yaml" } else { &entry });
     let mut diagnostics: Vec<Value> = out
         .diagnostics
@@ -129,7 +131,59 @@ pub extern "C" fn eifgb_check(files: *const c_char, entry: *const c_char) -> *co
     if let Some(story) = &out.story {
         diagnostics.extend(script_errors(story));
     }
-    give(json!({ "diagnostics": diagnostics }))
+    let mut result = json!({ "diagnostics": diagnostics });
+    if let (Some(story), Some(text)) = (out.story, walkthrough_file)
+        && !result["diagnostics"].as_array().is_some_and(|d| d.iter().any(|d| d["severity"] == "error"))
+    {
+        let played = walkthrough(story, &text);
+        if let Some(problem) = &played["problem"].as_str() {
+            result["diagnostics"].as_array_mut().unwrap().push(json!({ "severity": "warning", "path": WALKTHROUGH, "message": problem }));
+        }
+        result["walkthrough"] = played;
+    }
+    give(result)
+}
+
+/// The walkthrough the editor records from test play, and checks on every edit.
+const WALKTHROUGH: &str = "walkthrough.txt";
+
+/// Plays a walkthrough (one command a line; blank lines and `#` comments
+/// skipped) on a game of its own, with seed 1, as the editor's test play
+/// does, so the game being played isn't disturbed. It stops at the first
+/// ending. `{ result: "win" | "loss" | "neutral" | "unfinished" | "error",
+/// steps, line?, problem? }`: `problem` says what went wrong when it
+/// doesn't win, and `line` is where (1-based).
+fn walkthrough(story: eifgb_engine::ir::Story, text: &str) -> Value {
+    let mut g = match LuaHost::new().and_then(|h| Game::new(story, h, 1)) {
+        Ok(g) => g,
+        Err(e) => return json!({ "result": "error", "steps": 0, "problem": e.to_string() }),
+    };
+    g.start();
+    let mut steps = 0;
+    for (i, line) in text.lines().enumerate() {
+        let command = line.trim();
+        if command.is_empty() || command.starts_with('#') {
+            continue;
+        }
+        steps += 1;
+        let out = g.input(command);
+        let n = i + 1;
+        if let Some(err) = out.lines.iter().find(|l| l.kind == eifgb_engine::LineKind::Error) {
+            return json!({ "result": "error", "steps": steps, "line": n,
+                "problem": format!("the walkthrough hits a script error at line {n} ({command}): {}", err.text) });
+        }
+        if let Some(kind) = out.ended {
+            let kind = serde_json::to_value(kind).unwrap_or(Value::Null);
+            let problem = (kind != "win").then(|| {
+                let reply = out.text();
+                let reply = reply.lines().filter(|l| !l.trim().is_empty()).take(2).collect::<Vec<_>>().join(" ");
+                format!("the walkthrough no longer wins: at line {n} ({command}) the game ends in a {}: {reply}", kind.as_str().unwrap_or("loss"))
+            });
+            return json!({ "result": kind, "steps": steps, "line": n, "problem": problem });
+        }
+    }
+    json!({ "result": "unfinished", "steps": steps,
+        "problem": if steps == 0 { "the walkthrough is empty".to_string() } else { format!("the walkthrough no longer wins: after its {steps} commands the game is still going") } })
 }
 
 /// One line of player input: the game's output as JSON.

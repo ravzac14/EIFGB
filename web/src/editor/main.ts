@@ -13,7 +13,7 @@ import { MAP_FILE, besideRoom, layout, readMap, writeMap, type Point, type Posit
 import { MapView, type Selection } from "./map.ts";
 import { renderInspector, type InspectorContext } from "./inspector.ts";
 import { openAddComponent } from "./add-component.ts";
-import { TestPlay } from "./testplay.ts";
+import { TestPlay, WALKTHROUGH } from "./testplay.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
@@ -60,6 +60,10 @@ const testPlay = new TestPlay($("panel-play"), {
   },
   markHere: (room) => mapView?.setHere(room),
   showProblems: () => showTab("problems"),
+  saveWalkthrough: (text) =>
+    change(() => {
+      project = { ...project, files: { ...project.files, [WALKTHROUGH]: text } };
+    }),
 });
 
 /** Every file of the project at one moment: what undo goes back to. */
@@ -271,7 +275,7 @@ function openFile(path: string) {
   const pick = $<HTMLSelectElement>("file");
   pick.replaceChildren(
     ...Object.keys(project.files)
-      .filter((f) => f === "game.yaml" || f.endsWith(".lua"))
+      .filter((f) => f === "game.yaml" || f === WALKTHROUGH || f.endsWith(".lua"))
       .sort((a, b) => (a === "game.yaml" ? -1 : b === "game.yaml" ? 1 : a.localeCompare(b)))
       .map((f) => Object.assign(document.createElement("option"), { value: f, textContent: f, selected: f === currentFile })),
   );
@@ -281,7 +285,9 @@ function openFile(path: string) {
   $("file-help").textContent =
     currentFile === "game.yaml"
       ? "This is your game's file. Changes on the map show up here, and changes here show up on the map."
-      : "A Lua file for your scripts' shared functions. Problems in it show in the Problems tab.";
+      : currentFile === WALKTHROUGH
+        ? "Commands that win the game, one a line (# starts a comment). After every change, the editor plays them and says under Problems if they no longer win. Test play can record a new one."
+        : "A Lua file for your scripts' shared functions. Problems in it show in the Problems tab.";
   showTab("yaml");
 }
 
@@ -341,7 +347,9 @@ function scheduleCheck() {
     engine ??= loadEngine(new URL("./wasm/", location.href));
     const files: Files = { ...project.files };
     try {
-      problems = (await engine).check(files).diagnostics;
+      const checked = (await engine).check(files);
+      problems = checked.diagnostics;
+      testPlay.walkthrough(files[WALKTHROUGH] === undefined ? "none" : (checked.walkthrough ?? "unchecked"));
     } catch (e) {
       problems = [{ severity: "error", path: "", message: `The checker couldn't run: ${e}` }];
     }
@@ -396,6 +404,8 @@ function showProblems() {
 
 /** Selects what a problem's path is about, or shows it in the file. */
 function goTo(path: string) {
+  // The walkthrough: test play, where it can be played again and re-recorded.
+  if (path === WALKTHROUGH) return showTab("play");
   const parts = path.split(/[.[\]]+/).filter(Boolean);
   if (parts[0] === "rooms" && parts[1] && model?.room(parts[1])) {
     if (parts[2] === "exits" && parts[3] && model.exit(parts[1], parts[3] as Direction)) select({ kind: "exit", room: parts[1], dir: parts[3] as Direction });

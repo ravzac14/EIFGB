@@ -58,6 +58,13 @@ export interface Presentation {
   accent?: string;
 }
 export type Files = Record<string, string>;
+/** How walkthrough.txt played, when the editor's check finds one: see the bridge's `walkthrough`. */
+export interface Walkthrough {
+  result: "win" | "loss" | "neutral" | "unfinished" | "error";
+  steps: number;
+  line?: number;
+  problem?: string | null;
+}
 export interface Loaded {
   diagnostics: Diagnostic[];
   meta?: Meta;
@@ -67,7 +74,7 @@ export interface Engine {
   /** Compile `files` and start the game. */
   load(files: Files, entry?: string, seed?: number): Loaded;
   /** Compile only. */
-  check(files: Files, entry?: string): { diagnostics: Diagnostic[] };
+  check(files: Files, entry?: string): { diagnostics: Diagnostic[]; walkthrough?: Walkthrough };
   /** One line of input. */
   input(line: string): Output;
   /** The whole game state, as a string. */

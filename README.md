@@ -413,6 +413,15 @@ Replay it at any time, to check that your changes haven't broken the game:
 ./target/debug/eifgb play games/midnight_snack/game.yaml --commands games/midnight_snack/walkthrough.txt
 ```
 
+In the web editor, you don't have to write it by hand: play your game
+from the start in the **Test play** tab, then press **Save as
+walkthrough**. From then on, the editor replays it after every change. It
+shows "✓ The walkthrough still wins" in Test play, or a warning under
+Problems that says where it stopped working. The walkthrough is
+`walkthrough.txt`, in the Files tab with the rest of your game. Test play
+always uses the same random numbers as the check, so what you recorded
+plays the same way again.
+
 That's a complete game. Compare yours with
 [`spec/examples/midnight_snack/game.yaml`](spec/examples/midnight_snack/game.yaml).
 

@@ -178,6 +178,9 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .tp-bar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
 .tp-status { margin-left: auto; font-size: 0.85em; }
 .tp-stale { margin: 0.4rem 0 0; padding: 0.3rem 0.5rem; border-left: 3px solid var(--warn); background: var(--bg); font-size: 0.85em; }
+.tp-walk { margin: 0.4rem 0 0; font-size: 0.85em; }
+.tp-walk.ok { color: var(--fg); }
+.tp-walk.bad { margin-top: 0.4rem; padding: 0.3rem 0.5rem; border-left: 3px solid var(--err); background: var(--bg); color: var(--fg); }
 .tp-log { flex: 1; min-height: 0; overflow: auto; margin-top: 0.4rem; padding: 0.4rem 0.6rem; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-family: var(--serif); }
 .tp-log p { margin: 0 0 0.5em; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.95rem; }
 .tp-log .title { font-weight: bold; margin-top: 0.8em; }

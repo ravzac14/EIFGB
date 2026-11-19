@@ -23,7 +23,7 @@ function project(dir) {
     for (const name of readdirSync(d)) {
       const p = join(d, name);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ya?ml|lua)$/.test(name)) files[relative(dir, p).split("\\").join("/")] = readFileSync(p, "utf8");
+      else if (/\.(ya?ml|lua)$/.test(name) || name === "walkthrough.txt") files[relative(dir, p).split("\\").join("/")] = readFileSync(p, "utf8");
     }
   };
   walk(dir);

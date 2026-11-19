@@ -5,12 +5,17 @@
 import type { PlayerMap } from "./engine.ts";
 
 type Point = { x: number; y: number };
+/** A room's place, and its box's size if the author resized it in the editor. */
+type Place = Point & { w?: number; h?: number };
 
 /** Grid spacing and room box size, in SVG units. */
 const CELL = { x: 160, y: 90 };
 const BOX = { w: 124, h: 44 };
 /** The editor's grid spacing, to scale map.yaml positions to ours. */
 const EDITOR_CELL = { x: 210, y: 130 };
+/** The editor's usual room box, to scale resized boxes to ours. */
+const EDITOR_BOX = { w: 150, h: 56 };
+const boxOf = (p: Place) => ({ w: p.w ?? BOX.w, h: p.h ?? BOX.h });
 
 const STEP: Record<string, [number, number]> = {
   north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0],
@@ -29,12 +34,20 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
 }
 
 /** Author positions from a game's map.yaml, in our units. */
-export function authorPositions(text: string | undefined): Map<string, Point> {
-  const out = new Map<string, Point>();
+export function authorPositions(text: string | undefined): Map<string, Place> {
+  const out = new Map<string, Place>();
   if (!text) return out;
-  // map.yaml is written by the editor: `rooms:` then `  id: [x, y]` lines.
-  for (const m of text.matchAll(/^\s+([\w-]+):\s*\[\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\]/gm)) {
-    out.set(m[1], { x: (Number(m[2]) * CELL.x) / EDITOR_CELL.x, y: (Number(m[3]) * CELL.y) / EDITOR_CELL.y });
+  // map.yaml is written by the editor: `rooms:` then `  id: [x, y]` lines,
+  // or `[x, y, width, height]` for a room whose box was resized.
+  for (const m of text.matchAll(/^\s+([\w-]+):\s*\[([-\d.,\s]+)\]/gm)) {
+    const n = m[2].split(",").map((v) => Number(v.trim()));
+    if ((n.length !== 2 && n.length !== 4) || n.some((v) => !Number.isFinite(v))) continue;
+    const p: Place = { x: (n[0] * CELL.x) / EDITOR_CELL.x, y: (n[1] * CELL.y) / EDITOR_CELL.y };
+    if (n.length === 4) {
+      p.w = (n[2] * BOX.w) / EDITOR_BOX.w;
+      p.h = (n[3] * BOX.h) / EDITOR_BOX.h;
+    }
+    out.set(m[1], p);
   }
   return out;
 }
@@ -44,11 +57,11 @@ export function authorPositions(text: string | undefined): Map<string, Point> {
  * placed a step from a placed neighbour (breadth first from the first room),
  * moving to the nearest free spot if that one's taken.
  */
-export function placeRooms(map: PlayerMap, author: Map<string, Point>): Map<string, Point> {
-  const pos = new Map<string, Point>();
+export function placeRooms(map: PlayerMap, author: Map<string, Place>): Map<string, Place> {
+  const pos = new Map<string, Place>();
   const used = new Set<string>();
   const cellOf = (p: Point) => `${Math.round(p.x / CELL.x)},${Math.round(p.y / CELL.y)}`;
-  const put = (id: string, p: Point) => {
+  const put = (id: string, p: Place) => {
     pos.set(id, p);
     used.add(cellOf(p));
   };
@@ -94,16 +107,17 @@ export function placeRooms(map: PlayerMap, author: Map<string, Point>): Map<stri
 }
 
 /** Where a line from a box's centre towards `d` leaves the box. */
-function edge(c: Point, d: Point): Point {
+function edge(c: Place, d: Point): Point {
   const dx = d.x - c.x, dy = d.y - c.y;
   if (!dx && !dy) return c;
-  const t = Math.min(dx ? BOX.w / 2 / Math.abs(dx) : Infinity, dy ? BOX.h / 2 / Math.abs(dy) : Infinity);
+  const b = boxOf(c);
+  const t = Math.min(dx ? b.w / 2 / Math.abs(dx) : Infinity, dy ? b.h / 2 / Math.abs(dy) : Infinity);
   return { x: c.x + dx * t, y: c.y + dy * t };
 }
 
 /** Splits a room name over at most two lines that fit a box. */
-function wrap(name: string): string[] {
-  const max = 17;
+function wrap(name: string, width: number): string[] {
+  const max = Math.max(8, Math.floor(width / 7.3));
   if (name.length <= max) return [name];
   const words = name.split(/\s+/);
   let a = "";
@@ -115,12 +129,12 @@ function wrap(name: string): string[] {
 }
 
 /** Draws the map into `into` (replacing what's there) and scrolls the current room into view. */
-export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, Point>) {
+export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, Place>) {
   const pos = placeRooms(map, author);
-  const xs = [...pos.values()].map((p) => p.x), ys = [...pos.values()].map((p) => p.y);
+  const ps = [...pos.values()];
   const pad = 46;
-  const minX = Math.min(...xs) - BOX.w / 2 - pad, minY = Math.min(...ys) - BOX.h / 2 - pad;
-  const w = Math.max(...xs) - Math.min(...xs) + BOX.w + pad * 2, h = Math.max(...ys) - Math.min(...ys) + BOX.h + pad * 2;
+  const minX = Math.min(...ps.map((p) => p.x - boxOf(p).w / 2)) - pad, minY = Math.min(...ps.map((p) => p.y - boxOf(p).h / 2)) - pad;
+  const w = Math.max(...ps.map((p) => p.x + boxOf(p).w / 2)) + pad - minX, h = Math.max(...ps.map((p) => p.y + boxOf(p).h / 2)) + pad - minY;
   const root = svg("svg", { viewBox: `${minX} ${minY} ${w} ${h}`, width: w, height: h, role: "img", class: "pmap" });
   root.setAttribute("aria-label", `Map of the ${map.rooms.length === 1 ? "place" : `${map.rooms.length} places`} you've been`);
   const names = new Map(map.rooms.map((r) => [r.id, r.name]));
@@ -173,8 +187,9 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
   const boxes = svg("g", { class: "rooms" });
   for (const [id, p] of pos) {
     const g = svg("g", { class: id === map.here ? "room here" : "room" });
-    g.append(svg("rect", { x: p.x - BOX.w / 2, y: p.y - BOX.h / 2, width: BOX.w, height: BOX.h, rx: 6 }));
-    const parts = wrap(names.get(id) ?? id);
+    const b = boxOf(p);
+    g.append(svg("rect", { x: p.x - b.w / 2, y: p.y - b.h / 2, width: b.w, height: b.h, rx: 6 }));
+    const parts = wrap(names.get(id) ?? id, b.w);
     parts.forEach((t, i) => g.append(svg("text", { x: p.x, y: p.y + 5 + (i - (parts.length - 1) / 2) * 15 }, t)));
     g.append(svg("title", {}, id === map.here ? `${names.get(id)} (you are here)` : names.get(id) ?? id));
     boxes.append(g);

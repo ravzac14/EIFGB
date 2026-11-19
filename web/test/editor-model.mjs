@@ -261,6 +261,10 @@ const text = writeMap(layout(fang, saved), fang.roomIds());
 assert.match(text, new RegExp(`${fang.start()}: \\[500, -40\\]`));
 assert.deepEqual(readMap(text).get(fang.start()), { x: 500, y: -40 });
 assert.equal(readMap("not: [valid").size, 0);
+// A resized room keeps its size too; the usual size isn't written.
+const sized = writeMap(new Map([["hall", { x: 10, y: 20, w: 300, h: 90 }], ["cupboard", { x: 0, y: 0, w: 150, h: 56 }]]), ["hall", "cupboard"]);
+assert.match(sized, /hall: \[10, 20, 300, 90\]\n\s+cupboard: \[0, 0\]/);
+assert.deepEqual(readMap(sized).get("hall"), { x: 10, y: 20, w: 300, h: 90 });
 assert.equal(directionBetween({ x: 0, y: 0 }, { x: 0, y: -100 }), "north");
 assert.equal(directionBetween({ x: 0, y: 0 }, { x: 100, y: 90 }), "southeast");
 void CELL;

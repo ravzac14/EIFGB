@@ -538,7 +538,13 @@ document.addEventListener("keydown", (e) => {
 
 mapView = new MapView(document.getElementById("map") as unknown as SVGSVGElement, {
   select,
-  moveRoom: (id, to) => change(() => positions.set(id, to), { coalesce: `move:${id}` }),
+  moveRoom: (id, to) => change(() => positions.set(id, { ...positions.get(id), ...to }), { coalesce: `move:${id}` }),
+  resizeRoom: (id, size) =>
+    change(() => {
+      const p = positions.get(id);
+      if (!p) return;
+      positions.set(id, size ? { ...p, ...size } : { x: p.x, y: p.y });
+    }),
   connect: (from, dir, to) => {
     change((m) => m.connect(from, dir, to));
     selection = { kind: "exit", room: from, dir };

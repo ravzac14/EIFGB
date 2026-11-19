@@ -126,6 +126,27 @@ assert.match(moved(), /first_room: \[400, 40\]/);
 $("#undo").click();
 assert.match(moved(), /first_room: \[0, 0\]/);
 
+// Drag a selected room's corner to resize its box: kept in map.yaml with
+// its position, through moves; a double-click puts back the usual size.
+press($('#map [data-room="first_room"]'));
+const grip = () => $("#map .grip");
+pointer(grip(), "pointerdown", 0, 0);
+pointer(grip(), "pointermove", 50, 20);
+pointer(grip(), "pointerup", 50, 20);
+assert.match(moved(), /first_room: \[0, 0, 250, 100\]/);
+assert.equal($('#map [data-room="first_room"] rect').getAttribute("width"), "250");
+pointer($('#map [data-room="first_room"]'), "pointerdown", 0, 0);
+pointer($('#map [data-room="first_room"]'), "pointermove", 100, 0);
+pointer($('#map [data-room="first_room"]'), "pointerup", 100, 0);
+assert.match(moved(), /first_room: \[100, 0, 250, 100\]/);
+$("#undo").click();
+grip().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+assert.match(moved(), /first_room: \[0, 0\]/);
+$("#undo").click();
+assert.match(moved(), /first_room: \[0, 0, 250, 100\]/);
+$("#undo").click();
+assert.match(moved(), /first_room: \[0, 0\]/);
+
 // Drag a + onto another room: they're joined that way (and back, if free).
 press($('#map [data-room="first_room"]'));
 const east = [...document.querySelectorAll("#map .handle")].find((h) => h.querySelector("title").textContent.includes("to the east"));

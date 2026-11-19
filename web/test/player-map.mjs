@@ -48,6 +48,9 @@ assert.equal(new Set([...pos.values()].map((p) => `${p.x},${p.y}`)).size, pos.si
 // Author positions (map.yaml from the editor) win.
 const author = authorPositions("# comment\nrooms:\n  hall: [420, 260]\n  study: [0, 0]\n");
 assert.deepEqual(placeRooms(m, author).get("hall"), { x: 320, y: 180 });
+// A room resized in the editor is drawn bigger: 300 wide there is 248 here.
+const big = authorPositions("rooms:\n  hall: [0, 0, 300, 112]\n");
+assert.deepEqual(big.get("hall"), { x: 0, y: 0, w: 248, h: 88 });
 
 // Drawn: a box per room, the current one marked. Nothing on the map moves
 // the player: every action is typed.

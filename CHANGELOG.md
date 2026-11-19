@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- In the editor, drag a selected room's corner to make its box bigger or
+  smaller, so a great hall looks bigger than a closet. It's only for
+  picturing the map (it's kept in `map.yaml`), and the player's map draws
+  rooms the same size.
 - Barter: TRADE RING FOR LAMP swaps something you carry for something a
   merchant sells, no money needed, if it's worth enough to them. See
   [Trading](README.md#trading).

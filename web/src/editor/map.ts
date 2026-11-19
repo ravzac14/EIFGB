@@ -1,11 +1,13 @@
 // The map: rooms as boxes, exits as lines, doors on the lines. Drag rooms
 // to arrange them; drag from a room's + handles to another room to connect
 // them (or into empty space for a new room); click a + for a new room that
-// way. Drag the background to pan, scroll or use the buttons to zoom.
+// way. Drag the corner of a selected room to resize its box (it's only for
+// picturing the map). Drag the background to pan, scroll or use the buttons
+// to zoom.
 
 import type { Direction, Exit, Model } from "./model.ts";
 import { OPPOSITE } from "./model.ts";
-import type { Point, Positions } from "./layout.ts";
+import { boxOf, MAX_BOX, MIN_BOX, type Point, type Positions } from "./layout.ts";
 
 export type Selection =
   | null
@@ -25,6 +27,8 @@ export const THING_DRAG = "application/x-eifgb-thing";
 export interface MapActions {
   select(sel: Selection): void;
   moveRoom(id: string, to: Point): void;
+  /** Dragged a room's corner: its new box size, or null for the usual size. */
+  resizeRoom(id: string, size: { w: number; h: number } | null): void;
   /** Dragged a handle onto a room. */
   connect(from: string, dir: Direction, to: string): void;
   /** Clicked a handle, or dragged it into empty space (`at`). */
@@ -46,6 +50,7 @@ export function factionHue(id: string): number {
 const NS = "http://www.w3.org/2000/svg";
 const W = 150;
 const H = 56;
+type Size = { w: number; h: number };
 const SHORT: Record<Direction, string> = {
   north: "N", south: "S", east: "E", west: "W", northeast: "NE", northwest: "NW", southeast: "SE", southwest: "SW",
   up: "U", down: "D", in: "IN", out: "OUT",
@@ -69,9 +74,9 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
 }
 
 /** Where the line from a box's centre towards (dx, dy) leaves the box. */
-function edge(c: Point, dx: number, dy: number, pad = 0): Point {
-  const hw = W / 2 + pad;
-  const hh = H / 2 + pad;
+function edge(c: Point, dx: number, dy: number, pad = 0, size: Size = { w: W, h: H }): Point {
+  const hw = size.w / 2 + pad;
+  const hh = size.h / 2 + pad;
   const t = Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity);
   return { x: c.x + dx * t, y: c.y + dy * t };
 }
@@ -305,8 +310,8 @@ export class MapView {
     const off = n * 12;
     const ox = (-dy / len) * off;
     const oy = (dx / len) * off;
-    const a = edge({ x: pa.x + ox, y: pa.y + oy }, dx, dy, 4);
-    const b = l.a === l.b ? edge(pa, dx, dy, 40) : edge({ x: pb.x + ox, y: pb.y + oy }, -dx, -dy, 4);
+    const a = edge({ x: pa.x + ox, y: pa.y + oy }, dx, dy, 4, boxOf(pa));
+    const b = l.a === l.b ? edge(pa, dx, dy, 40, boxOf(pa)) : edge({ x: pb.x + ox, y: pb.y + oy }, -dx, -dy, 4, boxOf(pb));
     const door = l.ab?.door ?? l.ba?.door;
     // One-way, unless it goes through a door (the compiler adds the way back).
     const oneWay = !l.ba && !door;
@@ -353,7 +358,7 @@ export class MapView {
     const p = this.positions.get(room);
     if (!p) return;
     const [ux, uy] = UNIT[exit.dir];
-    const a = edge(p, ux, uy, 2);
+    const a = edge(p, ux, uy, 2, boxOf(p));
     const b = { x: a.x + ux * 34, y: a.y + uy * 34 };
     const g = svg("g", { class: `stub${this.isSelectedExit(room, exit) ? " selected" : ""}` }, layer);
     svg("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y }, g);
@@ -376,8 +381,10 @@ export class MapView {
     const selected = this.selection?.kind === "room" && this.selection.id === id;
     const g = svg("g", { class: `room${selected ? " selected" : ""}${this.bad.has(id) ? " bad" : ""}`, transform: `translate(${p.x} ${p.y})` }, layer);
     g.dataset.room = id;
-    svg("rect", { x: -W / 2, y: -H / 2, width: W, height: H, rx: 10 }, g);
-    const name = room.name.length > 20 ? `${room.name.slice(0, 19)}…` : room.name;
+    const { w, h } = boxOf(p);
+    svg("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 10 }, g);
+    const fits = Math.max(8, Math.floor(w / 7.5));
+    const name = room.name.length > fits ? `${room.name.slice(0, fits - 1)}…` : room.name;
     const things = this.model!.contents(id).length;
     const notes = [room.dark ? "dark" : "", things ? `${things} thing${things > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ");
     const t = svg("text", { x: 0, y: notes ? -6 : 0 }, g);
@@ -387,7 +394,7 @@ export class MapView {
       s.textContent = notes;
     }
     if (this.model!.start() === id) {
-      const s = svg("text", { class: "start", x: -W / 2 + 8, y: -H / 2 + 10, "text-anchor": "start" }, g);
+      const s = svg("text", { class: "start", x: -w / 2 + 8, y: -h / 2 + 10, "text-anchor": "start" }, g);
       s.textContent = "START";
     }
     const title = svg("title", {}, g);
@@ -442,7 +449,7 @@ export class MapView {
     const extra = people.length - shown.length;
     const total = widths.reduce((a, b) => a + b, 0) + (shown.length - 1) * 4 + (extra ? 30 : 0);
     let x = p.x - total / 2;
-    const y = p.y + H / 2 + 6;
+    const y = p.y + boxOf(p).h / 2 + 6;
     shown.forEach((c, i) => {
       const w = widths[i];
       const selected = this.selection?.kind === "character" && this.selection.id === c.id;
@@ -496,17 +503,74 @@ export class MapView {
   }
 
   private roomAt(pt: Point): string | null {
-    for (const [id, p] of this.positions) if (Math.abs(pt.x - p.x) <= W / 2 && Math.abs(pt.y - p.y) <= H / 2) return id;
+    for (const [id, p] of this.positions) {
+      const { w, h } = boxOf(p);
+      if (Math.abs(pt.x - p.x) <= w / 2 && Math.abs(pt.y - p.y) <= h / 2) return id;
+    }
     return null;
+  }
+
+  /**
+   * The resize grip on a selected room's bottom-right corner. The box grows
+   * both ways from its centre, so the room stays where it is; a
+   * double-click puts it back to the usual size.
+   */
+  private drawGrip(layer: SVGGElement, id: string) {
+    const p = this.positions.get(id)!;
+    const start = boxOf(p);
+    const g = svg("g", { class: "grip" }, layer);
+    const at = (s: Size) => ({ x: p.x + s.w / 2, y: p.y + s.h / 2 });
+    const c = at(start);
+    // Southeast of the box, just inside the SE handle's corner; the SE + handle sits further out.
+    svg("rect", { x: c.x - 7, y: c.y - 7, width: 10, height: 10, rx: 2 }, g);
+    const title = svg("title", {}, g);
+    title.textContent = "Drag to make the room's box bigger or smaller (only on this map). Double-click for the usual size.";
+    let down: { x: number; y: number } | null = null;
+    let size = start;
+    g.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      g.setPointerCapture(e.pointerId);
+      down = { x: e.clientX, y: e.clientY };
+    });
+    g.addEventListener("pointermove", (e) => {
+      if (!down) return;
+      const snap = (v: number) => Math.round(v / 10) * 10;
+      const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+      // Growing from the centre: the corner moves half as far as the box grows.
+      size = {
+        w: clamp(snap(start.w + (2 * (e.clientX - down.x)) / this.scale), MIN_BOX.w, MAX_BOX.w),
+        h: clamp(snap(start.h + (2 * (e.clientY - down.y)) / this.scale), MIN_BOX.h, MAX_BOX.h),
+      };
+      const box = this.root.querySelector(`[data-room="${CSS.escape(id)}"] rect`);
+      box?.setAttribute("x", String(-size.w / 2));
+      box?.setAttribute("y", String(-size.h / 2));
+      box?.setAttribute("width", String(size.w));
+      box?.setAttribute("height", String(size.h));
+      const r = g.querySelector("rect")!;
+      const nc = at(size);
+      r.setAttribute("x", String(nc.x - 7));
+      r.setAttribute("y", String(nc.y - 7));
+    });
+    g.addEventListener("pointerup", () => {
+      if (!down) return;
+      down = null;
+      if (size.w !== start.w || size.h !== start.h) this.actions.resizeRoom(id, size);
+    });
+    g.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      this.actions.resizeRoom(id, null);
+    });
   }
 
   private drawHandles(layer: SVGGElement, id: string) {
     const p = this.positions.get(id);
     if (!p || !this.model) return;
+    const { w, h } = boxOf(p);
+    this.drawGrip(layer, id);
     const taken = new Set(this.model.exits(id).map((e) => e.dir));
     for (const [dir, [fx, fy]] of Object.entries(HANDLE) as [Direction, [number, number]][]) {
       if (taken.has(dir)) continue;
-      const c = { x: p.x + fx * (W / 2 + 14), y: p.y + fy * (H / 2 + 14) };
+      const c = { x: p.x + fx * (w / 2 + 14), y: p.y + fy * (h / 2 + 14) };
       const g = svg("g", { class: "handle" }, layer);
       svg("circle", { cx: c.x, cy: c.y, r: 10 }, g);
       const t = svg("text", { x: c.x, y: c.y }, g);

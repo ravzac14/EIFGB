@@ -74,6 +74,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
       el("li", { textContent: "Click a room to select it. Click one of the + around it to add a room that way." }),
       el("li", { textContent: "Drag a + onto another room to connect the two." }),
       el("li", { textContent: "Drag rooms to arrange the map; drag the background to move around." }),
+      el("li", { textContent: "Drag a selected room's corner to make its box bigger or smaller. That's only for picturing the map." }),
       el("li", { textContent: "Click a line to choose its door, or to make it one way." }),
       el("li", { textContent: "Double-click empty space for a new room on its own." }),
       el("li", { textContent: "Drag things in a room's list onto another room on the map, or into a box or onto a table in the list." }),

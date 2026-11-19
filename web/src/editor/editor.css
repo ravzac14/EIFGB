@@ -83,6 +83,8 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 #map .handle circle { fill: var(--sel); opacity: 0.85; cursor: crosshair; }
 #map .handle:hover circle { opacity: 1; }
 #map .handle text { fill: #fff; font: 700 13px var(--sans); text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+#map .grip rect { fill: var(--bg); stroke: var(--sel); stroke-width: 2; cursor: nwse-resize; }
+#map .grip:hover rect { fill: var(--sel); }
 #map .rubber { stroke: var(--sel); stroke-width: 2.5; stroke-dasharray: 6 4; pointer-events: none; }
 #map .drop-target rect { stroke: var(--sel); stroke-width: 3; }
 

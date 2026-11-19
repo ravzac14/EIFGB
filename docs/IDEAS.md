@@ -39,24 +39,11 @@ Nothing waiting here right now.
 
 ## The editor
 
-### Resizable rooms
-
-Let authors resize a room's box on the editor's map, so a great hall can
-look bigger than a closet. Only for picturing the map: it changes nothing
-in the game.
-
-- Builds on: the map (`web/src/editor/map.ts`) and `map.yaml`, which
-  already keeps positions outside the game file.
-- Shape: drag handles on a selected room's corners; store the size beside
-  its position in `map.yaml` (`kitchen: [x, y, w, h]`); lines, handles and
-  drop targets use each room's own size.
-- Effort: small.
-
 ### More editor ideas
 
 - **Play inside the editor:** a play panel beside the map, so testing
   doesn't mean switching tabs; optionally "start from this room".
-- **Colours for rooms or regions** on the map (with resizable rooms above).
+- **Colours for rooms or regions** on the map, and on the player's map.
 - **Starter templates:** "a small house", "a dungeon with a locked door",
   to start a new game from.
 - **A blueprint theme** for the map: white lines on blue, so map work feels

@@ -6,11 +6,22 @@ import { parse, stringify } from "yaml";
 import type { Direction, Model } from "./model.ts";
 
 export type Point = { x: number; y: number };
-export type Positions = Map<string, Point>;
+/** A room's place on the map, and its box's size if the author resized it. */
+export type Place = Point & { w?: number; h?: number };
+export type Positions = Map<string, Place>;
 
 /** Room boxes are this far apart on the grid. */
 export const CELL = { x: 210, y: 130 };
 export const MAP_FILE = "map.yaml";
+/** A room box's usual size, and the limits when resizing it. */
+export const BOX = { w: 150, h: 56 };
+export const MIN_BOX = { w: 100, h: 44 };
+export const MAX_BOX = { w: 600, h: 400 };
+
+/** A room's box size: its own, or the usual one. */
+export function boxOf(p: Place | undefined): { w: number; h: number } {
+  return { w: p?.w ?? BOX.w, h: p?.h ?? BOX.h };
+}
 
 const STEP: Record<Direction, [number, number]> = {
   north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0],
@@ -24,7 +35,10 @@ export function readMap(text: string | undefined): Positions {
   try {
     const rooms = parse(text)?.rooms ?? {};
     for (const [id, p] of Object.entries(rooms)) {
-      if (Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number")) out.set(id, { x: p[0], y: p[1] });
+      if (!Array.isArray(p) || !p.every((n) => typeof n === "number")) continue;
+      // [x, y], or [x, y, width, height] for a resized room.
+      if (p.length === 2) out.set(id, { x: p[0], y: p[1] });
+      else if (p.length === 4) out.set(id, { x: p[0], y: p[1], w: p[2], h: p[3] });
     }
   } catch {
     /* a broken map file just means automatic positions */
@@ -33,13 +47,19 @@ export function readMap(text: string | undefined): Positions {
 }
 
 export function writeMap(positions: Positions, ids: string[]): string {
-  const rooms: Record<string, [number, number]> = {};
+  const rooms: Record<string, number[]> = {};
   for (const id of ids) {
     const p = positions.get(id);
-    if (p) rooms[id] = [Math.round(p.x), Math.round(p.y)];
+    if (!p) continue;
+    const at = [Math.round(p.x), Math.round(p.y)];
+    const sized = (p.w !== undefined && p.w !== BOX.w) || (p.h !== undefined && p.h !== BOX.h);
+    rooms[id] = sized ? [...at, Math.round(p.w ?? BOX.w), Math.round(p.h ?? BOX.h)] : at;
   }
-  const body = stringify({ rooms }, { flowCollectionPadding: false, collectionStyle: "any" }).replace(/^(\s+\w+):\n\s+- (-?\d+)\n\s+- (-?\d+)/gm, "$1: [$2, $3]");
-  return `# Where the editor draws each room on its map. The game never reads this file.\n${body}`;
+  const body = stringify({ rooms }, { flowCollectionPadding: false, collectionStyle: "any" }).replace(
+    /^(\s+[\w-]+):\n((?:\s+- -?\d+\n?)+)/gm,
+    (_, k: string, list: string) => `${k}: [${[...list.matchAll(/-?\d+/g)].map((m) => m[0]).join(", ")}]\n`,
+  );
+  return `# Where the editor draws each room on its map, and the size of any room\n# made bigger or smaller. The game never reads this file.\n${body.replace(/\n+$/, "\n")}`;
 }
 
 const key = (x: number, y: number) => `${x},${y}`;

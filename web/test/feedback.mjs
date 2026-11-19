@@ -37,7 +37,7 @@ assert.doesNotMatch(report(false).context, /last lines/);
 // The form: the game's lines can be left out; Send posts the answers.
 const sent = [];
 let closed = null;
-const form = feedbackForm((s) => (closed = s), async (target, values) => sent.push(values));
+const form = feedbackForm((s) => (closed = s), async (target, values) => sent.push(values), null);
 document.body.append(form);
 assert.match(form.querySelector(".feedback-context").textContent, /last lines of the game/);
 const box = form.querySelector("#feedback-log");
@@ -48,7 +48,7 @@ assert.doesNotMatch(form.querySelector(".feedback-context").textContent, /last l
 form.requestSubmit();
 await new Promise((r) => setTimeout(r));
 assert.equal(sent.length, 0);
-// Not set up (no form link in this copy): it offers to copy instead.
+// Not set up (no form link): it offers to copy instead.
 assert.equal(form.querySelector("button[type=submit]").textContent, "Copy the report");
 
 // Set up: Send posts every answer, with the kind in words.
@@ -71,4 +71,7 @@ assert.match(values.context, /last lines of the game/);
 assert.match(form2.textContent, /Thank you/);
 form2.querySelector("button").click();
 assert.equal(closed, true);
+// This site's form is set up.
+assert.match(formTarget()?.action ?? "", /^https:\/\/docs\.google\.com\/forms\/d\/e\/[\w-]+\/formResponse$/);
+assert.deepEqual(Object.keys(formTarget().fields).sort(), ["contact", "context", "message", "page", "type", "versions"]);
 console.log("ok   feedback");

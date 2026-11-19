@@ -28,6 +28,19 @@
 .log .choice + :not(.choice) { margin-top: 0.7em; }
 .log .cmd { color: var(--accent); margin-top: 1.3em; }
 .log .cmd::before { content: "> "; }
+/* Parchment: room names in small capitals, and a drop capital on the
+   first line after each one. flow-root keeps a short line from letting
+   the capital hang into the next paragraph. */
+:root[data-theme="parchment"] .log .title { font-variant: small-caps; letter-spacing: 0.04em; font-size: 1.1em; }
+:root[data-theme="parchment"] .log .banner { font-variant: small-caps; }
+:root[data-theme="parchment"] .log .title + p:not([class]) { display: flow-root; }
+:root[data-theme="parchment"] .log .title + p:not([class])::first-letter {
+  float: left; font-size: 3.15em; line-height: 0.82; margin: 0.06em 0.09em 0 0;
+  color: var(--accent); font-family: var(--serif); font-weight: normal;
+}
+/* Typewriter reveal: the rest of a line being typed is on the page, but
+   see-through, so the layout doesn't shift and screen readers get it all. */
+.log .untyped { color: transparent; text-shadow: none; }
 .diagnostics { font-family: var(--sans); font-size: 0.9rem; }
 .diagnostics li { margin: 0.4rem 0; }
 .diagnostics code { font-family: var(--mono); background: var(--panel); padding: 0 0.3em; border-radius: 4px; }

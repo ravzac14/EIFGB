@@ -65,4 +65,26 @@ assert.match(sentAlong, /game: Midnight Snack/);
 assert.match(sentAlong, /where: Pantry, turn \d+/);
 assert.match(sentAlong, /state: the game has ended/);
 assert.match(sentAlong, /last lines of the game:[^]*> eat it/);
+$("#feedback").close?.();
+
+// Typewriter reveal: new lines start see-through and are typed out, but
+// their whole text is there from the start.
+localStorage.setItem("eifgb:settings", JSON.stringify({ reveal: "typewriter" }));
+type("undo");
+type("look");
+const typing = [...$("#log").querySelectorAll(".untyped")];
+assert.ok(typing.length >= 2, "the room's lines are being typed");
+assert.match($("#log").textContent.slice(-200), /Shelves of jars[^]*Known exits/, "the whole text is on the page");
+for (let i = 0; i < 100 && $("#log .untyped"); i++) await tick(20);
+assert.equal($("#log .untyped"), null, "typed out in the end");
+// Any key shows everything at once.
+type("look");
+assert.ok($("#log .untyped"));
+document.dispatchEvent(new KeyboardEvent("keydown", { key: "x" }));
+assert.equal($("#log .untyped"), null);
+assert.match($("#log").textContent.slice(-200), /Shelves of jars[^]*Known exits/);
+// The settings dialog offers it here, on the play page.
+$("#settings-open").click();
+assert.ok($("#setting-reveal"), "Text appears is offered while playing");
+localStorage.removeItem("eifgb:settings");
 console.log("ok   player page");

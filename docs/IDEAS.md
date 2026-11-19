@@ -43,12 +43,7 @@ Nothing waiting here right now.
 
 ## The player
 
-### Smaller ideas
-
-- **Parchment theme:** paper texture, and a drop capital on each room's
-  first line.
-- **Typewriter reveal:** text appears letter by letter; off by default,
-  any key skips.
+Nothing waiting here right now.
 
 ## The website
 

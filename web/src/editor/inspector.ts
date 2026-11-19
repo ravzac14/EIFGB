@@ -68,6 +68,7 @@ function lookFields(ctx: InspectorContext): HTMLElement[] {
         ["light", "Light"],
         ["dark", "Dark"],
         ["sepia", "Sepia"],
+        ["parchment", "Parchment"],
         ["terminal", "Terminal (green)"],
         ["amber", "Terminal (amber)"],
         ["contrast", "High contrast"],

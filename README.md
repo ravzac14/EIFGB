@@ -1613,8 +1613,8 @@ it back on with `list_exits: true`).
 
 **Presentation:** how your game looks on the website.
 `presentation: { theme: terminal, accent: "#c33" }` picks one of the
-site's colour themes (`light`, `dark`, `sepia`, `terminal`, `amber`,
-`contrast`) and a highlight colour for links and the prompt. Players see
+site's colour themes (`light`, `dark`, `sepia`, `parchment`, `terminal`,
+`amber`, `contrast`) and a highlight colour for links and the prompt. Players see
 it unless they've picked their own colours with Aa, where it shows as
 "The game's own". The terminal player ignores it. The editor sets both
 under "How it looks".

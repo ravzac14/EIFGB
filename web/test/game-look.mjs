@@ -16,6 +16,7 @@ rooms:
 `;
 assert.deepEqual(engine.load({ "game.yaml": game }).meta.presentation, { theme: "terminal", accent: "#c33" });
 assert.equal(engine.load({ "game.yaml": game.replace(/presentation.*\n/, "") }).meta.presentation, null);
+assert.equal(engine.load({ "game.yaml": game.replace("terminal", "parchment") }).meta.presentation.theme, "parchment");
 
 GlobalRegistrator.register();
 const { applySettings, setGameLook, settings } = await import("../src/store.ts");

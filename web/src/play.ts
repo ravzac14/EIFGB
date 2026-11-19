@@ -1,7 +1,7 @@
 // The player: loads a game (bundled, or one you loaded), plays it, keeps an
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
-import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, type SaveFile, type Slot } from "./store.ts";
+import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
 import { feedbackButton, feedbackContext } from "./feedback.ts";
@@ -136,13 +136,72 @@ function status(o: Output) {
 /** Shows an output; returns the first element added, for scrolling. */
 function show(o: Output): HTMLElement | null {
   const first = log.lastElementChild;
+  const typed = settings.get().reveal === "typewriter";
   // Choices are numbered lines; the player types the number.
-  for (const l of o.lines) say(l.text, l.kind === "text" ? "" : l.kind);
+  for (const l of o.lines) {
+    const p = say(l.text, l.kind === "text" ? "" : l.kind);
+    if (typed) typeOut(p);
+  }
   status(o);
   last = o;
   refreshMap();
   return (first ? first.nextElementSibling : log.firstElementChild) as HTMLElement | null;
 }
+
+// ------------------------------------------------------- typewriter
+
+/*
+ * "Text appears: letter by letter" in Text and colours. A line's whole text
+ * is on the page from the start, the part not typed yet see-through, so the
+ * layout doesn't move, screen readers read it all at once, and the
+ * transcript is complete. Any key, click or tap shows everything at once.
+ */
+const LETTERS_PER_SECOND = 90;
+const typing: { p: HTMLElement; text: string; shown: Text; rest: HTMLElement }[] = [];
+let typingFrame = 0;
+let typedAt = 0;
+let owed = 0;
+
+function typeOut(p: HTMLElement) {
+  const text = p.textContent ?? "";
+  if (!text) return;
+  const shown = document.createTextNode("");
+  const rest = el("span", { className: "untyped", textContent: text });
+  p.replaceChildren(shown, rest);
+  typing.push({ p, text, shown, rest });
+  if (!typingFrame) {
+    typedAt = performance.now();
+    owed = 0;
+    typingFrame = requestAnimationFrame(typeStep);
+  }
+}
+
+function typeStep(now: number) {
+  owed += ((now - typedAt) / 1000) * LETTERS_PER_SECOND;
+  typedAt = now;
+  while (typing.length && owed >= 1) {
+    const t = typing[0];
+    const had = t.shown.length;
+    const n = Math.min(t.text.length, had + Math.floor(owed));
+    owed -= n - had;
+    t.shown.data = t.text.slice(0, n);
+    t.rest.textContent = t.text.slice(n);
+    if (n >= t.text.length) {
+      t.p.textContent = t.text;
+      typing.shift();
+    }
+  }
+  typingFrame = typing.length ? requestAnimationFrame(typeStep) : 0;
+}
+
+/** Shows everything still being typed. */
+function skipTyping() {
+  for (const t of typing) t.p.textContent = t.text;
+  typing.length = 0;
+  cancelAnimationFrame(typingFrame);
+  typingFrame = 0;
+}
+for (const type of ["keydown", "pointerdown"]) document.addEventListener(type, () => typing.length && skipTyping(), true);
 
 /**
  * Scrolls down to show what's new: as far as the bottom of the page, but
@@ -243,6 +302,7 @@ function handle(o: Output) {
 }
 
 function send(text: string, echo = text) {
+  skipTyping();
   say(echo, "cmd");
   const start = log.lastElementChild as HTMLElement;
   const o = engine.input(text);
@@ -252,6 +312,7 @@ function send(text: string, echo = text) {
 }
 
 function begin(): boolean {
+  skipTyping();
   log.replaceChildren();
   after.replaceChildren();
   over = false;

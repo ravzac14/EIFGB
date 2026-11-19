@@ -241,7 +241,7 @@ pub struct Presentation {
 }
 
 /// The website's colour themes a game can choose.
-pub const THEMES: [&str; 6] = ["light", "dark", "sepia", "terminal", "amber", "contrast"];
+pub const THEMES: [&str; 7] = ["light", "dark", "sepia", "parchment", "terminal", "amber", "contrast"];
 
 /// Game-wide switches from the source's `settings:` section.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

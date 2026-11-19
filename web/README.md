@@ -121,8 +121,12 @@ files round-trip exactly, and edited ones compile), and
 *Text and colours* (`src/settings-ui.ts`, stored by `src/store.ts`) sets
 `data-theme`, `data-size`, `data-face`, `data-spacing` and `data-width` on
 `<html>`; every page's CSS reads them (`src/style.css` has the themes:
-light, dark, sepia, terminal, amber, contrast). The docs apply them before
-painting with a small inline script. The legible typeface is the
+light, dark, sepia, parchment, terminal, amber, contrast; the player's
+`play.css` adds parchment's drop capitals). The docs apply them before
+painting with a small inline script. One more setting, *Text appears*
+(`reveal`), is only offered on the play page: "Letter by letter" types new
+lines out in `src/play.ts`, with the untyped rest of a line on the page but
+see-through, so layout, screen readers and the transcript are unaffected. The legible typeface is the
 `@fontsource/atkinson-hyperlegible` package, served with the site.
 
 The home page's demo game is `src/demo/game.yaml`; the engine loads the

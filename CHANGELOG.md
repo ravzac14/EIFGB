@@ -6,6 +6,14 @@ behave will be called out here.
 
 ## Unreleased
 
+- A Parchment look in *Text and colours*: ink on old paper, room names in
+  small capitals, and a drop capital at the start of each room's
+  description. Games can choose it too, with
+  `presentation: { theme: parchment }`.
+- *Text appears: letter by letter*, in *Text and colours* while playing:
+  new text is typed out like a typewriter. It's off unless you turn it on,
+  and any key, click or tap shows the rest at once.
+
 - Starter templates in the editor: start a new game from "A Small House"
   (five rooms, a locked front door and keys to find), "The Locked Door"
   (a dungeon cell, a sleeping guard and an iron door) or "Market Day"

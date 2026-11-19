@@ -10,6 +10,7 @@ const CHOICES: { [K in keyof Settings]: [Settings[K], string][] } = {
     ["light", "Light"],
     ["dark", "Dark"],
     ["sepia", "Sepia"],
+    ["parchment", "Parchment"],
     ["terminal", "Terminal (green)"],
     ["amber", "Terminal (amber)"],
     ["contrast", "High contrast"],
@@ -18,8 +19,11 @@ const CHOICES: { [K in keyof Settings]: [Settings[K], string][] } = {
   face: [["serif", "Book"], ["sans", "Plain"], ["legible", "Very legible"]],
   spacing: [["normal", "Normal"], ["relaxed", "Roomy"]],
   width: [["narrow", "Narrow"], ["medium", "Medium"], ["wide", "Wide"]],
+  reveal: [["instant", "All at once"], ["typewriter", "Letter by letter"]],
 };
-const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width" };
+const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width", reveal: "Text appears" };
+/** Settings that only mean something while playing: shown on the play page. */
+const PLAYER_ONLY = new Set<keyof Settings>(["reveal"]);
 
 export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
   applySettings();
@@ -31,6 +35,7 @@ export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
     const h = Object.assign(document.createElement("h2"), { textContent: "Text and colours" });
     dialog.append(close, h);
     for (const key of Object.keys(CHOICES) as (keyof Settings)[]) {
+      if (PLAYER_ONLY.has(key) && !document.getElementById("log")) continue;
       const row = document.createElement("div");
       row.className = "row";
       const label = document.createElement("label");

@@ -9,8 +9,9 @@ behave will be called out here.
 - Room colours in the editor, to group rooms into areas (the castle, the
   forest): pick one for each room, and it shows on the player's map too.
   They're kept in `map.yaml`, so the game itself doesn't change.
-- A Blueprint button on the editor's map: white lines on blue, so working
-  on the map feels different from playing. It's remembered in your browser.
+- An "Editor theme" choice on the editor's map: the site's colours, or
+  Blueprint (white lines on blue), so working on the map feels different
+  from playing. It's remembered in your browser.
 
 - Room descriptions end with "Known exits:", and list only the ways out
   that are open to the player right now: not an exit whose `when` is

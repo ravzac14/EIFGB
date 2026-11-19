@@ -5,7 +5,7 @@
 import { zipSync, strToU8 } from "fflate";
 import { loadEngine, type Diagnostic, type Engine, type Files } from "../engine.ts";
 import { fromFileList } from "../files.ts";
-import { blueprint, localGames, type LocalGame } from "../store.ts";
+import { localGames, mapTheme, type LocalGame, type MapTheme } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
 import { feedbackButton, feedbackContext } from "../feedback.ts";
 import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
@@ -505,16 +505,16 @@ $("download").addEventListener("click", () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
-// The map's look: plain, or a blueprint. Remembered in this browser.
-function showBlueprint(on: boolean) {
-  document.querySelector(".canvas")?.classList.toggle("blueprint", on);
-  $("blueprint").setAttribute("aria-pressed", String(on));
+// The editor theme: the map in the site's colours, or as a blueprint. Remembered in this browser.
+function showMapTheme(t: MapTheme) {
+  document.querySelector(".canvas")?.classList.toggle("blueprint", t === "blueprint");
+  $<HTMLSelectElement>("map-theme").value = t;
 }
-showBlueprint(blueprint.on());
-$("blueprint").addEventListener("click", () => {
-  const on = !blueprint.on();
-  blueprint.set(on);
-  showBlueprint(on);
+showMapTheme(mapTheme.get());
+$("map-theme").addEventListener("change", () => {
+  const t = $<HTMLSelectElement>("map-theme").value === "blueprint" ? "blueprint" : "site";
+  mapTheme.set(t);
+  showMapTheme(t);
 });
 $("add-room").addEventListener("click", () => {
   const r = $("map").getBoundingClientRect();

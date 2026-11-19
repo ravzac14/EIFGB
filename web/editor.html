@@ -65,7 +65,12 @@
       <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
       <button id="fit" type="button">Fit</button>
-      <button id="blueprint" type="button" aria-pressed="false" title="White lines on blue, so working on the map feels different from playing">Blueprint</button>
+      <label class="map-theme">Editor theme
+        <select id="map-theme" title="How the map looks while you work on it">
+          <option value="site">Same as the site</option>
+          <option value="blueprint">Blueprint</option>
+        </select>
+      </label>
     </div>
     <p id="map-hint" class="map-hint ui"></p>
   </section>

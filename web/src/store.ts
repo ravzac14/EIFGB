@@ -196,8 +196,9 @@ export function endingsText(game: string): string | null {
 
 // --------------------------------------------------- the editor's map
 
-/** Whether the editor's map is drawn as a blueprint (white lines on blue). */
-export const blueprint = {
-  on: (): boolean => read<boolean>("blueprint", false),
-  set: (on: boolean) => void write("blueprint", on),
+/** The editor's map theme: the site's colours, or a blueprint (white lines on blue). */
+export type MapTheme = "site" | "blueprint";
+export const mapTheme = {
+  get: (): MapTheme => (read<string>("map-theme", "site") === "blueprint" ? "blueprint" : "site"),
+  set: (t: MapTheme) => void write("map-theme", t),
 };

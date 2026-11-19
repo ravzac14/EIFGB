@@ -147,12 +147,16 @@ assert.match(moved(), /first_room: \[0, 0, 250, 100\]/);
 $("#undo").click();
 assert.match(moved(), /first_room: \[0, 0\]/);
 
-// The blueprint look for the map: a switch, remembered in this browser.
-$("#blueprint").click();
+// The editor theme: the site's colours, or a blueprint; remembered in this browser.
+const theme = $("#map-theme");
+assert.equal(theme.value, "site");
+assert.equal(theme.closest("label").textContent.trim().startsWith("Editor theme"), true);
+theme.value = "blueprint";
+theme.dispatchEvent(new Event("change"));
 assert.ok($(".canvas").classList.contains("blueprint"));
-assert.equal($("#blueprint").getAttribute("aria-pressed"), "true");
-assert.equal(localStorage.getItem("eifgb:blueprint"), "true");
-$("#blueprint").click();
+assert.equal(localStorage.getItem("eifgb:map-theme"), '"blueprint"');
+theme.value = "site";
+theme.dispatchEvent(new Event("change"));
 assert.ok(!$(".canvas").classList.contains("blueprint"));
 
 // A colour for the room, from the swatches: kept in map.yaml, drawn on the map.

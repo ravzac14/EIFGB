@@ -95,15 +95,6 @@ in the game.
 
 ## The player
 
-### A map you fill in as you go
-
-A Map button in the player showing the rooms the player has visited and the
-ways between them, drawn like the editor's map.
-
-- Builds on: the editor's layout (`web/src/editor/layout.ts`, `map.yaml`)
-  and the save state (visited rooms).
-- Effort: medium. Recommended next.
-
 ### Themes chosen by the game
 
 An author sets the look of their game, which players can still override:

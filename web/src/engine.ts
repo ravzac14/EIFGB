@@ -30,6 +30,13 @@ export interface Output {
   restore_requested: boolean;
   quit_requested: boolean;
 }
+/** What the player has seen of the map (see `eifgb_map` in the bridge). */
+export interface PlayerMap {
+  here: string;
+  rooms: { id: string; name: string }[];
+  /** `to` is missing when the far side hasn't been visited yet. */
+  exits: { from: string; dir: string; to?: string; door?: string; closed?: boolean }[];
+}
 export interface Meta {
   id: string;
   title: string;
@@ -53,6 +60,8 @@ export interface Engine {
   save(): string;
   /** Put a saved state back. */
   restore(save: string): Output;
+  /** The rooms visited so far and the ways out of them. */
+  map(): PlayerMap;
 }
 
 interface Module {
@@ -77,5 +86,6 @@ export async function loadEngine(base: string | URL): Promise<Engine> {
     input: (line) => call("eifgb_input", ["string"], [line]),
     save: () => call("eifgb_save", [], []),
     restore: (save) => call("eifgb_restore", ["string"], [save]),
+    map: () => call("eifgb_map", [], []),
   };
 }

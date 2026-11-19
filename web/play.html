@@ -21,6 +21,7 @@
   <span id="title" class="title"></span>
   <span id="status" class="status" aria-live="off"></span>
   <span class="tools">
+    <button id="map-open" type="button" aria-pressed="false" aria-controls="map" disabled>Map</button>
     <button id="saves-open" type="button" disabled>Saves</button>
     <button id="restart" type="button" disabled>Restart</button>
     <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
@@ -35,6 +36,10 @@
     <input id="line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="What do you do?">
   </form>
 </main>
+<aside id="map" class="map-panel ui" aria-label="Map" hidden>
+  <div class="map-head"><h2>Map</h2><span class="dim">Places you've been</span><button id="map-close" type="button" aria-label="Close the map">×</button></div>
+  <div id="map-body" class="map-body"></div>
+</aside>
 <dialog id="saves"></dialog>
 <dialog id="settings"></dialog>
 <script type="module" src="./src/play.ts"></script>

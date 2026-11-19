@@ -152,4 +152,34 @@ pub extern "C" fn eifgb_restore(save: *const c_char) -> *const c_char {
     give(with_game(|g| output(g.restore(&save))))
 }
 
+/// What the player has seen of the map: `{ here, rooms: [{id, name}],
+/// exits: [{from, dir, to?, door?, closed?}] }`. Only rooms the player has
+/// been in; an exit from one of them whose far side they haven't visited
+/// has no `to`. Exits through secret doors that haven't been found are left out.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_map() -> *const c_char {
+    give(with_game(|g| map(g.world())))
+}
+
+fn map(w: &eifgb_engine::World) -> Value {
+    let visited = &w.state.visited;
+    let key = |id: eifgb_engine::ir::EntityId| w.def(id).key.clone();
+    let rooms: Vec<Value> = visited.iter().map(|&r| json!({ "id": key(r), "name": w.def(r).name })).collect();
+    let mut exits = Vec::new();
+    for &r in visited {
+        for e in w.def(r).exits.iter().filter(|e| w.exit_visible(e)) {
+            let mut x = json!({ "from": key(r), "dir": e.direction });
+            if let Some(to) = e.to.filter(|t| visited.contains(t)) {
+                x["to"] = json!(key(to));
+            }
+            if let Some(d) = e.through {
+                x["door"] = json!(w.def(d).name);
+                x["closed"] = json!(!w.flag(d, "open"));
+            }
+            exits.push(x);
+        }
+    }
+    json!({ "here": key(w.here()), "rooms": rooms, "exits": exits })
+}
+
 fn main() {}

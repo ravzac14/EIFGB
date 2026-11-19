@@ -14,6 +14,14 @@ behave will be called out here.
   (Atkinson Hyperlegible), roomier line spacing, and narrow, medium or wide
   columns. They apply to the player, the editor and the docs.
 - The site has an icon, and links to it show a preview card when shared.
+- A map in the player that fills in as you explore: the places you've been,
+  the ways between them, doors, and the ways out you haven't tried yet.
+  Click a room next to yours to go there. Rooms sit where the author put
+  them in the editor.
+- The player scrolls down to show each reply as it arrives; a long reply
+  stops at its first line, so you can read it from the beginning.
+- The guide's list of commands every game understands is now a set of
+  tables, with the other ways to say each one.
 
 ## 2026-11-17: the website
 

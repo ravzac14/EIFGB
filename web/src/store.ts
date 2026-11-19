@@ -138,3 +138,11 @@ export function savesFor(game: string) {
     },
   };
 }
+
+// ------------------------------------------------------------- the map
+
+/** Whether the player's map panel is open; `null` until they've chosen. */
+export const mapPanel = {
+  open: (): boolean | null => read<boolean | null>("map-open", null),
+  set: (open: boolean) => void write("map-open", open),
+};

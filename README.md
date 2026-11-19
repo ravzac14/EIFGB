@@ -1404,16 +1404,92 @@ Options for `play`:
 | `--seed <n>` | Fix the random seed. The same seed and commands always give the same game. |
 | `--save-file <path>` | Where SAVE and RESTORE keep the saved game. Defaults to `<game id>.sav`. |
 
-In-game commands that every game understands include LOOK, EXAMINE (X),
-TAKE (… FROM), DROP, PUT … IN/ON, OPEN, CLOSE, LOCK, UNLOCK, SEARCH, TALK TO, WEAR,
-TAKE OFF, EAT, EMPTY (… INTO/ONTO), GO THROUGH / ENTER (a door), GET IN /
-SIT ON / CLIMB INTO and GET OUT / STAND UP (`enterable` things), INVENTORY (I), WAIT (Z),
-ATTACK / HIT / KILL (… WITH), BUY, SELL (… FOR), WARES, OFFER … FOR (HAGGLE FOR), ACCEPT, HEALTH
-(DIAGNOSE), SHOUT (YELL), APOLOGISE TO, GIVE … TO, PAY … TO (BRIBE), THROW (… AT, … NORTH), CALL … (NAME), EXAMINE TRACKS, FOLLOW (TRACKS), BURY, HIDE … IN, SNEAK (CREEP, TIPTOE), PEEK (LOOK NORTH),
-STEAL … FROM (PICKPOCKET, ROB), EAVESDROP (LISTEN AT, LISTEN NORTH), TELL … TO (NAME, …), BRANDISH (WAVE, SHOW … TO), HOWL (IMITATE …), BLOW (SOUND, RING), SET / DISARM (traps), BURN (SET … ALIGHT), SMASH, POUR … ON (DOUSE … WITH),
-LIGHT (TURN ON) and EXTINGUISH (PUT OUT, TURN OFF),
-directions (N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT), plus UNDO,
-AGAIN (G), SAVE, RESTORE, RESTART, SCORE, HELP and QUIT.
+### Commands every game understands
+
+Players can type these in any game. Words in the second column mean the
+same thing; `…` is where the name of a thing or person goes.
+
+#### Looking and moving
+
+| Command | Also | What it does |
+|---|---|---|
+| LOOK | L, LOOK AROUND | Describes where you are. |
+| EXAMINE … | X …, LOOK AT … | Describes a thing or person. |
+| SEARCH … | LOOK IN …, LOOK UNDER …, LOOK BEHIND … | Looks closely, and can turn up hidden things. |
+| N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT | NORTH, GO NORTH, … | Goes that way. |
+| GO THROUGH … | ENTER … | Goes through a door. |
+| GET IN … | SIT ON …, CLIMB INTO … | Gets into or onto something `enterable`. |
+| GET OUT | STAND UP | Gets out again. |
+| PEEK NORTH | LOOK NORTH, PEEK THROUGH … | Looks into the next room without going in. |
+| EAVESDROP | EAVESDROP NORTH, LISTEN NORTH, LISTEN AT … | Listens through a wall or door. |
+| SNEAK NORTH | CREEP NORTH, TIPTOE NORTH | Moves quietly, so fewer characters notice. |
+| EXAMINE TRACKS | TRACKS, LOOK FOR TRACKS | Reads the tracks left in the room. |
+| FOLLOW … | TRACK … | Follows a creature's tracks: FOLLOW WOLF. |
+
+#### Things
+
+| Command | Also | What it does |
+|---|---|---|
+| TAKE … | GET …, PICK UP …, TAKE … FROM … | Picks something up. |
+| DROP … | PUT DOWN … | Puts down something you carry. |
+| PUT … IN … / PUT … ON … | INSERT … INTO …, PLACE … ON … | Puts a thing into a container or onto a surface. |
+| EMPTY … | EMPTY … INTO …, EMPTY … ONTO … | Tips out what's inside. |
+| OPEN … / CLOSE … | SHUT … | Opens or closes a door or container. |
+| UNLOCK … / LOCK … | … WITH … | Unlocks or locks it, with the right key. |
+| WEAR … / TAKE OFF … | PUT ON …, REMOVE … | Puts clothing on or takes it off. |
+| EAT … | | Eats something edible. |
+| INVENTORY | I | Lists what you carry. |
+| LIGHT … | TURN ON … | Lights a lamp, torch or candle. |
+| EXTINGUISH … | PUT OUT …, BLOW OUT …, TURN OFF … | Puts a light or a fire out. |
+| BURN … | SET … ALIGHT, SET FIRE TO … | Sets fire to something that burns. |
+| POUR … ON … | DOUSE … WITH … | Pours water (or something else) on it. |
+| SMASH … | BREAK … | Breaks something breakable. |
+| THROW … | THROW … AT …, THROW … NORTH | Throws a thing at someone, or into the next room. |
+| HIDE … IN … | STUFF … IN … | Hides a thing in a container. |
+| BURY … | | Buries a body, so it isn't found. |
+| SET … / DISARM … | | Sets or disarms a trap. |
+| BLOW … | SOUND …, RING …, PLAY … | Blows a horn, rings a bell. |
+| PUSH, PULL, KICK, MOVE, LIFT, SHAKE, TURN, TOUCH, SMELL, LISTEN, TASTE | DRAG, TWIST, FEEL | Tries it out; the game decides if anything happens. |
+
+#### People and creatures
+
+| Command | Also | What it does |
+|---|---|---|
+| TALK TO … | SPEAK TO …, GREET … | Starts a conversation. |
+| GIVE … TO … | HAND … TO …, FEED … TO … | Hands something over: a gift, or food for an animal. |
+| BRIBE … | PAY 5 TO …, BRIBE … WITH 5 | Pays someone off. |
+| TELL … TO … | ORDER … TO …, ASK … TO … | Gives an order to someone who'll take it: TELL THE DOG TO FETCH THE STICK. |
+| CALL … … | NAME … …, RENAME … … | Gives someone a name: CALL THE DOG REX. |
+| SHOUT | YELL, SCREAM, MAKE NOISE | Makes a noise that carries. |
+| HOWL | BARK, GROWL, IMITATE …, MIMIC … | Mimics a call; only some listeners answer it. |
+| BRANDISH … | WAVE …, SHOW … TO … | Shows a weapon (or anything) to scare or impress. |
+| APOLOGISE TO … | APOLOGIZE TO …, SAY SORRY TO …, CALM … | Tries to calm someone you've angered. |
+| STEAL … FROM … | PICKPOCKET …, ROB … | Takes something without them noticing, or tries to. |
+
+#### Fighting and trading
+
+| Command | Also | What it does |
+|---|---|---|
+| ATTACK … | HIT …, KILL …, FIGHT …, ATTACK … WITH … | Fights someone. |
+| HEALTH | DIAGNOSE | Says how hurt you are. |
+| WARES | BROWSE, SHOP | Lists what a shopkeeper sells. |
+| BUY … | | Buys something. |
+| SELL … | SELL … TO …, SELL … FOR 5 | Sells something, at their price or yours. |
+| OFFER 5 FOR … | BID 5 FOR …, HAGGLE FOR … | Makes an offer; they may come back with another. |
+| ACCEPT | | Takes their counter-offer. |
+
+#### The game itself
+
+| Command | Also | What it does |
+|---|---|---|
+| WAIT | Z | Lets a turn go by. |
+| AGAIN | G | Repeats your last command. |
+| UNDO | | Takes back your last turn. |
+| SAVE / RESTORE | LOAD | Saves your place, or goes back to a save. |
+| RESTART | | Starts the game again. |
+| SCORE | | Shows your score, if the game keeps one. |
+| HELP | HINT | A short guide to playing. |
+| QUIT | Q | Stops playing. |
 
 Some verbs exist so that players can try them and authors can respond:
 PUSH, PULL, KICK, MOVE (DRAG), LIFT, SHAKE, TURN (TWIST), TOUCH (FEEL),

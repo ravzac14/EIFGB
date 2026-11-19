@@ -1,7 +1,8 @@
 // The player: loads a game (bundled, or one you loaded), plays it, keeps an
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
-import { localGames, savesFor, type SaveFile, type Slot } from "./store.ts";
+import { localGames, mapPanel, savesFor, type SaveFile, type Slot } from "./store.ts";
+import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
 import { fetchGame, resolve } from "./remote.ts";
 
@@ -131,15 +132,47 @@ function show(o: Output): HTMLElement | null {
   }
   status(o);
   last = o;
+  refreshMap();
   return (first ? first.nextElementSibling : log.firstElementChild) as HTMLElement | null;
 }
 
+/**
+ * Scrolls down to show what's new: as far as the bottom of the page, but
+ * never so far that `start` (the command, or the first new line) goes up
+ * under the header, so a long reply can be read from its beginning.
+ */
 function scrollTo(start: HTMLElement | null) {
   if (!start) return;
-  // Long replies: keep their start in view. Short ones: keep the prompt in view.
-  const tall = log.getBoundingClientRect().bottom - start.getBoundingClientRect().top > window.innerHeight * 0.7;
-  if (tall) start.scrollIntoView({ block: "start" });
-  else form.scrollIntoView({ block: "end" });
+  const header = document.querySelector<HTMLElement>("header.bar")?.offsetHeight ?? 0;
+  const top = start.getBoundingClientRect().top + window.scrollY - header - 12;
+  const bottom = document.documentElement.scrollHeight - window.innerHeight;
+  const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: Math.max(0, Math.min(top, bottom)), behavior: smooth ? "smooth" : "auto" });
+}
+
+// ------------------------------------------------------------- the map
+
+const mapBox = $("map");
+const mapBody = $("map-body");
+const mapButton = $<HTMLButtonElement>("map-open");
+// The narrow-screen map drops down from just under the header.
+const bar = document.querySelector<HTMLElement>("header.bar")!;
+new ResizeObserver(() => document.documentElement.style.setProperty("--bar-h", `${bar.offsetHeight}px`)).observe(bar);
+let author: ReturnType<typeof authorPositions> = new Map();
+
+function refreshMap() {
+  if (mapBox.hidden || !engine) return;
+  const m = engine.map();
+  if ("error" in m) return;
+  drawMap(mapBody, m, author, { go: (dir) => !over && send(dir) });
+}
+
+function showMap(open: boolean, remember = true) {
+  mapBox.hidden = !open;
+  document.body.classList.toggle("with-map", open);
+  mapButton.setAttribute("aria-pressed", String(open));
+  if (remember) mapPanel.set(open);
+  refreshMap();
 }
 
 function finish(message: string) {
@@ -327,6 +360,11 @@ log.addEventListener("click", () => {
   if (!getSelection()?.toString() && !form.hidden) line.focus({ preventScroll: true });
 });
 $("saves-open").addEventListener("click", openSaves);
+mapButton.addEventListener("click", () => showMap(mapBox.hidden));
+$("map-close").addEventListener("click", () => {
+  showMap(false);
+  mapButton.focus();
+});
 $("restart").addEventListener("click", () => restart(true));
 
 async function main() {
@@ -352,10 +390,11 @@ async function main() {
     window.history.replaceState(null, "", location.href.replace(/[?&]fresh=1/, ""));
   }
   from = src.from ?? null;
+  author = authorPositions(files["map.yaml"]);
   if (!begin()) return;
   document.title = meta.title;
   $("title").textContent = meta.title;
-  for (const b of ["saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
+  for (const b of ["map-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
   form.hidden = false;
 
   const auto = saves.auto();
@@ -366,6 +405,7 @@ async function main() {
       say("Welcome back. Here's where you were.", "notice");
       show(o);
       say("(Restart, at the top, begins again.)", "notice");
+      scrollTo(log.lastElementChild as HTMLElement);
     } else {
       // The save didn't fit this version of the game: start fresh.
       saves.clearAuto();
@@ -373,7 +413,9 @@ async function main() {
     }
   }
   saves.setAuto(engine.save());
-  line.focus();
+  // The map starts open on wide screens, until the player says otherwise.
+  showMap(mapPanel.open() ?? matchMedia("(min-width: 70rem)").matches, false);
+  line.focus({ preventScroll: true });
 }
 
 main();

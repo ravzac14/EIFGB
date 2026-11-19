@@ -163,6 +163,29 @@ function showMap(open: boolean, remember = true) {
   refreshMap();
 }
 
+/** The story so far, as plain text: what's on the page, commands marked with ">". */
+function transcriptText(): string {
+  const lines: string[] = [];
+  const head = [meta?.title, meta?.author ? `by ${meta.author}` : ""].filter(Boolean).join(", ");
+  if (head) lines.push(head, `Played ${new Date().toLocaleString()}`, "");
+  for (const node of log.children) {
+    const e = node as HTMLElement;
+    if (e.classList.contains("diagnostics")) continue;
+    const text = e.textContent?.trim() ?? "";
+    if (!text) continue;
+    if (e.classList.contains("cmd")) lines.push("", `> ${text}`);
+    else lines.push(text);
+  }
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+}
+
+function downloadTranscript() {
+  const blob = new Blob([transcriptText()], { type: "text/plain;charset=utf-8" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: `${meta.id}-transcript.txt` });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 function finish(message: string) {
   over = true;
   form.hidden = true;
@@ -170,6 +193,7 @@ function finish(message: string) {
   after.replaceChildren(
     el("span", { className: "dim", textContent: message }),
     button("Play again", () => restart(false), "primary"),
+    button("Download the transcript", downloadTranscript),
     el("a", { href: "./", textContent: "Back to the games" }),
   );
 }
@@ -325,6 +349,11 @@ function openSaves() {
     fileInput.hidden = true;
     fileInput.addEventListener("change", () => fileInput.files?.[0] && upload(fileInput.files[0], msg));
     savesDialog.append(el("div", { className: "row" }, button("Load a save file…", () => fileInput.click()), fileInput), msg);
+    savesDialog.append(
+      el("h3", { textContent: "Transcript" }),
+      el("p", { className: "dim", textContent: "Everything on the page since you opened it, as a text file." }),
+      el("div", { className: "row" }, button("Download the transcript", downloadTranscript)),
+    );
   };
   render();
   if (!savesDialog.open) savesDialog.showModal();

@@ -6,6 +6,8 @@ behave will be called out here.
 
 ## Unreleased
 
+- Download a transcript of your game, as a text file, from Saves or when
+  the game ends.
 - Endings found: a game's card on the home page and in the gallery says
   "You've found 2 of 3 endings", and so does the end of a game. It's kept
   in your browser.

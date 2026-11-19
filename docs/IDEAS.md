@@ -57,7 +57,6 @@ Nothing waiting here right now.
   first line.
 - **Typewriter reveal:** text appears letter by letter; off by default,
   any key skips.
-- **Download a transcript** of a play-through.
 
 ## The website
 

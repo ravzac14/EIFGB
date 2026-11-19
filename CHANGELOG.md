@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- When a game ends on the website, you can still type: UNDO, RESTORE and
+  RESTART work, as the game says.
+
 - For AI assistants: a guide to writing games with one (format, common
   mistakes, a complete checked example), every docs page as Markdown next
   to its HTML, and `llms.txt`, `llms-full.txt` and `sitemap.xml` at the

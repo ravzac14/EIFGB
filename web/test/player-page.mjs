@@ -39,7 +39,14 @@ for (const s of steps) type(s);
 
 // The end: what kind, and the endings found so far.
 assert.match($("#after").textContent, /You won\. You've found 1 of 2 endings\./);
-assert.ok($("#prompt").hidden);
+// The game says UNDO, RESTORE or RESTART still work, so the prompt stays.
+assert.match($("#log").textContent, /Type UNDO to take back your last move/);
+assert.equal($("#prompt").hidden, false);
+type("undo");
+assert.equal($("#after").textContent, "", "back in the story: the ending's buttons go");
+assert.match($("#status").textContent, /Pantry/);
+type("eat it");
+assert.match($("#after").textContent, /You won\./);
 
 // The transcript, from the button after the ending.
 [...$("#after").querySelectorAll("button")].find((b) => b.textContent === "Download the transcript").click();

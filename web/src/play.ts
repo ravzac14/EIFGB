@@ -206,9 +206,12 @@ function downloadTranscript() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+/**
+ * The game has ended (or the player quit). The prompt stays: the game says
+ * UNDO, RESTORE or RESTART still work, and they do.
+ */
 function finish(message: string) {
   over = true;
-  form.hidden = true;
   saves.clearAuto();
   after.replaceChildren(
     el("span", { className: "dim", textContent: message }),
@@ -225,6 +228,11 @@ function handle(o: Output) {
     else say("There's no room left in this browser to keep that save.", "error");
   }
   if (o.restore_requested) openSaves();
+  // Back in the story after an ending (UNDO, RESTART or RESTORE): carry on.
+  if (over && !o.ended && !o.quit_requested) {
+    over = false;
+    after.replaceChildren();
+  }
   if (o.ended) {
     if (o.ending) endingsFor(gameKey).record(o.ending, meta.endings ?? [o.ending]);
     const found = endingsText(gameKey);
@@ -235,7 +243,6 @@ function handle(o: Output) {
 }
 
 function send(text: string, echo = text) {
-  if (over) return;
   say(echo, "cmd");
   const start = log.lastElementChild as HTMLElement;
   const o = engine.input(text);

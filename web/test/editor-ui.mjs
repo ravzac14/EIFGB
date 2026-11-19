@@ -457,6 +457,38 @@ assert.ok(projectFiles()["scripts/helpers.lua"]);
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
 
+// Test play, in the drawer: the game as it is, from the start room or a chosen one.
+$("#tab-play").click();
+for (let i = 0; i < 40 && !$("#panel-play .tp-log .title"); i++) await tick(50);
+const tp = $("#panel-play");
+const firstRoom = yaml().match(/start: (\w+)/)[1];
+assert.ok(tp.querySelector(".tp-log .title"), tp.textContent);
+assert.equal($("#map .room.here")?.dataset.room, firstRoom, "the map marks where the player is");
+const tpLine = tp.querySelector(".tp-prompt input");
+tpLine.value = "look";
+tp.querySelector(".tp-prompt").requestSubmit();
+assert.match(tp.querySelector(".tp-log").textContent, /> ?look|look/);
+// Start in another room: select it on the map first.
+press($(`#map [data-room="${eastRoom}"]`));
+const startIn = [...tp.querySelectorAll(".tp-bar button")].find((b) => b.textContent.startsWith("Start in"));
+assert.equal(startIn.disabled, false);
+startIn.click();
+await tick(50);
+assert.match(tp.querySelector(".tp-log").textContent, /as if the game began there/);
+assert.equal($("#map .room.here")?.dataset.room, eastRoom);
+assert.match(yaml(), new RegExp(`start: ${firstRoom}`), "the game file itself is unchanged");
+// Changing the game marks the game in progress as out of date; moving a room doesn't.
+assert.ok(tp.querySelector(".tp-stale").hidden);
+pointer($(`#map [data-room="${eastRoom}"]`), "pointerdown", 0, 0);
+pointer($(`#map [data-room="${eastRoom}"]`), "pointermove", 60, 0);
+pointer($(`#map [data-room="${eastRoom}"]`), "pointerup", 60, 0);
+assert.ok(tp.querySelector(".tp-stale").hidden, "moving a room isn't a change to the game");
+typeName([...document.querySelectorAll("#inspector input[type=text]")][0], "Changed room");
+assert.equal(tp.querySelector(".tp-stale").hidden, false);
+// Leaving the tab takes the mark off the map.
+$("#tab-problems").click();
+assert.equal($("#map .room.here"), null);
+
 assert.deepEqual(errors, []);
 console.log("ok   editor page");
 await GlobalRegistrator.unregister();

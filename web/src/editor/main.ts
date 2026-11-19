@@ -12,6 +12,7 @@ import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
 import { MAP_FILE, besideRoom, layout, readMap, writeMap, type Point, type Positions } from "./layout.ts";
 import { MapView, type Selection } from "./map.ts";
 import { renderInspector } from "./inspector.ts";
+import { TestPlay } from "./testplay.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
@@ -44,6 +45,21 @@ let positions: Positions = new Map();
 let selection: Selection = null;
 let problems: Diagnostic[] = [];
 let mapView: MapView;
+
+// Test play, in the drawer.
+const testPlay = new TestPlay($("panel-play"), {
+  engine: () => (engine ??= loadEngine(new URL("./wasm/", location.href))),
+  files: () => {
+    save();
+    return { ...project.files };
+  },
+  selectedRoom: () => {
+    const r = selection?.kind === "room" && model ? model.room(selection.id) : null;
+    return r && selection?.kind === "room" ? { id: selection.id, name: r.name } : null;
+  },
+  markHere: (room) => mapView?.setHere(room),
+  showProblems: () => showTab("problems"),
+});
 
 /** Every file of the project at one moment: what undo goes back to. */
 interface Snapshot {
@@ -185,6 +201,7 @@ function drawMap() {
 
 function redraw() {
   drawMap();
+  testPlay.update();
   if (!model) {
     $("inspector").replaceChildren(el("p", { className: "dim", textContent: "Fix the mistake in the game file to see the map." }));
     return;
@@ -304,6 +321,7 @@ let engine: Promise<Engine> | null = null;
 let checkTimer = 0;
 
 function scheduleCheck() {
+  testPlay.changed(project.files);
   clearTimeout(checkTimer);
   checkTimer = window.setTimeout(async () => {
     engine ??= loadEngine(new URL("./wasm/", location.href));
@@ -393,12 +411,15 @@ function goTo(path: string) {
   showInFile(parts[1] ? `${parts[1]}:` : parts[0] ?? "");
 }
 
-function showTab(which: "problems" | "yaml") {
-  $("tab-problems").setAttribute("aria-selected", String(which === "problems"));
-  $("tab-yaml").setAttribute("aria-selected", String(which === "yaml"));
-  $("panel-problems").hidden = which !== "problems";
-  $("panel-yaml").hidden = which !== "yaml";
+function showTab(which: "problems" | "yaml" | "play") {
+  for (const t of ["problems", "yaml", "play"] as const) {
+    $(`tab-${t}`).setAttribute("aria-selected", String(which === t));
+    $(`panel-${t}`).hidden = which !== t;
+  }
+  testPlay.shown(which === "play");
 }
+
+
 
 function showInFile(find: string) {
   if (currentFile !== "game.yaml") openFile("game.yaml");
@@ -456,6 +477,7 @@ $("yaml").addEventListener("input", () => {
   }, 600);
 });
 $("tab-problems").addEventListener("click", () => showTab("problems"));
+$("tab-play").addEventListener("click", () => showTab("play"));
 $("tab-yaml").addEventListener("click", () => openFile(currentFile));
 $("file").addEventListener("change", () => openFile($<HTMLSelectElement>("file").value));
 

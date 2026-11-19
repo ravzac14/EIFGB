@@ -165,3 +165,25 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .inspector .option select { width: auto; max-width: 9rem; }
 .file-row { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.35rem; flex-wrap: wrap; }
 .file-row span { font-size: 0.85em; }
+
+/* Test play, in the drawer */
+#panel-play { max-height: none; display: flex; flex-direction: column; height: 34vh; padding-bottom: 0.4rem; }
+#panel-play[hidden] { display: none; }
+.tp-bar { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.tp-status { margin-left: auto; font-size: 0.85em; }
+.tp-stale { margin: 0.4rem 0 0; padding: 0.3rem 0.5rem; border-left: 3px solid var(--warn); background: var(--bg); font-size: 0.85em; }
+.tp-log { flex: 1; min-height: 0; overflow: auto; margin-top: 0.4rem; padding: 0.4rem 0.6rem; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-family: var(--serif); }
+.tp-log p { margin: 0 0 0.5em; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.95rem; }
+.tp-log .title { font-weight: bold; margin-top: 0.8em; }
+.tp-log .banner { font-weight: bold; text-align: center; letter-spacing: 0.03em; }
+.tp-log .notice { color: var(--dim); font-style: italic; }
+.tp-log .ending { font-weight: bold; text-align: center; }
+.tp-log .error { color: var(--err); font-family: var(--mono); font-size: 0.85em; }
+.tp-log .cmd { color: var(--accent); margin-top: 0.8em; }
+.tp-log .cmd::before { content: "> "; }
+.tp-log .choice { margin: 0 0 0.2em; padding-left: 1em; }
+.tp-prompt { display: flex; gap: 0.4em; align-items: baseline; padding-top: 0.35rem; }
+.tp-prompt[hidden] { display: none; }
+.tp-prompt .caret { color: var(--accent); font-family: var(--serif); }
+.tp-prompt input { flex: 1; min-width: 0; font: 0.95rem var(--serif); color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.25em 0.5em; }
+#map .room.here rect { stroke: var(--accent); stroke-width: 3; fill: color-mix(in srgb, var(--accent) 16%, var(--room)); }

@@ -41,8 +41,6 @@ Nothing waiting here right now.
 
 ### More editor ideas
 
-- **Play inside the editor:** a play panel beside the map, so testing
-  doesn't mean switching tabs; optionally "start from this room".
 - **Colours for rooms or regions** on the map, and on the player's map.
 - **Starter templates:** "a small house", "a dungeon with a locked door",
   to start a new game from.

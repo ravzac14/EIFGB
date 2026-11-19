@@ -120,6 +120,8 @@ export class MapView {
   private positions: Positions = new Map();
   private selection: Selection = null;
   private bad = new Set<string>();
+  /** The room the player is in during test play, marked on the map. */
+  private here: string | null = null;
   private svgEl: SVGSVGElement;
   private actions: MapActions;
 
@@ -375,11 +377,17 @@ export class MapView {
       });
   }
 
+  /** Marks the room the player is in during test play (null: none). */
+  setHere(id: string | null) {
+    this.here = id;
+    for (const g of this.root.querySelectorAll<SVGGElement>(".room")) g.classList.toggle("here", g.dataset.room === id);
+  }
+
   private drawRoom(layer: SVGGElement, id: string) {
     const p = this.positions.get(id)!;
     const room = this.model!.room(id)!;
     const selected = this.selection?.kind === "room" && this.selection.id === id;
-    const g = svg("g", { class: `room${selected ? " selected" : ""}${this.bad.has(id) ? " bad" : ""}`, transform: `translate(${p.x} ${p.y})` }, layer);
+    const g = svg("g", { class: `room${selected ? " selected" : ""}${this.bad.has(id) ? " bad" : ""}${this.here === id ? " here" : ""}`, transform: `translate(${p.x} ${p.y})` }, layer);
     g.dataset.room = id;
     const { w, h } = boxOf(p);
     svg("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 10 }, g);

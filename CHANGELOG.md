@@ -6,6 +6,11 @@ behave will be called out here.
 
 ## Unreleased
 
+- Test play in the editor: play your game in the editor's bottom panel
+  while you work on it, from the start or from the room selected on the
+  map, with the room you're in lit up on the map. It tells you when you've
+  changed the game since starting.
+
 - When a game ends on the website, you can still type: UNDO, RESTORE and
   RESTART work, as the game says.
 

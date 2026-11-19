@@ -193,3 +193,11 @@ export function endingsText(game: string): string | null {
   if (found.length >= total) return total === 2 ? "You've found both endings." : `You've found all ${total} endings.`;
   return `You've found ${found.length} of ${total} endings.`;
 }
+
+// --------------------------------------------------- the editor's map
+
+/** Whether the editor's map is drawn as a blueprint (white lines on blue). */
+export const blueprint = {
+  on: (): boolean => read<boolean>("blueprint", false),
+  set: (on: boolean) => void write("blueprint", on),
+};

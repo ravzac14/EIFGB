@@ -31,6 +31,9 @@ export interface InspectorContext {
   openFile(path: string): void;
   /** Adds a script file to the game; returns its path. */
   addScriptFile(name: string): string | null;
+  /** A room's colour on the map (kept in map.yaml), or undefined. */
+  roomColour(id: string): string | undefined;
+  setRoomColour(id: string, colour: string | null): void;
 }
 
 type Kids = (Node | string)[];

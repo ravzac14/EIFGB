@@ -6,6 +6,7 @@ import {
   type Behavior, type Direction, type Exit, type Kind, type Model, type Person, type Thing,
 } from "./model.ts";
 import { THING_DRAG, factionHue } from "./map.ts";
+import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, roomName, select, type InspectorContext } from "./ui.ts";
 
@@ -25,6 +26,22 @@ export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   if (s?.kind === "choice" && ctx.model.choice(s.id)) return choicePanel(panel, ctx, s.id);
   if (s?.kind === "verb" && ctx.model.ids("verbs").includes(s.id)) return verbPanel(panel, ctx, s.id);
   gamePanel(panel, ctx);
+}
+
+/** A row of swatches: the room's colour on the map, to group rooms into regions. */
+function colourPicker(ctx: InspectorContext, id: string): HTMLElement {
+  const current = ctx.roomColour(id);
+  const row = el("div", { class: "swatches", role: "radiogroup", ariaLabel: "Colour on the map" });
+  const pick = (name: string | null, label: string, style: string) => {
+    const b = el("button", { type: "button", class: `swatch${(current ?? null) === name ? " on" : ""}`, title: label, ariaLabel: label });
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String((current ?? null) === name));
+    if (style) b.setAttribute("style", style);
+    b.addEventListener("click", () => ctx.setRoomColour(id, name));
+    return b;
+  };
+  row.append(pick(null, "No colour", ""), ...Object.entries(COLOURS).map(([name, c]) => pick(name, c.label, colourStyle(name))));
+  return el("div", {}, el("label", { textContent: "Colour on the map" }), row, help("Group rooms into areas: the castle, the forest. Only for the map; players see it on theirs too."));
 }
 
 // ------------------------------------------------------------- the game
@@ -124,7 +141,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
       el("li", { textContent: "Click a room to select it. Click one of the + around it to add a room that way." }),
       el("li", { textContent: "Drag a + onto another room to connect the two." }),
       el("li", { textContent: "Drag rooms to arrange the map; drag the background to move around." }),
-      el("li", { textContent: "Drag a selected room's corner to make its box bigger or smaller. That's only for picturing the map." }),
+      el("li", { textContent: "Drag a selected room's corner to make its box bigger or smaller, and give it a colour to group it with others. That's only for picturing the map." }),
       el("li", { textContent: "Test play, at the bottom, plays your game right here: from the start, or from the room you've selected." }),
       el("li", { textContent: "Click a line to choose its door, or to make it one way." }),
       el("li", { textContent: "Double-click empty space for a new room on its own." }),
@@ -182,6 +199,7 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     check("Lists its exits after the description", m.bool(["rooms", id, "list_exits"], m.bool(["settings", "list_exits"], true)), (v) =>
       ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
     ),
+    colourPicker(ctx, id),
     el("h3", { textContent: "Ways out" }),
   );
   if (exits.length) panel.append(el("ul", { class: "exits" }, ...exits.map((e) => exitLine(ctx, id, e))));

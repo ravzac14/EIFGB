@@ -51,13 +51,18 @@ assert.deepEqual(placeRooms(m, author).get("hall"), { x: 320, y: 180 });
 // A room resized in the editor is drawn bigger: 300 wide there is 248 here.
 const big = authorPositions("rooms:\n  hall: [0, 0, 300, 112]\n");
 assert.deepEqual(big.get("hall"), { x: 0, y: 0, w: 248, h: 88 });
+// Room colours from the editor.
+const tinted = authorPositions("rooms:\n  hall: [0, 0]\n  study: [0, -130]\ncolours:\n  hall: green\n  study: nonsense\n");
+assert.equal(tinted.get("hall").colour, "green");
+assert.equal(tinted.get("study").colour, undefined);
 
 // Drawn: a box per room, the current one marked. Nothing on the map moves
 // the player: every action is typed.
 GlobalRegistrator.register();
 const box = document.createElement("div");
-drawMap(box, m, new Map());
+drawMap(box, m, authorPositions("rooms:\n  hall: [0, 0]\ncolours:\n  hall: green\n"));
 assert.equal(box.querySelectorAll(".room").length, 3);
+assert.match(box.querySelector(".room.coloured").getAttribute("style"), /--tint: hsl\(125/);
 assert.equal(box.querySelector(".room.here title").textContent, "Attic (you are here)");
 assert.equal(box.querySelectorAll("[role=button], [tabindex]").length, 0, "nothing on the map is clickable");
 assert.ok(box.querySelector(".stub"), "unexplored ways are drawn");

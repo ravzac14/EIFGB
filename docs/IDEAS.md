@@ -41,11 +41,8 @@ Nothing waiting here right now.
 
 ### More editor ideas
 
-- **Colours for rooms or regions** on the map, and on the player's map.
 - **Starter templates:** "a small house", "a dungeon with a locked door",
   to start a new game from.
-- **A blueprint theme** for the map: white lines on blue, so map work feels
-  different from playing.
 
 ## The player
 

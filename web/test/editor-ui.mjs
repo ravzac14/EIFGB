@@ -147,6 +147,26 @@ assert.match(moved(), /first_room: \[0, 0, 250, 100\]/);
 $("#undo").click();
 assert.match(moved(), /first_room: \[0, 0\]/);
 
+// The blueprint look for the map: a switch, remembered in this browser.
+$("#blueprint").click();
+assert.ok($(".canvas").classList.contains("blueprint"));
+assert.equal($("#blueprint").getAttribute("aria-pressed"), "true");
+assert.equal(localStorage.getItem("eifgb:blueprint"), "true");
+$("#blueprint").click();
+assert.ok(!$(".canvas").classList.contains("blueprint"));
+
+// A colour for the room, from the swatches: kept in map.yaml, drawn on the map.
+press($('#map [data-room="first_room"]'));
+document.querySelector('#inspector .swatch[title="Green"]').click();
+assert.match(moved(), /\ncolours:\n  first_room: green\n/);
+assert.match($('#map [data-room="first_room"]').getAttribute("style"), /--tint/);
+assert.equal(document.querySelector('#inspector .swatch[title="Green"]').getAttribute("aria-checked"), "true");
+// Resizing back to the usual size keeps the colour.
+grip().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+assert.match(moved(), /first_room: green/);
+document.querySelector('#inspector .swatch[title="No colour"]').click();
+assert.doesNotMatch(moved(), /\ncolours:/);
+
 // Drag a + onto another room: they're joined that way (and back, if free).
 press($('#map [data-room="first_room"]'));
 const east = [...document.querySelectorAll("#map .handle")].find((h) => h.querySelector("title").textContent.includes("to the east"));

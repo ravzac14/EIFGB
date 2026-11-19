@@ -7,7 +7,7 @@
 
 import type { Direction, Exit, Model } from "./model.ts";
 import { OPPOSITE } from "./model.ts";
-import { boxOf, MAX_BOX, MIN_BOX, type Point, type Positions } from "./layout.ts";
+import { boxOf, colourStyle, MAX_BOX, MIN_BOX, type Point, type Positions } from "./layout.ts";
 
 export type Selection =
   | null
@@ -391,6 +391,10 @@ export class MapView {
     g.dataset.room = id;
     const { w, h } = boxOf(p);
     svg("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 10 }, g);
+    if (p.colour) {
+      g.setAttribute("style", colourStyle(p.colour));
+      g.classList.add("coloured");
+    }
     const fits = Math.max(8, Math.floor(w / 7.5));
     const name = room.name.length > fits ? `${room.name.slice(0, fits - 1)}…` : room.name;
     const things = this.model!.contents(id).length;

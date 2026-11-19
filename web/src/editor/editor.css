@@ -187,3 +187,32 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .tp-prompt .caret { color: var(--accent); font-family: var(--serif); }
 .tp-prompt input { flex: 1; min-width: 0; font: 0.95rem var(--serif); color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.25em 0.5em; }
 #map .room.here rect { stroke: var(--accent); stroke-width: 3; fill: color-mix(in srgb, var(--accent) 16%, var(--room)); }
+
+/* Room colours (regions), from map.yaml */
+#map .room.coloured rect { fill: var(--tint); }
+#map .room.coloured:not(.selected):not(.here):not(.bad) rect { stroke: var(--tint-line); }
+.swatches { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.25rem 0 0.2rem; }
+.swatch { width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 50%; border: 2px solid var(--tint-line, var(--line)); background: var(--tint, transparent); position: relative; }
+.swatch:not([style])::after { content: ""; position: absolute; inset: 45% 10%; background: var(--dim); transform: rotate(-45deg); }
+.swatch.on { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+/* The blueprint look for the map: white lines on blue, whatever the site's colours. */
+.canvas.blueprint {
+  --bg: #1b4a87; --fg: #f3f7ff; --dim: #b9cdee; --panel: #22579c; --line: #5f8ac8; --accent: #ffd84a;
+  --room: rgb(255 255 255 / 0.05); --room-line: #e9f1ff; --sel: #ffd84a; --link: #d6e4ff; --door: #ffd84a; --bad: #ff9c9c;
+  color: var(--fg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.13) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+  text-shadow: none;
+}
+.canvas.blueprint #map .room text { font-family: var(--mono); letter-spacing: 0.04em; }
+.canvas.blueprint #map .room rect { stroke-width: 1.8; }
+.canvas.blueprint #map .handle text { fill: #1b4a87; }
+.canvas.blueprint .map-tools button { background: var(--panel); border-color: var(--line); color: var(--fg); }
+.canvas.blueprint .map-tools button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.canvas.blueprint .map-hint { color: var(--dim); }

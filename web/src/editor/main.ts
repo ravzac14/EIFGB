@@ -5,7 +5,7 @@
 import { zipSync, strToU8 } from "fflate";
 import { loadEngine, type Diagnostic, type Engine, type Files } from "../engine.ts";
 import { fromFileList } from "../files.ts";
-import { localGames, type LocalGame } from "../store.ts";
+import { blueprint, localGames, type LocalGame } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
 import { feedbackButton, feedbackContext } from "../feedback.ts";
 import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
@@ -229,6 +229,14 @@ function redraw() {
     verbs,
     openFile,
     addScriptFile,
+    roomColour: (id) => positions.get(id)?.colour,
+    setRoomColour: (id, colour) =>
+      change(() => {
+        const p = positions.get(id);
+        if (!p) return;
+        const { colour: _old, ...rest } = p;
+        positions.set(id, colour ? { ...rest, colour } : rest);
+      }),
   });
 }
 
@@ -497,6 +505,17 @@ $("download").addEventListener("click", () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
+// The map's look: plain, or a blueprint. Remembered in this browser.
+function showBlueprint(on: boolean) {
+  document.querySelector(".canvas")?.classList.toggle("blueprint", on);
+  $("blueprint").setAttribute("aria-pressed", String(on));
+}
+showBlueprint(blueprint.on());
+$("blueprint").addEventListener("click", () => {
+  const on = !blueprint.on();
+  blueprint.set(on);
+  showBlueprint(on);
+});
 $("add-room").addEventListener("click", () => {
   const r = $("map").getBoundingClientRect();
   addAt(mapView.toMap(r.left + r.width / 2, r.top + r.height / 2));
@@ -575,7 +594,7 @@ mapView = new MapView(document.getElementById("map") as unknown as SVGSVGElement
     change(() => {
       const p = positions.get(id);
       if (!p) return;
-      positions.set(id, size ? { ...p, ...size } : { x: p.x, y: p.y });
+      positions.set(id, size ? { ...p, ...size } : { x: p.x, y: p.y, ...(p.colour ? { colour: p.colour } : {}) });
     }),
   connect: (from, dir, to) => {
     change((m) => m.connect(from, dir, to));

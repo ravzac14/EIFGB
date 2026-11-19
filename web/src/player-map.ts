@@ -3,10 +3,11 @@
 // Rooms sit where the author put them in the editor (map.yaml), if the game
 // has one; otherwise each is placed by compass direction from a neighbour.
 import type { PlayerMap } from "./engine.ts";
+import { COLOURS, colourStyle } from "./colours.ts";
 
 type Point = { x: number; y: number };
 /** A room's place, and its box's size if the author resized it in the editor. */
-type Place = Point & { w?: number; h?: number };
+type Place = Point & { w?: number; h?: number; colour?: string };
 
 /** Grid spacing and room box size, in SVG units. */
 const CELL = { x: 160, y: 90 };
@@ -48,6 +49,12 @@ export function authorPositions(text: string | undefined): Map<string, Place> {
       p.h = (n[3] * BOX.h) / EDITOR_BOX.h;
     }
     out.set(m[1], p);
+  }
+  // Room colours: a `colours:` section of `  id: colour` lines.
+  const colours = text.match(/^colours:\s*\n((?:[ \t]+.*\n?)*)/m)?.[1] ?? "";
+  for (const m of colours.matchAll(/^\s+([\w-]+):\s*([a-z]+)\s*$/gm)) {
+    const p = out.get(m[1]);
+    if (p && COLOURS[m[2]]) p.colour = m[2];
   }
   return out;
 }
@@ -186,7 +193,8 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
 
   const boxes = svg("g", { class: "rooms" });
   for (const [id, p] of pos) {
-    const g = svg("g", { class: id === map.here ? "room here" : "room" });
+    const g = svg("g", { class: `room${id === map.here ? " here" : ""}${p.colour ? " coloured" : ""}` });
+    if (p.colour) g.setAttribute("style", colourStyle(p.colour));
     const b = boxOf(p);
     g.append(svg("rect", { x: p.x - b.w / 2, y: p.y - b.h / 2, width: b.w, height: b.h, rx: 6 }));
     const parts = wrap(names.get(id) ?? id, b.w);

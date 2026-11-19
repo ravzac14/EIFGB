@@ -76,6 +76,8 @@
 .pmap .door.shut { fill: var(--dim); }
 .pmap .room rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
 .pmap .room text { fill: var(--fg); text-anchor: middle; }
+.pmap .room.coloured rect { fill: var(--tint); }
+.pmap .room.coloured:not(.here) rect { stroke: var(--tint-line); }
 .pmap .room.here rect { stroke: var(--accent); stroke-width: 3; }
 .pmap .room.here text { font-weight: bold; }
 #map-open[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }

@@ -4,10 +4,13 @@
 
 import { parse, stringify } from "yaml";
 import type { Direction, Model } from "./model.ts";
+import { COLOURS } from "../colours.ts";
+export { COLOURS, colourStyle } from "../colours.ts";
 
 export type Point = { x: number; y: number };
-/** A room's place on the map, and its box's size if the author resized it. */
-export type Place = Point & { w?: number; h?: number };
+/** A room's place on the map, its box's size if the author resized it, and its colour if it has one. */
+export type Place = Point & { w?: number; h?: number; colour?: string };
+
 export type Positions = Map<string, Place>;
 
 /** Room boxes are this far apart on the grid. */
@@ -33,12 +36,18 @@ export function readMap(text: string | undefined): Positions {
   const out: Positions = new Map();
   if (!text) return out;
   try {
-    const rooms = parse(text)?.rooms ?? {};
+    const doc = parse(text) ?? {};
+    const rooms = doc.rooms ?? {};
     for (const [id, p] of Object.entries(rooms)) {
       if (!Array.isArray(p) || !p.every((n) => typeof n === "number")) continue;
       // [x, y], or [x, y, width, height] for a resized room.
       if (p.length === 2) out.set(id, { x: p[0], y: p[1] });
       else if (p.length === 4) out.set(id, { x: p[0], y: p[1], w: p[2], h: p[3] });
+    }
+    // Colours, by room: `colours: { kitchen: green }`.
+    for (const [id, c] of Object.entries(doc.colours ?? {})) {
+      const p = out.get(id);
+      if (p && typeof c === "string" && COLOURS[c]) p.colour = c;
     }
   } catch {
     /* a broken map file just means automatic positions */
@@ -59,7 +68,8 @@ export function writeMap(positions: Positions, ids: string[]): string {
     /^(\s+[\w-]+):\n((?:\s+- -?\d+\n?)+)/gm,
     (_, k: string, list: string) => `${k}: [${[...list.matchAll(/-?\d+/g)].map((m) => m[0]).join(", ")}]\n`,
   );
-  return `# Where the editor draws each room on its map, and the size of any room\n# made bigger or smaller. The game never reads this file.\n${body.replace(/\n+$/, "\n")}`;
+  const colours = ids.filter((id) => positions.get(id)?.colour).map((id) => `  ${id}: ${positions.get(id)!.colour}`);
+  return `# Where the editor draws each room on its map, the size of any room made\n# bigger or smaller, and room colours. The game never reads this file.\n${body.replace(/\n+$/, "\n")}${colours.length ? `colours:\n${colours.join("\n")}\n` : ""}`;
 }
 
 const key = (x: number, y: number) => `${x},${y}`;

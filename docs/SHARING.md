@@ -4,6 +4,26 @@ Once your game plays the way you want, anyone can play it in their browser
 from a link, with nothing to install. You put the game's files online
 somewhere public, and the web player fetches them from there.
 
+There's an even simpler way, with no account anywhere: [download your
+game as a web page](#a-game-as-one-web-page).
+
+## A game as one web page
+
+In the editor, press **Download**, then **Download a web page (.html)**.
+You get a single file with your game and the game engine inside it, about
+3 MB. Anyone can play it by opening it in a browser: from their own
+computer, with no internet, or from any website you put it on. Email it,
+put it on a USB stick, or upload it to a site like itch.io as an HTML game.
+
+The page has the same reading look as the site, and follows the
+`presentation:` theme your game chooses (or the reader's light or dark
+setting). Players type commands just as on the site. Their progress is
+kept in their browser, so closing the page and opening it again carries
+on; SAVE and RESTORE keep one saved place too, and RESTART begins again.
+
+The page plays the game as it was when you downloaded it. Download again
+after you change it.
+
 ## Getting a play link
 
 ### 1. Put your game online

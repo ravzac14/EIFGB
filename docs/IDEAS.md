@@ -35,8 +35,6 @@ Everything from the first list has now been built:
 
 ## The world
 
-- **Hints:** graded hints for each puzzle, from a nudge to the answer. HINT
-  shows only those for puzzles the player has reached and not yet solved.
 - **A journal of goals:** goals with `when` conditions; JOURNAL lists the
   current ones, and a notice says when one is done.
 - **ASK and TELL about topics:** ASK GUARD ABOUT KEY, from `topics:` on
@@ -46,9 +44,6 @@ Everything from the first list has now been built:
 
 ## The editor
 
-- **Record a walkthrough from test play:** save what you typed as
-  `walkthrough.txt`, and a "Does it still win?" check that replays it
-  after every edit.
 - **A puzzle chain view:** what unlocks what (key → door → room →
   ending), flagging endings nobody can reach and keys that open nothing.
 - **Rename everywhere:** change an id and every reference follows: exits,
@@ -65,5 +60,3 @@ Everything from the first list has now been built:
 ## The website
 
 - **A featured game** at the top of the gallery.
-- **Download as a single web page:** a game as one HTML file with the
-  engine inside, that plays offline and can be hosted or emailed anywhere.

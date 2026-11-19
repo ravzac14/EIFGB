@@ -238,3 +238,6 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .component-form select, .component-form input[type=text] { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.4em 0.5em; }
 .component-form .row { margin-top: 0.6rem; }
 @media (max-width: 30rem) { .component { grid-template-columns: 1fr; gap: 0.1rem; } }
+.download-dialog { max-width: 32rem; }
+.download-dialog .choice-row { display: grid; gap: 0.3rem; margin: 0.9rem 0; justify-items: start; }
+.download-dialog .choice-row p { margin: 0; font-size: 0.9em; }

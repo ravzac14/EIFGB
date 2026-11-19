@@ -513,13 +513,63 @@ $("play").addEventListener("click", () => {
   save();
   window.open(`./play.html?local=${encodeURIComponent(project.key)}&fresh=1`, "_blank", "noopener");
 });
-$("download").addEventListener("click", () => {
-  save();
-  const id = (typeof model?.get(["game", "id"]) === "string" ? (model.get(["game", "id"]) as string) : "game").replace(/[^\w-]/g, "_");
-  const zip = zipSync(Object.fromEntries(Object.entries(project.files).map(([p, t]) => [`${id}/${p}`, strToU8(t)])));
-  const a = el("a", { href: URL.createObjectURL(new Blob([zip], { type: "application/zip" })), download: `${id}.zip` });
+function downloadBlob(blob: Blob, name: string) {
+  const a = el("a", { href: URL.createObjectURL(blob), download: name });
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const gameId = () => (typeof model?.get(["game", "id"]) === "string" ? (model.get(["game", "id"]) as string) : "game").replace(/[^\w-]/g, "_");
+
+// Download: the game's files as a zip (to keep, or open here again), or
+// the game as one web page that plays anywhere (to share).
+$("download").addEventListener("click", () => {
+  save();
+  const dialog = $<HTMLDialogElement>("download-dialog");
+  const status = el("p", { className: "dim", role: "status" });
+  const errors = problems.filter((p) => p.severity === "error").length;
+  const zip = button("Download the files (.zip)", () => {
+    const id = gameId();
+    downloadBlob(new Blob([zipSync(Object.fromEntries(Object.entries(project.files).map(([p, t]) => [`${id}/${p}`, strToU8(t)])))], { type: "application/zip" }), `${id}.zip`);
+    dialog.close();
+  });
+  const page = button(
+    "Download a web page (.html)",
+    async () => {
+      page.disabled = true;
+      status.textContent = "Putting the page together…";
+      try {
+        const { fetchEngineFiles, standalonePage } = await import("../standalone.ts");
+        const engineFiles = await fetchEngineFiles(new URL("./wasm/", location.href));
+        const site = location.protocol === "https:" ? new URL("./", location.href).href : undefined;
+        const html = standalonePage({ ...project.files }, model?.title() ?? "My Game", engineFiles, site);
+        downloadBlob(new Blob([html], { type: "text/html" }), `${gameId()}.html`);
+        dialog.close();
+      } catch (e) {
+        status.textContent = `The page couldn't be made: ${e}`;
+        page.disabled = false;
+      }
+    },
+    "primary",
+  );
+  page.disabled = errors > 0;
+  dialog.replaceChildren(
+    button("Cancel", () => dialog.close(), "close"),
+    el("h2", { id: "download-title", textContent: "Download" }),
+    el("div", { className: "choice-row" }, zip, el("p", { className: "dim", textContent: "Your game's files, to keep or to open in the editor again later (Choose files or a zip, on the editor's first page)." })),
+    el(
+      "div",
+      { className: "choice-row" },
+      page,
+      el("p", {
+        className: "dim",
+        textContent: errors
+          ? "Fix the game's errors (under Problems) first: a page needs a game that can be played."
+          : "Your game as a single page that anyone can play in a browser, even offline: put it on any website, or send it to someone. It's about 3 MB, as the game engine is inside it.",
+      }),
+    ),
+    status,
+  );
+  dialog.showModal();
 });
 // The editor theme: the map in the site's colours, or as a blueprint. Remembered in this browser.
 function showMapTheme(t: MapTheme) {

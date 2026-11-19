@@ -13,10 +13,18 @@ Element.prototype.setPointerCapture ??= () => {};
 globalThis.CSS ??= { escape: (s) => s };
 // The page's fetches, served from public/ (npm run prepare-site makes them).
 globalThis.fetch = window.fetch = async (url) => {
-  const path = String(url).replace(/^.*?(games\/|verbs\.json)/, (_, a) => a);
-  const text = readFileSync(`${web}public/${path}`, "utf8");
-  return { ok: true, json: async () => JSON.parse(text), text: async () => text };
+  const path = String(url).replace(/^.*?(games\/|wasm\/|verbs\.json)/, (_, a) => a);
+  const bytes = readFileSync(`${web}public/${path}`);
+  const text = bytes.toString("utf8");
+  return { ok: true, json: async () => JSON.parse(text), text: async () => text, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) };
 };
+const downloads = [];
+URL.createObjectURL = (blob) => (downloads.push(blob), "blob:test");
+URL.revokeObjectURL = () => {};
+HTMLAnchorElement.prototype.click = function () {
+  downloads.at(-1).name = this.download;
+};
+HTMLDialogElement.prototype.showModal ??= function () { this.open = true; };
 
 const html = readFileSync(`${web}editor.html`, "utf8");
 document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*)<\/body>/)[1].replace(/<script[\s\S]*?<\/script>/g, "");
@@ -44,6 +52,22 @@ assert.equal(saved.title, "The Locked Door");
 assert.deepEqual(Object.keys(saved.files).sort(), ["game.yaml", "map.yaml", "walkthrough.txt"]);
 assert.match(saved.files["map.yaml"], /guard_room: red/);
 assert.match(document.querySelector('#map [data-room="stairs"]').getAttribute("style") ?? "", /--tint/);
+
+// Download: the files as a zip, or the game as one web page.
+document.querySelector("#download").click();
+const dialog = document.querySelector("#download-dialog");
+const choice = (text) => [...dialog.querySelectorAll("button")].find((b) => b.textContent.startsWith(text));
+choice("Download the files").click();
+assert.equal(downloads.at(-1).name, "locked_dungeon.zip");
+document.querySelector("#download").click();
+choice("Download a web page").click();
+for (let i = 0; i < 100 && downloads.length < 2; i++) await tick(20);
+const page = downloads.at(-1);
+assert.equal(page.name, "locked_dungeon.html");
+const pageHtml = await page.text();
+assert.match(pageHtml, /<title>The Locked Door<\/title>/);
+assert.match(pageHtml, /id="eifgb-wasm"/);
+assert.ok(pageHtml.length > 1_000_000, "the engine is inside");
 
 console.log("starters: ok");
 process.exit(0);

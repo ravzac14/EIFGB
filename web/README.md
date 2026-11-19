@@ -115,6 +115,13 @@ files round-trip exactly, and edited ones compile), and
   tags, and *Share your game* checks a link and gives its play link.
   `scripts/bundle-gallery.mjs` checks every entry at build time.
 - `docs/SHARING.md` (the Sharing docs page) is the guide for authors.
+- The editor's **Download** also makes a game into one web page
+  (`src/standalone.ts`): the site's `style.css` and `play.css`, the game's
+  files as JSON, the engine's WebAssembly as base64, the engine's loader
+  turned into an ordinary script (module scripts can't load from a file on
+  disk), and a small plain-JavaScript player (`src/standalone/player.js`),
+  which hands the loader the WebAssembly with `instantiateWasm`. It plays
+  opened straight from a disk. `test/standalone.mjs` builds one and plays it.
 
 ## Looks
 

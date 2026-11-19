@@ -23,7 +23,7 @@
   <span class="tools" id="tools" hidden>
     <button id="undo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
     <button id="redo" type="button" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
-    <button id="download" type="button" title="Download the game as a zip">Download</button>
+    <button id="download" type="button" aria-haspopup="dialog" title="Download the game's files, or the game as a web page to share">Download</button>
     <button id="play" class="primary" type="button" title="Play the game from the start, in a new tab">Play</button>
   </span>
   <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
@@ -93,6 +93,7 @@
   </section>
 </div>
 <dialog id="settings"></dialog>
+<dialog id="download-dialog" class="download-dialog" aria-labelledby="download-title"></dialog>
 <dialog id="add-dialog" class="add-dialog" aria-label="Add a component"></dialog>
 <script type="module" src="./src/editor/main.ts"></script>
 </body>

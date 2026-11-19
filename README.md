@@ -1785,7 +1785,8 @@ your patterns to it.
   **Parser behavior** section, which shows how the game answers typos,
   ambiguous commands and things it doesn't understand.
 - **[Sharing your game](docs/SHARING.md)**: a link anyone can play your
-  game from, in their browser, and getting it into the gallery.
+  game from, in their browser, a single web page that plays anywhere,
+  even offline, and getting it into the gallery.
 - **[Writing games with an AI assistant](docs/AI.md)**: the format in
   brief, with a complete checked example, for an AI model or coding agent
   helping you write a game. The website also has

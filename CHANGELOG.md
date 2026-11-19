@@ -6,6 +6,20 @@ behave will be called out here.
 
 ## Unreleased
 
+- Hints: a `hints:` section lists puzzles in the order players meet them,
+  each with steps from a nudge to the answer and a `when` that's true while
+  it's unsolved. HINT shows the next step for the puzzle the player is on
+  (it used to be the same as HELP). The starter templates have hints.
+- Record a walkthrough in the editor: play from the start in Test play,
+  then **Save as walkthrough**. After every change, the editor replays it,
+  says in Test play whether it still wins, and warns under Problems when it
+  doesn't. Starter templates and copied examples bring theirs along. Test
+  play now always uses the same random numbers, so recordings replay the
+  same way.
+- Download a game as one web page: the editor's **Download** offers a
+  single .html file with the game and engine inside, that plays anywhere,
+  even offline. The zip of the game's files is still there too.
+
 - A Parchment look in *Text and colours*: ink on old paper, room names in
   small capitals, and a drop capital at the start of each room's
   description. Games can choose it too, with

@@ -25,6 +25,8 @@ export interface Output {
   /** The open choice's options, numbered from 1. */
   options: string[];
   ended: "win" | "loss" | "neutral" | null;
+  /** Which ending was reached (its key in `endings:`). */
+  ending?: string | null;
   /** Set after SAVE: the whole game state. */
   save: string | null;
   restore_requested: boolean;
@@ -44,6 +46,8 @@ export interface Meta {
   version: string;
   /** The game's own look (`presentation:` in game.yaml), if it chose one. */
   presentation?: Presentation | null;
+  /** Every ending's key, from `endings:`. */
+  endings?: string[];
 }
 export interface Presentation {
   theme?: string;

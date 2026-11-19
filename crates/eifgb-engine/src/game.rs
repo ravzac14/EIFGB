@@ -59,6 +59,8 @@ pub struct Output {
     /// A web host can show these as buttons.
     pub options: Vec<String>,
     pub ended: Option<EndingKind>,
+    /// Which ending was reached (its key in `endings:`), with `ended`.
+    pub ending: Option<String>,
     /// Set after SAVE: the host should keep this string somewhere.
     pub save: Option<String>,
     /// Set after RESTORE: the host should fetch a save and pass it to [`Game::restore`].
@@ -213,6 +215,7 @@ impl<H: ScriptHost> Game<H> {
             turns: self.world.state.turn,
         };
         out.ended = self.world.state.ending.map(|e| self.world.story().endings[e.index()].kind);
+        out.ending = self.world.state.ending.map(|e| self.world.story().endings[e.index()].key.clone());
         out
     }
 

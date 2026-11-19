@@ -6,6 +6,7 @@ h2 { font-size: 1.2rem; margin: 2rem 0 0.8rem; font-family: var(--sans); }
 .games a.title { font-weight: bold; font-size: 1.15em; text-decoration: none; }
 .games a.title:hover { text-decoration: underline; }
 .games .about { font-family: var(--sans); font-size: 0.8em; color: var(--dim); margin-left: 0.4em; }
+.games .found { display: block; font-family: var(--sans); font-size: 0.8em; color: var(--accent); margin: 0.2em 0 0; }
 .games p { margin: 0.3rem 0 0; }
 .games .actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 1rem; text-align: center; }

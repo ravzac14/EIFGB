@@ -1,7 +1,7 @@
 // The player: loads a game (bundled, or one you loaded), plays it, keeps an
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
-import { localGames, mapPanel, savesFor, setGameLook, type SaveFile, type Slot } from "./store.ts";
+import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
 import { fetchGame, resolve } from "./remote.ts";
@@ -78,6 +78,8 @@ let engine: Engine;
 let files: Files;
 let meta: Meta;
 let saves: ReturnType<typeof savesFor>;
+/** The game's key in this browser's storage (its saves and endings). */
+let gameKey = "";
 /** The sharing guide's safety section. */
 const SAFETY = "./docs/sharing.html#is-it-safe-to-play-other-peoples-games";
 let last: Output | null = null;
@@ -179,7 +181,11 @@ function handle(o: Output) {
     else say("There's no room left in this browser to keep that save.", "error");
   }
   if (o.restore_requested) openSaves();
-  if (o.ended) return finish(o.ended === "win" ? "You won." : o.ended === "loss" ? "The story is over." : "The end.");
+  if (o.ended) {
+    if (o.ending) endingsFor(gameKey).record(o.ending, meta.endings ?? [o.ending]);
+    const found = endingsText(gameKey);
+    return finish(`${o.ended === "win" ? "You won." : o.ended === "loss" ? "The story is over." : "The end."}${found ? ` ${found}` : ""}`);
+  }
   if (o.quit_requested) return finish("You've stopped playing.");
   saves.setAuto(engine.save());
 }
@@ -371,6 +377,7 @@ async function main() {
     return;
   }
   saves = savesFor(src.key);
+  gameKey = src.key;
   // The editor's Play button: always from the beginning.
   if (new URLSearchParams(location.search).has("fresh")) {
     saves.clearAuto();

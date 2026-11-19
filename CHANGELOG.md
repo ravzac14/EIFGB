@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- Endings found: a game's card on the home page and in the gallery says
+  "You've found 2 of 3 endings", and so does the end of a game. It's kept
+  in your browser.
 - Games can choose their look on the website: `presentation: { theme:
   terminal, accent: "#c33" }`, or "How it looks" in the editor. Players
   see it unless they've picked their own colours.

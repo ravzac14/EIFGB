@@ -57,8 +57,6 @@ Nothing waiting here right now.
   first line.
 - **Typewriter reveal:** text appears letter by letter; off by default,
   any key skips.
-- **Endings collected:** "You've found 2 of 3 endings" on the home page
-  card, as a reason to replay.
 - **Download a transcript** of a play-through.
 
 ## The website

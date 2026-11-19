@@ -1,7 +1,7 @@
 // The home page: bundled games, and loading your own.
 import { fromDrop, fromFileList } from "./files.ts";
 import { loadEngine, type Engine, type Files, type Output } from "./engine.ts";
-import { hashFiles, localGames, savesFor } from "./store.ts";
+import { endingsText, hashFiles, localGames, savesFor } from "./store.ts";
 import { settingsDialog } from "./settings-ui.ts";
 
 interface Example {
@@ -25,6 +25,8 @@ function card(title: string, href: string, about: string | null, blurb: string, 
   const li = el("li");
   li.append(el("a", { className: "title", href, textContent: title }));
   if (about) li.append(el("span", { className: "about", textContent: about }));
+  const found = endingsText(game);
+  if (found) li.append(el("span", { className: "found", textContent: found }));
   if (blurb) li.append(el("p", { textContent: blurb.length > 220 ? blurb.slice(0, 217).trimEnd() + "…" : blurb }));
   const actions = el("div", { className: "actions" });
   const resume = savesFor(game).auto() !== null;

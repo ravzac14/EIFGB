@@ -163,3 +163,33 @@ export const mapPanel = {
   open: (): boolean | null => read<boolean | null>("map-open", null),
   set: (open: boolean) => void write("map-open", open),
 };
+
+// ------------------------------------------------------------- endings
+
+interface EndingsFound {
+  found: string[];
+  total: number;
+}
+
+/** The endings a player has reached in a game, kept in this browser. */
+export function endingsFor(game: string) {
+  const key = `endings:${game}`;
+  return {
+    get: (): EndingsFound => read<EndingsFound>(key, { found: [], total: 0 }),
+    /** Notes an ending reached; `all` is every ending the game has. */
+    record(id: string, all: string[]) {
+      const known = read<EndingsFound>(key, { found: [], total: 0 }).found.filter((f) => all.includes(f));
+      const found = known.includes(id) ? known : [...known, id];
+      write(key, { found, total: all.length });
+    },
+  };
+}
+
+/** "You've found 2 of 3 endings.", or null before the first. */
+export function endingsText(game: string): string | null {
+  const { found, total } = endingsFor(game).get();
+  if (!found.length) return null;
+  if (total <= 1) return "You've found the ending.";
+  if (found.length >= total) return total === 2 ? "You've found both endings." : `You've found all ${total} endings.`;
+  return `You've found ${found.length} of ${total} endings.`;
+}

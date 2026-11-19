@@ -1,6 +1,6 @@
 // The Gallery page: games from gallery.yaml, and making a share link.
 import { settingsDialog } from "./settings-ui.ts";
-import { savesFor } from "./store.ts";
+import { endingsText, savesFor } from "./store.ts";
 import { fetchGame, resolve } from "./remote.ts";
 import { loadEngine } from "./engine.ts";
 
@@ -61,6 +61,8 @@ function show() {
       const li = el("li");
       li.append(el("a", { className: "title", href: href(g), textContent: g.title }), " ", el("span", { className: "by", textContent: `by ${g.author}` }));
       li.append(el("p", { textContent: g.about }));
+      const found = endingsText(saveKey(g));
+      if (found) li.append(el("p", { className: "found", textContent: found }));
       const actions = el("div", { className: "actions" });
       actions.append(el("a", { href: href(g), textContent: savesFor(saveKey(g)).auto() ? "Continue" : "Play" }));
       for (const t of g.tags) actions.append(el("span", { className: "tag", textContent: t }));

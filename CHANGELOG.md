@@ -19,6 +19,8 @@ behave will be called out here.
   Rooms sit where the author put them in the editor.
 - The player scrolls down to show each reply as it arrives; a long reply
   stops at its first line, so you can read it from the beginning.
+- Choices (in conversations and menus) are typed by number, like every
+  other command, rather than clicked.
 - The guide's list of commands every game understands is now a set of
   tables, with the other ways to say each one.
 
@@ -34,7 +36,7 @@ Everything now runs in the browser, at
 - Your place is saved automatically after every command. SAVE and RESTORE
   keep named saves, and saves can be downloaded and loaded on another device.
 - A book-like page with light, dark and sepia colours, three text sizes, and
-  a layout that works on phones. Choices appear as buttons.
+  a layout that works on phones.
 
 ### Sharing
 

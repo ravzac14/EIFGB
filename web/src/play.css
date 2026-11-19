@@ -24,12 +24,10 @@
 .log .notice { color: var(--dim); font-style: italic; }
 .log .ending { font-weight: bold; text-align: center; font-size: 1.2em; margin: 1.5em 0; }
 .log .error { color: var(--err); font-family: var(--mono); font-size: 0.85em; }
+.log .choice { margin: 0 0 0.3em; padding-left: 1em; }
+.log .choice + :not(.choice) { margin-top: 0.7em; }
 .log .cmd { color: var(--accent); margin-top: 1.3em; }
 .log .cmd::before { content: "> "; }
-.log ol.options { margin: 0 0 0.8em; padding-left: 0; list-style: none; display: grid; gap: 0.35rem; }
-.log ol.options button { width: 100%; text-align: left; font-family: inherit; font-size: inherit; padding: 0.4em 0.7em; }
-.log ol.options button:disabled { cursor: default; opacity: 0.6; }
-.log ol.options .n { color: var(--dim); margin-right: 0.5em; }
 .diagnostics { font-family: var(--sans); font-size: 0.9rem; }
 .diagnostics li { margin: 0.4rem 0; }
 .diagnostics code { font-family: var(--mono); background: var(--panel); padding: 0 0.3em; border-radius: 4px; }

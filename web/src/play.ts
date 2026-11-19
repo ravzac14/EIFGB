@@ -114,22 +114,8 @@ function status(o: Output) {
 /** Shows an output; returns the first element added, for scrolling. */
 function show(o: Output): HTMLElement | null {
   const first = log.lastElementChild;
-  for (const l of o.lines) {
-    if (l.kind === "choice" && o.options.length) continue;
-    say(l.text, l.kind === "text" ? "" : l.kind);
-  }
-  if (o.options.length) {
-    const ol = el("ol", { className: "options" });
-    o.options.forEach((text, i) => {
-      const b = button("", () => {
-        for (const x of ol.querySelectorAll("button")) x.disabled = true;
-        send(String(i + 1), text);
-      });
-      b.append(el("span", { className: "n", textContent: `${i + 1}.` }), text);
-      ol.append(el("li", {}, b));
-    });
-    log.append(ol);
-  }
+  // Choices are numbered lines; the player types the number.
+  for (const l of o.lines) say(l.text, l.kind === "text" ? "" : l.kind);
   status(o);
   last = o;
   refreshMap();

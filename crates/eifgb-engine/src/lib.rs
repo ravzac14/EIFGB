@@ -15,10 +15,12 @@
 //! * [`parser`]: turns input into commands, with typo correction and clarifying questions;
 //! * [`game`]: the turn loop, which is the entry point for hosts;
 //! * [`npc`]: what characters do on their turn: moving and fighting;
+//! * [`journal`]: goals for the JOURNAL, and the time of day;
 //! * [`lang`]: language rules such as stemming, articles and lists.
 
 mod actions;
 pub mod game;
+pub mod journal;
 pub mod lang;
 pub mod npc;
 mod people;
@@ -37,5 +39,6 @@ pub use game::{Game, Line, LineKind, Output, Status};
 pub use eifgb_ir as ir;
 pub use script::{Arg, Ctx, Effect, Outcome, ScriptError, ScriptHost, ScriptValue};
 pub use state::{GameState, SaveError, SaveFile};
+pub use journal::ClockReading;
 pub use npc::NpcEvent;
 pub use world::{Blocked, Fit, MoveError, World};

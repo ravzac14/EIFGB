@@ -2,7 +2,7 @@
 // conversations (choices), custom verbs, variables and script files.
 
 import { EVENTS } from "./model.ts";
-import { button, check, el, field, help, select, type InspectorContext } from "./ui.ts";
+import { boolField, button, check, el, field, help, numField, select, type InspectorContext } from "./ui.ts";
 
 // ------------------------------------------------------------ scripts
 
@@ -150,7 +150,7 @@ function options(list: [string, string][], value: string): HTMLOptionElement[] {
 
 // ---------------------------------------------- the game panel's story list
 
-function entryRow(ctx: InspectorContext, kind: "ending" | "timer" | "hint" | "choice" | "verb", id: string, note: string) {
+function entryRow(ctx: InspectorContext, kind: "ending" | "timer" | "hint" | "goal" | "choice" | "verb", id: string, note: string) {
   const selected = ctx.selection?.kind === kind && ctx.selection.id === id;
   const row = el("div", { class: `thing${selected ? " selected" : ""}` }, el("span", { class: "name", textContent: id.replace(/_/g, " ") }), el("span", { class: "tag", textContent: note }));
   if (problemsAt(ctx, `${kind === "choice" ? "choices" : `${kind}s`}.${id}`).some((d) => d.severity === "error")) row.classList.add("bad");
@@ -192,7 +192,8 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
       ...timers.map((t) => {
         const after = m.get(["timers", t, "after"]);
         const every = m.get(["timers", t, "every"]);
-        return entryRow(ctx, "timer", t, every ? `every ${every} turns` : `after ${after ?? "?"} turns`);
+        const at = m.get(["timers", t, "at"]);
+        return entryRow(ctx, "timer", t, at !== undefined ? `each day at ${at}` : every ? `every ${every} turns` : `after ${after ?? "?"} turns`);
       }),
     ),
     ...(timers.length ? [] : [help("Things that happen after a number of turns: a storm, a train leaving, a pie cooling.")]),
@@ -201,6 +202,50 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
       ctx.change((x) => (id = x.addTimer()));
       ctx.select({ kind: "timer", id });
     })),
+  );
+
+  // Goals.
+  const goals = m.ids("goals");
+  group(
+    "Goals",
+    el("ul", { class: "things" }, ...goals.map((g) => entryRow(ctx, "goal", g, m.get(["goals", g, "when"]) ? "added later" : "from the start"))),
+    help(
+      goals.length
+        ? "Players type JOURNAL to see the goals they have, and get a notice when one is added or done."
+        : "What the player is trying to do, for a journal: players type JOURNAL to see their goals, and get a notice as each one is done.",
+    ),
+    el("div", { class: "actions" }, button("Add a goal", () => {
+      let id = "";
+      ctx.change((x) => (id = x.addGoal()));
+      ctx.select({ kind: "goal", id });
+    })),
+  );
+
+  // The time of day.
+  const clock = m.get(["clock"]) !== undefined;
+  const time = (k: string, label: string, byDefault: string, helpText: string) =>
+    field(label, String(m.get(["clock", k]) ?? ""), (v) => ctx.change((x) => x.set(["clock", k], v.trim() || undefined), { coalesce: `clock.${k}`, redraw: false }), {
+      placeholder: byDefault,
+      help: helpText,
+    });
+  group(
+    "Time of day",
+    ...(clock
+      ? [
+          ...time("start", "The story starts at", "8:00", "A time like 8:00, 19:30 or 7:30 pm."),
+          ...numField(ctx, ["clock", "minutes_per_turn"], "Minutes each turn takes", m.get(["clock", "minutes_per_turn"]), "Every command that takes time moves the clock on this much.", "1"),
+          ...time("dawn", "Dawn", "6:00", "Night is from dusk until dawn: scripts and text can check clock.night."),
+          ...time("dusk", "Dusk", "18:00", "Timers can go off at a time of day too, or at dawn or dusk."),
+          ...boolField(ctx, ["clock", "show"], "Show the time on the status line", true),
+          help("Players type TIME to ask the time. In text, ${clock.time} is the time (\"7:30 pm\"); in scripts, clock.hour, clock.night and clock.day (from 1). pass_time(30) and set_clock(\"6:00\") move it on."),
+          el("div", { class: "actions" }, button("Stop keeping time", () => {
+            if (confirm("Stop keeping the time of day? Its settings are removed.")) ctx.change((x) => x.set(["clock"], undefined));
+          })),
+        ]
+      : [
+          help("A clock that moves on with each turn, for a sunset, shops that close, or a ghost that only walks at night."),
+          el("div", { class: "actions" }, button("Keep the time of day", () => ctx.change((x) => x.addClock()))),
+        ]),
   );
 
   // Hints.
@@ -338,7 +383,7 @@ function variablesSection(ctx: InspectorContext): HTMLElement[] {
 
 // -------------------------------------------------------------- endings
 
-function renameRow(ctx: InspectorContext, section: string, id: string, kind: "ending" | "timer" | "hint" | "choice" | "verb") {
+function renameRow(ctx: InspectorContext, section: string, id: string, kind: "ending" | "timer" | "hint" | "goal" | "choice" | "verb") {
   const input = el("input", { type: "text", value: id, ariaLabel: "ID" }) as HTMLInputElement;
   const msg = help("");
   return [
@@ -425,18 +470,22 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
   const m = ctx.model;
   const p = ["timers", id];
   const every = m.get([...p, "every"]);
-  const repeat = typeof every === "number";
-  const count = (repeat ? every : m.get([...p, "after"])) as number | undefined;
-  const n = el("input", { type: "text", inputMode: "numeric", value: count === undefined ? "" : String(count), ariaLabel: "Turns" }) as HTMLInputElement;
-  const how = select([["after", "Once, after"], ["every", "Every"]], repeat ? "every" : "after", (v) =>
+  const at = m.get([...p, "at"]);
+  const mode = at !== undefined ? "at" : typeof every === "number" ? "every" : "after";
+  const count = (mode === "at" ? at : mode === "every" ? every : m.get([...p, "after"])) as number | string | undefined;
+  const n = el("input", { type: "text", inputMode: mode === "at" ? "text" : "numeric", value: count === undefined ? "" : String(count), ariaLabel: mode === "at" ? "Time of day" : "Turns" }) as HTMLInputElement;
+  const clocked = m.get(["clock"]) !== undefined;
+  const modes: [string, string][] = [["after", "Once, after"], ["every", "Every"], ...(clocked || mode === "at" ? [["at", "Each day at"] as [string, string]] : [])];
+  const how = select(modes, mode, (v) =>
     ctx.change((x) => {
       const k = Number.parseInt(n.value, 10) || 5;
-      x.set([...p, v === "every" ? "after" : "every"], undefined);
-      x.set([...p, v], k);
+      for (const f of ["after", "every", "at"]) x.set([...p, f], undefined);
+      x.set([...p, v], v === "at" ? "dusk" : k);
     }), "How often");
   n.addEventListener("input", () => {
+    if (mode === "at") return ctx.change((x) => x.set([...p, "at"], n.value.trim() || undefined), { coalesce: `${id}.n`, redraw: false });
     const k = Number.parseInt(n.value, 10);
-    if (k >= 1) ctx.change((x) => x.set([...p, repeat ? "every" : "after"], k), { coalesce: `${id}.n`, redraw: false });
+    if (k >= 1) ctx.change((x) => x.set([...p, mode], k), { coalesce: `${id}.n`, redraw: false });
   });
   const endings = m.ids("endings");
   const str = (k: string) => String(m.get([...p, k]) ?? "");
@@ -444,8 +493,12 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
     el("p", { class: "kind", textContent: "Timer" }),
     el("h2", { textContent: id.replace(/_/g, " ") }),
     el("label", { textContent: "It goes off" }),
-    el("div", { class: "add three" }, how, n, el("span", { class: "dim", textContent: "turns" })),
-    help("Turns are commands that take time: LOOK and SAVE don't count."),
+    el("div", { class: "add three" }, how, n, el("span", { class: "dim", textContent: mode === "at" ? "" : "turns" })),
+    help(
+      mode === "at"
+        ? "A time like 19:00 or 7:30 pm, or dawn or dusk. It goes off each day the clock gets there, until it's stopped."
+        : `Turns are commands that take time: LOOK and SAVE don't count.${clocked ? " With the time of day kept, “Each day at” goes off at a time instead." : ""}`,
+    ),
     ...ruleBuilder(ctx, [...p, "started_by"], "It starts when the player", "(when the game starts)"),
     ...ruleBuilder(ctx, [...p, "stopped_by"], "It stops when the player", "(never)"),
     el("h3", { textContent: "When it goes off" }),
@@ -523,6 +576,48 @@ export function hintPanel(panel: HTMLElement, ctx: InspectorContext, id: string)
     el("div", { class: "actions" }, button("Delete this hint", () => {
       if (!confirm(`Delete the hint “${id}”?`)) return;
       ctx.change((x) => x.deleteEntry("hints", id));
+      ctx.select(null);
+    }, "danger")),
+  );
+}
+
+// ---------------------------------------------------------------- goals
+
+export function goalPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
+  const m = ctx.model;
+  const p = ["goals", id];
+  const all = m.ids("goals");
+  const at = all.indexOf(id);
+  const str = (k: string) => String(m.get([...p, k]) ?? "");
+  const lua = (k: string, label: string, helpText: string) => [
+    el("label", { textContent: label }),
+    codeBox(str(k), (v) => ctx.change((x) => x.set([...p, k], v.trim() || undefined), { coalesce: `${id}.${k}`, redraw: false }), label, 1),
+    help(helpText),
+  ];
+  panel.append(
+    el("p", { class: "kind", textContent: "Goal" }),
+    el("h2", { textContent: id.replace(/_/g, " ") }),
+    ...field("In the journal", str("text"), (v) => ctx.change((x) => x.set([...p, "text"], v), { coalesce: `${id}.text`, redraw: false }), {
+      placeholder: "Find a way out of the house.",
+      help: "What the player is trying to do, as JOURNAL lists it.",
+    }),
+    ...lua("when", "Added when (Lua)", "A condition, like here == world.cellar or world.letter.read. The goal is added (with a notice) once it's true. Empty: from the start."),
+    ...lua("done", "Done when (Lua)", `A condition, like world.key.location == player or not world.gate.locked. Scripts can also say it's done: complete_goal("${id}").`),
+    ...numField(ctx, [...p, "points"], "Points for doing it", m.get([...p, "points"]), "Added to the score when it's done.", "0"),
+    el("label", { textContent: "Order" }),
+    el(
+      "div",
+      { class: "row" },
+      Object.assign(button("Earlier", () => ctx.change((x) => x.moveEntry("goals", id, -1))), { disabled: at <= 0 }),
+      Object.assign(button("Later", () => ctx.change((x) => x.moveEntry("goals", id, 1))), { disabled: at < 0 || at >= all.length - 1 }),
+      el("span", { class: "dim", textContent: `${at + 1} of ${all.length}` }),
+    ),
+    help("The journal lists goals in this order."),
+    ...problemNotes(ctx, `goals.${id}`),
+    ...renameRow(ctx, "goals", id, "goal"),
+    el("div", { class: "actions" }, button("Delete this goal", () => {
+      if (!confirm(`Delete the goal “${id}”?`)) return;
+      ctx.change((x) => x.deleteEntry("goals", id));
       ctx.select(null);
     }, "danger")),
   );

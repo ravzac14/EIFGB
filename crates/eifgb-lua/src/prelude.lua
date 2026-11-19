@@ -180,6 +180,20 @@ env.game = setmetatable({}, {
   __metatable = "locked",
 })
 
+-- The time of day: clock.hour, clock.night, clock.time ("7:30 am")…
+env.clock = setmetatable({}, {
+  __index = function(_, k) return H.clock_get(k) end,
+  __newindex = locked("clock can't be assigned to; use pass_time(minutes) or set_clock(\"6:00\")"),
+  __metatable = "locked",
+})
+
+-- Goals: goals.find_key is nil (not in the journal yet), "active" or "done".
+env.goals = setmetatable({}, {
+  __index = function(_, k) return H.goal_get(k) end,
+  __newindex = locked("goals can't be assigned to; use start_goal(key) or complete_goal(key)"),
+  __metatable = "locked",
+})
+
 env.player = ent(0)
 
 function env.say(...) H.say(join(...)) end
@@ -195,6 +209,17 @@ function env.end_game(key) H.end_game(key) end
 function env.open_choice(key) H.open_choice(key) end
 function env.start_timer(key) H.start_timer(key) end
 function env.stop_timer(key) H.stop_timer(key) end
+function env.start_goal(key) H.start_goal(key) end
+function env.complete_goal(key) H.complete_goal(key) end
+-- Moves the clock on: pass_time(30), or set_clock("6:00") for the next 6:00.
+function env.pass_time(minutes)
+  if type(minutes) ~= "number" then error("pass_time needs a number of minutes", 2) end
+  H.pass_time(minutes)
+end
+function env.set_clock(at)
+  if type(at) ~= "string" then error("set_clock needs a time, like \"6:00\" or \"7:30 pm\"", 2) end
+  H.set_clock(at)
+end
 -- Actions until the timer is next due, or nil when it isn't running.
 function env.timer_left(key) return H.timer_left(key) end
 

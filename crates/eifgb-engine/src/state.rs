@@ -29,6 +29,16 @@ pub struct GameState {
     /// tags in lists: "a small box (empty)".
     #[serde(default)]
     pub known: BTreeSet<EntityId>,
+    /// The clock, in minutes since midnight on the first day (0 when the
+    /// game keeps no time).
+    #[serde(default)]
+    pub clock: u64,
+    /// How far `at` timers have been checked, on the same scale as `clock`.
+    #[serde(default)]
+    pub clock_checked: u64,
+    /// Goals in the journal: key → whether it's done.
+    #[serde(default)]
+    pub goals: BTreeMap<String, bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -51,6 +61,7 @@ impl GameState {
     pub fn new(story: &Story, seed: u64) -> Self {
         let mut visited = BTreeSet::new();
         visited.insert(story.meta.start);
+        let start = story.clock.as_ref().map_or(0, |c| u64::from(c.start));
         GameState {
             turn: 0,
             score: 0,
@@ -73,6 +84,9 @@ impl GameState {
                 .collect(),
             // The player knows what they start out holding.
             known: story.entities.iter().enumerate().filter(|(_, e)| e.location == Some(PLAYER)).map(|(i, _)| EntityId(i as u32)).collect(),
+            clock: start,
+            clock_checked: start,
+            goals: BTreeMap::new(),
         }
     }
 }

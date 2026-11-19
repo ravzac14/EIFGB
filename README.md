@@ -851,7 +851,7 @@ timers:
 
 | Field | Meaning |
 |---|---|
-| `after: N` / `every: N` | Fire once N actions after starting, or every N actions. Exactly one is required. |
+| `after: N` / `every: N` / `at: time` | Fire once N actions after starting, every N actions, or each day the clock reaches a time (`"19:00"`, `"7:30 pm"`, `dawn` or `dusk`; needs a [clock](#time-of-day)). Exactly one is required. |
 | `started_by`, `stopped_by` | Rules like `revealed_by`: `"<verb> <object>"`, `"(<category>) <object>"`, or a list. Starting a timer that's already running doesn't reset it. |
 | `running` | Whether it counts from the start of the game. Defaults to `true`, or `false` if it has `started_by`. |
 | `when` | A Lua condition checked when it's due. If false, this firing is skipped. |
@@ -866,6 +866,95 @@ else.
 Scripts can also use `start_timer("bell")`, `stop_timer("bell")` and
 `timer_left("bell")`. `timer_left` gives the number of actions left,
 counting the current one, or `nil` if the timer isn't running.
+
+## Goals: a journal
+
+Goals tell players what they're trying to do. JOURNAL (or GOALS) lists
+the ones they have, and a notice says when one is added or done:
+
+```yaml
+goals:
+  find_keys:
+    text: Find your keys.
+    done: world.keys.location == player     # done once this is true
+  catch_bus:
+    text: Catch the 9:15 bus.
+    when: here == world.front_garden        # added once this is true
+    done: vars.on_bus
+    points: 5                               # scored when it's done
+```
+
+| Field | Meaning |
+|---|---|
+| `text` | What JOURNAL lists. Text, so `${…}` works. |
+| `when` | A Lua condition: the goal is added once it's true, and stays. Without it, the goal is there from the start. |
+| `done` | A Lua condition: the goal is done once it's true, and stays done. Without it, only a script can finish it. |
+| `points` | Added to the score when it's done. |
+
+"[New goal: Find your keys.]" and "[Done: Find your keys.]" appear after
+the action that did it; the first goal also says that JOURNAL lists them.
+JOURNAL shows the goals still to do, in the order they're written, then
+those done. It takes no turn. Goals are saved and undone with everything
+else.
+
+Scripts can use `complete_goal("catch_bus")` and `start_goal("catch_bus")`
+(which adds it whatever its `when`), and read `goals.catch_bus`: `nil`
+before it's added, then `"active"`, then `"done"`.
+
+In the web editor, add one with **Add component → Goal**, or under
+**Goals** in the game's details.
+
+## Time of day
+
+A game can keep a clock that moves on with each turn:
+
+```yaml
+clock:
+  start: "8:50"            # when the story starts: "8:50", "19:30", "7:30 pm", "noon"
+  minutes_per_turn: 1      # how far each action moves it (default 1)
+  dawn: "6:00"             # night is from dusk until dawn (these are the defaults)
+  dusk: "18:00"
+  show: true               # the time on the status line (the default)
+```
+
+Every action that takes a turn moves the clock on; TIME (which doesn't)
+tells the player the time: "It's 8:52 am." Scripts and text read it
+through `clock`:
+
+| | |
+|---|---|
+| `clock.time` | `"8:52 am"` |
+| `clock.hour`, `clock.minute` | 8 and 52 (hours from 0 to 23) |
+| `clock.minutes` | Minutes after midnight: 532 |
+| `clock.day` | The day, from 1 |
+| `clock.night`, `clock.daytime` | Whether it's between dusk and dawn, or not |
+| `clock.period` | `"morning"`, `"afternoon"`, `"evening"` or `"night"` |
+
+```yaml
+rooms:
+  street:
+    description: |
+      ${if clock.night}The street lamps hum.${else}Shoppers hurry past.${end}
+
+timers:
+  sunset:
+    at: dusk               # each day, when the clock gets there
+    say: The sun slips behind the rooftops.
+
+verbs:
+  sleep: { patterns: [sleep] }
+on:
+  sleep: 'set_clock("6:00"); say("You sleep until dawn.")'
+```
+
+`pass_time(30)` moves the clock on 30 minutes, and `set_clock("6:00")` to
+the next 6:00 (tomorrow's, if it's already later). Timers `at` a time go
+off once each day the clock passes it, even when a script jumps over it.
+The time is saved and undone with everything else.
+
+In the web editor, choose **Add component → Time of day**, or **Keep the
+time of day** under **Time of day** in the game's details. The Small House
+starter template uses both goals and a clock.
 
 ## Hints
 
@@ -1605,6 +1694,8 @@ same thing; `…` is where the name of a thing or person goes.
 | SCORE | | Shows your score, if the game keeps one. |
 | HELP | | A short guide to playing. |
 | HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
+| JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them. |
+| TIME | WHAT TIME IS IT | The time of day, if the game keeps one. |
 | QUIT | Q | Stops playing. |
 
 Some verbs exist so that players can try them and authors can respond:
@@ -1743,7 +1834,9 @@ chooses text. `the(x)`, `The(x)`, `a(x)` and `A(x)` add articles.
 **Lua:** `world.<id>`, `player`, `here`, `self`, `args.target`, `args.tool`,
 `vars.<name>`, `game.turn`, `game.score`; `say()`, `block()`, `score(n)`,
 `end_game(id)`, `open_choice(id)`, `random(a, b)`, `start_timer(id)`,
-`stop_timer(id)`, `timer_left(id)`; on objects,
+`stop_timer(id)`, `timer_left(id)`, `goals.<id>`, `start_goal(id)`,
+`complete_goal(id)`, `clock.time`, `clock.hour`, `clock.night`,
+`clock.day`, `pass_time(minutes)`, `set_clock(time)`; on objects,
 `:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`,
 `:can_hold(thing)`, and `.capacity`, which can be changed.
 

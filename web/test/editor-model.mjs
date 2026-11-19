@@ -258,6 +258,23 @@ console.log("ok   editor characters");
   g.deleteEntry("hints", "key");
   g.deleteEntry("hints", h2);
   assert.doesNotMatch(g.toString(), /hints:/);
+
+  // Goals, named from their first words, and the time of day.
+  const g1 = g.addGoal("Find the brass key.");
+  const g2 = g.addGoal("Find the brass key, again");
+  assert.deepEqual([g1, g2], ["find_the_brass", "find_the_brass_2"]);
+  g.set(["goals", g1, "done"], "vars.gold > 1");
+  g.set(["goals", g1, "points"], 2);
+  assert.match(g.toString(), /goals:\n  find_the_brass:\n    text: Find the brass key\.\n    done: vars.gold > 1\n    points: 2\n/);
+  g.addClock();
+  g.addClock();
+  assert.match(g.toString(), /clock:\n  start: "?8:00"?\n  minutes_per_turn: 1\n/);
+  g.addTimer();
+  g.set(["timers", g.ids("timers").at(-1), "after"], undefined);
+  g.set(["timers", g.ids("timers").at(-1), "at"], "dusk");
+  assert.deepEqual(errors(g.toString()).filter((e) => !/talk/.test(e.message)), []);
+  g.set(["clock"], undefined);
+  assert.ok(errors(g.toString()).some((e) => /clock:/.test(e.message)), "a timer at a time needs the clock");
 }
 console.log("ok   editor scripts");
 

@@ -3660,3 +3660,151 @@ fn hint_mistakes_are_reported() {
     let errors = LuaHost::new().unwrap().syntax_errors(&codes);
     assert!(errors.iter().any(|(o, _)| o == "hints.open_gate.when"), "{errors:?}");
 }
+
+// ---------------------------------------------------------------- goals
+
+const GOALS: &str = "
+format: eifgb/0.1
+game: { id: goals, title: Goals, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { north: { to: yard, through: gate } } }
+  yard: { name: Yard }
+objects:
+  gate: { name: gate, in: hall, traits: [door, openable, lockable, scenery], state: { locked: true }, unlocks_with: key }
+  mat: { name: mat, in: hall, traits: [scenery] }
+  key: { name: key, in: hall, traits: [portable], state: { hidden: true }, revealed_by: search mat }
+  bell: { name: bell, in: yard, traits: [scenery], on: { ring: 'say(\"Ding.\"); complete_goal(\"ring\")' } }
+verbs:
+  ring: { patterns: ['ring {target}'] }
+goals:
+  get_out:
+    text: Get out into the yard.
+    done: here == world.yard
+  find_key:
+    text: Find the key to the gate.
+    when: game.turn >= 1
+    done: world.key.location == player
+    points: 2
+  ring:
+    text: Ring the bell.
+    when: here == world.yard
+";
+
+#[test]
+fn goals_are_added_and_done_as_play_goes_on() {
+    let mut g = game(compile_str(GOALS).story.unwrap());
+    // Goals with no `when` are there from the start; the first says where to look.
+    let mut g2 = Game::new(compile_str(GOALS).story.unwrap(), LuaHost::new().unwrap(), 1).unwrap();
+    assert!(g2.start().text().contains("[New goal: Get out into the yard. (JOURNAL lists your goals.)]"));
+    assert_eq!(say(&mut g, "journal"), "Your goals:\n– Get out into the yard.");
+    // A goal whose `when` comes true is added, once.
+    assert_says(&mut g, "x mat", "[New goal: Find the key to the gate.]");
+    assert!(!say(&mut g, "look").contains("New goal"));
+    // Done: a notice, and its points.
+    say(&mut g, "search mat");
+    let out = say(&mut g, "take key");
+    assert!(out.contains("[Done: Find the key to the gate.]") && out.contains("[Your score has gone up by 2.]"), "{out}");
+    assert_eq!(g.world().state.score, 2);
+    assert_eq!(say(&mut g, "goals"), "Your goals:\n– Get out into the yard.\nDone:\n✓ Find the key to the gate.");
+    // JOURNAL takes no turn.
+    let turns = g.input("journal").status.turns;
+    assert_eq!(g.input("journal").status.turns, turns);
+    say(&mut g, "unlock gate");
+    say(&mut g, "open gate");
+    let out = say(&mut g, "n");
+    assert!(out.contains("[Done: Get out into the yard.]") && out.contains("[New goal: Ring the bell.]"), "{out}");
+    // Scripts can read and finish goals.
+    assert_eq!(say(&mut g, "ring bell"), "Ding.\n[Done: Ring the bell.]");
+    assert_eq!(say(&mut g, "journal"), "You've done everything you set out to do, for now.\nDone:\n✓ Get out into the yard.\n✓ Find the key to the gate.\n✓ Ring the bell.");
+    // Undo takes a goal back.
+    say(&mut g, "undo");
+    assert!(say(&mut g, "journal").contains("– Ring the bell."));
+    // Goals are saved.
+    let save = g.input("save").save.unwrap();
+    let mut h = game(compile_str(GOALS).story.unwrap());
+    h.restore(&save);
+    assert!(say(&mut h, "journal").contains("✓ Find the key to the gate."));
+}
+
+#[test]
+fn scripts_see_goals_and_mistakes_are_reported() {
+    let src = GOALS.replace("complete_goal(\"ring\")", "if goals.ring == \"active\" then say(\"(listed)\") end; complete_goal(\"rnig\")");
+    let out = compile_str(&src);
+    assert!(out.diagnostics.iter().any(|d| d.message.contains("complete_goal(\"rnig\"): no such goal")), "{:#?}", out.diagnostics);
+    let out = compile_str(&GOALS.replace("text: Ring the bell.", "text: ''"));
+    assert!(out.diagnostics.iter().any(|d| d.path == "goals.ring.text"), "{:#?}", out.diagnostics);
+    // A game without goals says so.
+    let mut g = game(compile_str(&GOALS[..GOALS.find("goals:").unwrap()].replace("; complete_goal(\"ring\")", "")).story.unwrap());
+    assert!(say(&mut g, "journal").starts_with("This game doesn't keep a journal."));
+}
+
+// ---------------------------------------------------------------- clock
+
+fn clocked(clock: &str, extra: &str) -> Game<LuaHost> {
+    small(&format!("clock: {clock}\n{extra}"))
+}
+
+#[test]
+fn the_clock_moves_with_the_turns() {
+    let mut g = clocked("{ start: '7:58', minutes_per_turn: 2 }", "");
+    assert_eq!(g.input("time").status.time.as_deref(), Some("7:58 am"));
+    // TIME takes no time; any action takes the clock on.
+    assert_eq!(say(&mut g, "time"), "It's 7:58 am.");
+    say(&mut g, "look");
+    assert_eq!(say(&mut g, "time"), "It's 8:00 am.");
+    say(&mut g, "wait");
+    assert_eq!(say(&mut g, "time"), "It's 8:02 am.");
+    // Undo turns the clock back too.
+    say(&mut g, "undo");
+    assert_eq!(say(&mut g, "time"), "It's 8:00 am.");
+    // Without a clock there's no time.
+    let mut g = small("");
+    assert_eq!(g.input("look").status.time, None);
+    assert_eq!(say(&mut g, "time"), "There's no telling the time here.");
+}
+
+#[test]
+fn scripts_read_and_move_the_clock() {
+    let mut g = clocked(
+        "{ start: '5:00 pm', dusk: '17:30' }",
+        "verbs:\n  sleep: { patterns: [sleep] }\n  peer: { patterns: [peer] }\non:\n  sleep: 'set_clock(\"6:00\"); say(\"You sleep.\")'\n  peer: 'say(clock.hour, \" \", clock.period, \" \", clock.night, \" day \", clock.day)'\n  wait: 'pass_time(29)'\n",
+    );
+    assert_eq!(say(&mut g, "peer"), "17 evening false day 1");
+    // Waiting passes the turn's minute, plus the script's 29.
+    say(&mut g, "wait");
+    assert_eq!(say(&mut g, "peer"), "17 night true day 1");
+    // Sleeping until 6:00 is the next morning.
+    say(&mut g, "sleep");
+    assert_eq!(say(&mut g, "time"), "It's 6:01 am, on day 2.");
+    assert_eq!(say(&mut g, "peer"), "6 morning false day 2");
+}
+
+#[test]
+fn timers_fire_at_a_time_of_day() {
+    let mut g = clocked(
+        "{ start: '18:57', dusk: '19:00', show: false }",
+        "timers:\n  sunset: { at: dusk, say: The sun sets. }\n  bells: { at: '7pm', say: Bells ring. }\n  dawn_chorus: { at: dawn, say: Birds sing. }\n",
+    );
+    assert_eq!(g.input("time").status.time, None, "show: false keeps the time off the status line");
+    assert!(!say(&mut g, "wait").contains("The sun sets."));
+    say(&mut g, "wait");
+    assert_eq!(say(&mut g, "wait"), "Time passes.\nThe sun sets.\nBells ring.");
+    assert!(!say(&mut g, "wait").contains("The sun sets."));
+}
+
+#[test]
+fn clock_mistakes_are_reported() {
+    let diag = |src: &str| {
+        let full = format!("format: eifgb/0.1\ngame: {{ id: t, title: T, version: '1', start: hall }}\nrooms:\n  hall: {{ name: Hall }}\n{src}");
+        compile_str(&full).diagnostics
+    };
+    let d = diag("clock: { start: '25:00' }\n");
+    assert!(d.iter().any(|d| d.path == "clock.start" && d.message.contains("isn't a time of day")), "{d:#?}");
+    let d = diag("timers:\n  t: { at: dusk, say: x }\n");
+    assert!(d.iter().any(|d| d.path == "timers.t.at" && d.message.contains("clock:")), "{d:#?}");
+    let d = diag("on:\n  wait: 'if clock.night then say(1) end'\n");
+    assert!(d.iter().any(|d| d.message.contains("doesn't keep time")), "{d:#?}");
+    let d = diag("clock: { start: 7 }\ntimers:\n  t: { at: teatime, say: x }\n");
+    assert!(d.iter().any(|d| d.path == "timers.t.at"), "{d:#?}");
+    assert!(diag("clock: { start: 7, dawn: '5:30 am', dusk: 'noon' }\n").is_empty());
+}

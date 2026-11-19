@@ -805,6 +805,17 @@ export class Model {
     this.doc.setIn(["hints", id, "steps"], seq);
   }
 
+  /** A goal for the journal, named from its first few words. */
+  addGoal(text = "Something to do."): string {
+    const name = text.replace(/[^\p{L}\p{N}\s]/gu, " ").trim().split(/\s+/).slice(0, 3).join(" ") || "goal";
+    return this.addEntry("goals", name, { text }, ["hints", "timers", "endings", "choices", "characters", "objects", "rooms"]);
+  }
+
+  /** Starts keeping the time of day, from 8:00 in the morning. */
+  addClock() {
+    if (!this.map(["clock"])) this.addSection("clock", { start: "8:00", minutes_per_turn: 1 }, ["settings", "presentation", "game"]);
+  }
+
   /** Moves an entry of a top-level section earlier (-1) or later (+1): for hints, whose order matters. */
   moveEntry(section: string, id: string, by: -1 | 1): boolean {
     const m = this.map([section]);

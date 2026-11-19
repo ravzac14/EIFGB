@@ -112,6 +112,9 @@ pub fn play(story: Story, commands: Option<&Path>, seed: Option<u64>, save_file:
     }
     let s = &game.world().state;
     let turns = if s.turn == 1 { "turn" } else { "turns" };
-    println!("\n[{} {turns}, score {}]", s.turn, s.score);
+    match game.world().clock() {
+        Some(c) => println!("\n[{} {turns}, score {}, {} on day {}]", s.turn, s.score, c.time, c.day),
+        None => println!("\n[{} {turns}, score {}]", s.turn, s.score),
+    }
     Ok(())
 }

@@ -102,6 +102,10 @@ pub enum Effect {
     OpenChoice(String),
     StartTimer(String),
     StopTimer(String),
+    /// `start_goal`: list a goal in the journal now.
+    StartGoal(String),
+    /// `complete_goal`: a goal is done.
+    CompleteGoal(String),
     /// A character moved or attacked; the engine describes it if the player can see.
     Npc(crate::npc::NpcEvent),
 }

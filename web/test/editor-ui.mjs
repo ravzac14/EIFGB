@@ -571,6 +571,24 @@ offered.dispatchEvent(new Event("input"));
 assert.match(yaml(), /light_the_lamp:\n    steps:\n      - The lamp needs oil\.\n      - "The answer: what to type\."\n      - FILL LAMP\.\n    when: vars.lamp_oil > 0/);
 [...document.querySelectorAll("#inspector .hint-step")][1].querySelector("button").click();
 assert.equal(document.querySelectorAll("#inspector .hint-step").length, 2);
+// A goal, from Add component; then when it's done.
+addComponent("goal");
+form("Goal").value = "Light the lamp.";
+addButton("Add the goal").click();
+assert.match(yaml(), /goals:\n  light_the_lamp:\n    text: Light the lamp\.\n/);
+const doneWhen = $('#inspector textarea[aria-label="Done when (Lua)"]');
+doneWhen.value = "vars.lamp_oil > 5";
+doneWhen.dispatchEvent(new Event("input"));
+assert.match(yaml(), /done: vars.lamp_oil > 5/);
+// The time of day, and a timer that goes off at dusk.
+addComponent("clock");
+assert.match(yaml(), /clock:\n  start: "?8:00"?/);
+clickButton("Add a timer");
+const how = $('#inspector select[aria-label="How often"]');
+how.value = "at";
+how.dispatchEvent(new Event("change"));
+assert.match(yaml(), /at: dusk/);
+assert.equal($('#inspector input[aria-label="Time of day"]').value, "dusk");
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
 

@@ -49,6 +49,8 @@ pub struct Status {
     pub score: i64,
     pub max_score: Option<i64>,
     pub turns: u64,
+    /// The time of day, like "7:30 am", when the game keeps time and shows it.
+    pub time: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -213,6 +215,7 @@ impl<H: ScriptHost> Game<H> {
             score: self.world.state.score,
             max_score: self.world.story().meta.max_score,
             turns: self.world.state.turn,
+            time: self.world.clock().filter(|_| self.world.story().clock.as_ref().is_some_and(|c| c.show)).map(|c| c.time),
         };
         out.ended = self.world.state.ending.map(|e| self.world.story().endings[e.index()].kind);
         out.ending = self.world.state.ending.map(|e| self.world.story().endings[e.index()].key.clone());
@@ -312,6 +315,8 @@ impl<H: ScriptHost> Game<H> {
                 Effect::StopTimer(k) => {
                     self.world.state.timers.remove(&k);
                 }
+                Effect::StartGoal(k) => self.start_goal(&k),
+                Effect::CompleteGoal(k) => self.complete_goal(&k),
                 Effect::Npc(event) => self.narrate(&event),
             }
         }
@@ -470,6 +475,8 @@ impl<H: ScriptHost> Game<H> {
             BuiltinAction::Score => self.msg("score.report", &ctx),
             BuiltinAction::Help => self.msg("help.text", &ctx),
             BuiltinAction::Hint => self.hint(),
+            BuiltinAction::Journal => self.journal(),
+            BuiltinAction::Time => self.tell_time(),
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }
@@ -686,6 +693,7 @@ impl<H: ScriptHost> Game<H> {
 
     fn end_turn(&mut self) {
         self.world.state.turn += 1;
+        self.tick_clock();
         // Someone the player just beat doesn't get to strike back.
         self.check_defeats();
         self.report_woken();
@@ -752,10 +760,15 @@ impl<H: ScriptHost> Game<H> {
                 break;
             }
             let Some(&due) = self.world.state.timers.get(&t.key) else { continue };
-            if due > now {
+            let due_now = match t.schedule {
+                Schedule::At(at) => crate::journal::passes(self.world.state.clock_checked, self.world.state.clock, at),
+                _ => due <= now,
+            };
+            if !due_now {
                 continue;
             }
             match t.schedule {
+                Schedule::At(_) => {}
                 Schedule::After(_) => {
                     self.world.state.timers.remove(&t.key);
                 }
@@ -782,10 +795,12 @@ impl<H: ScriptHost> Game<H> {
                 self.end_requested.get_or_insert(key);
             }
         }
+        self.world.state.clock_checked = self.world.state.clock;
     }
 
     /// Carries out an ending or an opened choice that a script asked for.
     fn settle(&mut self) {
+        self.update_goals();
         if let Some(key) = self.end_requested.take() {
             self.choice_requested = None;
             self.finish_game(&key);

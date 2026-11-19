@@ -627,9 +627,79 @@ impl ScriptHost for LuaHost {
                         if !w.story().timers.iter().any(|t| t.key == key) {
                             return Err(rt(format!("timer_left: there is no timer called '{key}'")));
                         }
-                        Ok(w.state.timers.get(&key).map(|due| due.saturating_sub(w.state.turn) as i64))
+                        Ok(w.timer_left(&key).map(|n| n as i64))
                     })?,
                 )?;
+
+                h.set(
+                    "clock_get",
+                    scope.create_function(move |lua, k: String| {
+                        let w = world.borrow();
+                        let Some(c) = w.clock() else {
+                            return Err(rt("the game doesn't keep time; add a 'clock:' section with the time it starts"));
+                        };
+                        Ok(match k.as_str() {
+                            "day" => mlua::Value::Integer(c.day as i64),
+                            "hour" => mlua::Value::Integer(i64::from(c.hour)),
+                            "minute" => mlua::Value::Integer(i64::from(c.minute)),
+                            "minutes" => mlua::Value::Integer(i64::from(c.minutes)),
+                            "time" => mlua::Value::String(lua.create_string(&c.time)?),
+                            "period" => mlua::Value::String(lua.create_string(c.period)?),
+                            "night" => mlua::Value::Boolean(c.night),
+                            "daytime" => mlua::Value::Boolean(!c.night),
+                            other => {
+                                return Err(rt(format!(
+                                    "clock.{other} doesn't exist; there's day, hour, minute, minutes, time, period, night and daytime"
+                                )))
+                            }
+                        })
+                    })?,
+                )?;
+                h.set(
+                    "pass_time",
+                    scope.create_function(move |_, minutes: i64| {
+                        let minutes = u64::try_from(minutes).map_err(|_| rt("pass_time: time only goes forward"))?;
+                        if !world.borrow_mut().pass_time(minutes) {
+                            return Err(rt("pass_time: the game doesn't keep time; add a 'clock:' section"));
+                        }
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "set_clock",
+                    scope.create_function(move |_, at: String| {
+                        let at = eifgb_ir::parse_time(&at).map_err(|e| rt(format!("set_clock: {e}")))?;
+                        if !world.borrow_mut().set_clock(at) {
+                            return Err(rt("set_clock: the game doesn't keep time; add a 'clock:' section"));
+                        }
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "goal_get",
+                    scope.create_function(move |lua, key: String| {
+                        let w = world.borrow();
+                        if !w.story().goals.iter().any(|g| g.key == key) {
+                            return Err(rt(format!("goals.{key}: there is no goal called '{key}'")));
+                        }
+                        Ok(match w.goal(&key) {
+                            None => mlua::Value::Nil,
+                            Some(done) => mlua::Value::String(lua.create_string(if done { "done" } else { "active" })?),
+                        })
+                    })?,
+                )?;
+                for (name, done) in [("start_goal", false), ("complete_goal", true)] {
+                    h.set(
+                        name,
+                        scope.create_function(move |_, key: String| {
+                            if !world.borrow().story().goals.iter().any(|g| g.key == key) {
+                                return Err(rt(format!("{name}: there is no goal called '{key}'")));
+                            }
+                            effects.borrow_mut().push(if done { Effect::CompleteGoal(key) } else { Effect::StartGoal(key) });
+                            Ok(())
+                        })?,
+                    )?;
+                }
 
                 h.set(
                     "random",

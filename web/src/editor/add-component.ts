@@ -211,6 +211,37 @@ export const COMPONENTS: Component[] = [
     },
   },
   {
+    id: "goal",
+    name: "Goal",
+    about: "Something the player is trying to do, listed when they type JOURNAL, with a notice when it's done.",
+    form: (h, done) => {
+      const what = text("Goal", "Find a way out of the house.");
+      const add = button(
+        "Add the goal",
+        () => {
+          if (!what.value.trim()) return what.focus();
+          let id = "";
+          h.change((x) => (id = x.addGoal(what.value.trim())));
+          done();
+          h.select({ kind: "goal", id });
+        },
+        "primary",
+      );
+      return [...field("What is the player trying to do?", what), el("div", { class: "row" }, add)];
+    },
+  },
+  {
+    id: "clock",
+    name: "Time of day",
+    about: "A clock that moves on with each turn, for sunsets, opening hours and things that happen at night.",
+    form: null,
+    add: (h) => {
+      if (h.model.get(["clock"]) === undefined) h.change((x) => x.addClock());
+      h.select(null);
+      h.notice("The game keeps the time of day now: see Time of day in the game's details.");
+    },
+  },
+  {
     id: "conversation",
     name: "Conversation",
     about: "A conversation or menu, with numbered choices the player types.",

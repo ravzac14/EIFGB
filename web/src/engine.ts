@@ -18,6 +18,8 @@ export interface Status {
   score: number;
   max_score: number | null;
   turns: number;
+  /** The time of day ("7:30 am"), when the game keeps time and shows it. */
+  time?: string | null;
 }
 export interface Output {
   lines: Line[];

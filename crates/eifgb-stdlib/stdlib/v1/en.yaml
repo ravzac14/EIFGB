@@ -176,6 +176,12 @@ verbs:
   hint:
     action: hint
     patterns: ["hint", "hints", "clue", "give me a hint"]
+  journal:
+    action: journal
+    patterns: ["journal", "goals", "objectives", "tasks", "quests"]
+  time:
+    action: time
+    patterns: ["time", "what time is it", "check the time", "check time", "tell the time"]
   push_to:
     action: push_to
     patterns:
@@ -1015,6 +1021,17 @@ messages:
   hint.show: "${if args.of > 1}(Hint ${args.n} of ${args.of}) ${end}${args.hint}"
   hint.none: "You don't need a hint right now. Try looking around, and examining anything interesting."
   hint.none_in_game: "This game doesn't have hints. Try examining everything, and searching anything that looks interesting."
+  goal.new: "[New goal: ${args.goal}${if args.first} (JOURNAL lists your goals.)${end}]"
+  goal.done: "[Done: ${args.goal}]"
+  journal.goals: "Your goals:"
+  journal.goal: "– ${args.goal}"
+  journal.done: "Done:"
+  journal.done_goal: "✓ ${args.goal}"
+  journal.all_done: "You've done everything you set out to do, for now."
+  journal.empty: "You've nothing in particular to do yet. Have a look around."
+  journal.none_in_game: "This game doesn't keep a journal. Look around, and see what you can find."
+  clock.now: "It's ${args.time}${if args.day > 1}, on day ${args.day}${end}."
+  clock.none: "There's no telling the time here."
   help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, SAVE and RESTORE keep your place, and HINT helps if you're stuck."
   ending.win: "*** You have won ***"
   ending.loss: "*** You have lost ***"

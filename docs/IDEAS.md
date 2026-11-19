@@ -35,12 +35,8 @@ Everything from the first list has now been built:
 
 ## The world
 
-- **A journal of goals:** goals with `when` conditions; JOURNAL lists the
-  current ones, and a notice says when one is done.
 - **ASK and TELL about topics:** ASK GUARD ABOUT KEY, from `topics:` on
   characters, alongside the numbered conversations.
-- **Time of day:** an optional clock that moves with turns, for text like
-  `${if clock.night}` and timers that fire at dusk.
 
 ## The editor
 

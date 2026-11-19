@@ -6,6 +6,16 @@ behave will be called out here.
 
 ## Unreleased
 
+- Goals: a `goals:` section, each with text, and conditions for when it's
+  added and when it's done. JOURNAL lists them, and a notice says when one
+  is added or done. In the editor: Add component → Goal.
+- The time of day: a `clock:` section starts a clock that moves on with
+  each turn, shown on the status line. TIME tells the player; text and
+  scripts can check `clock.night`, `clock.hour` and more; `pass_time` and
+  `set_clock` move it on; and timers can go off `at: dusk` or at a time.
+  In the editor: Add component → Time of day.
+- The Small House starter template now has goals, the time of day, and
+  a clock that strikes nine.
 - Hints: a `hints:` section lists puzzles in the order players meet them,
   each with steps from a nudge to the answer and a `when` that's true while
   it's unsolved. HINT shows the next step for the puzzle the player is on

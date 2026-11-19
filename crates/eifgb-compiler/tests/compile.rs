@@ -334,7 +334,7 @@ fn timers_are_checked() {
     assert!(!timer.running, "a timer with started_by waits to be started");
     assert!(t("every: 2, say: drip").story.unwrap().timers[0].running);
 
-    assert_error(&t("after: 3, every: 2, say: x"), "not both");
+    assert_error(&t("after: 3, every: 2, say: x"), "use only one of");
     assert_error(&t("say: x"), "needs 'after");
     assert_error(&t("after: 0, say: x"), "at least 1");
     assert_error(&t("after: 3, end: bom"), "did you mean 'boom'?");

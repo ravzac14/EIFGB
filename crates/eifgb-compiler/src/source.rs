@@ -47,6 +47,10 @@ pub struct Source {
     pub factions: IndexMap<String, Faction>,
     #[serde(default)]
     pub hints: IndexMap<String, Hint>,
+    #[serde(default)]
+    pub goals: IndexMap<String, Goal>,
+    #[serde(default)]
+    pub clock: Option<Clock>,
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, String>,
@@ -522,6 +526,45 @@ pub struct Hint {
     pub steps: Vec<String>,
 }
 
+/// A goal for the JOURNAL: `text`, listed once `when` (Lua) is true, and
+/// done once `done` (Lua) is true.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Goal {
+    pub text: String,
+    #[serde(default)]
+    pub when: Option<String>,
+    #[serde(default)]
+    pub done: Option<String>,
+    #[serde(default)]
+    pub points: Option<i64>,
+}
+
+/// The time of day. Times are written like "7:30", "19:00", "7:30 pm",
+/// "noon" or "midnight".
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Clock {
+    pub start: TimeOfDay,
+    #[serde(default)]
+    pub minutes_per_turn: Option<u32>,
+    #[serde(default)]
+    pub dawn: Option<TimeOfDay>,
+    #[serde(default)]
+    pub dusk: Option<TimeOfDay>,
+    /// Shows the time on the status line (the default).
+    #[serde(default)]
+    pub show: Option<bool>,
+}
+
+/// A time as written: "7:30", or a bare hour like 7 (YAML reads 7:30 as text).
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum TimeOfDay {
+    Text(String),
+    Hour(u32),
+}
+
 /// Something that happens after a number of actions.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -532,6 +575,9 @@ pub struct Timer {
     /// Fires every this many actions, until stopped.
     #[serde(default)]
     pub every: Option<u32>,
+    /// Fires each day when the clock reaches this time ("19:00", "dusk").
+    #[serde(default)]
+    pub at: Option<TimeOfDay>,
     /// Running from the start of the game. Defaults to true unless the
     /// timer has `started_by`.
     #[serde(default)]

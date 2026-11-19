@@ -85,6 +85,123 @@ pub struct Story {
     /// Hints for HINT, in the order they're offered.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hints: Vec<Hint>,
+    /// Goals for the JOURNAL, in the order they're listed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub goals: Vec<Goal>,
+    /// The time of day, if the game keeps one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clock: Option<Clock>,
+}
+
+/// Something the player is trying to do, listed by JOURNAL. It's added
+/// once `when` is true (no `when`: from the start), and done once `done`
+/// is true or a script calls `complete_goal`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Goal {
+    pub key: String,
+    pub text: Text,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done: Option<Code>,
+    /// Points scored when it's done.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub points: i64,
+}
+
+fn is_zero(n: &i64) -> bool {
+    *n == 0
+}
+
+/// Minutes in a day.
+pub const DAY: u32 = 24 * 60;
+
+/// A clock that moves with the turns. Times are minutes after midnight.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Clock {
+    /// The time the game starts.
+    pub start: u32,
+    /// Minutes each action takes.
+    pub per_turn: u32,
+    /// Night is from `dusk` until `dawn`.
+    pub dawn: u32,
+    pub dusk: u32,
+    /// Whether the status line shows the time.
+    pub show: bool,
+}
+
+impl Clock {
+    /// Whether a time of day (minutes after midnight) is at night.
+    pub fn is_night(&self, at: u32) -> bool {
+        let at = at % DAY;
+        if self.dawn <= self.dusk { at < self.dawn || at >= self.dusk } else { at >= self.dusk && at < self.dawn }
+    }
+
+    /// "night", "morning", "afternoon" or "evening".
+    pub fn period(&self, at: u32) -> &'static str {
+        let at = at % DAY;
+        if self.is_night(at) {
+            "night"
+        } else if at < 12 * 60 {
+            "morning"
+        } else if at < 17 * 60 {
+            "afternoon"
+        } else {
+            "evening"
+        }
+    }
+}
+
+/// A time of day as authors write it, in minutes after midnight: "7:30",
+/// "07:30", "19:00", "7:30 pm", "7pm", "noon", "midnight", or an hour ("7").
+pub fn parse_time(text: &str) -> Result<u32, String> {
+    let bad = |s: &str| format!("'{s}' isn't a time of day; write it like \"7:30\", \"19:00\" or \"7:30 pm\"");
+    let s = text.trim().to_ascii_lowercase();
+    match s.as_str() {
+        "noon" | "midday" => return Ok(12 * 60),
+        "midnight" => return Ok(0),
+        _ => {}
+    }
+    let (clock, half) = if let Some(c) = s.strip_suffix("am") {
+        (c.trim().trim_end_matches('.'), Some(false))
+    } else if let Some(c) = s.strip_suffix("pm") {
+        (c.trim().trim_end_matches('.'), Some(true))
+    } else if let Some(c) = s.strip_suffix("a.m.").or(s.strip_suffix("p.m.")) {
+        (c.trim(), Some(s.ends_with("p.m.")))
+    } else {
+        (s.as_str(), None)
+    };
+    let (h, m) = match clock.split_once(':').or(clock.split_once('.')) {
+        Some((h, m)) if m.len() == 2 => (h.parse::<u32>().ok(), m.parse::<u32>().ok()),
+        Some(_) => (None, None),
+        None => (clock.parse::<u32>().ok(), Some(0)),
+    };
+    let (Some(mut h), Some(m)) = (h, m) else { return Err(bad(&s)) };
+    if m > 59 {
+        return Err(bad(&s));
+    }
+    match half {
+        Some(pm) => {
+            if h == 0 || h > 12 {
+                return Err(bad(&s));
+            }
+            h = h % 12 + if pm { 12 } else { 0 };
+        }
+        None if h > 23 => return Err(bad(&s)),
+        None => {}
+    }
+    Ok(h * 60 + m)
+}
+
+/// A time of day as players read it: "7:05 am", "12:30 pm".
+pub fn time_text(at: u32) -> String {
+    let at = at % DAY;
+    let (h, m) = (at / 60, at % 60);
+    let h12 = match h % 12 {
+        0 => 12,
+        n => n,
+    };
+    format!("{h12}:{m:02} {}", if h < 12 { "am" } else { "pm" })
 }
 
 /// A puzzle's hints, from a nudge to the answer. HINT shows the next one
@@ -186,12 +303,15 @@ pub enum Schedule {
     After(u32),
     /// Every this many actions, until stopped.
     Every(u32),
+    /// Each day when the clock reaches this time (minutes after midnight).
+    At(u32),
 }
 
 impl Schedule {
     pub fn actions(self) -> u32 {
         match self {
             Schedule::After(n) | Schedule::Every(n) => n,
+            Schedule::At(_) => 0,
         }
     }
 }
@@ -1041,6 +1161,10 @@ pub enum BuiltinAction {
     Trade,
     /// The next hint for the puzzle the player is on.
     Hint,
+    /// The player's goals.
+    Journal,
+    /// What time it is.
+    Time,
 }
 
 impl BuiltinAction {
@@ -1055,6 +1179,8 @@ impl BuiltinAction {
                 | BuiltinAction::Restart
                 | BuiltinAction::Help
                 | BuiltinAction::Hint
+                | BuiltinAction::Journal
+                | BuiltinAction::Time
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )
@@ -1304,5 +1430,42 @@ mod tests {
         for d in Direction::ALL {
             assert_eq!(Direction::from_key(d.key()), Some(d));
         }
+    }
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::*;
+
+    #[test]
+    fn times_are_read_the_ways_people_write_them() {
+        for (s, m) in [
+            ("7:30", 450),
+            ("07:30", 450),
+            ("19:00", 1140),
+            ("7:30 pm", 1170),
+            ("7pm", 1140),
+            ("7:30 a.m.", 450),
+            ("12 am", 0),
+            ("12:15 pm", 735),
+            ("noon", 720),
+            ("Midnight", 0),
+            ("7", 420),
+        ] {
+            assert_eq!(parse_time(s), Ok(m), "{s}");
+        }
+        for s in ["25:00", "7:60", "13 pm", "teatime", "7:5", ""] {
+            assert!(parse_time(s).is_err(), "{s}");
+        }
+        assert_eq!(time_text(0), "12:00 am");
+        assert_eq!(time_text(735), "12:15 pm");
+        assert_eq!(time_text(1170 + DAY), "7:30 pm");
+    }
+
+    #[test]
+    fn night_is_from_dusk_to_dawn() {
+        let c = Clock { start: 0, per_turn: 1, dawn: 360, dusk: 1080, show: true };
+        assert!(c.is_night(0) && c.is_night(359) && !c.is_night(360) && c.is_night(1080));
+        assert_eq!([c.period(400), c.period(800), c.period(1050), c.period(1100)], ["morning", "afternoon", "evening", "night"]);
     }
 }

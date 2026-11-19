@@ -58,6 +58,7 @@
     var s = o.status;
     var parts = [s.room];
     if (s.max_score !== null || s.score) parts.push(s.max_score !== null ? "Score " + s.score + "/" + s.max_score : "Score " + s.score);
+    if (s.time) parts.push(s.time);
     parts.push("Turn " + s.turns);
     statusLine.textContent = parts.filter(Boolean).join(" · ");
     return first;

@@ -19,7 +19,7 @@ feedbackContext({
   info: () => ({
     game: meta ? `${meta.title}${meta.author ? ` by ${meta.author}` : ""}` : "not loaded",
     from: from ?? (gameKey.split(":")[0] || ""),
-    where: last ? `${last.status.room || "?"}, turn ${last.status.turns}${last.status.max_score !== null ? `, score ${last.status.score}/${last.status.max_score}` : ""}` : "",
+    where: last ? `${last.status.room || "?"}, turn ${last.status.turns}${last.status.time ? `, ${last.status.time}` : ""}${last.status.max_score !== null ? `, score ${last.status.score}/${last.status.max_score}` : ""}` : "",
     state: over ? "the game has ended" : last?.options.length ? "choosing from a list" : "playing",
     map: mapBox.hidden ? "closed" : "open",
   }),
@@ -129,6 +129,7 @@ function status(o: Output) {
   const s = o.status;
   const parts = [s.room];
   if (s.max_score !== null || s.score) parts.push(s.max_score !== null ? `Score ${s.score}/${s.max_score}` : `Score ${s.score}`);
+  if (s.time) parts.push(s.time);
   parts.push(`Turn ${s.turns}`);
   $("status").textContent = parts.filter(Boolean).join(" · ");
 }

@@ -214,7 +214,8 @@ impl<'a> Lowerer<'a> {
                 );
             }
         }
-        let timers = self.lower_timers(&s.timers, &endings);
+        let clock = s.clock.as_ref().and_then(|c| self.lower_clock(c));
+        let timers = self.lower_timers(&s.timers, &endings, clock.as_ref());
         for t in &timers {
             if let Some(f) = t.noise.as_ref().and_then(|n| n.faction.as_ref())
                 && !factions.iter().any(|x| &x.key == f)
@@ -225,6 +226,7 @@ impl<'a> Lowerer<'a> {
         }
         let scripts = self.load_scripts(&s.scripts);
         let hints = self.lower_hints(&s.hints);
+        let goals = self.lower_goals(&s.goals);
 
         let presentation = s.presentation.as_ref().map(|p| self.presentation(p));
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
@@ -262,6 +264,8 @@ impl<'a> Lowerer<'a> {
             timers,
             factions,
             hints,
+            goals,
+            clock,
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -1241,24 +1245,93 @@ impl<'a> Lowerer<'a> {
         out
     }
 
+    // --------------------------------------------------------------- goals
+
+    fn lower_goals(&mut self, raw: &indexmap::IndexMap<String, src::Goal>) -> Vec<Goal> {
+        let mut out = Vec::new();
+        for (key, g) in raw {
+            let path = format!("goals.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&path, e);
+            }
+            if g.text.trim().is_empty() {
+                self.d.error(format!("{path}.text"), "a goal needs text for the journal, like 'Find a way out of the house.'");
+            }
+            let points = g.points.unwrap_or(0);
+            if points < 0 {
+                self.d.error(format!("{path}.points"), "points for a goal can't be negative");
+            }
+            out.push(Goal {
+                key: key.clone(),
+                text: self.text(&g.text, &format!("{path}.text")),
+                when: g.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
+                done: g.done.as_deref().map(|d| self.code(d, &format!("{path}.done"))),
+                points,
+            });
+        }
+        out
+    }
+
+    // --------------------------------------------------------------- clock
+
+    fn lower_clock(&mut self, c: &src::Clock) -> Option<Clock> {
+        let time = |t: &src::TimeOfDay, path: &str, this: &mut Self| match parse_time(t) {
+            Ok(m) => Some(m),
+            Err(e) => {
+                this.d.error(path, e);
+                None
+            }
+        };
+        let start = time(&c.start, "clock.start", self);
+        let dawn = c.dawn.as_ref().map_or(Some(6 * 60), |t| time(t, "clock.dawn", self));
+        let dusk = c.dusk.as_ref().map_or(Some(18 * 60), |t| time(t, "clock.dusk", self));
+        let per_turn = c.minutes_per_turn.unwrap_or(1);
+        if per_turn == 0 {
+            self.d.error("clock.minutes_per_turn", "time has to move: use 1 or more minutes a turn");
+        }
+        let (start, dawn, dusk) = (start?, dawn?, dusk?);
+        if dawn == dusk {
+            self.d.error("clock.dusk", "dawn and dusk can't be at the same time");
+        }
+        Some(Clock { start, per_turn: per_turn.max(1), dawn, dusk, show: c.show.unwrap_or(true) })
+    }
+
     // -------------------------------------------------------------- timers
 
-    fn lower_timers(&mut self, raw: &indexmap::IndexMap<String, src::Timer>, endings: &[Ending]) -> Vec<Timer> {
+    fn lower_timers(&mut self, raw: &indexmap::IndexMap<String, src::Timer>, endings: &[Ending], clock: Option<&Clock>) -> Vec<Timer> {
         let mut out = Vec::new();
         for (key, t) in raw {
             let path = format!("timers.{key}");
             if let Err(e) = check_id(key) {
                 self.d.error(&path, e);
             }
-            let schedule = match (t.after, t.every) {
-                (Some(n), None) => Schedule::After(n),
-                (None, Some(n)) => Schedule::Every(n),
-                (Some(_), Some(_)) => {
-                    self.d.error(&path, "use either 'after' (once) or 'every' (repeating), not both");
+            let schedule = match (t.after, t.every, &t.at) {
+                (Some(n), None, None) => Schedule::After(n),
+                (None, Some(n), None) => Schedule::Every(n),
+                (None, None, Some(at)) => {
+                    let Some(clock) = clock else {
+                        self.d.error(format!("{path}.at"), "'at' needs the game to keep time; add a 'clock:' section with the time it starts");
+                        continue;
+                    };
+                    let parsed = match at {
+                        src::TimeOfDay::Text(s) if s.trim().eq_ignore_ascii_case("dawn") => Ok(clock.dawn),
+                        src::TimeOfDay::Text(s) if s.trim().eq_ignore_ascii_case("dusk") => Ok(clock.dusk),
+                        other => parse_time(other),
+                    };
+                    match parsed {
+                        Ok(m) => Schedule::At(m),
+                        Err(e) => {
+                            self.d.error(format!("{path}.at"), format!("{e}, or 'dawn' or 'dusk'"));
+                            continue;
+                        }
+                    }
+                }
+                (None, None, None) => {
+                    self.d.error(&path, "a timer needs 'after: <actions>', 'every: <actions>' or 'at: <time of day>'");
                     continue;
                 }
-                (None, None) => {
-                    self.d.error(&path, "a timer needs 'after: <actions>' or 'every: <actions>'");
+                _ => {
+                    self.d.error(&path, "use only one of 'after' (once), 'every' (repeating) and 'at' (a time of day)");
                     continue;
                 }
             };
@@ -1500,6 +1573,25 @@ impl<'a> Lowerer<'a> {
                     }
                 }
             }
+            for call in ["start_goal", "complete_goal"] {
+                for name in literal_calls(src, call) {
+                    if !story.goals.iter().any(|g| g.key == name) {
+                        let hint = did_you_mean(name, story.goals.iter().map(|g| g.key.as_str()));
+                        self.d.error(origin, format!("{call}(\"{name}\"): no such goal{hint}"));
+                    }
+                }
+            }
+            if story.clock.is_none() {
+                let used = |word: &str| {
+                    src.match_indices(word).any(|(i, _)| !src[..i].ends_with(|c: char| c.is_alphanumeric() || c == '_' || c == '.'))
+                };
+                for word in ["pass_time(", "set_clock(", "clock."] {
+                    if used(word) {
+                        let name = word.trim_end_matches(['(', '.']);
+                        self.d.error(origin, format!("{name}: the game doesn't keep time; add a 'clock:' section with the time it starts"));
+                    }
+                }
+            }
             for name in literal_calls(src, "open_choice") {
                 if !choices.contains(&name) {
                     let hint = did_you_mean(name, choices.iter().copied());
@@ -1554,6 +1646,14 @@ fn vocab(name: &str, synonyms: &[String], adjectives: &[String]) -> Vocab {
 }
 
 /// Calls `f` on every Lua snippet in the story, including the ones inside templates.
+/// A time as written in the game file, in minutes after midnight.
+pub(crate) fn parse_time(t: &src::TimeOfDay) -> Result<u32, String> {
+    match t {
+        src::TimeOfDay::Hour(h) => eifgb_ir::parse_time(&h.to_string()),
+        src::TimeOfDay::Text(s) => eifgb_ir::parse_time(s),
+    }
+}
+
 pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
     fn text(t: &Text, f: &mut dyn FnMut(&Code)) {
         for seg in &t.0 {
@@ -1623,6 +1723,12 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
         opt_text(&t.say, f);
         if let Some(r) = &t.run {
             f(r);
+        }
+    }
+    for g in &story.goals {
+        text(&g.text, f);
+        for c in [&g.when, &g.done].into_iter().flatten() {
+            f(c);
         }
     }
     for h in &story.hints {

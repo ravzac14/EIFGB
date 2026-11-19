@@ -62,7 +62,7 @@ console.log(`bundled ${starters.length} starter templates into public/games/temp
 
 // The standard verbs, for the editor's script picker: id and an example.
 const stdlib = parse(readFileSync(join(root, "crates/eifgb-stdlib/stdlib/v1/en.yaml"), "utf8"));
-const META = new Set(["inventory", "hint", "score", "undo", "save", "restore", "restart", "help", "again", "quit", "health", "wait", "wares"]);
+const META = new Set(["inventory", "hint", "journal", "time", "score", "undo", "save", "restore", "restart", "help", "again", "quit", "health", "wait", "wares"]);
 const verbs = Object.entries(stdlib.verbs ?? {})
   .filter(([id]) => !META.has(id))
   .map(([id, v]) => ({ id, example: (v.patterns?.[0] ?? id).replace(/\{(\w+)\}/g, (_, s) => (s === "target" ? "it" : s === "tool" ? "something" : "…")) }));

@@ -217,7 +217,7 @@ export class TestPlay {
     if (o.ended === "win") this.won = true;
     if (o.ended) this.say(`That's an ending${o.ending ? ` (${o.ending})` : ""}. UNDO goes back a move; Start over plays again.`, "notice");
     const s = o.status;
-    this.status.textContent = [s.room, s.max_score !== null ? `score ${s.score}/${s.max_score}` : "", `turn ${s.turns}`].filter(Boolean).join(" · ");
+    this.status.textContent = [s.room, s.max_score !== null ? `score ${s.score}/${s.max_score}` : "", s.time ?? "", `turn ${s.turns}`].filter(Boolean).join(" · ");
     if (o.save || o.restore_requested) this.say("(Saving and restoring aren't kept in test play: use UNDO, or Start over.)", "notice");
     this.setHere(this.engine?.map().here ?? null);
     this.log.scrollTop = this.log.scrollHeight;

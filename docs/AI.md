@@ -103,6 +103,12 @@ unknown section or field is an error, not ignored, so a typo is caught.
   Players answer by typing the option's number.
 - **Timers:** under `timers:`, `after: N` (or `every: N`) actions, with
   `say`, `do` (Lua), `when` and `end` (an ending ID).
+- **Goals:** under `goals:`, each with `text` for the JOURNAL, and Lua
+  `when` (added once true; omit for from the start) and `done` (done once
+  true). Notices tell the player as goals are added and done.
+- **Time of day:** `clock: { start: "8:00", minutes_per_turn: 5 }`; text
+  and scripts read `clock.time`, `clock.hour`, `clock.night`; timers can
+  have `at: dusk` or `at: "19:00"`.
 - **Hints:** under `hints:`, one entry per puzzle in the order players
   meet them, each with `steps` (a list of text, nudge first, answer last)
   and a Lua `when` that's true while the puzzle is unsolved. HINT shows the

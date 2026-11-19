@@ -10,6 +10,12 @@ game:
   intro: |
     You're late. You're always late. And now you can't find your keys.
 
+# The time of day: it moves on a minute with each command. TIME tells the
+# player, and the status line shows it.
+clock:
+  start: "8:50"
+  minutes_per_turn: 1
+
 rooms:
   bedroom:
     name: Bedroom
@@ -96,6 +102,21 @@ objects:
 
 # HINT shows the next step for the first puzzle here whose `when` is
 # true: a nudge first, the answer last.
+# What the player is trying to do. JOURNAL lists them, and a notice says
+# when one is added or done.
+goals:
+  find_keys:
+    text: Find your keys.
+    done: world.keys.location == player
+  leave:
+    text: Get out of the house.
+    done: here == world.front_garden
+
+timers:
+  nine_oclock:
+    at: "9:00"
+    say: Somewhere a clock strikes nine. You're officially late.
+
 hints:
   find_keys:
     when: world.keys.hidden
@@ -112,4 +133,4 @@ hints:
 endings:
   out_the_door:
     kind: win
-    text: You lock the door behind you and hurry off. Only a little late, today.
+    text: You lock the door behind you at ${clock.time} and hurry off. Only a little late, today.

@@ -41,6 +41,8 @@ stay interchangeable.
 | `endings`    | Named endings with a `kind` (`win`, `loss` or `neutral`). |
 | `timers`     | Things that happen after a number of actions. See **Timers**. |
 | `factions`   | Sides for characters: `hostile_to` (factions and/or `player`) and `eats_corpses`. See **Characters**. |
+| `goals`      | Goals for JOURNAL, in order: `text` (text), and optional Lua `when` and `done`, and `points`. See **Goals**. |
+| `clock`      | The time of day: `start` (a time), `minutes_per_turn` (default 1), `dawn` (default 6:00), `dusk` (default 18:00), `show` (default true). See **Time of day**. |
 | `hints`      | Hints for HINT, by puzzle: `steps` (a non-empty list of text, a nudge first and the answer last) and an optional Lua `when`. HINT (verb `hint`: hint, hints, clue; out of the game, so it takes no turn) shows the next step of the first puzzle, in order, whose `when` is true (or that has none): `[hint.show]` with `args.hint`, `args.n` and `args.of`; when every step has been shown, the last repeats. None true `[hint.none]`; no `hints:` at all `[hint.none_in_game]`. How many steps of each have been shown is kept in the player's private `_hints` state, so it's saved and undone. |
 
 IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `died`, `enter`, `leave`, `defeated`), because handlers are keyed by both.
@@ -169,7 +171,7 @@ A handler can be a block of statements or a single expression.
 A timer fires after a number of **actions**: commands that took a turn.
 Parse failures and meta commands (SAVE, UNDO, SCORE…) don't count.
 
-- **Schedule:** `after: N` (once) or `every: N` (repeating), exactly one. N ≥ 1.
+- **Schedule:** `after: N` (once), `every: N` (repeating), or `at: <time>` (each day the clock passes that time; also `dawn` or `dusk`; needs `clock:`), exactly one. N ≥ 1.
 - **Start:** `running` (default `true`, or `false` when `started_by` is given) starts it with the game. `started_by` and `stopped_by` take the same rules as `revealed_by`, including categories. They're checked when the action happens and isn't blocked by a `before_` handler. Starting a running timer leaves it alone.
 - **Counting:** a timer started during an action counts the actions after it. One started outside an action (the `start` handler, or a choice) counts from the next action.
 - **Firing:** due timers fire at the end of the turn, after `turn` handlers, in declaration order. `when` (Lua) is checked first; if false, the firing is skipped, and an `after` timer is then done. Then `say`, `do`, and `end` (an ending ID). Firing stops once an ending is requested.
@@ -177,6 +179,23 @@ Parse failures and meta commands (SAVE, UNDO, SCORE…) don't count.
 - **Scripts:** `start_timer(id)`, `stop_timer(id)` (both take effect when the script returns), and `timer_left(id)`, the number of actions left counting the current one, or `nil`.
 - **State:** running timers live in `GameState.timers` (ID → due turn), so they're saved and undone.
 - **Compiler checks:** schedule shape, ending IDs, rules, and literal `start_timer`/`stop_timer`/`timer_left` names. A warning is given for timers that do nothing.
+
+## Goals
+
+- **Adding:** after every action (and the opening, and choices), goals are checked in order. One not yet in the journal is added once its `when` (Lua) is true, or at once without `when`: `[goal.new]` (a notice) with `args.goal` (the rendered text) and `args.first` (no goal was added before). One added (or being added) whose `done` (Lua) is true is done: `[goal.done]`, and `points` are scored with `[score.gained]`. A goal whose `when` and `done` come true together is only announced as done. Nothing is checked once the game has ended.
+- **Scripts:** `start_goal(id)` adds a goal now, whatever its `when`; `complete_goal(id)` finishes it (added or not). Both take effect when the script returns. `goals.<id>` is `nil`, `"active"` or `"done"`; an unknown ID is an error.
+- **JOURNAL** (verb `journal`: journal, goals, objectives, tasks, quests; meta, takes no turn): `[journal.goals]` then `[journal.goal]` for each active goal, or `[journal.all_done]` when none are; then `[journal.done]` and `[journal.done_goal]` for each done one. No goal added yet `[journal.empty]`; no `goals:` `[journal.none_in_game]`.
+- **State:** `GameState.goals` (ID → done), so they're saved and undone.
+- **Compiler checks:** non-empty `text`, points ≥ 0, and literal `start_goal`/`complete_goal` names.
+
+## Time of day
+
+- **Times** are written `"7:30"`, `"07:30"`, `"19:00"`, `"7:30 pm"`, `"7pm"`, `"7:30 a.m."`, `noon`, `midnight`, or a bare hour (`7`).
+- **The clock:** `GameState.clock` is minutes since midnight on day 1, starting at `start`. Each action that takes a turn adds `minutes_per_turn` (≥ 1), when the turn counter goes up, before characters act. `pass_time(minutes)` (≥ 0) and `set_clock(time)` (forward to the next time it's that time; already then, no change) change it at once.
+- **Reading it:** `clock.time` (`"7:05 am"`), `clock.hour` (0–23), `clock.minute`, `clock.minutes` (after midnight), `clock.day` (from 1), `clock.night` (at or after `dusk`, or before `dawn`), `clock.daytime`, `clock.period` (`night`, else `morning` before 12:00, `afternoon` before 17:00, `evening`). Without `clock:`, these and `pass_time`/`set_clock` are compile errors.
+- **Timers** `at` a time are checked with the other timers: one fires when the clock has passed that time since timers were last checked (once, however many days were skipped). `timer_left` gives the actions until it's next due, at the clock's speed.
+- **TIME** (verb `time`: time, what time is it, check the time; meta): `[clock.now]` with `args.time`, `args.period`, `args.day`, `args.hour`, `args.minute`; without a clock `[clock.none]`.
+- **Status:** `Status.time` is `clock.time` when the clock has `show: true`, else null.
 
 ## Characters
 

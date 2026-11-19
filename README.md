@@ -1126,6 +1126,15 @@ Nineteen features reward players who try something clever:
   is shut inside something (a wardrobe, a barrel), a lamp in there with
   them lights it, even in a dark room.
 
+  Light shows through open ways between rooms: through an exit with no
+  door, or an open one. LOOK in a dark room next to a lit one adds
+  "Light spills in from the north." (or "from above"), and LOOK in a lit
+  room next to a dark one adds "It's dark to the north." Neither makes
+  anything visible. To reword them, override the messages
+  `look.light_from` and `look.dark_beyond`, and the phrases they list
+  (`look.from`, `look.toward`, and `look.from_up`, `look.toward_down` and
+  so on for up, down, in and out).
+
 - **Peeking:** PEEK THROUGH THE DOOR, PEEK NORTH, PEER NORTH or LOOK
   NORTH gives an impression of the next room without going in or being
   noticed: never its description, just whether anyone's there (and

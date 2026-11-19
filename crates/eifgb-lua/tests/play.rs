@@ -2714,6 +2714,42 @@ fn a_lamp_shut_in_a_bag_gives_no_light() {
     assert_says(&mut g, "look", "It's pitch dark.");
 }
 
+const NEXT_DOOR: &str = r#"format: eifgb/0.1
+game: { id: n, title: Next door, version: "1", start: hall }
+rooms:
+  hall: { name: Hall, exits: { north: { to: vault, through: vault_door }, east: cellar, down: pit } }
+  cellar: { name: Cellar, dark: true, exits: { west: hall, north: crypt } }
+  crypt: { name: Crypt, dark: true, exits: { south: cellar } }
+  vault: { name: Vault, dark: true, exits: { south: { to: hall, through: vault_door } } }
+  pit: { name: Pit, dark: true, exits: { up: hall } }
+objects:
+  vault_door: { name: vault door, in: hall, traits: [door, openable, scenery] }
+  lantern: { name: lantern, in: player, traits: [portable, light_source], state: { lit: false } }
+"#;
+
+#[test]
+fn light_shows_through_open_ways_between_dark_and_lit_rooms() {
+    let mut g = game(compile_str(NEXT_DOOR).story.unwrap());
+    // From the lit hall: the dark rooms through open ways, not the shut vault.
+    let out = say(&mut g, "look");
+    assert!(out.contains("It's dark to the east and below."), "{out}");
+    say(&mut g, "open vault door");
+    assert_says(&mut g, "look", "It's dark to the north, to the east and below.");
+    // From the dark cellar: light from the hall, none from the dark crypt.
+    let out = say(&mut g, "e");
+    assert!(out.contains("It's pitch dark. You can't see a thing.\nLight spills in from the west."), "{out}");
+    let out = say(&mut g, "n");
+    assert!(!out.contains("Light spills"), "{out}");
+    // With a lamp, the cellar is lit: the crypt beyond is dark, the hall isn't mentioned.
+    say(&mut g, "s");
+    let out = say(&mut g, "light lantern");
+    assert!(out.contains("It's dark to the north.") && !out.contains("west."), "{out}");
+    // Light comes up from below too: down in the pit, it's from above.
+    say(&mut g, "turn off lantern");
+    say(&mut g, "w");
+    assert_says(&mut g, "d", "Light spills in from above.");
+}
+
 #[test]
 fn only_characters_that_see_in_the_dark_can_find_you_there() {
     // No rat; a guard who can't see in the dark stands in the cellar.

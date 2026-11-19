@@ -45,19 +45,6 @@ patience instead of coins.
   less the merchant's haggle; counters ask for "something more".
 - Effort: small.
 
-### Light from next door
-
-LOOK in a dark room next to a lit one, with no door between them or an
-open one, describes the light coming through: "Light spills in from the
-north." (and the other way, darkness beyond a doorway from a lit room).
-
-- Builds on: darkness, `is_lit`, peeking (which already reads the next
-  room's light), doors' open state.
-- Shape: when describing a room, for each exit whose door is absent or
-  open, if the room beyond is lit and this one isn't (or the reverse), add
-  a sentence from a new message (`light.from`, with `args.from`).
-- Effort: small.
-
 ### Pushing and climbing
 
 PUSH CRATE NORTH to drag heavy things between rooms, STAND ON CRATE to
@@ -108,9 +95,6 @@ An author sets the look of their game, which players can still override:
 
 ### Smaller ideas
 
-- **Tap a word to act on it:** names of things in the text become tappable
-  (EXAMINE), with quick buttons for LOOK, INVENTORY and the compass. Needs
-  the engine to mark which words are things.
 - **Parchment theme:** paper texture, and a drop capital on each room's
   first line.
 - **Typewriter reveal:** text appears letter by letter; off by default,

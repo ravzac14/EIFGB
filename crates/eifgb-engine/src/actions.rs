@@ -154,6 +154,7 @@ impl<H: ScriptHost> Game<H> {
         if self.world.in_darkness() {
             self.msg_kind(LineKind::Title, "look.dark_title", &Ctx::new());
             self.msg("look.dark", &Ctx::new());
+            self.light_next_door(here, true);
             return;
         }
         let (name, description, exits) = {
@@ -203,6 +204,9 @@ impl<H: ScriptHost> Game<H> {
                 self.describe_contents(c);
             }
         }
+        if !self.world.player_sees_in_dark() {
+            self.light_next_door(here, false);
+        }
         let ways: Vec<String> = exits
             .iter()
             .filter(|x| x.to.is_some() && self.world.exit_visible(x))
@@ -214,6 +218,43 @@ impl<H: ScriptHost> Game<H> {
             let list = (self.grammar.lang().list_and)(&ways);
             self.msg("look.exits", &Ctx::new().text("list", list));
         }
+    }
+
+    /// Light through an open way (no door, or an open one) between rooms.
+    /// From a dark room (`from_dark`): "Light spills in from the north."
+    /// for each lit room next door. From a lit one: "It's dark to the
+    /// north." for each dark room next door.
+    fn light_next_door(&mut self, here: EntityId, from_dark: bool) {
+        let mut dirs: Vec<Direction> = Vec::new();
+        for e in &self.world.def(here).exits {
+            let Some(to) = e.to else { continue };
+            let open = e.through.is_none_or(|d| self.world.flag(d, "open"));
+            if to == here || !open || !self.world.exit_visible(e) || dirs.contains(&e.direction) {
+                continue;
+            }
+            if self.world.is_lit(to) == from_dark {
+                dirs.push(e.direction);
+            }
+        }
+        if dirs.is_empty() {
+            return;
+        }
+        let base = if from_dark { "look.from" } else { "look.toward" };
+        let phrases: Vec<String> = dirs
+            .iter()
+            .map(|&d| match d {
+                Direction::Up | Direction::Down | Direction::In | Direction::Out => {
+                    self.msg_str(&format!("{base}_{}", d.key()), &Ctx::new())
+                }
+                _ => {
+                    let word = self.grammar.direction_word(d);
+                    self.msg_str(base, &Ctx::new().text("direction", word))
+                }
+            })
+            .collect();
+        let list = (self.grammar.lang().list_and)(&phrases);
+        let key = if from_dark { "look.light_from" } else { "look.dark_beyond" };
+        self.msg(key, &Ctx::new().text("list", list));
     }
 
     /// Things worth naming in a room description or a list of contents.

@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- Light shows through open ways between rooms: in a dark room next to a
+  lit one, "Light spills in from the north."; in a lit room next to a dark
+  one, "It's dark to the north."
+
 - The home page's heading is now *Interactive Fiction Game Builder/Player*.
 - This changelog, on the website.
 - A tiny game to try at the top of the home page: you're locked in a study.

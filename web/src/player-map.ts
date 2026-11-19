@@ -114,13 +114,8 @@ function wrap(name: string): string[] {
   return b ? [a, b] : [a];
 }
 
-export interface DrawOptions {
-  /** Called with a direction when the player clicks a neighbouring room or an unexplored way. */
-  go?: (dir: string) => void;
-}
-
 /** Draws the map into `into` (replacing what's there) and scrolls the current room into view. */
-export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, Point>, opts: DrawOptions = {}) {
+export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, Point>) {
   const pos = placeRooms(map, author);
   const xs = [...pos.values()].map((p) => p.x), ys = [...pos.values()].map((p) => p.y);
   const pad = 46;
@@ -130,9 +125,6 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
   root.setAttribute("aria-label", `Map of the ${map.rooms.length === 1 ? "place" : `${map.rooms.length} places`} you've been`);
   const names = new Map(map.rooms.map((r) => [r.id, r.name]));
   const here = pos.get(map.here);
-  /** Directions from here, by the room they lead to. */
-  const fromHere = new Map<string, string>();
-  for (const e of map.exits) if (e.from === map.here && e.to && !fromHere.has(e.to)) fromHere.set(e.to, e.dir);
 
   const lines = svg("g", { class: "ways" });
   const seen = new Set<string>();
@@ -173,7 +165,6 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
       g.append(svg("line", { x1: p.x, y1: p.y, x2: end.x, y2: end.y }), svg("text", { x: end.x + (dx * 8), y: end.y + dy * 8 + 4 }, "?"));
       g.append(svg("title", {}, `${e.dir}${e.door ? `, through the ${e.door}` : ""}: not explored yet`));
       if (LABEL[e.dir]) g.append(svg("text", { x: (p.x + end.x) / 2, y: (p.y + end.y) / 2 - 6, class: "dir" }, LABEL[e.dir]));
-      if (e.from === map.here && opts.go) clickable(g, `Go ${e.dir}`, () => opts.go!(e.dir));
       lines.append(g);
     }
   }
@@ -186,8 +177,6 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
     const parts = wrap(names.get(id) ?? id);
     parts.forEach((t, i) => g.append(svg("text", { x: p.x, y: p.y + 5 + (i - (parts.length - 1) / 2) * 15 }, t)));
     g.append(svg("title", {}, id === map.here ? `${names.get(id)} (you are here)` : names.get(id) ?? id));
-    const dir = fromHere.get(id);
-    if (dir && opts.go) clickable(g, `Go ${dir}, to ${names.get(id)}`, () => opts.go!(dir));
     boxes.append(g);
   }
   root.append(boxes);
@@ -196,18 +185,4 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
     into.scrollLeft = here.x - minX - into.clientWidth / 2;
     into.scrollTop = here.y - minY - into.clientHeight / 2;
   }
-}
-
-function clickable(g: SVGGElement, label: string, go: () => void) {
-  g.classList.add("go");
-  g.setAttribute("role", "button");
-  g.setAttribute("tabindex", "0");
-  g.setAttribute("aria-label", label);
-  g.addEventListener("click", go);
-  g.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" || ev.key === " ") {
-      ev.preventDefault();
-      go();
-    }
-  });
 }

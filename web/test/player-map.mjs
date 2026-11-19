@@ -49,15 +49,13 @@ assert.equal(new Set([...pos.values()].map((p) => `${p.x},${p.y}`)).size, pos.si
 const author = authorPositions("# comment\nrooms:\n  hall: [420, 260]\n  study: [0, 0]\n");
 assert.deepEqual(placeRooms(m, author).get("hall"), { x: 320, y: 180 });
 
-// Drawn: a box per room, the current one marked; the way back down can be clicked.
+// Drawn: a box per room, the current one marked. Nothing on the map moves
+// the player: every action is typed.
 GlobalRegistrator.register();
 const box = document.createElement("div");
-const went = [];
-drawMap(box, m, new Map(), { go: (d) => went.push(d) });
+drawMap(box, m, new Map());
 assert.equal(box.querySelectorAll(".room").length, 3);
 assert.equal(box.querySelector(".room.here title").textContent, "Attic (you are here)");
-const study = [...box.querySelectorAll(".room")].find((g) => g.querySelector("title").textContent === "Study");
-study.dispatchEvent(new Event("click"));
-assert.deepEqual(went, ["down"]);
+assert.equal(box.querySelectorAll("[role=button], [tabindex]").length, 0, "nothing on the map is clickable");
 assert.ok(box.querySelector(".stub"), "unexplored ways are drawn");
 console.log("ok   player map");

@@ -164,7 +164,7 @@ function refreshMap() {
   if (mapBox.hidden || !engine) return;
   const m = engine.map();
   if ("error" in m) return;
-  drawMap(mapBody, m, author, { go: (dir) => !over && send(dir) });
+  drawMap(mapBody, m, author);
 }
 
 function showMap(open: boolean, remember = true) {

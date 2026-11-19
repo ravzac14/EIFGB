@@ -80,9 +80,4 @@
 .pmap .room text { fill: var(--fg); text-anchor: middle; }
 .pmap .room.here rect { stroke: var(--accent); stroke-width: 3; }
 .pmap .room.here text { font-weight: bold; }
-.pmap .go { cursor: pointer; }
-.pmap .go:hover rect, .pmap .go:focus-visible rect { stroke: var(--accent); }
-.pmap .go:hover line, .pmap .go:focus-visible line, .pmap .stub.go:hover text { stroke: var(--accent); fill: var(--accent); }
-.pmap .go:focus { outline: none; }
-.pmap .go:focus-visible rect { stroke-width: 3; }
 #map-open[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }

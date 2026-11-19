@@ -894,7 +894,10 @@ players meet them, and write each `when` to be true from when the puzzle
 can be found until it's solved. Hints take no turn, and are saved with the
 game. Steps are text, so `${…}` works in them.
 
-The editor's starter templates all have hints to copy from.
+In the web editor, add one with **Add component → Hint**, or under
+**Hints** in the game's details. Each hint's panel has its steps, the
+"Offered while" condition, and **Earlier**/**Later** to put them in
+order. The editor's starter templates all have hints to copy from.
 
 ## Characters: NPCs and enemies
 

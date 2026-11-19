@@ -241,6 +241,23 @@ console.log("ok   editor characters");
   assert.match(g.toString(), /verbs:\n\s+ring:\n\s+patterns: \["ring \{target\}"\]\n\s+default: Nothing happens./);
   assert.deepEqual(errors(g.toString()).filter((e) => !/talk/.test(e.message)), []);
   void v;
+
+  // Hints: steps as a list, a `when`, and an order that can change.
+  const h1 = g.addHint("Find the key");
+  const h2 = g.addHint("Open the gate");
+  assert.deepEqual([h1, h2], ["find_the_key", "open_the_gate"]);
+  assert.deepEqual(g.list(["hints", h1, "steps"]), ["A nudge: what should the player notice?", "The answer: what to type."]);
+  g.setHintSteps(h1, ["Look around.", "Something's under the ${'mat'}: what is it?", "SEARCH MAT."]);
+  g.set(["hints", h1, "when"], "vars.gold == 0");
+  assert.match(g.toString(), /hints:\n  find_the_key:\n    steps:\n      - Look around\.\n/);
+  assert.deepEqual(errors(g.toString()).filter((e) => !/talk/.test(e.message)), []);
+  assert.ok(g.moveEntry("hints", h2, -1));
+  assert.deepEqual(g.ids("hints"), [h2, h1]);
+  assert.equal(g.moveEntry("hints", h2, -1), false, "already first");
+  assert.equal(g.renameEntry("hints", h1, "key"), "key");
+  g.deleteEntry("hints", "key");
+  g.deleteEntry("hints", h2);
+  assert.doesNotMatch(g.toString(), /hints:/);
 }
 console.log("ok   editor scripts");
 

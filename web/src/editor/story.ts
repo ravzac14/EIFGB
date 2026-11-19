@@ -150,7 +150,7 @@ function options(list: [string, string][], value: string): HTMLOptionElement[] {
 
 // ---------------------------------------------- the game panel's story list
 
-function entryRow(ctx: InspectorContext, kind: "ending" | "timer" | "choice" | "verb", id: string, note: string) {
+function entryRow(ctx: InspectorContext, kind: "ending" | "timer" | "hint" | "choice" | "verb", id: string, note: string) {
   const selected = ctx.selection?.kind === kind && ctx.selection.id === id;
   const row = el("div", { class: `thing${selected ? " selected" : ""}` }, el("span", { class: "name", textContent: id.replace(/_/g, " ") }), el("span", { class: "tag", textContent: note }));
   if (problemsAt(ctx, `${kind === "choice" ? "choices" : `${kind}s`}.${id}`).some((d) => d.severity === "error")) row.classList.add("bad");
@@ -200,6 +200,21 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
       let id = "";
       ctx.change((x) => (id = x.addTimer()));
       ctx.select({ kind: "timer", id });
+    })),
+  );
+
+  // Hints.
+  const hints = m.ids("hints");
+  group(
+    "Hints",
+    el("ul", { class: "things" }, ...hints.map((h) => entryRow(ctx, "hint", h, `${m.list(["hints", h, "steps"]).length} steps`))),
+    ...(hints.length
+      ? [help("HINT gives the next step of the first one here that's offered, so keep them in the order players meet the puzzles.")]
+      : [help("Help for players who are stuck: for each puzzle, a nudge first and the answer last. Players type HINT.")]),
+    el("div", { class: "actions" }, button("Add a hint", () => {
+      let id = "";
+      ctx.change((x) => (id = x.addHint()));
+      ctx.select({ kind: "hint", id });
     })),
   );
 
@@ -323,7 +338,7 @@ function variablesSection(ctx: InspectorContext): HTMLElement[] {
 
 // -------------------------------------------------------------- endings
 
-function renameRow(ctx: InspectorContext, section: string, id: string, kind: "ending" | "timer" | "choice" | "verb") {
+function renameRow(ctx: InspectorContext, section: string, id: string, kind: "ending" | "timer" | "hint" | "choice" | "verb") {
   const input = el("input", { type: "text", value: id, ariaLabel: "ID" }) as HTMLInputElement;
   const msg = help("");
   return [
@@ -453,6 +468,61 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
     el("div", { class: "actions" }, button("Delete this timer", () => {
       if (!confirm(`Delete the timer “${id}”?`)) return;
       ctx.change((x) => x.deleteEntry("timers", id));
+      ctx.select(null);
+    }, "danger")),
+  );
+}
+
+// ---------------------------------------------------------------- hints
+
+export function hintPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
+  const m = ctx.model;
+  const p = ["hints", id];
+  const all = m.ids("hints");
+  const at = all.indexOf(id);
+  const steps = m.list([...p, "steps"]);
+  const when = String(m.get([...p, "when"]) ?? "");
+  const stepRow = (text: string, i: number) => {
+    const box = el("textarea", { rows: 2, value: text, ariaLabel: `Step ${i + 1}`, placeholder: i === 0 ? "A nudge…" : "…or the answer" }) as HTMLTextAreaElement;
+    box.addEventListener("input", () =>
+      ctx.change(
+        (x) => {
+          const now = x.list([...p, "steps"]);
+          now[i] = box.value;
+          x.setHintSteps(id, now);
+        },
+        { coalesce: `${id}.step${i}`, redraw: false },
+      ),
+    );
+    const remove = button("Remove", () => ctx.change((x) => x.setHintSteps(id, x.list([...p, "steps"]).filter((_, k) => k !== i))));
+    remove.disabled = steps.length < 2;
+    remove.title = steps.length < 2 ? "A hint needs at least one step" : `Remove step ${i + 1}`;
+    return el("li", { class: "hint-step" }, el("span", { class: "dim", textContent: `${i + 1}.` }), box, remove);
+  };
+  panel.append(
+    el("p", { class: "kind", textContent: "Hint" }),
+    el("h2", { textContent: id.replace(/_/g, " ") }),
+    help("When a player types HINT, they get the next step: the first, then the second, and so on, with the last one repeated. Start with a nudge, and end with the answer."),
+    el("label", { textContent: "Steps" }),
+    el("ol", { class: "hint-steps" }, ...steps.map(stepRow)),
+    el("div", { class: "actions" }, button("Add a step", () => ctx.change((x) => x.setHintSteps(id, [...x.list([...p, "steps"]), ""])))),
+    el("label", { textContent: "Offered while (Lua)" }),
+    codeBox(when, (v) => ctx.change((x) => x.set([...p, "when"], v.trim() || undefined), { coalesce: `${id}.when`, redraw: false }), "Offered while", 1),
+    help("A condition that's true from when the puzzle can be found until it's solved, like world.small_key.hidden or not world.gate.open. Empty: always offered."),
+    el("label", { textContent: "Order" }),
+    el(
+      "div",
+      { class: "row" },
+      Object.assign(button("Earlier", () => ctx.change((x) => x.moveEntry("hints", id, -1))), { disabled: at <= 0 }),
+      Object.assign(button("Later", () => ctx.change((x) => x.moveEntry("hints", id, 1))), { disabled: at < 0 || at >= all.length - 1 }),
+      el("span", { class: "dim", textContent: `${at + 1} of ${all.length}` }),
+    ),
+    help("HINT uses the first hint in the list that's offered, so put them in the order players meet the puzzles."),
+    ...problemNotes(ctx, `hints.${id}`),
+    ...renameRow(ctx, "hints", id, "hint"),
+    el("div", { class: "actions" }, button("Delete this hint", () => {
+      if (!confirm(`Delete the hint “${id}”?`)) return;
+      ctx.change((x) => x.deleteEntry("hints", id));
       ctx.select(null);
     }, "danger")),
   );

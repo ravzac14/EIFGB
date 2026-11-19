@@ -18,6 +18,7 @@ export type Selection =
   | { kind: "faction"; id: string }
   | { kind: "ending"; id: string }
   | { kind: "timer"; id: string }
+  | { kind: "hint"; id: string }
   | { kind: "choice"; id: string }
   | { kind: "verb"; id: string };
 

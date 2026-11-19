@@ -241,3 +241,7 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .download-dialog { max-width: 32rem; }
 .download-dialog .choice-row { display: grid; gap: 0.3rem; margin: 0.9rem 0; justify-items: start; }
 .download-dialog .choice-row p { margin: 0; font-size: 0.9em; }
+.hint-steps { list-style: none; padding: 0; margin: 0 0 0.4rem; display: grid; gap: 0.4rem; }
+.hint-step { display: grid; grid-template-columns: auto 1fr auto; gap: 0.4rem; align-items: start; }
+.hint-step textarea { width: 100%; resize: vertical; font: inherit; }
+.hint-step > span { padding-top: 0.35rem; }

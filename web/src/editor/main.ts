@@ -119,7 +119,7 @@ function load(yaml: string, map?: string) {
   if (selection?.kind === "thing" && !model?.thing(selection.id)) selection = null;
   if (selection?.kind === "character" && !model?.character(selection.id)) selection = null;
   if (selection?.kind === "faction" && !model?.faction(selection.id)) selection = null;
-  for (const [kind, section] of [["ending", "endings"], ["timer", "timers"], ["choice", "choices"], ["verb", "verbs"]] as const) {
+  for (const [kind, section] of [["ending", "endings"], ["timer", "timers"], ["hint", "hints"], ["choice", "choices"], ["verb", "verbs"]] as const) {
     if (selection?.kind === kind && !model?.ids(section).includes(selection.id)) selection = null;
   }
   redraw();
@@ -421,7 +421,7 @@ function goTo(path: string) {
   if (parts[0] === "objects" && parts[1] && model?.thing(parts[1])) return select({ kind: "thing", id: parts[1] });
   if (parts[0] === "characters" && parts[1] && model?.character(parts[1])) return select({ kind: "character", id: parts[1] });
   if (parts[0] === "factions" && parts[1] && model?.faction(parts[1])) return select({ kind: "faction", id: parts[1] });
-  for (const [kind, section] of [["ending", "endings"], ["timer", "timers"], ["choice", "choices"], ["verb", "verbs"]] as const) {
+  for (const [kind, section] of [["ending", "endings"], ["timer", "timers"], ["hint", "hints"], ["choice", "choices"], ["verb", "verbs"]] as const) {
     if (parts[0] === section && parts[1] && model?.ids(section).includes(parts[1])) return select({ kind, id: parts[1] });
   }
   if (parts[0] === "on") return select(null);
@@ -620,7 +620,7 @@ document.addEventListener("keydown", (e) => {
         selection = null;
         change((m) => m.deleteFaction(id));
       }
-    } else if (selection.kind === "ending" || selection.kind === "timer" || selection.kind === "choice" || selection.kind === "verb") {
+    } else if (selection.kind === "ending" || selection.kind === "timer" || selection.kind === "hint" || selection.kind === "choice" || selection.kind === "verb") {
       const { kind, id } = selection;
       const section = kind === "choice" ? "choices" : `${kind}s`;
       if (confirm(`Delete the ${kind === "choice" ? "conversation" : kind} “${id}”?`)) {

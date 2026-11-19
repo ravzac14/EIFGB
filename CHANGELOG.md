@@ -9,7 +9,8 @@ behave will be called out here.
 - Hints: a `hints:` section lists puzzles in the order players meet them,
   each with steps from a nudge to the answer and a `when` that's true while
   it's unsolved. HINT shows the next step for the puzzle the player is on
-  (it used to be the same as HELP). The starter templates have hints.
+  (it used to be the same as HELP). The starter templates have hints, and
+  the editor can add and edit them (Add component → Hint).
 - Record a walkthrough in the editor: play from the start in Test play,
   then **Save as walkthrough**. After every change, the editor replays it,
   says in Test play whether it still wins, and warns under Problems when it

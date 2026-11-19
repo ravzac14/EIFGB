@@ -791,6 +791,31 @@ export class Model {
     return this.addEntry("timers", name, { after: 5, say: "Something happens." }, ["characters", "objects", "rooms"]);
   }
 
+  /** A puzzle's hints: a nudge, then the answer, offered always until given a `when`. */
+  addHint(name = "hint"): string {
+    const id = this.addEntry("hints", name, {}, ["timers", "endings", "choices", "characters", "objects", "rooms"]);
+    this.setHintSteps(id, ["A nudge: what should the player notice?", "The answer: what to type."]);
+    return id;
+  }
+
+  /** A hint's steps, one a line in the file, as written (empty ones too, while being typed). */
+  setHintSteps(id: string, steps: string[]) {
+    const seq = this.doc.createNode(steps) as YAMLSeq;
+    seq.flow = false;
+    this.doc.setIn(["hints", id, "steps"], seq);
+  }
+
+  /** Moves an entry of a top-level section earlier (-1) or later (+1): for hints, whose order matters. */
+  moveEntry(section: string, id: string, by: -1 | 1): boolean {
+    const m = this.map([section]);
+    if (!m) return false;
+    const i = m.items.findIndex((p) => (isScalar(p.key) ? p.key.value : p.key) === id);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= m.items.length) return false;
+    [m.items[i], m.items[j]] = [m.items[j], m.items[i]];
+    return true;
+  }
+
   addVerb(word: string): string {
     const id = slug(word, "verb");
     const added = this.addEntry("verbs", id, { patterns: [`${id.replace(/_/g, " ")} {target}`], default: "Nothing happens." }, ["characters", "objects", "rooms"]);

@@ -7,7 +7,7 @@ import {
 } from "./model.ts";
 import { THING_DRAG, factionHue } from "./map.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
-import { choicePanel, endingPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
+import { choicePanel, endingPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, roomName, select, type InspectorContext } from "./ui.ts";
 
 export type { InspectorContext } from "./ui.ts";
@@ -23,6 +23,7 @@ export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   if (s?.kind === "faction" && ctx.model.faction(s.id)) return factionPanel(panel, ctx, s.id);
   if (s?.kind === "ending" && ctx.model.ids("endings").includes(s.id)) return endingPanel(panel, ctx, s.id);
   if (s?.kind === "timer" && ctx.model.ids("timers").includes(s.id)) return timerPanel(panel, ctx, s.id);
+  if (s?.kind === "hint" && ctx.model.ids("hints").includes(s.id)) return hintPanel(panel, ctx, s.id);
   if (s?.kind === "choice" && ctx.model.choice(s.id)) return choicePanel(panel, ctx, s.id);
   if (s?.kind === "verb" && ctx.model.ids("verbs").includes(s.id)) return verbPanel(panel, ctx, s.id);
   gamePanel(panel, ctx);

@@ -192,6 +192,25 @@ export const COMPONENTS: Component[] = [
     },
   },
   {
+    id: "hint",
+    name: "Hint",
+    about: "Help for a puzzle, for players who type HINT: a nudge first, the answer last.",
+    form: (h, done) => {
+      const name = text("Puzzle's name", "find the key, open the gate…");
+      const add = button(
+        "Add the hint",
+        () => {
+          let id = "";
+          h.change((x) => (id = x.addHint(name.value.trim() || "hint")));
+          done();
+          h.select({ kind: "hint", id });
+        },
+        "primary",
+      );
+      return [...field("Which puzzle is it for?", name), el("div", { class: "row" }, add)];
+    },
+  },
+  {
     id: "conversation",
     name: "Conversation",
     about: "A conversation or menu, with numbered choices the player types.",

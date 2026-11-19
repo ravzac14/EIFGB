@@ -554,6 +554,23 @@ addComponent("verb");
 assert.ok($('#add-dialog [data-component="room"]'));
 addButton("Cancel").click();
 assert.equal($("#add-dialog").open, false);
+// A hint, from Add component; then its steps and condition in the details panel.
+addComponent("hint");
+form("Puzzle's name").value = "Light the lamp";
+addButton("Add the hint").click();
+assert.match(yaml(), /hints:\n  light_the_lamp:\n    steps:\n      - "A nudge: what should the player notice\?"/);
+const stepBox = (n) => $(`#inspector textarea[aria-label="Step ${n}"]`);
+stepBox(1).value = "The lamp needs oil.";
+stepBox(1).dispatchEvent(new Event("input"));
+clickButton("Add a step");
+stepBox(3).value = "FILL LAMP.";
+stepBox(3).dispatchEvent(new Event("input"));
+const offered = $('#inspector textarea[aria-label="Offered while"]');
+offered.value = "vars.lamp_oil > 0";
+offered.dispatchEvent(new Event("input"));
+assert.match(yaml(), /light_the_lamp:\n    steps:\n      - The lamp needs oil\.\n      - "The answer: what to type\."\n      - FILL LAMP\.\n    when: vars.lamp_oil > 0/);
+[...document.querySelectorAll("#inspector .hint-step")][1].querySelector("button").click();
+assert.equal(document.querySelectorAll("#inspector .hint-step").length, 2);
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
 

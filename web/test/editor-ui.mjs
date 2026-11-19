@@ -496,6 +496,67 @@ assert.ok(projectFiles()["scripts/helpers.lua"]);
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
 
+// Add component: one button for everything, a form where it needs one.
+const addComponent = (which) => {
+  $("#add-component").click();
+  assert.ok($("#add-dialog").open, "the window opens");
+  $(`#add-dialog [data-component="${which}"]`).click();
+};
+const form = (label) => [...document.querySelectorAll("#add-dialog select, #add-dialog input")].find((x) => x.getAttribute("aria-label") === label);
+const addButton = (text) => [...document.querySelectorAll("#add-dialog button")].find((b) => b.textContent === text);
+// A room: added straight away, in the middle of the map.
+const roomsBefore = (yaml().match(/^  \w+:\n    name: New room/gm) ?? []).length;
+addComponent("room");
+assert.equal($("#add-dialog").open, false);
+assert.equal((yaml().match(/^  \w+:\n    name: New room/gm) ?? []).length, roomsBefore + 1);
+assert.equal($("#inspector .kind").textContent, "Room");
+// An object: it asks which room (suggesting the selected one) before it's made.
+press($(`#map [data-room="${eastRoom}"]`));
+const before = yaml();
+addComponent("object");
+assert.equal(yaml(), before, "nothing is made until the room is chosen");
+assert.equal(form("Room to add it to").value, eastRoom);
+form("Kind of object").value = "container";
+form("Kind of object").dispatchEvent(new Event("change"));
+form("Room to add it to").value = "first_room";
+form("Room to add it to").dispatchEvent(new Event("change"));
+addButton("Add the object").click();
+assert.equal($("#add-dialog").open, false);
+assert.match(yaml(), /\n  box:\n    name: box\n    in: first_room\n    traits: \[container, openable\]/);
+assert.equal($("#inspector .kind").textContent, "Thing");
+// A character, an ending, a variable and a door.
+addComponent("character");
+form("Room to add them to").value = "first_room";
+form("Room to add them to").dispatchEvent(new Event("change"));
+addButton("Add the character").click();
+assert.match(yaml(), /characters:[^]*?in: first_room/);
+addComponent("ending");
+form("Ending's name").value = "Escaped";
+form("Kind of ending").value = "loss";
+form("Kind of ending").dispatchEvent(new Event("change"));
+addButton("Add the ending").click();
+assert.match(yaml(), /endings:[^]*?escaped(_\d+)?:\n\s+kind: loss/);
+addComponent("variable");
+form("Variable's name").value = "lamp_oil";
+form("Its starting value").value = "3";
+addButton("Add the variable").click();
+assert.match(yaml(), /vars:[^]*?lamp_oil: 3/);
+addComponent("door");
+form("Room the door is in").value = "first_room";
+form("Room the door is in").dispatchEvent(new Event("change"));
+assert.ok(form("Which way"), $("#add-dialog").textContent);
+form("Door's name").value = "oak door";
+addButton("Add the door").click();
+assert.match(yaml(), /name: oak door\n\s+in: first_room\n\s+traits: \[door, openable, scenery\]/);
+// Back to the list from a form, and Cancel closes it.
+addComponent("verb");
+[...document.querySelectorAll("#add-dialog button")].find((b) => b.textContent.startsWith("←")).click();
+assert.ok($('#add-dialog [data-component="room"]'));
+addButton("Cancel").click();
+assert.equal($("#add-dialog").open, false);
+await tick(1500);
+assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
+
 // Test play, in the drawer: the game as it is, from the start room or a chosen one.
 $("#tab-play").click();
 for (let i = 0; i < 40 && !$("#panel-play .tp-log .title"); i++) await tick(50);

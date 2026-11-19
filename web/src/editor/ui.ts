@@ -85,6 +85,8 @@ export function select(options: [string, string][], value: string, onchange: (v:
     o.selected = v === value;
     s.append(o);
   }
+  // Set as well as marked: an option marked before the list is on the page isn't always honoured.
+  if (options.some(([v]) => v === value)) s.value = value;
   s.addEventListener("change", () => onchange(s.value));
   return s;
 }

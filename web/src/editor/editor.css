@@ -218,3 +218,16 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .canvas.blueprint .map-tools button { background: var(--panel); border-color: var(--line); color: var(--fg); }
 .canvas.blueprint .map-tools select { background: var(--panel); border-color: var(--line); color: var(--fg); }
 .canvas.blueprint .map-hint { color: var(--dim); }
+
+/* Add component */
+.add-dialog { width: min(34rem, calc(100vw - 32px)); font-family: var(--sans); }
+.add-dialog h2 { margin-top: 0; }
+.components { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.component { width: 100%; display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.6rem; align-items: baseline; text-align: left; padding: 0.5rem 0.7rem; }
+.component span { color: var(--dim); font-size: 0.9em; }
+.component:hover strong, .component:focus-visible strong { color: var(--accent); }
+.component-form { display: grid; gap: 0.3rem; margin: 0.6rem 0; }
+.component-form label { font-weight: 600; margin-top: 0.4rem; }
+.component-form select, .component-form input[type=text] { width: 100%; box-sizing: border-box; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.4em 0.5em; }
+.component-form .row { margin-top: 0.6rem; }
+@media (max-width: 30rem) { .component { grid-template-columns: 1fr; gap: 0.1rem; } }

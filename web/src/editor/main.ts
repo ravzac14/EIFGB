@@ -11,7 +11,8 @@ import { feedbackButton, feedbackContext } from "../feedback.ts";
 import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
 import { MAP_FILE, besideRoom, layout, readMap, writeMap, type Point, type Positions } from "./layout.ts";
 import { MapView, type Selection } from "./map.ts";
-import { renderInspector } from "./inspector.ts";
+import { renderInspector, type InspectorContext } from "./inspector.ts";
+import { openAddComponent } from "./add-component.ts";
 import { TestPlay } from "./testplay.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -206,7 +207,12 @@ function redraw() {
     $("inspector").replaceChildren(el("p", { className: "dim", textContent: "Fix the mistake in the game file to see the map." }));
     return;
   }
-  renderInspector($("inspector"), {
+  renderInspector($("inspector"), inspectorContext(model));
+}
+
+/** What the details panel (and Add component) can see and do. */
+function inspectorContext(model: Model): InspectorContext {
+  return {
     model,
     selection,
     change,
@@ -237,7 +243,7 @@ function redraw() {
         const { colour: _old, ...rest } = p;
         positions.set(id, colour ? { ...rest, colour } : rest);
       }),
-  });
+  };
 }
 
 /** A new Lua file under scripts/, listed in the game's `scripts:`. */
@@ -516,9 +522,15 @@ $("map-theme").addEventListener("change", () => {
   mapTheme.set(t);
   showMapTheme(t);
 });
-$("add-room").addEventListener("click", () => {
-  const r = $("map").getBoundingClientRect();
-  addAt(mapView.toMap(r.left + r.width / 2, r.top + r.height / 2));
+$("add-component").addEventListener("click", () => {
+  if (!model) return;
+  openAddComponent($<HTMLDialogElement>("add-dialog"), {
+    ...inspectorContext(model),
+    addRoom: () => {
+      const r = $("map").getBoundingClientRect();
+      addAt(mapView.toMap(r.left + r.width / 2, r.top + r.height / 2));
+    },
+  });
 });
 $("zoom-in").addEventListener("click", () => mapView.zoom(1.25));
 $("zoom-out").addEventListener("click", () => mapView.zoom(0.8));

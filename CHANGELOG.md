@@ -6,6 +6,11 @@ behave will be called out here.
 
 ## Unreleased
 
+- The editor's "+ Room" button is now "Add component", for anything a game
+  can have: a room (added straight away, as before), an object or a
+  character (it asks which room first), a door, a side, an ending, a
+  conversation, a verb, a timer, a variable or a script file.
+
 - Room colours in the editor, to group rooms into areas (the castle, the
   forest): pick one for each room, and it shows on the player's map too.
   They're kept in `map.yaml`, so the game itself doesn't change.

@@ -145,6 +145,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
       el("li", { textContent: "Test play, at the bottom, plays your game right here: from the start, or from the room you've selected." }),
       el("li", { textContent: "Click a line to choose its door, or to make it one way." }),
       el("li", { textContent: "Double-click empty space for a new room on its own." }),
+      el("li", { textContent: "Add component, above the map, adds anything else: an object, a character, a door, an ending and more." }),
       el("li", { textContent: "Drag things in a room's list onto another room on the map, or into a box or onto a table in the list." }),
     ),
   );
@@ -411,7 +412,7 @@ function doorForm(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
 // ------------------------------------------------------------- things
 
-const KIND_LABEL: Record<Kind, string> = {
+export const KIND_LABEL: Record<Kind, string> = {
   carry: "Something to pick up",
   scenery: "Part of the room",
   container: "A container (box, chest)",
@@ -734,7 +735,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
 // ------------------------------------------------------- characters
 
-const PERSON_LABEL: Record<Person, string> = {
+export const PERSON_LABEL: Record<Person, string> = {
   talker: "Someone to talk to",
   merchant: "A shopkeeper",
   wanderer: "Someone who wanders",

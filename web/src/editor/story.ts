@@ -280,7 +280,7 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
 }
 
 /** Values as typed: true/false and numbers become those; anything else is text. */
-function parseValue(s: string): unknown {
+export function parseValue(s: string): unknown {
   const t = s.trim();
   if (t === "true" || t === "false") return t === "true";
   if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);

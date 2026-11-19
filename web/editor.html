@@ -61,7 +61,7 @@
   <section class="canvas" aria-label="Map">
     <svg id="map" role="application" aria-label="The map of rooms. Click a room to select it."></svg>
     <div class="map-tools ui">
-      <button id="add-room" type="button">+ Room</button>
+      <button id="add-component" type="button" class="primary" aria-haspopup="dialog">Add component</button>
       <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
       <button id="fit" type="button">Fit</button>
@@ -91,6 +91,7 @@
   </section>
 </div>
 <dialog id="settings"></dialog>
+<dialog id="add-dialog" class="add-dialog" aria-label="Add a component"></dialog>
 <script type="module" src="./src/editor/main.ts"></script>
 </body>
 </html>

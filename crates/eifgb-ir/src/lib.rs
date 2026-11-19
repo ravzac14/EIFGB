@@ -255,6 +255,9 @@ pub struct Settings {
     /// How many actions tracks last before fading. 0 means no tracks.
     #[serde(default = "thirty")]
     pub track_life: u32,
+    /// End room descriptions with the ways out ("Known exits: north.").
+    #[serde(default = "yes")]
+    pub list_exits: bool,
 }
 
 fn thirty() -> u32 {
@@ -263,7 +266,7 @@ fn thirty() -> u32 {
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { describe_state: true, voice: 2, track_life: 30 }
+        Settings { describe_state: true, voice: 2, track_life: 30, list_exits: true }
     }
 }
 
@@ -361,6 +364,10 @@ pub struct Entity {
     /// Rooms: soft ground, where things can be buried.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub diggable: bool,
+    /// Rooms: whether this room's description lists its exits, overriding
+    /// `settings.list_exits`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub list_exits: Option<bool>,
     /// Rooms: unlit, so peeking in shows nothing unless a light is burning.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub dark: bool,

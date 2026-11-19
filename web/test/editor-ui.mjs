@@ -279,6 +279,21 @@ looks().dispatchEvent(new Event("change"));
 assert.doesNotMatch(yaml(), /presentation/);
 looks().value = "sepia";
 looks().dispatchEvent(new Event("change"));
+// Listing exits: on by default; off for the game, and back on for one room.
+const checkbox = (start) => [...document.querySelectorAll("#inspector label.check")].find((l) => l.textContent.startsWith(start)).querySelector("input");
+checkbox("List each room's exits").checked = false;
+checkbox("List each room's exits").dispatchEvent(new Event("change"));
+assert.match(yaml(), /settings:\n\s+list_exits: false/);
+press($('#map [data-room="first_room"]'));
+assert.equal(checkbox("Lists its exits").checked, false, "a room follows the game's setting");
+checkbox("Lists its exits").checked = true;
+checkbox("Lists its exits").dispatchEvent(new Event("change"));
+assert.match(yaml(), /first_room:[^]*?list_exits: true/);
+pointer($("#map"), "pointerdown", 5, 5);
+pointer($("#map"), "pointerup", 5, 5);
+checkbox("List each room's exits").checked = true;
+checkbox("List each room's exits").dispatchEvent(new Event("change"));
+assert.doesNotMatch(yaml(), /settings:/, "back to the default: no settings section left");
 
 // It all compiles.
 await tick(1500);

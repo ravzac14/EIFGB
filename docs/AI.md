@@ -68,7 +68,9 @@ unknown section or field is an error, not ignored, so a typo is caught.
 - **Exits:** `north: pantry`; `south: "The sea. Not tonight."` (always
   blocked, with that message); or `{ to, through, when, blocked }`.
   Directions: north, south, east, west, northeast, northwest, southeast,
-  southwest, up, down, in, out.
+  southwest, up, down, in, out. Room descriptions end with "Known exits:"
+  and the ways out open right now; `settings: { list_exits: false }` (or
+  `list_exits: false` on a room) leaves that out.
 - **Doors:** an object with the `door` trait (usually `openable`, maybe
   `lockable` with `unlocks_with: <key id>`), placed `in:` one of the two
   rooms, and an exit `through:` it. The way back is added automatically.

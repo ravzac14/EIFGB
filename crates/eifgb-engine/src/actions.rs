@@ -209,11 +209,19 @@ impl<H: ScriptHost> Game<H> {
         if !self.world.player_sees_in_dark() {
             self.light_next_door(here, false);
         }
-        let ways: Vec<String> = exits
-            .iter()
-            .filter(|x| x.to.is_some() && self.world.exit_visible(x))
-            .map(|x| self.grammar.direction_word(x.direction))
-            .collect();
+        let list = self.world.def(here).list_exits.unwrap_or(self.world.story().meta.settings.list_exits);
+        if !list {
+            return;
+        }
+        // The ways out the player can take right now: not through a secret
+        // door they haven't found, and not one whose `when` is false.
+        let mut dirs: Vec<Direction> = Vec::new();
+        for x in &exits {
+            if x.to.is_some() && self.world.exit_visible(x) && !dirs.contains(&x.direction) && self.exit_allowed(x, here) {
+                dirs.push(x.direction);
+            }
+        }
+        let ways: Vec<String> = dirs.iter().map(|&d| self.grammar.direction_word(d)).collect();
         if ways.is_empty() {
             self.msg("look.no_exits", &Ctx::new());
         } else {

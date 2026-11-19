@@ -124,7 +124,7 @@ A flat clearing beside your tent. In the middle is a ring of blackened stones:
 the fire pit. A trail leads north into the woods.
 You can see a backpack here.
 In the backpack you can see a box of matches and a bag of marshmallows.
-Exits: north.
+Known exits: north.
 ```
 
 ## Step 2: a backpack that frees your hands

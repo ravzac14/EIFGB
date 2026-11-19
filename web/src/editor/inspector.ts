@@ -94,6 +94,15 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
       "Starting room",
     ),
     ...lookFields(ctx),
+    check("List each room's exits after its description", m.bool(["settings", "list_exits"], true), (v) =>
+      ctx.change((x) => {
+        x.setBool(["settings", "list_exits"], v, true);
+        // No empty `settings: {}` left behind.
+        const left = x.get(["settings"]);
+        if (left && typeof left === "object" && "items" in left && !(left as { items: unknown[] }).items.length) x.set(["settings"], undefined);
+      }),
+    ),
+    help("“Known exits: north and up.” Only the ways that are open to the player right now are listed."),
     el("h3", { textContent: "Carried at the start" }),
     thingTree(ctx, "player", "Nothing yet. Drag things here, or add one."),
     addThingRow(ctx, "player"),
@@ -170,6 +179,9 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       else ctx.change(() => {}); // a game needs a start: keep it, and redraw
     }),
     check("It's dark: the player needs a light to see", r.dark, (v) => ctx.change((x) => x.set(["rooms", id, "dark"], v || undefined))),
+    check("Lists its exits after the description", m.bool(["rooms", id, "list_exits"], m.bool(["settings", "list_exits"], true)), (v) =>
+      ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
+    ),
     el("h3", { textContent: "Ways out" }),
   );
   if (exits.length) panel.append(el("ul", { class: "exits" }, ...exits.map((e) => exitLine(ctx, id, e))));

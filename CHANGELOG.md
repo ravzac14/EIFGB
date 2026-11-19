@@ -6,6 +6,12 @@ behave will be called out here.
 
 ## Unreleased
 
+- Room descriptions end with "Known exits:", and list only the ways out
+  that are open to the player right now: not an exit whose `when` is
+  false, and not a secret door that hasn't been found. Games can turn the
+  list off with `settings: { list_exits: false }`, or per room; the
+  editor has a switch for both.
+
 - Test play in the editor: play your game in the editor's bottom panel
   while you work on it, from the start or from the room selected on the
   map, with the room you're in lit up on the map. It tells you when you've

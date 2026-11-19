@@ -266,7 +266,7 @@ Crossroads
 Three trails meet in a bowl of broken rock. Howls drift from a den to the
 east; smoke rises from a camp to the west. North, the path climbs to the
 shrine gate. The trailhead is back to the south.
-Exits: south, east, west and north.
+Known exits: south, east, west and north.
 The alpha wolf arrives.
 The young wolf arrives.
 The goblin chief arrives.
@@ -294,7 +294,7 @@ can't see the fight, but you can hear it:
 Trailhead
 The path into the pass starts here, between two leaning boulders. It climbs
 north to a crossroads.
-Exits: north.
+Known exits: north.
 You hear snarls and the clash of a fight somewhere north.
 
 > z
@@ -331,7 +331,7 @@ dropped is left, and a wolf that's still hungry:
 Crossroads
 ...
 You can see a crude club and a young wolf here.
-Exits: south, east, west and north.
+Known exits: south, east, west and north.
 The young wolf attacks you.
 ```
 
@@ -422,7 +422,7 @@ it, it fights:
 Wolf Den
 A hollow under the rocks, littered with gnawed bones.
 You can see an alpha wolf here.
-Exits: west.
+Known exits: west.
 The alpha wolf attacks you.
 
 > x alpha
@@ -612,7 +612,7 @@ The goblin grunt attacks the alpha wolf.
 Goblin Camp
 Ragged tents around a smoky fire.
 You can see an iron key here.
-Exits: east.
+Known exits: east.
 You hear snarls and the clash of a fight somewhere east.
 ```
 

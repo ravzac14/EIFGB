@@ -714,11 +714,11 @@ fn secret_doors_and_their_exits_appear_when_found() {
     assert_says(&mut g, "e", "You can't go that way.");
     assert_says(&mut g, "open panel", "You can't see any such thing.");
     say(&mut g, "x painting");
-    assert_says(&mut g, "look", "Exits: east.");
+    assert_says(&mut g, "look", "Known exits: east.");
     let out = say(&mut g, "e");
     assert!(out.contains("(first opening the sliding panel)") && out.contains("Vault"), "{out}");
     // The return exit is linked through the same panel.
-    assert_says(&mut g, "look", "Exits: west.");
+    assert_says(&mut g, "look", "Known exits: west.");
 }
 
 #[test]
@@ -797,10 +797,10 @@ fn a_door_hidden_from_one_side_is_plain_from_the_other() {
 
     let mut g = bookcase("den");
     let out = say(&mut g, "look");
-    assert!(out.contains("You can see a bookcase door here.") && out.contains("Exits: south."), "{out}");
+    assert!(out.contains("You can see a bookcase door here.") && out.contains("Known exits: south."), "{out}");
     // Coming through from the plain side reveals it on the hidden side too.
     let out = say(&mut g, "s");
-    assert!(out.contains("Library") && out.contains("Exits: north."), "{out}");
+    assert!(out.contains("Library") && out.contains("Known exits: north."), "{out}");
     assert_says(&mut g, "x bookcase", "It's open.");
 }
 
@@ -3523,4 +3523,59 @@ fn the_ai_guides_example_compiles_and_wins() {
         last = say(&mut g, cmd);
     }
     assert!(last.contains("You have won"), "{last}");
+}
+
+// ------------------------------------------------------------ listing exits
+
+const EXITS: &str = r#"format: eifgb/0.1
+game: { id: x, title: Exits, version: "1", start: hall }
+vars: { bridge_down: false }
+rooms:
+  hall:
+    name: Hall
+    exits:
+      north:
+        - { to: bridge, when: vars.bridge_down }
+        - { blocked: "The bridge is raised." }
+      east: { to: study, through: bookcase }
+      west: [{ to: garden, through: red_door }, { to: shed, through: blue_door }]
+      south: "The sea. Not tonight."
+  bridge: { name: Bridge, exits: { south: hall } }
+  study: { name: Study, exits: { west: { to: hall, through: bookcase } } }
+  garden: { name: Garden, exits: { east: { to: hall, through: red_door } } }
+  shed: { name: Shed, list_exits: false, exits: { east: { to: hall, through: blue_door } } }
+objects:
+  bookcase: { name: bookcase, in: hall, traits: [door, openable, scenery], state: { hidden: true }, revealed_by: search shelves }
+  shelves: { name: shelves, in: hall, traits: [scenery] }
+  red_door: { name: red door, in: hall, traits: [door, openable] }
+  blue_door: { name: blue door, in: hall, traits: [door, openable] }
+  lever: { name: lever, in: hall, traits: [scenery], on: { pull: "vars.bridge_down = true\nsay(\"The bridge comes down.\")" } }
+"#;
+
+#[test]
+fn only_known_open_exits_are_listed() {
+    let mut g = game(compile_str(EXITS).story.unwrap());
+    // Not the raised bridge, the secret bookcase or the sea; west once, for both doors.
+    assert_says(&mut g, "look", "Known exits: west.");
+    say(&mut g, "pull lever");
+    assert_says(&mut g, "look", "Known exits: north and west.");
+    say(&mut g, "search shelves");
+    assert_says(&mut g, "look", "Known exits: north, east and west.");
+    // A room can leave its exits out.
+    say(&mut g, "go through blue door");
+    assert!(!say(&mut g, "look").contains("exits"), "the shed doesn't list them");
+}
+
+#[test]
+fn listing_exits_can_be_turned_off() {
+    let src = EXITS.replace("vars: { bridge_down: false }", "vars: { bridge_down: false }\nsettings: { list_exits: false }")
+        .replace("  bridge: { name: Bridge, exits", "  bridge: { name: Bridge, list_exits: true, exits");
+    let out = compile_str(&src);
+    let errors: Vec<String> = out.errors().map(|d| d.to_string()).collect();
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{errors:#?}")));
+    let out = say(&mut g, "look");
+    assert!(!out.contains("exits") && !out.contains("no obvious way"), "{out}");
+    say(&mut g, "pull lever");
+    // …except where a room asks for them.
+    assert_says(&mut g, "n", "Known exits: south.");
 }

@@ -929,7 +929,7 @@ The grey wolf attacks you.
 
 Hall
 You can see a grey wolf (badly wounded) here.
-Exits: north and east.
+Known exits: north and east.
 The grey wolf attacks you.
 
 > kill wolf with sword
@@ -1604,6 +1604,12 @@ top level. See [Characters](#characters-npcs-and-enemies).
 **Settings:** `describe_state` (default `true`) describes state
 automatically in examine text, room descriptions and lists, including
 your own fields. See [States and descriptions](#states-and-descriptions).
+`list_exits` (default `true`) ends each room description with the ways
+out the player can take right now: "Known exits: north and up." Exits
+through a secret door that hasn't been found, and exits whose `when` is
+false, aren't listed. Turn it off with `settings: { list_exits: false }`,
+or for one room with `list_exits: false` on the room (and a room can turn
+it back on with `list_exits: true`).
 
 **Presentation:** how your game looks on the website.
 `presentation: { theme: terminal, accent: "#c33" }` picks one of the

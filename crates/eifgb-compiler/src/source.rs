@@ -95,11 +95,14 @@ pub struct Settings {
     /// How many actions tracks last. 0 turns tracks off. Defaults to 30.
     #[serde(default)]
     pub track_life: Option<u32>,
+    /// End room descriptions with "Known exits: …". On by default.
+    #[serde(default = "yes")]
+    pub list_exits: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { describe_state: true, track_life: None }
+        Settings { describe_state: true, track_life: None, list_exits: true }
     }
 }
 
@@ -197,6 +200,9 @@ pub struct Room {
     /// Unlit: peeking in shows nothing unless something is burning.
     #[serde(default)]
     pub dark: bool,
+    /// Whether this room's description lists its exits (overrides `settings.list_exits`).
+    #[serde(default)]
+    pub list_exits: Option<bool>,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]

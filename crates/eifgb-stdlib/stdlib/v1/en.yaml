@@ -835,7 +835,7 @@ messages:
   parser.no_all: "You can't use \"all\" with that."
   parser.all_none: "There's nothing suitable here."
   # looking
-  look.exits: "Exits: ${args.list}."
+  look.exits: "Known exits: ${args.list}."
   look.no_exits: "There's no obvious way out."
   look.you_see: "You can see ${args.list} here."
   examine.default: "You see nothing special about ${the(args.target)}."

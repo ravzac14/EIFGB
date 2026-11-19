@@ -18,7 +18,7 @@ const opening = engine.load({ "game.yaml": yaml }).output.lines.filter((l) => l.
 const html = readFileSync(`${web}index.html`, "utf8");
 const shown = [...html.match(/<div id="demo-log"[^>]*>([\s\S]*?)<\/div>/)[1].matchAll(/<p[^>]*>([^<]*)<\/p>/g)].map((m) => m[1]);
 // The engine also lists exits; the page leaves that line for the engine's first reply.
-assert.deepEqual(shown, opening.filter((l) => !l.startsWith("Exits:")), "index.html's demo opening matches the game");
+assert.deepEqual(shown, opening.filter((l) => !l.startsWith("Known exits:")), "index.html's demo opening matches the game");
 
 // Played on the page.
 GlobalRegistrator.register({ url: pathToFileURL(`${web}public/index.html`).href });

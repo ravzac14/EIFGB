@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- ASK and TELL start a conversation, like TALK TO: ASK KEEPER, ASK
+  KEEPER ABOUT THE GATE, TELL KEEPER ABOUT THE STORM. With only one person
+  here to talk to, TALK or ASK ABOUT THE GATE needs no name. (ASK … TO is
+  still an order.)
 - Read aloud, in *Text and colours* while playing: new text is spoken
   with your browser's own voices, at normal speed, slower or faster.
   Escape stops it. Off unless you turn it on.

@@ -272,6 +272,29 @@ fn dialogue_options_appear_as_conditions_change() {
 }
 
 #[test]
+fn ask_and_tell_start_the_conversation() {
+    let mut g = game(lighthouse());
+    assert_says(&mut g, "ask about the gate", "There's nobody here to talk to.");
+    say(&mut g, "n");
+    for line in ["ask keeper about the gate", "tell the old man about the storm", "ask keeper", "question keeper", "ask about the lamp", "talk"] {
+        let out = g.input(line);
+        assert_eq!(out.options, vec!["Ask about the gate", "Say goodbye"], "> {line}\n{}", out.text());
+        say(&mut g, "goodbye");
+    }
+    // ASK … TO is still an order.
+    assert_says(&mut g, "ask keeper to wait", "ignores you");
+}
+
+#[test]
+fn asking_with_two_people_here_says_which() {
+    let mut g = small(
+        "characters:\n  ann: { name: Ann, in: hall, talk: chat }\n  bob: { name: Bob, in: hall, talk: chat }\nchoices:\n  chat:\n    start: hi\n    nodes:\n      hi:\n        text: Hello.\n        options:\n          - { text: Bye, end: true }\n",
+    );
+    assert_says(&mut g, "ask about the weather", "Who do you want to talk to?");
+    assert_eq!(g.input("ask bob about the weather").options, vec!["Bye"]);
+}
+
+#[test]
 fn undo_works_inside_a_choice() {
     let mut g = game(lighthouse());
     say(&mut g, "search pool");

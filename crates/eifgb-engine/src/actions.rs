@@ -98,6 +98,18 @@ impl<H: ScriptHost> Game<H> {
             (A::Lock, Some(t)) => self.lock_or_unlock(t, cmd.tool, true),
             (A::Search, Some(t)) => self.search(t, ctx),
             (A::Talk, Some(t)) => self.talk(t, ctx),
+            // ASK ABOUT THE GATE: whoever here there is to talk to.
+            (A::Talk, None) => match self.people_to_talk_to()[..] {
+                [t] => self.talk(t, &ctx.clone().entity("target", t)),
+                [] => {
+                    self.msg("talk.nobody", ctx);
+                    false
+                }
+                _ => {
+                    self.msg("talk.who", ctx);
+                    false
+                }
+            },
             (A::Wear, Some(t)) => self.wear(t, ctx),
             (A::TakeOff, Some(t)) => self.take_off(t, ctx),
             (A::Eat, Some(t)) => self.eat(t, ctx),
@@ -1222,6 +1234,15 @@ impl<H: ScriptHost> Game<H> {
     }
 
     // ------------------------------------------------------------- people
+
+    /// The characters here who'd talk, if asked.
+    fn people_to_talk_to(&self) -> Vec<EntityId> {
+        let w = &self.world;
+        w.scope()
+            .into_iter()
+            .filter(|&c| c != PLAYER && w.def(c).kind == EntityKind::Character && w.def(c).talk.is_some() && !w.is_dead(c) && !w.is_asleep(c))
+            .collect()
+    }
 
     fn talk(&mut self, t: EntityId, ctx: &Ctx) -> bool {
         if self.world.def(t).kind != EntityKind::Character {

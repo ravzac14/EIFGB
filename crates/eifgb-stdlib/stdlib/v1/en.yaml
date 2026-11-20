@@ -143,6 +143,16 @@ verbs:
       - "speak with {target}"
       - "chat with {target}"
       - "greet {target}"
+      - "ask {target}"
+      - "tell {target}"
+      - "ask {target} about {text}"
+      - "tell {target} about {text}"
+      - "ask {target} for {text}"
+      - "question {target}"
+      - "talk"
+      - "chat"
+      - "ask about {text}"
+      - "tell about {text}"
   wear:
     action: wear
     patterns: ["wear {target}", "put on {target}", "put {target} on"]
@@ -999,6 +1009,8 @@ messages:
   lock.cannot: "That doesn't have a lock."
   # people
   talk.no_response: "${The(args.target)} doesn't respond."
+  talk.nobody: "There's nobody here to talk to."
+  talk.who: "Who do you want to talk to?"
   talk.not_person: "You'd get more conversation out of a brick."
   # clothing and food
   wear.done: "You put on ${the(args.target)}."

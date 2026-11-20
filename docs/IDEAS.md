@@ -35,9 +35,6 @@ Everything from the first list has now been built:
 
 ## The world
 
-- **ASK and TELL about topics:** ASK GUARD ABOUT KEY, from `topics:` on
-  characters, alongside the numbered conversations.
-
 ## The editor
 
 - **A puzzle chain view:** what unlocks what (key → door → room →

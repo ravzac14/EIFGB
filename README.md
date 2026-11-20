@@ -1658,7 +1658,7 @@ same thing; `…` is where the name of a thing or person goes.
 
 | Command | Also | What it does |
 |---|---|---|
-| TALK TO … | SPEAK TO …, GREET … | Starts a conversation. |
+| TALK TO … | SPEAK TO …, GREET …, ASK …, TELL …, ASK … ABOUT …, TELL … ABOUT … | Starts a conversation. With one person here to talk to, TALK or ASK ABOUT … needs no name. |
 | GIVE … TO … | HAND … TO …, FEED … TO … | Hands something over: a gift, or food for an animal. |
 | BRIBE … | PAY 5 TO …, BRIBE … WITH 5 | Pays someone off. |
 | TELL … TO … | ORDER … TO …, ASK … TO … | Gives an order to someone who'll take it: TELL THE DOG TO FETCH THE STICK. |

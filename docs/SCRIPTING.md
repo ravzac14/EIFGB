@@ -615,7 +615,8 @@ characters:
   [Characters](../README.md#characters-npcs-and-enemies). A character with
   `talk` is a conversationalist even if you leave this out, but saying so
   makes the file easier to read.
-- **`talk: ranger_talk`** names the conversation that TALK TO RANGER opens.
+- **`talk: ranger_talk`** names the conversation that TALK TO RANGER opens
+  (and ASK RANGER, or ASK RANGER ABOUT THE TRAIL).
 
 A conversation is a **choice graph**: nodes with text, and numbered
 options that lead to other nodes. Add a `choices` section:

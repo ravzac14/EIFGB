@@ -115,7 +115,7 @@ pub extern "C" fn eifgb_load(files: *const c_char, entry: *const c_char, seed: f
     give(load(&arg(files), &arg(entry), seed as u64))
 }
 
-/// The editor's live check: `{ diagnostics, walkthrough? }`. Compiles, and plays
+/// The editor's live check: `{ diagnostics, puzzles?, walkthrough? }`. Compiles, and plays
 /// `walkthrough.txt` if there is one (see [`walkthrough`]).
 #[unsafe(no_mangle)]
 pub extern "C" fn eifgb_check(files: *const c_char, entry: *const c_char) -> *const c_char {
@@ -132,6 +132,9 @@ pub extern "C" fn eifgb_check(files: *const c_char, entry: *const c_char) -> *co
         diagnostics.extend(script_errors(story));
     }
     let mut result = json!({ "diagnostics": diagnostics });
+    if let Some(story) = &out.story {
+        result["puzzles"] = serde_json::to_value(eifgb_compiler::puzzles::puzzles(story)).unwrap_or(Value::Null);
+    }
     if let (Some(story), Some(text)) = (out.story, walkthrough_file)
         && !result["diagnostics"].as_array().is_some_and(|d| d.iter().any(|d| d["severity"] == "error"))
     {

@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- The editor's **Puzzles** tab: one way through the game, step by step
+  (find, unlock, reach, end), and what can never happen: rooms nobody can
+  reach, keys that open nothing, locks with no key, hidden things nothing
+  reveals, endings nothing leads to.
 - Test play keeps what the game didn't understand, under **Not
   understood**, each with a fix: add the word as another name for
   something in that room, make an unknown verb mean one the game knows,

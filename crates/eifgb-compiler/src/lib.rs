@@ -11,6 +11,7 @@ mod diag;
 mod files;
 mod lower;
 mod pattern;
+pub mod puzzles;
 pub mod source;
 mod template;
 mod util;

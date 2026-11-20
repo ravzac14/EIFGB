@@ -80,10 +80,12 @@
   <section class="drawer ui">
     <div class="tabs" role="tablist">
       <button id="tab-problems" role="tab" type="button" aria-selected="true">Problems</button>
+      <button id="tab-puzzles" role="tab" type="button" aria-selected="false">Puzzles</button>
       <button id="tab-yaml" role="tab" type="button" aria-selected="false">Files</button>
       <button id="tab-play" role="tab" type="button" aria-selected="false">Test play</button>
     </div>
     <div id="panel-problems" class="panel" role="tabpanel"></div>
+    <div id="panel-puzzles" class="panel" role="tabpanel" hidden></div>
     <div id="panel-yaml" class="panel" role="tabpanel" hidden>
       <div class="file-row"><select id="file" aria-label="File"><option value="game.yaml">game.yaml</option></select><span id="file-help" class="dim">This is your game's file. Changes on the map show up here, and changes here show up on the map.</span></div>
       <textarea id="yaml" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="game.yaml"></textarea>

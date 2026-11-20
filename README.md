@@ -435,6 +435,16 @@ another name for something in that room, make the verb mean one the game
 knows (an [alias](#your-own-words-aliases)), or add it as an object.
 Players will try the same things.
 
+The **Puzzles** tab reads the game and shows one way through it, in
+order: what has to be found (SEARCH THE MAT: A SMALL KEY), unlocked (THE
+PANTRY DOOR WITH THE SMALL KEY: PANTRY OPENS UP) and reached, and what
+ends the game. Above that, it lists what can never happen: a room nobody
+can get to, a key that opens nothing, something locked with no key, a
+hidden thing nothing reveals, an ending nothing leads to. It follows
+exits, doors, keys, containers, `revealed_by`, conversations, timers and
+the Lua that names things (`world.cellar`, `end_game("won")`), and assumes
+`when` conditions come true sooner or later. Click a line to go to it.
+
 That's a complete game. Compare yours with
 [`spec/examples/midnight_snack/game.yaml`](spec/examples/midnight_snack/game.yaml).
 

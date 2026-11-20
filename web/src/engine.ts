@@ -71,6 +71,12 @@ export interface Presentation {
   accent?: string;
 }
 export type Files = Record<string, string>;
+/** The puzzle chain, from the editor's check: see crates/eifgb-compiler/src/puzzles.rs. */
+export interface Puzzles {
+  steps: { kind: "start" | "find" | "unlock" | "reach" | "ending"; id: string; text: string }[];
+  endings: { key: string; kind: "win" | "loss" | "neutral"; reachable: boolean; from: string[] }[];
+  problems: { id: string; what: "room" | "thing" | "character" | "ending"; message: string }[];
+}
 /** How walkthrough.txt played, when the editor's check finds one: see the bridge's `walkthrough`. */
 export interface Walkthrough {
   result: "win" | "loss" | "neutral" | "unfinished" | "error";
@@ -87,7 +93,7 @@ export interface Engine {
   /** Compile `files` and start the game. */
   load(files: Files, entry?: string, seed?: number): Loaded;
   /** Compile only. */
-  check(files: Files, entry?: string): { diagnostics: Diagnostic[]; walkthrough?: Walkthrough };
+  check(files: Files, entry?: string): { diagnostics: Diagnostic[]; walkthrough?: Walkthrough; puzzles?: Puzzles };
   /** One line of input. */
   input(line: string): Output;
   /** The whole game state, as a string. */

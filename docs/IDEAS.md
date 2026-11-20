@@ -33,13 +33,6 @@ Everything from the first list has now been built:
 - **Fire and smashing:** `flammable`, `destructible`, SET … ALIGHT, SMASH,
   spreading next door, scorching, smoke, and `douses`.
 
-## The world
-
-## The editor
-
-- **A puzzle chain view:** what unlocks what (key → door → room →
-  ending), flagging endings nobody can reach and keys that open nothing.
-
 ## The website
 
 - **A featured game** at the top of the gallery.

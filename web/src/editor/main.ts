@@ -4,7 +4,7 @@
 
 import { dataBytes, isPicture, pictureSrc, shrink } from "../pictures.ts";
 import { zipSync, strToU8 } from "fflate";
-import { loadEngine, type Diagnostic, type Engine, type Files } from "../engine.ts";
+import { loadEngine, type Diagnostic, type Engine, type Files, type Puzzles } from "../engine.ts";
 import { fromFileList } from "../files.ts";
 import { localGames, mapTheme, type LocalGame, type MapTheme } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
@@ -412,13 +412,69 @@ function scheduleCheck() {
     try {
       const checked = (await engine).check(files);
       problems = checked.diagnostics;
+      puzzles = checked.puzzles ?? null;
       testPlay.walkthrough(files[WALKTHROUGH] === undefined ? "none" : (checked.walkthrough ?? "unchecked"));
     } catch (e) {
       problems = [{ severity: "error", path: "", message: `The checker couldn't run: ${e}` }];
     }
     showProblems();
+    showPuzzles();
     refreshPanel();
   }, 350);
+}
+
+let puzzles: Puzzles | null = null;
+
+/** The Puzzles tab: what can't happen, then what the player does, in order. */
+function showPuzzles() {
+  const panel = $("panel-puzzles");
+  const bad = puzzles?.problems ?? [];
+  $("tab-puzzles").textContent = bad.length ? `Puzzles (${bad.length})` : "Puzzles";
+  if (!puzzles) {
+    panel.replaceChildren(el("p", { className: "dim", textContent: "The puzzle chain shows once the game's errors are fixed." }));
+    return;
+  }
+  const go = (what: string, id: string) => {
+    if (what === "ending") return goTo(`endings.${id}`);
+    if (model?.room(id)) return select({ kind: "room", id });
+    if (model?.character(id)) return select({ kind: "character", id });
+    goTo(`objects.${id}`);
+  };
+  const out: HTMLElement[] = [];
+  if (bad.length) {
+    out.push(el("h3", { textContent: "Can't happen" }));
+    const ul = el("ul", { className: "problems" });
+    for (const p of bad) {
+      const li = el("li", { className: "warning", title: "Show it" });
+      li.append(el("span", { className: "sev", textContent: p.what === "ending" ? "Ending" : p.what === "room" ? "Room" : "Thing" }), p.message);
+      li.addEventListener("click", () => go(p.what, p.id));
+      ul.append(li);
+    }
+    out.push(ul);
+  }
+  out.push(
+    el("h3", { textContent: "What the player does" }),
+    el("p", { className: "dim", textContent: "One way through, from the start: what has to be found, unlocked and reached, and what ends the game. Conditions are assumed to come true." }),
+  );
+  const ol = el("ol", { className: "chain" });
+  for (const s of puzzles.steps) {
+    const li = el("li", { className: `step ${s.kind}`, title: "Show it", textContent: s.text });
+    li.addEventListener("click", () => go(s.kind === "ending" ? "ending" : "", s.id));
+    ol.append(li);
+  }
+  out.push(ol);
+  if (puzzles.endings.length) {
+    out.push(el("h3", { textContent: "Endings" }));
+    const ul = el("ul", { className: "endings-list" });
+    for (const e of puzzles.endings) {
+      const li = el("li", { className: e.reachable ? "ok" : "bad", title: "Show it" });
+      li.append(el("strong", { textContent: `${e.reachable ? "✓" : "✗"} ${e.key}` }), ` (${e.kind === "win" ? "a win" : e.kind === "loss" ? "a loss" : "neither"})`, e.from.length ? `: ${e.from.join(", ")}` : ": nothing leads here");
+      li.addEventListener("click", () => go("ending", e.key));
+      ul.append(li);
+    }
+    out.push(ul);
+  }
+  panel.replaceChildren(...out);
 }
 
 /**
@@ -498,8 +554,8 @@ function goTo(path: string) {
   showInFile(parts[1] ? `${parts[1]}:` : parts[0] ?? "");
 }
 
-function showTab(which: "problems" | "yaml" | "play") {
-  for (const t of ["problems", "yaml", "play"] as const) {
+function showTab(which: "problems" | "puzzles" | "yaml" | "play") {
+  for (const t of ["problems", "puzzles", "yaml", "play"] as const) {
     $(`tab-${t}`).setAttribute("aria-selected", String(which === t));
     $(`panel-${t}`).hidden = which !== t;
   }
@@ -564,6 +620,7 @@ $("yaml").addEventListener("input", () => {
   }, 600);
 });
 $("tab-problems").addEventListener("click", () => showTab("problems"));
+$("tab-puzzles").addEventListener("click", () => showTab("puzzles"));
 $("tab-play").addEventListener("click", () => showTab("play"));
 $("tab-yaml").addEventListener("click", () => openFile(currentFile));
 $("file").addEventListener("change", () => openFile($<HTMLSelectElement>("file").value));

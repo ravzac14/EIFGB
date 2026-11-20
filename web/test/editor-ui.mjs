@@ -668,6 +668,16 @@ assert.equal(tp.querySelector(".tp-stale").hidden, false);
 $("#tab-problems").click();
 assert.equal($("#map .room.here"), null);
 
+// The puzzle chain: from the start, and what can't happen.
+await tick(1500);
+$("#tab-puzzles").click();
+assert.equal($("#panel-puzzles").hidden, false);
+const chain = [...document.querySelectorAll("#panel-puzzles .chain .step")].map((li) => li.textContent);
+assert.match(chain[0], /^Start in /, chain.join(" | "));
+assert.ok($("#panel-puzzles").textContent.includes("Endings"), $("#panel-puzzles").textContent);
+document.querySelector("#panel-puzzles .chain .step").click();
+assert.equal($("#inspector .kind").textContent, "Room", "a step selects what it's about");
+
 assert.deepEqual(errors, []);
 console.log("ok   editor page");
 await GlobalRegistrator.unregister();

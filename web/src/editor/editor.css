@@ -254,3 +254,16 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .tp-misses li { padding: 0.35rem 0; border-top: 1px solid var(--line); }
 .tp-misses code { margin-right: 0.3rem; }
 .tp-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin-top: 0.25rem; }
+/* The puzzle chain. */
+#panel-puzzles h3 { margin: 0.6rem 0 0.3rem; font-size: 0.95rem; }
+.chain { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.chain .step { position: relative; margin: 0 0 0.35rem; padding: 0.35rem 0.6rem 0.35rem 2rem; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.chain .step::before { counter-increment: step; content: counter(step); position: absolute; left: 0.55rem; top: 0.35rem; font-weight: 600; color: var(--dim); }
+.chain .step:not(:last-child)::after { content: "↓"; position: absolute; left: 0.62rem; bottom: -0.9rem; color: var(--dim); font-size: 0.75rem; }
+.chain .step.unlock { border-left: 3px solid var(--accent); }
+.chain .step.find { border-left: 3px solid #c9a227; }
+.chain .step.ending { border-left: 3px solid #3a9a5b; }
+.chain .step:hover, .endings-list li:hover { background: var(--hover, rgba(127,127,127,.08)); }
+.endings-list { list-style: none; margin: 0; padding: 0; }
+.endings-list li { padding: 0.25rem 0.2rem; cursor: pointer; }
+.endings-list li.bad strong { color: var(--err); }

@@ -1614,17 +1614,21 @@ Options for `play`:
 ### Commands every game understands
 
 Players can type these in any game. Words in the second column mean the
-same thing; `…` is where the name of a thing or person goes.
+same thing; `…` is where the name of a thing or person goes. AND joins
+commands: TAKE THE KEY AND OPEN THE DOOR, as do THEN and full stops.
 
 #### Looking and moving
 
 | Command | Also | What it does |
 |---|---|---|
-| LOOK | L, LOOK AROUND | Describes where you are. |
+| LOOK | L, LOOK AROUND, WHERE AM I, X ROOM | Describes where you are. EXAMINE and SEARCH work on the room too: SEARCH HERE, LOOK AT THE HALL. |
+| EXITS | WAYS OUT, WHERE CAN I GO | Lists the ways out of here. Takes no turn. |
 | EXAMINE … | X …, LOOK AT … | Describes a thing or person. |
 | SEARCH … | LOOK IN …, LOOK UNDER …, LOOK BEHIND … | Looks closely, and can turn up hidden things. |
 | N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT | NORTH, GO NORTH, CLIMB UP, … | Goes that way. |
 | GO THROUGH … | ENTER … | Goes through a door. |
+| GO TO … | WALK TO …, RETURN TO … | Walks to a place you've been, by the way you know, a turn a step. It stops if anything happens on the way, and UNDO takes the whole walk back. |
+| GO BACK | BACK, RETURN | Goes back to the room you just came from. |
 | GET IN … | SIT ON …, STAND ON …, CLIMB ON …, CLIMB INTO … | Gets into or onto something `enterable`. Standing on something reaches things up high. |
 | GET OUT | STAND UP | Gets out again. |
 | PEEK NORTH | LOOK NORTH, PEEK THROUGH … | Looks into the next room without going in. |
@@ -1637,7 +1641,7 @@ same thing; `…` is where the name of a thing or person goes.
 
 | Command | Also | What it does |
 |---|---|---|
-| TAKE … | GET …, PICK UP …, TAKE … FROM … | Picks something up. |
+| TAKE … | GET …, PICK UP …, TAKE … FROM … | Picks something up. TAKE ALL, TAKE ALL BUT THE KEY, TAKE THE KEY AND THE LAMP. |
 | DROP … | PUT DOWN … | Puts down something you carry. |
 | PUSH … NORTH | SHOVE, DRAG, PULL, ROLL, SLIDE, MOVE … NORTH | Pushes something heavy into the next room, and follows it. |
 | PUT … IN … / PUT … ON … | INSERT … INTO …, PLACE … ON … | Puts a thing into a container or onto a surface. |
@@ -1647,6 +1651,7 @@ same thing; `…` is where the name of a thing or person goes.
 | WEAR … / TAKE OFF … | PUT ON …, REMOVE … | Puts clothing on or takes it off. |
 | EAT … | | Eats something edible. |
 | INVENTORY | I | Lists what you carry. |
+| USE … | USE … ON …, USE … WITH … | Does what the thing is for: lights a lamp, wears a hat, eats food, opens a door (or goes through it once it's open). USE KEY ON DOOR unlocks it, and USE SWORD ON GOBLIN attacks. |
 | LIGHT … | TURN ON … | Lights a lamp, torch or candle. |
 | EXTINGUISH … | PUT OUT …, BLOW OUT …, TURN OFF … | Puts a light or a fire out. |
 | BURN … | SET … ALIGHT, SET FIRE TO … | Sets fire to something that burns. |
@@ -1692,6 +1697,7 @@ same thing; `…` is where the name of a thing or person goes.
 | Command | Also | What it does |
 |---|---|---|
 | WAIT | Z | Lets a turn go by. |
+| WAIT 3 | WAIT 10 MINUTES, WAIT AN HOUR, WAIT UNTIL DUSK, WAIT UNTIL 9:30 PM | Waits a while, stopping as soon as anything happens. Minutes, hours and times of day need a [clock](#time-of-day). |
 | AGAIN | G | Repeats your last command. |
 | UNDO | | Takes back your last turn. |
 | SAVE / RESTORE | LOAD | Saves your place, or goes back to a save. |

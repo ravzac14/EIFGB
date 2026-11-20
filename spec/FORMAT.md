@@ -341,6 +341,13 @@ reword any of them under `messages:`.
 | `n` (two doors lead north) | "Which do you mean, the red door or the blue door?" Answering `blue` goes through it | Several exits the same way, told apart by their doors |
 | `go through red door`, `enter red door` | Leaves by the exit that uses that door | |
 | `search pool. n then take can` | Runs all three | `.`, `;` and `then` chain commands; the chain stops at the first failure |
+| `take key and open gate` | Runs both | `and` (lexicon `and_words`) chains commands when a verb or direction follows it |
+| `take the key and the can`, `take all but the key` | Each thing named; everything except the key | `and` between things lists them, unless one thing's name has `and` in it; lexicon `except_words` (but, except, excluding, besides) leave things out of ALL |
+| `x room`, `search here`, `look at the base` | The room: LOOK, or SEARCH of the room's contents | Lexicon `room_words` and the room's name, for EXAMINE and SEARCH, when nothing in scope is called that |
+| `where am i` / `exits` | LOOK / the ways out `[look.exits]` | EXITS (`exits`, a meta verb) takes no turn |
+| `use key on gate`, `use lamp`, `use coat` | UNLOCK, LIGHT (or PUT OUT if lit), WEAR… | USE (`use`) runs another verb, handlers and all: with a second thing, UNLOCK when it's the key, BURN when it's flammable and the first is lit, ATTACK with a weapon (`damage`) on a character, else GIVE; alone, by trait: light source, wearable, edible, open door (ENTER), openable (OPEN), enterable, a character with `talk`, something that `calls`. Otherwise `[use.how]` / `[use.on_how]` |
+| `go to the lighthouse`, `go back` | Walks there, a turn a step | GO TO (`go_to`) matches the names of visited rooms, nearest first, and walks the shortest way through visited rooms by visible exits. Rooms on the way show only their name; the walk stops when a step fails or anything but a title or notice is printed. GO BACK (`go_back`) walks to the room last walked out of. One UNDO takes back the whole walk. `[go.unknown_place, go.already_there, go.no_route, go.no_back]` |
+| `wait 3`, `wait ten minutes`, `wait until dusk`, `wait until 9:30 pm` | Waits, quietly, then "Time passes." | WAIT FOR (`wait_for`) and WAIT UNTIL (`wait_until`) run WAIT turns, stopping at the first output. Lexicon `numbers`, `durations` (turn, minute, hour) and `times` (dawn, dusk, noon…). Minutes, hours and times need a clock `[wait.no_clock]`; at most 1000 turns; one UNDO for all of it. `[wait.how_long, wait.when, wait.already]` |
 | `again` / `g` | Repeats the last command | |
 
 ### Clarifying questions

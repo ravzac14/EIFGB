@@ -189,9 +189,6 @@ verbs:
       - "pour {tool} into {target}"
       - "refuel {target} with {tool}"
     default: "You can't fill that."
-  use:
-    patterns: ["use {target}"]
-    default: "You're not sure how."
   tune:
     patterns: ["tune {target}", "tune {target} to {text}"]
     default: "There's nothing to tune."

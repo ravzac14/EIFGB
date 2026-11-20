@@ -39,6 +39,9 @@ pub struct GameState {
     /// Goals in the journal: key → whether it's done.
     #[serde(default)]
     pub goals: BTreeMap<String, bool>,
+    /// The room the player last walked out of, for GO BACK.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub came_from: Option<EntityId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -87,6 +90,7 @@ impl GameState {
             clock: start,
             clock_checked: start,
             goals: BTreeMap::new(),
+            came_from: None,
         }
     }
 }

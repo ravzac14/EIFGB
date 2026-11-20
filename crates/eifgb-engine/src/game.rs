@@ -90,9 +90,13 @@ pub struct Game<H: ScriptHost> {
     pub(crate) grammar: Grammar,
     seed: u64,
     pub(crate) pending: Option<Pending>,
-    last: Option<Vec<String>>,
+    pub(crate) last: Option<Vec<String>>,
     /// Set by an action that only asked a question, so the turn doesn't count.
     pub(crate) no_turn: bool,
+    /// Walking through on the way somewhere (GO TO): rooms show only their name.
+    pub(crate) passing: bool,
+    /// Waiting several turns: WAIT says nothing each turn.
+    pub(crate) quiet_wait: bool,
     /// Set while the player SNEAKs, so arriving doesn't wake anyone.
     pub(crate) sneaking: bool,
     /// Set while the player PUSHes something into the next room: it goes
@@ -122,6 +126,8 @@ impl<H: ScriptHost> Game<H> {
             pending: None,
             last: None,
             no_turn: false,
+            passing: false,
+            quiet_wait: false,
             heard_nearby: None,
             sneaking: false,
             pushing: None,
@@ -428,6 +434,11 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
+    /// Runs a command made up by the engine, as if it had been typed.
+    pub(crate) fn execute_command(&mut self, cmd: Command) -> bool {
+        self.execute(cmd)
+    }
+
     fn execute(&mut self, cmd: Command) -> bool {
         let verb = self.world.story().verbs[cmd.verb].clone();
         if let VerbAction::Builtin(a) = verb.action
@@ -438,6 +449,12 @@ impl<H: ScriptHost> Game<H> {
         if self.world.state.ending.is_some() {
             self.msg_kind(LineKind::Notice, "ending.options", &Ctx::new());
             return false;
+        }
+        // Several turns at once: each one an ordinary command.
+        if let VerbAction::Builtin(a @ (BuiltinAction::GoTo | BuiltinAction::GoBack | BuiltinAction::WaitFor | BuiltinAction::WaitUntil)) =
+            verb.action
+        {
+            return self.errand(a, &cmd);
         }
 
         let before = self.world.state.clone();
@@ -498,6 +515,7 @@ impl<H: ScriptHost> Game<H> {
             BuiltinAction::Hint => self.hint(),
             BuiltinAction::Journal => self.journal(),
             BuiltinAction::Time => self.tell_time(),
+            BuiltinAction::Exits => self.exits_action(),
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }
@@ -579,7 +597,7 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
-    fn perform_one(&mut self, verb: &Verb, target: Option<EntityId>, cmd: &Command) {
+    pub(crate) fn perform_one(&mut self, verb: &Verb, target: Option<EntityId>, cmd: &Command) {
         let here = self.world.here();
         let ctx = self.command_ctx(verb, target, cmd);
         let with_owner = |owner: Option<EntityId>| Ctx { this: owner, ..ctx.clone() };

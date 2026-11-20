@@ -1165,6 +1165,20 @@ pub enum BuiltinAction {
     Journal,
     /// What time it is.
     Time,
+    /// Use something, alone or on something else: USE KEY ON DOOR. Does
+    /// whatever the thing is for (unlock, light, wear, eat, open…).
+    Use,
+    /// Walk to a place visited before, by the way the player knows: GO TO
+    /// THE STUDY. One turn a step, stopping if anything happens on the way.
+    GoTo,
+    /// Go back to the room the player was in before.
+    GoBack,
+    /// Wait for some turns, or minutes or hours on the clock: WAIT 3.
+    WaitFor,
+    /// Wait until a time of day: WAIT UNTIL DUSK.
+    WaitUntil,
+    /// List the ways out of here.
+    Exits,
 }
 
 impl BuiltinAction {
@@ -1181,6 +1195,7 @@ impl BuiltinAction {
                 | BuiltinAction::Hint
                 | BuiltinAction::Journal
                 | BuiltinAction::Time
+                | BuiltinAction::Exits
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )
@@ -1260,6 +1275,25 @@ pub struct Lexicon {
     /// Words for a dead character's body: "corpse", "body".
     #[serde(default)]
     pub corpse_words: Vec<String>,
+    /// Words that join things or commands: "take the key and the lamp",
+    /// "take the key and open the door".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub and_words: Vec<String>,
+    /// Words that leave things out of "all": "take all but the key".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub except_words: Vec<String>,
+    /// Words for the room the player is in: "x room", "search here".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub room_words: Vec<String>,
+    /// Number words: "wait three turns".
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub numbers: BTreeMap<String, u32>,
+    /// Units of waiting: word → "turn", "minute" or "hour".
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub durations: BTreeMap<String, String>,
+    /// Times of day by name: word → "dawn", "dusk" or a time ("12:00").
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub times: BTreeMap<String, String>,
 }
 
 // ------------------------------------------------------------------ handlers

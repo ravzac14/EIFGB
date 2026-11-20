@@ -488,6 +488,14 @@ impl World {
         self.undo.push_back(state);
     }
 
+    /// Replaces the last `n` undo steps with one, back to `state`.
+    pub(crate) fn replace_undo(&mut self, n: usize, state: GameState) {
+        for _ in 0..n.min(self.undo.len()) {
+            self.undo.pop_back();
+        }
+        self.push_undo(state);
+    }
+
     /// Returns false when there's nothing to undo.
     pub fn undo(&mut self) -> bool {
         match self.undo.pop_back() {

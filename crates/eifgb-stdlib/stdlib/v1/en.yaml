@@ -10,7 +10,7 @@
 verbs:
   look:
     action: look
-    patterns: ["look", "l", "look around"]
+    patterns: ["look", "l", "look around", "where am i"]
   examine:
     action: examine
     patterns:
@@ -165,6 +165,33 @@ verbs:
   wait:
     action: wait
     patterns: ["wait", "z"]
+  wait_for:
+    action: wait_for
+    patterns: ["wait {text}", "wait for {text}", "z {text}"]
+  wait_until:
+    action: wait_until
+    patterns: ["wait until {text}", "wait till {text}", "wait til {text}", "wait for it to be {text}", "sleep until {text}"]
+  use:
+    action: use
+    patterns:
+      - "use {target}"
+      - "use {target} on {tool}"
+      - "use {target} with {tool}"
+      - "use {target} in {tool}"
+      - "apply {target} to {tool}"
+  go_to:
+    action: go_to
+    patterns:
+      - "go to {text}"
+      - "walk to {text}"
+      - "go back to {text}"
+      - "return to {text}"
+  go_back:
+    action: go_back
+    patterns: ["go back", "back", "walk back", "return", "retreat", "go back the way i came", "turn back"]
+  exits:
+    action: exits
+    patterns: ["exits", "list exits", "ways out", "where can i go", "which way can i go", "directions"]
   score:
     action: score
     patterns: ["score"]
@@ -585,6 +612,23 @@ lexicon:
   filler: ["please", "try to", "i want to", "i'd like to", "let me", "i will", "i'll"]
   pronouns: [it, them, him, her]
   all_words: [all, everything]
+  and_words: [and]
+  except_words: [but, except, excluding, besides]
+  room_words: [room, here, area, surroundings, place, around]
+  numbers: {
+    a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+    ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, few: 3, couple: 2
+  }
+  durations: {
+    turn: turn, turns: turn, move: turn, moves: turn, moment: turn, moments: turn,
+    minute: minute, minutes: minute, min: minute, mins: minute,
+    hour: hour, hours: hour, hr: hour, hrs: hour
+  }
+  times: {
+    dawn: dawn, sunrise: dawn, daybreak: dawn, morning: dawn, daylight: dawn, day: dawn,
+    dusk: dusk, sunset: dusk, nightfall: dusk, evening: dusk, night: dusk, dark: dusk, nighttime: dusk,
+    noon: "12:00", midday: "12:00", midnight: "0:00"
+  }
   self_words: [me, myself, self]
   # Refer to any dead character: "x corpse", "search the body".
   corpse_words: [corpse, body, remains, carcass, bones]
@@ -1023,6 +1067,16 @@ messages:
   eat.cannot: "That's not edible."
   # meta
   wait.done: "Time passes."
+  wait.how_long: "I didn't follow how long to wait. Try WAIT 3, or WAIT UNTIL DUSK."
+  wait.when: "I didn't follow when to wait until. Try WAIT UNTIL DUSK, or WAIT UNTIL 9:00."
+  wait.no_clock: "This game doesn't keep the time of day. WAIT 3 waits three turns."
+  wait.already: "It's ${args.time} already."
+  use.how: "How do you want to use ${the(args.target)}? Try saying what to do with it: OPEN it, PUSH it, TURN it…"
+  use.on_how: "You can't see how to use ${the(args.target)} on ${the(args.tool)}. Try saying what to do: PUT, GIVE, UNLOCK…"
+  go.unknown_place: "You don't know of anywhere called that."
+  go.already_there: "You're already here."
+  go.no_route: "You don't know the way to ${args.place} from here."
+  go.no_back: "You haven't come from anywhere yet."
   score.report: "You have scored ${game.score}${if game.max_score} out of a possible ${game.max_score}${end}, in ${game.turn} turns."
   score.gained: "[Your score has gone up by ${args.points}.]"
   undo.done: "[Undone.]"

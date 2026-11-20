@@ -27,6 +27,7 @@ mod people;
 pub mod tracks;
 mod peek;
 mod fire;
+mod errands;
 pub mod parser;
 pub mod rng;
 pub mod script;

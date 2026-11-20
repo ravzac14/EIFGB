@@ -6,6 +6,22 @@ behave will be called out here.
 
 ## Unreleased
 
+- More of what players type works:
+  - AND joins commands: TAKE THE KEY AND OPEN THE DOOR. It still joins
+    things, too: TAKE THE KEY AND THE LAMP, and now TAKE ALL BUT THE KEY.
+  - USE: USE LAMP lights it, USE HAT wears it, USE KEY ON DOOR unlocks
+    it, USE SWORD ON GOBLIN attacks. The game's own handlers for those
+    verbs still run. A game that defines its own `use` verb now gets a
+    warning, as with any standard verb.
+  - GO TO THE KITCHEN walks to a place visited before, a turn a step,
+    stopping if anything happens. GO BACK returns to the last room. UNDO
+    takes back the whole walk.
+  - WAIT 3, WAIT TEN MINUTES, WAIT UNTIL DUSK, WAIT UNTIL 9:30 PM wait,
+    stopping as soon as anything happens.
+  - X ROOM, SEARCH HERE and LOOK AT THE HALL work on the room; WHERE AM I
+    is LOOK; EXITS lists the ways out.
+  - Fixed: EXITS no longer means EXIT (go out), SING no longer means S
+    (south), and BRIEF is no longer taken as a misspelling of BRIBE.
 - Doors can be named by the way they lead: UNLOCK NW DOOR, OPEN THE EAST
   DOOR. When two doors have the same name, "Which do you mean?" says
   which way each one goes, and NORTHWEST is enough as a reply.

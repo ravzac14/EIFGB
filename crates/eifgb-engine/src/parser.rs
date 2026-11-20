@@ -123,6 +123,12 @@ pub struct Grammar {
     described_words: HashSet<String>,
     /// "corpse", "body": words for any dead character.
     corpse_words: HashSet<String>,
+    /// "and": joins things ("the key and the lamp") or commands.
+    and_words: HashSet<String>,
+    /// "but", "except": "all but the key".
+    except_words: HashSet<String>,
+    /// "room", "here": the room the player is in.
+    room_words: HashSet<String>,
 }
 
 /// The words of a text's literal parts, including both branches of every
@@ -148,6 +154,11 @@ fn text_words(text: &eifgb_ir::Text, out: &mut Vec<String>) {
 
 fn words(s: &str) -> Vec<String> {
     s.split_whitespace().map(str::to_string).collect()
+}
+
+/// A name's words, lowercased: "Base of the Lighthouse" → base, of, the, lighthouse.
+fn words_of(s: &str) -> Vec<String> {
+    s.to_lowercase().split(|c: char| !c.is_alphanumeric() && c != '\'').filter(|w| !w.is_empty()).map(str::to_string).collect()
 }
 
 /// Edit distance where swapping two neighbouring letters ("tkae") counts
@@ -180,7 +191,8 @@ fn closest<'a>(word: &str, candidates: impl IntoIterator<Item = &'a String>) -> 
     if word.chars().count() < 3 || word.starts_with(ENTITY_TOKEN) {
         return None;
     }
-    let limit = if word.chars().count() <= 4 { 1 } else { 2 };
+    // Two letters wrong only in a long word: "brief" isn't "bribe".
+    let limit = if word.chars().count() <= 6 { 1 } else { 2 };
     let mut best: Option<(usize, &String)> = None;
     let mut tie = false;
     for c in candidates {
@@ -277,6 +289,9 @@ impl Grammar {
             described,
             described_words,
             corpse_words: lx.corpse_words.iter().cloned().collect(),
+            and_words: lx.and_words.iter().cloned().collect(),
+            except_words: lx.except_words.iter().cloned().collect(),
+            room_words: lx.room_words.iter().cloned().collect(),
         }
     }
 
@@ -285,7 +300,9 @@ impl Grammar {
     }
 
     /// Splits raw input into separate commands, each one a list of
-    /// lowercase words. "." and ";" separate commands, and so does "then".
+    /// lowercase words. "." and ";" separate commands, and so does "then",
+    /// and so does "and" when a command follows it ("take the key and
+    /// open the door", but not "take the key and the lamp").
     pub fn split_commands(&self, input: &str) -> Vec<Vec<String>> {
         let cleaned: String = input
             .to_lowercase()
@@ -299,8 +316,15 @@ impl Grammar {
         let mut out = Vec::new();
         for part in cleaned.split('.') {
             let mut cur = Vec::new();
-            for w in part.split_whitespace() {
-                if w == "then" {
+            let words: Vec<&str> = part.split_whitespace().collect();
+            for (i, &w) in words.iter().enumerate() {
+                let next = words.get(i + 1).copied();
+                let starts_command = |n: &str| {
+                    n == "then" || self.is_known_start(n) || (self.lang.stems)(n).iter().any(|s| self.is_known_start(s) && !self.directions.contains_key(s))
+                };
+                if self.and_words.contains(w) && !cur.is_empty() && next.is_some_and(starts_command) {
+                    out.push(std::mem::take(&mut cur));
+                } else if w == "then" {
                     if !cur.is_empty() {
                         out.push(std::mem::take(&mut cur));
                     }
@@ -327,7 +351,8 @@ impl Grammar {
         }
         if let Some(first) = toks.first()
             && !self.is_known_start(first)
-            && let Some(stem) = (self.lang.stems)(first).into_iter().find(|s| self.is_known_start(s))
+            // "sing" isn't "s" (south), and "exits" isn't "exit".
+            && let Some(stem) = (self.lang.stems)(first).into_iter().find(|s| self.is_known_start(s) && !self.directions.contains_key(s))
         {
             toks[0] = stem;
         }
@@ -608,6 +633,40 @@ impl Grammar {
             }
         }
 
+        // "all but the key (and the lamp)".
+        if let Some(i) = phrase.iter().position(|w| self.except_words.contains(w)) {
+            let all: Vec<&String> = phrase[..i].iter().filter(|w| !self.articles.contains(*w)).collect();
+            if all.len() == 1 && self.all_words.contains(all[0]) {
+                let items = self.resolve_all(world, &scope, action, tool)?;
+                let mut left_out = Vec::new();
+                for part in phrase[i + 1..].split(|w| self.and_words.contains(w)) {
+                    let part: Vec<&String> = part.iter().filter(|w| !self.articles.contains(*w)).collect();
+                    if !part.is_empty() {
+                        left_out.extend(self.match_scope(world, &items, &part));
+                    }
+                }
+                let rest: Vec<EntityId> = items.into_iter().filter(|id| !left_out.contains(id)).collect();
+                return if rest.is_empty() { Err(NounFail::AllNone) } else { Ok(rest) };
+            }
+        }
+        // "the key and the lamp": each of them, unless one thing is called that.
+        if words.iter().any(|w| self.and_words.contains(*w)) && self.match_scope(world, &scope, &words).is_empty() {
+            let mut out = Vec::new();
+            for part in phrase.split(|w| self.and_words.contains(w)) {
+                if part.iter().all(|w| self.articles.contains(w)) {
+                    continue;
+                }
+                for id in self.resolve(world, part, action, tool)? {
+                    if !out.contains(&id) {
+                        out.push(id);
+                    }
+                }
+            }
+            if !out.is_empty() {
+                return Ok(out);
+            }
+        }
+
         if words.len() == 1 {
             let w = words[0];
             if let Some(n) = w.strip_prefix(ENTITY_TOKEN).and_then(|n| n.parse::<u32>().ok()) {
@@ -627,6 +686,17 @@ impl Grammar {
         }
 
         let mut matches = self.match_scope(world, &scope, &words);
+        // The room itself: "x room", "search here", "look at the hall".
+        if matches.is_empty()
+            && matches!(action, Some(BuiltinAction::Examine | BuiltinAction::Search))
+            && !world.in_darkness()
+        {
+            let here = world.here();
+            let name = words_of(&world.def(here).name);
+            if words.iter().all(|w| self.room_words.contains(*w) || name.contains(*w)) {
+                return Ok(vec![here]);
+            }
+        }
         if matches.is_empty() {
             // Step 4: words the player read in a description: "x glint" after "Something
             // glints at the bottom." Real names always win; this is only a fallback.

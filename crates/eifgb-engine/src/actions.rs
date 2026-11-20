@@ -80,9 +80,12 @@ impl<H: ScriptHost> Game<H> {
             }
             (A::Inventory, _) => self.inventory(),
             (A::Wait, _) => {
-                self.msg("wait.done", ctx);
+                if !self.quiet_wait {
+                    self.msg("wait.done", ctx);
+                }
                 true
             }
+            (A::Use, Some(t)) => self.use_action(t, cmd.tool, ctx),
             (A::Go, _) => self.go(cmd, ctx),
             (A::Enter, Some(t)) => self.enter(t, ctx),
             (A::GetOut, t) => self.get_out(t),
@@ -163,6 +166,35 @@ impl<H: ScriptHost> Game<H> {
 
     // ------------------------------------------------------------ looking
 
+    /// "Known exits: north and up."
+    pub(crate) fn list_exits(&mut self, here: EntityId, exits: &[Exit]) {
+        // The ways out the player can take right now: not through a secret
+        // door they haven't found, and not one whose `when` is false.
+        let mut dirs: Vec<Direction> = Vec::new();
+        for x in exits {
+            if x.to.is_some() && self.world.exit_visible(x) && !dirs.contains(&x.direction) && self.exit_allowed(x, here) {
+                dirs.push(x.direction);
+            }
+        }
+        let ways: Vec<String> = dirs.iter().map(|&d| self.grammar.direction_word(d)).collect();
+        if ways.is_empty() {
+            self.msg("look.no_exits", &Ctx::new());
+        } else {
+            let list = (self.grammar.lang().list_and)(&ways);
+            self.msg("look.exits", &Ctx::new().text("list", list));
+        }
+    }
+
+    /// EXITS: the ways out of here, even where the room description leaves them out.
+    pub(crate) fn exits_action(&mut self) {
+        if self.world.in_darkness() {
+            return self.msg("look.dark", &Ctx::new());
+        }
+        let here = self.world.here();
+        let exits = self.world.def(here).exits.clone();
+        self.list_exits(here, &exits);
+    }
+
     pub(crate) fn look(&mut self) {
         let here = self.world.here();
         if self.world.in_darkness() {
@@ -184,6 +216,9 @@ impl<H: ScriptHost> Game<H> {
             _ => name,
         };
         self.push(LineKind::Title, title);
+        if self.passing {
+            return;
+        }
         // Shut inside something: that's all there is to see.
         let ceiling = self.world.ceiling();
         if ceiling != here {
@@ -225,21 +260,7 @@ impl<H: ScriptHost> Game<H> {
         if !list {
             return;
         }
-        // The ways out the player can take right now: not through a secret
-        // door they haven't found, and not one whose `when` is false.
-        let mut dirs: Vec<Direction> = Vec::new();
-        for x in &exits {
-            if x.to.is_some() && self.world.exit_visible(x) && !dirs.contains(&x.direction) && self.exit_allowed(x, here) {
-                dirs.push(x.direction);
-            }
-        }
-        let ways: Vec<String> = dirs.iter().map(|&d| self.grammar.direction_word(d)).collect();
-        if ways.is_empty() {
-            self.msg("look.no_exits", &Ctx::new());
-        } else {
-            let list = (self.grammar.lang().list_and)(&ways);
-            self.msg("look.exits", &Ctx::new().text("list", list));
-        }
+        self.list_exits(here, &exits);
     }
 
     /// Light through an open way (no door, or an open one) between rooms.
@@ -570,6 +591,7 @@ impl<H: ScriptHost> Game<H> {
         if self.world.move_to(PLAYER, Some(to)).is_err() {
             return false;
         }
+        self.world.state.came_from = Some(here);
         // Pushing something: it goes first, and the player follows it in.
         if let Some(t) = self.pushing.take()
             && self.world.move_to(t, Some(to)).is_ok()

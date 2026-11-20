@@ -3871,3 +3871,174 @@ fn clock_mistakes_are_reported() {
     assert!(d.iter().any(|d| d.path == "timers.t.at"), "{d:#?}");
     assert!(diag("clock: { start: 7, dawn: '5:30 am', dusk: 'noon' }\n").is_empty());
 }
+
+// ------------------------------------------------- what players expect
+
+const HOUSE: &str = "format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+clock: { start: \"8:00\", minutes_per_turn: 5 }
+rooms:
+  hall:
+    name: Front Hall
+    description: A dusty hall.
+    exits:
+      northwest: { to: study, through: study_door }
+      east: kitchen
+      south: yard
+  study: { name: Study, description: Books., exits: { southeast: hall } }
+  kitchen: { name: Kitchen, description: Pots., exits: { west: hall, north: pantry } }
+  pantry: { name: Pantry, description: Shelves., exits: { south: kitchen } }
+  yard: { name: Yard, description: Grass., exits: { north: hall } }
+objects:
+  key: { name: brass key, in: hall, traits: [portable] }
+  coin: { name: gold coin, in: hall, traits: [portable] }
+  apple: { name: red apple, in: hall, traits: [portable, edible] }
+  lamp: { name: lamp, in: hall, traits: [portable, light_source] }
+  hat: { name: hat, in: hall, traits: [portable, wearable] }
+  study_door:
+    name: door
+    in: hall
+    traits: [door, openable, lockable]
+    state: { locked: true }
+    unlocks_with: key
+  rock: { name: rock, in: yard, traits: [portable] }
+timers:
+  bell:
+    at: \"8:30\"
+    say: A bell rings somewhere.
+";
+
+fn house() -> Game<LuaHost> {
+    let out = compile_str(HOUSE);
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+/// The house without its bell.
+fn quiet_house() -> Game<LuaHost> {
+    let out = compile_str(HOUSE.split("timers:").next().unwrap());
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+fn time(g: &mut Game<LuaHost>) -> String {
+    g.world().clock().unwrap().time
+}
+
+#[test]
+fn words_that_used_to_go_wrong() {
+    let mut g = house();
+    // EXITS isn't EXIT (go out), SING isn't S, BRIEF isn't BRIBE.
+    assert_eq!(say(&mut g, "exits"), "Known exits: northwest, east and south.");
+    assert_says(&mut g, "sing", "I don't know the verb \"sing\"");
+    assert_says(&mut g, "brief", "I don't know the verb \"brief\"");
+    assert_eq!(g.input("exits").status.turns, 0, "EXITS takes no turn");
+}
+
+#[test]
+fn all_but_and_lists_of_things() {
+    let mut g = house();
+    assert_eq!(say(&mut g, "take all but the key and the apple"), "gold coin: Taken.\nlamp: Taken.\nhat: Taken.");
+    assert_eq!(say(&mut g, "drop everything except the lamp"), "gold coin: Dropped.\nhat: Dropped.");
+    assert_eq!(say(&mut g, "take the key and the coin"), "brass key: Taken.\ngold coin: Taken.");
+}
+
+#[test]
+fn and_joins_commands() {
+    let mut g = house();
+    assert_eq!(say(&mut g, "take key and unlock door with it and open it"), "Taken.\nYou unlock the door with the brass key.\nYou open the door.");
+    assert_says(&mut g, "take hat and wear it", "You put on the hat.");
+    assert_says(&mut g, "e and n", "Pantry");
+}
+
+#[test]
+fn use_does_what_a_thing_is_for() {
+    let mut g = house();
+    say(&mut g, "take key");
+    say(&mut g, "take lamp");
+    say(&mut g, "take hat");
+    assert_says(&mut g, "use key on door", "You unlock the door with the brass key.");
+    assert_says(&mut g, "use lamp", "You light the lamp.");
+    assert_says(&mut g, "use the lamp", "You put out the lamp.");
+    assert_says(&mut g, "use hat", "You put on the hat.");
+    assert_says(&mut g, "use apple", "You eat the red apple.");
+    assert_says(&mut g, "use door", "You open the door.");
+    assert_says(&mut g, "use door", "Study");
+    assert_says(&mut g, "use key", "How do you want to use the brass key?");
+    assert_says(&mut g, "use key on lamp", "You can't see how to use the brass key on the lamp.");
+}
+
+#[test]
+fn the_room_is_something_to_look_at() {
+    let mut g = house();
+    for line in ["x room", "look at the hall", "examine the front hall", "where am i"] {
+        assert!(say(&mut g, line).starts_with("Front Hall\nA dusty hall."), "> {line}");
+    }
+    assert_says(&mut g, "search here", "In the Front Hall you find a brass key");
+}
+
+#[test]
+fn go_to_a_place_walks_the_known_way() {
+    let mut g = quiet_house();
+    assert_says(&mut g, "go to the yard", "You don't know of anywhere called that.");
+    say(&mut g, "e");
+    say(&mut g, "n");
+    say(&mut g, "s");
+    say(&mut g, "w");
+    say(&mut g, "s");
+    assert_says(&mut g, "go to the yard", "You're already here.");
+    // Rooms on the way show just their name.
+    let out = say(&mut g, "go to the pantry");
+    assert!(out.starts_with("Front Hall\nKitchen\nPantry\nShelves."), "{out}");
+    assert_eq!(g.world().state.turn, 8);
+    // UNDO takes the whole walk back.
+    assert_says(&mut g, "undo", "Yard");
+    assert_says(&mut g, "go back", "Front Hall");
+    assert_says(&mut g, "go back", "Yard");
+    assert_says(&mut g, "walk to kitchen", "Kitchen");
+}
+
+#[test]
+fn a_walk_stops_when_something_happens() {
+    let mut g = house();
+    say(&mut g, "e");
+    say(&mut g, "n");
+    say(&mut g, "s");
+    say(&mut g, "w");
+    say(&mut g, "s");
+    // The bell rings at 8:30, two steps in.
+    let out = say(&mut g, "go to the pantry");
+    assert_eq!(out, "Front Hall\nA bell rings somewhere.");
+    assert_eq!(g.world().def(g.world().here()).name, "Front Hall");
+}
+
+#[test]
+fn waiting_a_while() {
+    let mut g = house();
+    assert_eq!(say(&mut g, "wait 3"), "Time passes.");
+    assert_eq!(time(&mut g), "8:15 am");
+    // The bell at 8:30 interrupts.
+    assert_eq!(say(&mut g, "wait an hour"), "A bell rings somewhere.");
+    assert_eq!(time(&mut g), "8:30 am");
+    say(&mut g, "wait ten minutes");
+    assert_eq!(time(&mut g), "8:40 am");
+    say(&mut g, "wait until noon");
+    assert_eq!(time(&mut g), "12:00 pm");
+    say(&mut g, "wait until 9:30 pm");
+    assert_eq!(time(&mut g), "9:30 pm");
+    assert_eq!(say(&mut g, "wait until 9:30 pm"), "It's 9:30 pm already.");
+    say(&mut g, "wait for dawn");
+    assert_eq!(time(&mut g), "6:00 am");
+    assert_says(&mut g, "wait banana", "I didn't follow how long to wait.");
+    assert_says(&mut g, "wait until whenever", "I didn't follow when to wait until.");
+    // One UNDO for the whole wait.
+    say(&mut g, "undo");
+    assert_eq!(time(&mut g), "9:30 pm");
+}
+
+#[test]
+fn waiting_without_a_clock_counts_turns() {
+    let mut g = small("");
+    assert_eq!(say(&mut g, "wait 5"), "Time passes.");
+    assert_eq!(g.world().state.turn, 5);
+    assert_says(&mut g, "wait an hour", "doesn't keep the time of day");
+    assert_says(&mut g, "wait until dusk", "doesn't keep the time of day");
+}

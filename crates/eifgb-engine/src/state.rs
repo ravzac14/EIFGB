@@ -47,6 +47,9 @@ pub struct GameState {
     /// reach what they know is here.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub located: BTreeMap<EntityId, EntityId>,
+    /// Timers that have gone off at least once (for `say_again`).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub fired: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -95,6 +98,7 @@ impl GameState {
             goals: BTreeMap::new(),
             came_from: None,
             located: BTreeMap::new(),
+            fired: BTreeSet::new(),
         }
     }
 }

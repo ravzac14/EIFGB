@@ -282,6 +282,9 @@ pub struct Timer {
     pub when: Option<Code>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub say: Option<Text>,
+    /// Said instead of `say` every time after the first.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say_again: Option<Text>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run: Option<Code>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

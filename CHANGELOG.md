@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- Timers can say something else after the first time: `say_again`. In the
+  editor: "After the first time, it says". Left empty, `say` plays every
+  time.
 - Timers can go off at random: `after: 3-8` or `every: 5-10` picks a
   random number of turns in the range, again each time for `every`. The
   same seed plays the same way, so walkthroughs still replay. In the

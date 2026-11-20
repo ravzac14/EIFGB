@@ -4348,3 +4348,20 @@ fn a_random_timer_is_saved_and_undone_like_any_other() {
     h.restore(&saved);
     assert_eq!(h.world().state.timers["bell"], due);
 }
+
+#[test]
+fn a_timer_can_say_something_else_after_the_first_time() {
+    let src = |extra: &str| format!("format: eifgb/0.1\ngame: {{ id: t, title: T, version: '1', start: hall }}\nrooms:\n  hall: {{ name: Hall }}\ntimers:\n  storm:\n    every: 2\n    say: Thunder rolls in the distance.\n{extra}");
+    let fired = |g: &mut Game<LuaHost>| (0..6).map(|_| g.input("wait").text()).filter(|t| t.contains("hunder")).collect::<Vec<_>>();
+    let mut g = game(compile_str(&src("    say_again: More thunder.\n")).story.unwrap());
+    assert_eq!(fired(&mut g), ["Time passes.\nThunder rolls in the distance.", "Time passes.\nMore thunder.", "Time passes.\nMore thunder."]);
+    // Undone, it's the first time again.
+    let mut h = game(compile_str(&src("    say_again: More thunder.\n")).story.unwrap());
+    say(&mut h, "wait");
+    assert_says(&mut h, "wait", "Thunder rolls in the distance.");
+    say(&mut h, "undo");
+    assert_says(&mut h, "wait", "Thunder rolls in the distance.");
+    // Without say_again, the same every time.
+    let mut k = game(compile_str(&src("")).story.unwrap());
+    assert!(fired(&mut k).iter().all(|t| t.ends_with("Thunder rolls in the distance.")));
+}

@@ -965,6 +965,7 @@ timers:
 | `running` | Whether it counts from the start of the game. Defaults to `true`, or `false` if it has `started_by`. |
 | `when` | A Lua condition checked when it's due. If false, this firing is skipped. |
 | `say`, `do`, `end` | What happens: print text, run Lua, end the game. Any combination. |
+| `say_again` | Said instead of `say` every time after the first: `say: Thunder rolls in the distance.`, then `say_again: More thunder.` Leave it out to say the same each time. |
 | `noise: { at, loudness, faction }` | A noise that hunters within `loudness` rooms (of `faction` only, if given) come to investigate. `at` is a room, or a thing (the noise is wherever it is); without it, wherever the player is. See [Tricks players can find](#tricks-players-can-find). |
 
 A timer started by an action counts the actions *after* that one. With

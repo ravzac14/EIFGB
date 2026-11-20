@@ -1406,6 +1406,7 @@ impl<'a> Lowerer<'a> {
                 stopped_by,
                 when: t.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
                 say: self.text_opt(t.say.as_deref(), &format!("{path}.say")),
+                say_again: self.text_opt(t.say_again.as_deref(), &format!("{path}.say_again")),
                 run: t.run.as_deref().map(|r| self.code(r, &format!("{path}.do"))),
                 end,
                 noise,
@@ -1871,6 +1872,7 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
             f(w);
         }
         opt_text(&t.say, f);
+        opt_text(&t.say_again, f);
         if let Some(r) = &t.run {
             f(r);
         }

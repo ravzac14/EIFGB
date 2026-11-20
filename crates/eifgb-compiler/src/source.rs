@@ -627,6 +627,9 @@ pub struct Timer {
     pub when: Option<String>,
     #[serde(default)]
     pub say: Option<String>,
+    /// Said instead of `say` from the second time it goes off.
+    #[serde(default)]
+    pub say_again: Option<String>,
     #[serde(default, rename = "do")]
     pub run: Option<String>,
     /// Ends the game with this ending.

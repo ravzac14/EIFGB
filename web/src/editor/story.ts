@@ -549,6 +549,11 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
     ...ruleBuilder(ctx, [...p, "stopped_by"], "It stops when the player", "(never)"),
     el("h3", { textContent: "When it goes off" }),
     ...field("It says", str("say"), (v) => ctx.change((x) => x.set([...p, "say"], v || undefined), { coalesce: `${id}.say`, redraw: false }), { multiline: true, placeholder: "Thunder rolls closer." }),
+    ...field("After the first time, it says", str("say_again"), (v) => ctx.change((x) => x.set([...p, "say_again"], v || undefined), { coalesce: `${id}.say_again`, redraw: false }), {
+      multiline: true,
+      placeholder: "More thunder.",
+      help: "Optional. Leave it empty to say the same thing every time.",
+    }),
     el("label", { textContent: "Then ends the game with" }),
     select([["", "(nothing: the game goes on)"], ...endings.map((e): [string, string] => [e, e.replace(/_/g, " ")])], str("end"), (v) => ctx.change((x) => x.set([...p, "end"], v || undefined)), "Ending"),
     el(

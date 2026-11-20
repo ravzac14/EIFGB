@@ -880,7 +880,9 @@ impl<H: ScriptHost> Game<H> {
             {
                 continue;
             }
-            if let Some(s) = &t.say {
+            // The first time, `say`; after that, `say_again` if there is one.
+            let again = !self.world.state.fired.insert(t.key.clone());
+            if let Some(s) = t.say_again.as_ref().filter(|_| again).or(t.say.as_ref()) {
                 self.render_line(LineKind::Text, s, &Ctx::new());
             }
             if let Some(r) = &t.run {

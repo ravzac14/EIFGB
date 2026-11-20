@@ -670,6 +670,12 @@ verbs:
   twist:
     patterns: ["turn {target}", "twist {target}", "rotate {target}", "spin {target}"]
     default: "Nothing obvious happens."
+  feel_around:
+    action: feel_around
+    patterns: ["feel around", "feel about", "grope around", "grope about", "feel in the dark", "grope in the dark", "feel around in the dark", "feel the floor", "feel the walls", "grope"]
+  feel_for:
+    action: feel_for
+    patterns: ["feel for {text}", "feel around for {text}", "grope for {text}", "grope around for {text}", "search for {text}", "fumble for {text}", "reach for {text}"]
   touch:
     patterns: ["touch {target}", "feel {target}", "rub {target}", "pat {target}"]
     default: "You feel nothing unexpected."
@@ -820,6 +826,14 @@ messages:
   parser.dark: "It's too dark to see."
   look.dark_title: "Darkness"
   look.dark: "It's pitch dark. You can't see a thing."
+  look.dark_known: "You know where to feel for ${args.list}."
+  examine.dark: "It's too dark to see ${the(args.target)}, but you can feel it there."
+  feel.found: "You feel around in the dark: ${args.list}."
+  feel.nothing: "You feel around, but there's nothing within reach."
+  feel.not_found: "You feel around, but find nothing like that."
+  feel.found_one: "You find ${the(args.target)} by touch."
+  feel.contents: "In ${the(args.target)} you feel ${args.list}."
+  feel.on_top: "On ${the(args.target)} you feel ${args.list}."
   # Light through an open way between a dark room and a lit one. The lists
   # are made of the phrases below: "the north and above".
   look.light_from: "Light spills in from ${args.list}."

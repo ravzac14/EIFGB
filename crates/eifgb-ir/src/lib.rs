@@ -489,6 +489,10 @@ pub struct Entity {
     /// unless the player is standing on something.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub high: bool,
+    /// Objects: the player can find it by feel in the dark without having
+    /// seen it first (a light switch by the door, a candle by the bed).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub findable_in_dark: bool,
     /// What its tracks look like ("paw prints"). Characters only; None means
     /// its faction's, or "footprints".
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1213,6 +1217,10 @@ pub enum BuiltinAction {
     Climb,
     /// Wake a sleeping character.
     Wake,
+    /// Feel around in the dark for what's here.
+    FeelAround,
+    /// Feel around for something, and take it: FEEL FOR THE KEY.
+    FeelFor,
 }
 
 impl BuiltinAction {

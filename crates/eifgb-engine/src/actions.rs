@@ -89,6 +89,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Drink, Some(t)) => self.drink(t, ctx),
             (A::Climb, Some(t)) => self.climb(t, ctx),
             (A::Wake, Some(t)) => self.wake_action(t, ctx),
+            (A::FeelAround, _) => self.feel_around(ctx),
+            (A::FeelFor, _) => self.feel_for(cmd, ctx),
             (A::Go, _) => self.go(cmd, ctx),
             (A::Enter, Some(t)) => self.enter(t, ctx),
             (A::GetOut, t) => self.get_out(t),
@@ -203,6 +205,11 @@ impl<H: ScriptHost> Game<H> {
         if self.world.in_darkness() {
             self.msg_kind(LineKind::Title, "look.dark_title", &Ctx::new());
             self.msg("look.dark", &Ctx::new());
+            let known: Vec<EntityId> = self.world.felt_here().into_iter().filter(|t| self.world.state.located.contains_key(t)).collect();
+            if !known.is_empty() {
+                let list = self.list_a(&known);
+                self.msg("look.dark_known", &Ctx::new().text("list", list));
+            }
             self.light_next_door(here, true);
             return;
         }
@@ -332,7 +339,20 @@ impl<H: ScriptHost> Game<H> {
         if items.is_empty() {
             return;
         }
-        let key = if self.world.has(holder, Trait::Supporter) { "examine.on_top" } else { "examine.contents" };
+        // In the dark, it's by feel, and the player knows where they are now.
+        let dark = self.world.in_darkness();
+        let key = match (self.world.has(holder, Trait::Supporter), dark) {
+            (true, false) => "examine.on_top",
+            (false, false) => "examine.contents",
+            (true, true) => "feel.on_top",
+            (false, true) => "feel.contents",
+        };
+        if dark {
+            let here = self.world.here();
+            for &t in &items {
+                self.world.state.located.insert(t, here);
+            }
+        }
         let list = self.list_a(&items);
         self.msg(key, &Ctx::new().entity("target", holder).text("list", list));
         for item in items {
@@ -344,6 +364,11 @@ impl<H: ScriptHost> Game<H> {
         let def = self.world.def(t);
         if def.kind == EntityKind::Room {
             self.look();
+            return true;
+        }
+        // Found by feel: there, but not to be seen.
+        if self.world.in_darkness() && !self.world.is_within(t, PLAYER) && t != PLAYER {
+            self.msg("examine.dark", &Ctx::new().entity("target", t));
             return true;
         }
         let description = def.description.clone();
@@ -366,6 +391,12 @@ impl<H: ScriptHost> Game<H> {
         if items.is_empty() {
             self.msg("search.nothing", ctx);
         } else {
+            if self.world.in_darkness() {
+                let here = self.world.here();
+                for &i in &items {
+                    self.world.state.located.insert(i, here);
+                }
+            }
             let list = self.list_a(&items);
             self.msg("search.contents", &ctx.clone().text("list", list));
         }

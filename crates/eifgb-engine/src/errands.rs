@@ -434,3 +434,50 @@ fn push_new(v: &mut Vec<String>, s: String) {
         v.push(s);
     }
 }
+
+// ------------------------------------------------------------ the dark
+
+impl<H: ScriptHost> Game<H> {
+    /// FEEL AROUND: what's here, by touch. From then on the player knows
+    /// where it is, and can reach it in the dark.
+    pub(crate) fn feel_around(&mut self, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        // What's lying about, and on things: not what's tucked inside them.
+        let found: Vec<EntityId> = self
+            .world
+            .touchable_things()
+            .into_iter()
+            .filter(|&t| self.world.location(t).is_some_and(|l| l == here || self.world.has(l, Trait::Supporter)))
+            .collect();
+        if found.is_empty() {
+            self.msg("feel.nothing", ctx);
+            return true;
+        }
+        for &t in &found {
+            self.world.state.located.insert(t, here);
+        }
+        let list = self.list_a(&found);
+        self.msg("feel.found", &ctx.clone().text("list", list));
+        true
+    }
+
+    /// FEEL FOR THE KEY: feel around, then take it if it's there.
+    pub(crate) fn feel_for(&mut self, cmd: &Command, ctx: &Ctx) -> bool {
+        let here = self.world.here();
+        for t in self.world.touchable_things() {
+            self.world.state.located.insert(t, here);
+        }
+        let words: Vec<String> = cmd.text.as_deref().unwrap_or("").split_whitespace().map(str::to_string).collect();
+        let found = self.grammar.name_matches(&self.world, &words);
+        let Some(&t) = found.iter().find(|&&t| !self.world.is_within(t, PLAYER)) else {
+            self.msg("feel.not_found", ctx);
+            return false;
+        };
+        if !self.world.has(t, Trait::Portable) {
+            self.msg("feel.found_one", &ctx.clone().entity("target", t));
+            return true;
+        }
+        let take_ctx = ctx.clone().entity("target", t);
+        self.builtin(BuiltinAction::Take, Some(t), &Command { targets: vec![t], text: None, ..cmd.clone() }, &take_ctx)
+    }
+}

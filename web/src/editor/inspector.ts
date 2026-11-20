@@ -672,6 +672,10 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ...trait("Gives light", "light_source", "Lights up dark rooms when it's lit."),
   );
   if (has("light_source")) panel.append(el("div", { class: "indent" }, state("Starts lit", "lit", t.lit)));
+  panel.append(
+    check("Can be found by feel in the dark", m.bool(["objects", id, "findable_in_dark"], false), (v) => ctx.change((x) => x.set(["objects", id, "findable_in_dark"], v || undefined))),
+    help("In a dark room, players can always reach it (a light switch by the door, matches by the bed). Other things they can reach once they've seen them, or felt around for them."),
+  );
   panel.append(...trait("Burns", "flammable"), ...trait("Can be smashed", "destructible"));
   if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));

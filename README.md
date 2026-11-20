@@ -1399,12 +1399,33 @@ Nineteen features reward players who try something clever:
   of a `light_source` that's lit (`lit` or `on`) and in plain sight:
   lying there, carried by the player or anyone else, but not shut in a
   bag. In the dark, LOOK gives "Darkness / It's pitch dark. You can't
-  see a thing.", the player can only handle what they're holding
-  ("It's too dark to see."), and characters are just "Something":
-  "Something attacks you." Moving still works, to feel your way out.
-  LIGHT LAMP (TURN ON, SWITCH ON, IGNITE) and EXTINGUISH LAMP (PUT OUT,
-  BLOW OUT, TURN OFF, SNUFF) are standard verbs for light sources;
-  lighting one in the dark shows the room at once.
+  see a thing.", and characters are just "Something": "Something
+  attacks you." Moving still works, to feel your way out. LIGHT LAMP
+  (TURN ON, SWITCH ON, IGNITE) and EXTINGUISH LAMP (PUT OUT, BLOW OUT,
+  TURN OFF, SNUFF) are standard verbs for light sources; lighting one in
+  the dark shows the room at once.
+
+  **Feeling your way.** In the dark the player can use what they're
+  holding (a lighter, a box of matches) and reach what they know is
+  there, but nothing else ("It's too dark to see."). They know where
+  something is once they've seen it there in the light, put it down
+  there, or felt for it:
+
+  ```
+  > feel around
+  You feel around in the dark: a brass key, a candle, a table and a crate.
+  > take key
+  Taken.
+  > light the candle with the lighter
+  ```
+
+  FEEL AROUND (GROPE ABOUT) finds what's lying about and on things; FEEL
+  FOR THE KEY (GROPE FOR, FUMBLE FOR) feels around and picks it up.
+  Opening a box in the dark, or feeling in it, finds what's inside. LOOK
+  in the dark reminds the player what they know is there, and EXAMINE
+  says "It's too dark to see the brass key, but you can feel it there."
+  Something with `findable_in_dark: true` can always be reached in the
+  dark, seen or not: a light switch by the door, the matches by the bed.
 
   Characters are as blind in the dark as the player, unless they have
   `sees_in_dark: true` (or their faction does). A blind character in an

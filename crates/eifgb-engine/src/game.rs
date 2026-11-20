@@ -121,6 +121,8 @@ pub struct Game<H: ScriptHost> {
     pub(crate) passing: bool,
     /// Waiting several turns: WAIT says nothing each turn.
     pub(crate) quiet_wait: bool,
+    /// What the player was holding when this input began.
+    held_before: Vec<EntityId>,
     /// Set while the player SNEAKs, so arriving doesn't wake anyone.
     pub(crate) sneaking: bool,
     /// Set while the player PUSHes something into the next room: it goes
@@ -152,6 +154,7 @@ impl<H: ScriptHost> Game<H> {
             no_turn: false,
             passing: false,
             quiet_wait: false,
+            held_before: Vec::new(),
             heard_nearby: None,
             sneaking: false,
             pushing: None,
@@ -190,6 +193,7 @@ impl<H: ScriptHost> Game<H> {
 
     pub fn input(&mut self, line: &str) -> Output {
         self.out = Output::default();
+        self.held_before = self.world.ids().filter(|&t| t != PLAYER && self.world.is_within(t, PLAYER)).collect();
         if self.world.state.choice.is_some() {
             self.choice_input(line);
         } else {
@@ -238,7 +242,15 @@ impl<H: ScriptHost> Game<H> {
     }
 
     fn finish(&mut self) -> Output {
+        // What the player can see, they'll know where to find in the dark;
+        // and what they put down in the dark, too.
+        self.world.note_seen();
         let here = self.world.here();
+        for t in std::mem::take(&mut self.held_before) {
+            if !self.world.is_within(t, PLAYER) && self.world.touchable_here(t) {
+                self.world.state.located.insert(t, here);
+            }
+        }
         let mut out = std::mem::take(&mut self.out);
         out.status = Status {
             room: self.world.def(here).name.clone(),

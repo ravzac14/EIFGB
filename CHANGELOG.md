@@ -6,6 +6,13 @@ behave will be called out here.
 
 ## Unreleased
 
+- Feeling your way in the dark: things the player has seen (or put down,
+  or felt for) can still be reached in the dark, so TAKE KEY and LIGHT THE
+  CANDLE WITH THE LIGHTER work. FEEL AROUND finds what's within reach,
+  FEEL FOR THE KEY finds it and picks it up, and LOOK in the dark says
+  what the player knows is there. `findable_in_dark: true` (in the
+  editor: "Can be found by feel in the dark") for a light switch or
+  matches the player can always find.
 - The editor's **Puzzles** tab: one way through the game, step by step
   (find, unlock, reach, end), and what can never happen: rooms nobody can
   reach, keys that open nothing, locks with no key, hidden things nothing

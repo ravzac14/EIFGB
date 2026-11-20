@@ -376,6 +376,9 @@ pub struct Thing {
     /// Objects: up out of reach unless the player stands on something.
     #[serde(default)]
     pub high: bool,
+    /// Objects: found by feel in the dark, even if never seen.
+    #[serde(default)]
+    pub findable_in_dark: bool,
     /// What its tracks look like ("paw prints").
     #[serde(default)]
     pub prints: Option<String>,

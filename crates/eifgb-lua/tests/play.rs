@@ -4245,3 +4245,68 @@ fn commands_not_understood_say_why() {
     // The game's own parse_failed handler answered it: nothing to fix.
     assert_eq!(g.input("swim").missed, None);
 }
+
+const CELLAR: &str = "format: eifgb/0.1
+game: { id: d, title: D, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, description: A bright hall. Stairs go down., exits: { down: cellar } }
+  cellar: { name: Cellar, dark: true, description: A damp cellar., exits: { up: hall } }
+player: {}
+objects:
+  lighter: { name: lighter, in: hall, traits: [portable, light_source] }
+  key: { name: brass key, in: cellar, traits: [portable] }
+  candle: { name: candle, in: table, traits: [portable, light_source] }
+  table: { name: table, in: cellar, traits: [supporter, scenery] }
+  crate: { name: crate, in: cellar, traits: [container, openable] }
+  coin: { name: coin, in: crate, traits: [portable] }
+  switch: { name: light switch, synonyms: [switch], in: cellar, traits: [scenery], findable_in_dark: true }
+";
+
+fn cellar() -> Game<LuaHost> {
+    let out = compile_str(CELLAR);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn in_the_dark_the_player_can_feel_for_things() {
+    let mut g = cellar();
+    say(&mut g, "take lighter");
+    say(&mut g, "d");
+    // Never seen: out of reach, until felt for.
+    assert_says(&mut g, "take key", "It's too dark to see.");
+    assert_eq!(say(&mut g, "feel around"), "You feel around in the dark: a brass key, a candle, a table, a crate and a light switch.");
+    assert_says(&mut g, "x key", "It's too dark to see the brass key, but you can feel it there.");
+    assert_eq!(say(&mut g, "take key"), "Taken.");
+    // The lighter works in the dark, and so does what it lights.
+    assert_says(&mut g, "light the candle with the lighter", "You light the candle.");
+    assert_says(&mut g, "look", "A damp cellar.");
+}
+
+#[test]
+fn what_was_seen_in_the_light_can_be_found_in_the_dark() {
+    let mut g = cellar();
+    say(&mut g, "take lighter");
+    say(&mut g, "d");
+    say(&mut g, "light lighter");
+    assert_says(&mut g, "put out the lighter", "You know where to feel for a brass key, a candle, a table, a crate and a light switch.");
+    assert_eq!(say(&mut g, "take key"), "Taken.");
+    // Put down in the dark: the player knows where.
+    say(&mut g, "drop key");
+    assert_eq!(say(&mut g, "take key"), "Taken.");
+    // Inside something: found by feel once it's open, or felt in.
+    assert_says(&mut g, "take coin", "It's too dark to see.");
+    assert_says(&mut g, "open crate", "In the crate you feel a coin.");
+    assert_eq!(say(&mut g, "take coin"), "Taken.");
+    assert_says(&mut g, "feel for the spoon", "find nothing like that");
+}
+
+#[test]
+fn some_things_can_always_be_found_in_the_dark() {
+    let mut g = cellar();
+    say(&mut g, "d");
+    // findable_in_dark: the light switch, never seen.
+    assert_says(&mut g, "touch the switch", "You feel nothing unexpected.");
+    assert_says(&mut g, "take candle", "It's too dark to see.");
+    assert_eq!(say(&mut g, "feel for the candle"), "Taken.");
+}

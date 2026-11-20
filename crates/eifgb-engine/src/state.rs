@@ -42,6 +42,11 @@ pub struct GameState {
     /// The room the player last walked out of, for GO BACK.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub came_from: Option<EntityId>,
+    /// Where the player knows things are: seen there in the light, felt
+    /// there in the dark, or put down there. In the dark, they can still
+    /// reach what they know is here.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub located: BTreeMap<EntityId, EntityId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -91,6 +96,7 @@ impl GameState {
             clock_checked: start,
             goals: BTreeMap::new(),
             came_from: None,
+            located: BTreeMap::new(),
         }
     }
 }

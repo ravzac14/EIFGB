@@ -63,7 +63,7 @@ impl World {
         self.story.entity_by_key(key)
     }
 
-    fn ids(&self) -> impl Iterator<Item = EntityId> + '_ {
+    pub(crate) fn ids(&self) -> impl Iterator<Item = EntityId> + '_ {
         (0..self.story.entities.len() as u32).map(EntityId)
     }
 
@@ -335,10 +335,16 @@ impl World {
     /// carry. Hidden things are left out, except for things the player carries.
     pub fn scope(&self) -> Vec<EntityId> {
         let mut out = Vec::new();
-        // In the dark, only what the player is holding.
+        // In the dark: what the player is holding, and what they can find
+        // by feel (things they know are here, and the `findable_in_dark`).
         if self.in_darkness() {
             out.push(PLAYER);
             self.collect_visible(PLAYER, &mut out);
+            for t in self.felt_here() {
+                if !out.contains(&t) {
+                    out.push(t);
+                }
+            }
             return out;
         }
         let here = self.here();
@@ -357,6 +363,53 @@ impl World {
             self.collect_visible(PLAYER, &mut out);
         }
         out
+    }
+
+    /// In the dark: things here the player knows of (or that are
+    /// `findable_in_dark`) and can reach by touch.
+    pub fn felt_here(&self) -> Vec<EntityId> {
+        let here = self.here();
+        self.ids()
+            .filter(|&t| t != PLAYER && self.def(t).kind != EntityKind::Room && !self.is_hidden(t) && !self.is_within(t, PLAYER))
+            .filter(|&t| self.state.located.get(&t) == Some(&here) || self.def(t).findable_in_dark)
+            .filter(|&t| self.touchable_here(t))
+            .collect()
+    }
+
+    /// Whether a thing is here, and not shut away in something closed.
+    pub fn touchable_here(&self, t: EntityId) -> bool {
+        let here = self.here();
+        let mut cur = self.location(t);
+        while let Some(c) = cur {
+            if c == here {
+                return true;
+            }
+            if self.def(c).kind != EntityKind::Object || (self.has(c, Trait::Container) && !self.is_open(c)) {
+                return false;
+            }
+            cur = self.location(c);
+        }
+        false
+    }
+
+    /// The things here the player can feel for, whether they knew of them or not.
+    pub fn touchable_things(&self) -> Vec<EntityId> {
+        self.ids()
+            .filter(|&t| t != PLAYER && self.def(t).kind != EntityKind::Room && !self.is_hidden(t) && !self.is_within(t, PLAYER) && self.touchable_here(t))
+            .collect()
+    }
+
+    /// Remembers where things the player can see now are.
+    pub fn note_seen(&mut self) {
+        if self.in_darkness() {
+            return;
+        }
+        let here = self.here();
+        for t in self.scope() {
+            if t != PLAYER && self.def(t).kind != EntityKind::Room && !self.is_within(t, PLAYER) && self.room_of(t) == Some(here) {
+                self.state.located.insert(t, here);
+            }
+        }
     }
 
     fn collect_visible(&self, holder: EntityId, out: &mut Vec<EntityId>) {

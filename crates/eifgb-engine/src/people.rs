@@ -829,7 +829,27 @@ impl<H: ScriptHost> Game<H> {
             self.msg("throw.not_held", ctx);
             return false;
         }
-        self.msg("brandish.done", ctx);
+        // SHOW X TO Y: holding it up for someone to see.
+        let showing = ctx.text_arg("verb") == Some("show");
+        if showing && at.is_none() {
+            let w = &self.world;
+            let who: Vec<EntityId> = w
+                .scope()
+                .into_iter()
+                .filter(|&c| c != PLAYER && w.def(c).kind == eifgb_ir::EntityKind::Character && !w.is_dead(c) && !w.is_asleep(c) && !w.is_hidden(c))
+                .collect();
+            match who[..] {
+                [c] => return self.brandish_action(t, Some(c), &ctx.clone().entity("tool", c)),
+                [] => {}
+                _ => {
+                    self.msg("show.who", ctx);
+                    return false;
+                }
+            }
+        }
+        if !showing {
+            self.msg("brandish.done", ctx);
+        }
         let scared: Vec<EntityId> = (0..self.world.story().entities.len() as u32)
             .map(EntityId)
             .filter(|&c| at.is_none_or(|a| a == c))
@@ -837,7 +857,11 @@ impl<H: ScriptHost> Game<H> {
             .filter(|&c| self.world.can_see(c, PLAYER) && self.world.fears(c, t))
             .collect();
         if scared.is_empty() {
-            self.msg("brandish.nothing", ctx);
+            if showing && at.is_some() {
+                self.msg("show.done", ctx);
+            } else {
+                self.msg("brandish.nothing", ctx);
+            }
         }
         for c in scared {
             self.world.panic(c);

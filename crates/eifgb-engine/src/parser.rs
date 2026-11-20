@@ -129,6 +129,16 @@ pub struct Grammar {
     except_words: HashSet<String>,
     /// "room", "here": the room the player is in.
     room_words: HashSet<String>,
+    my_words: HashSet<String>,
+    one_words: HashSet<String>,
+    other_words: HashSet<String>,
+    ordinals: HashMap<String, u32>,
+    numbers: HashMap<String, u32>,
+    adverbs: HashSet<String>,
+    /// Longest first.
+    trailing: Vec<Vec<String>>,
+    /// The game's `aliases`, longest first.
+    aliases: Vec<(Vec<String>, Vec<String>)>,
 }
 
 /// The words of a text's literal parts, including both branches of every
@@ -292,7 +302,44 @@ impl Grammar {
             and_words: lx.and_words.iter().cloned().collect(),
             except_words: lx.except_words.iter().cloned().collect(),
             room_words: lx.room_words.iter().cloned().collect(),
+            my_words: lx.my_words.iter().cloned().collect(),
+            one_words: lx.one_words.iter().cloned().collect(),
+            other_words: lx.other_words.iter().cloned().collect(),
+            ordinals: lx.ordinals.iter().map(|(k, v)| (k.clone(), *v)).collect(),
+            numbers: lx.numbers.iter().map(|(k, v)| (k.clone(), *v)).collect(),
+            adverbs: lx.adverbs.iter().cloned().collect(),
+            trailing: {
+                let mut t: Vec<Vec<String>> = lx.trailing.iter().map(|f| words(f)).collect();
+                t.sort_by_key(|f| std::cmp::Reverse(f.len()));
+                t
+            },
+            aliases: {
+                let mut a: Vec<(Vec<String>, Vec<String>)> = lx.aliases.iter().map(|(k, v)| (words(k), words(v))).collect();
+                a.sort_by_key(|(k, _)| std::cmp::Reverse(k.len()));
+                a
+            },
         }
+    }
+
+    /// The game's aliases swapped in, wherever they appear.
+    fn apply_aliases(&self, words: Vec<String>) -> Vec<String> {
+        if self.aliases.is_empty() {
+            return words;
+        }
+        let mut out = Vec::new();
+        let mut i = 0;
+        'outer: while i < words.len() {
+            for (from, to) in &self.aliases {
+                if words[i..].starts_with(from) {
+                    out.extend(to.iter().cloned());
+                    i += from.len();
+                    continue 'outer;
+                }
+            }
+            out.push(words[i].clone());
+            i += 1;
+        }
+        out
     }
 
     pub fn lang(&self) -> &'static Lang {
@@ -307,21 +354,43 @@ impl Grammar {
         let cleaned: String = input
             .to_lowercase()
             .chars()
-            .map(|c| match c {
-                '.' | ';' | '!' | '?' => '.',
-                c if c.is_alphanumeric() || c == '\'' || c == '-' || c == ENTITY_TOKEN => c,
-                _ => ' ',
+            .flat_map(|c| match c {
+                '.' | ';' | '!' | '?' => vec!['.'],
+                // A comma lists things, like "and": "the key, the coin and the lamp".
+                ',' => vec![' ', ',', ' '],
+                c if c.is_alphanumeric() || c == '\'' || c == '-' || c == ENTITY_TOKEN => vec![c],
+                _ => vec![' '],
             })
             .collect();
+        let and = self.and_words.iter().min().cloned();
         let mut out = Vec::new();
         for part in cleaned.split('.') {
             let mut cur = Vec::new();
-            let words: Vec<&str> = part.split_whitespace().collect();
-            for (i, &w) in words.iter().enumerate() {
-                let next = words.get(i + 1).copied();
+            let words: Vec<String> = part
+                .split_whitespace()
+                .filter_map(|w| if w == "," { and.clone() } else { Some(w.to_string()) })
+                .collect();
+            let words = self.apply_aliases(words);
+            // UNDO UNDO: the same command twice.
+            if words.len() > 1 && words.iter().all(|w| *w == words[0]) && self.verb_words.contains(&words[0]) {
+                out.extend(words.iter().map(|w| vec![w.clone()]));
+                continue;
+            }
+            for (i, w) in words.iter().enumerate() {
+                let w = w.as_str();
+                let next = words.get(i + 1).map(String::as_str);
+                // A verb (or direction) after "and" starts a new command,
+                // unless it's also the name of something here: "the hammer and saw".
                 let starts_command = |n: &str| {
-                    n == "then" || self.is_known_start(n) || (self.lang.stems)(n).iter().any(|s| self.is_known_start(s) && !self.directions.contains_key(s))
+                    n == "then"
+                        || (!self.vocab_words.contains(n)
+                            && (self.is_known_start(n)
+                                || (self.lang.stems)(n).iter().any(|s| self.is_known_start(s) && !self.directions.contains_key(s))))
                 };
+                // A stray "and" (", and", or at either end) joins nothing.
+                if self.and_words.contains(w) && (cur.is_empty() || next.is_none_or(|n| self.and_words.contains(n))) {
+                    continue;
+                }
                 if self.and_words.contains(w) && !cur.is_empty() && next.is_some_and(starts_command) {
                     out.push(std::mem::take(&mut cur));
                 } else if w == "then" {
@@ -348,6 +417,13 @@ impl Grammar {
     pub fn normalize(&self, mut toks: Vec<String>) -> Vec<String> {
         while let Some(f) = self.filler.iter().find(|f| toks.len() > f.len() && toks.starts_with(f)) {
             toks.drain(..f.len());
+        }
+        // "look closely at the lamp": adverbs change nothing (unless they're a name).
+        if toks.len() > 1 {
+            let kept: Vec<String> = toks.iter().filter(|w| !self.adverbs.contains(*w) || self.vocab_words.contains(*w)).cloned().collect();
+            if !kept.is_empty() {
+                toks = kept;
+            }
         }
         if let Some(first) = toks.first()
             && !self.is_known_start(first)
@@ -418,6 +494,31 @@ impl Grammar {
     }
 
     pub fn parse(&self, world: &World, toks: &[String]) -> Parsed {
+        let parsed = self.parse_words(world, toks);
+        // GO {text} takes anything; it only counts if it names a place.
+        let nowhere = |p: &Parsed| match p {
+            Parsed::Command(c) => {
+                world.story().verbs[c.verb].action == VerbAction::Builtin(BuiltinAction::GoTo)
+                    && world.places_named(&c.text.as_deref().unwrap_or("").split_whitespace().filter(|w| !self.articles.contains(*w)).map(str::to_string).collect::<Vec<_>>(), &[]).is_empty()
+            }
+            _ => true,
+        };
+        if !nowhere(&parsed) {
+            return parsed;
+        }
+        // "save game", "go east please": try again without the extra words at the end.
+        for t in &self.trailing {
+            if toks.len() > t.len() && toks.ends_with(t) {
+                let fewer = &toks[..toks.len() - t.len()];
+                if let p @ Parsed::Command(_) = self.parse(world, fewer) {
+                    return p;
+                }
+            }
+        }
+        parsed
+    }
+
+    fn parse_words(&self, world: &World, toks: &[String]) -> Parsed {
         if toks.is_empty() {
             return Parsed::Fail(Failure::Empty);
         }
@@ -425,8 +526,9 @@ impl Grammar {
         let mut toks = toks.to_vec();
         let mut cands = self.candidates(story, &toks);
 
-        // Step 5: correct a misspelled verb or direction.
-        if cands.is_empty() && !self.is_known_start(&toks[0]) {
+        // Step 5: correct a misspelled verb or direction (but HALL is a place, not CALL).
+        let place: Vec<String> = toks.iter().filter(|w| !self.articles.contains(*w)).cloned().collect();
+        if cands.is_empty() && !self.is_known_start(&toks[0]) && world.places_named(&place, &[]).is_empty() {
             let starts: Vec<String> = self
                 .verb_words
                 .iter()
@@ -449,6 +551,10 @@ impl Grammar {
         if cands.is_empty() {
             return self.no_pattern(world, &toks);
         }
+        // The pattern with the most fixed words first: "wait until {text}"
+        // before "wait {text}", "ask {target} for forgiveness" before
+        // "ask {target} for {text}".
+        cands.sort_by_key(|c| std::cmp::Reverse(c.specificity));
 
         let mut best: Option<(usize, Parsed)> = None;
         for c in &cands {
@@ -549,6 +655,13 @@ impl Grammar {
                 direction: None,
                 words: toks.to_vec(),
             });
+        }
+        // A place's name: KITCHEN means GO TO THE KITCHEN.
+        let place: Vec<String> = toks.iter().filter(|w| !self.articles.contains(*w)).cloned().collect();
+        if !world.places_named(&place, &[]).is_empty()
+            && let Some(vi) = story.verbs.iter().position(|v| v.action == VerbAction::Builtin(BuiltinAction::GoTo))
+        {
+            return Parsed::Command(Command { verb: vi, targets: Vec::new(), tool: None, text: Some(toks.join(" ")), direction: None, words: toks.to_vec() });
         }
         Parsed::Fail(Failure::UnknownVerb { word: toks[0].clone() })
     }
@@ -697,6 +810,15 @@ impl Grammar {
                 return Ok(vec![here]);
             }
         }
+        // "take key from the floor": the floor and the ground are the room, for any verb.
+        if matches.is_empty() && !world.in_darkness() && words.iter().all(|w| self.room_words.contains(*w)) && matches!(words.last().map(|w| w.as_str()), Some("floor" | "ground")) {
+            return Ok(vec![world.here()]);
+        }
+        if matches.is_empty()
+            && let Some(r) = self.resolve_modified(world, &scope, &words, action)
+        {
+            return r;
+        }
         if matches.is_empty() {
             // Step 4: words the player read in a description: "x glint" after "Something
             // glints at the bottom." Real names always win; this is only a fallback.
@@ -739,16 +861,97 @@ impl Grammar {
                 let named = |w: &str| (0..world.story().entities.len() as u32).any(|i| world.named_word(EntityId(i), w));
                 let unknown = words
                     .iter()
-                    .find(|w| !self.vocab_words.contains(**w) && !self.stem_known(w) && !named(w) && self.direction_of(w).is_none())
+                    .find(|w| !self.vocab_words.contains(**w) && !self.stem_known(w) && !named(w) && self.direction_of(w).is_none() && !self.is_modifier(w))
                     .map(|w| (*w).clone());
                 Err(NounFail::NotFound { unknown_word: unknown })
             }
             1 => Ok(matches),
-            _ => {
-                let narrowed = self.prefer(world, &matches, action);
-                if narrowed.len() == 1 { Ok(narrowed) } else { Err(NounFail::Ambiguous(narrowed)) }
+            _ => self.one_of(world, &matches, action),
+        }
+    }
+
+    /// "my", "one", "other", "second", "two": words that pick among things rather than name them.
+    fn is_modifier(&self, w: &str) -> bool {
+        self.my_words.contains(w)
+            || self.one_words.contains(w)
+            || self.other_words.contains(w)
+            || self.ordinals.contains_key(w)
+            || self.numbers.contains_key(w)
+            || w.parse::<u32>().is_ok()
+    }
+
+    /// "my hat", "the brass one", "the other key", "the second key", "two
+    /// coins". None when there's no such word, or the rest names nothing.
+    fn resolve_modified(
+        &self,
+        world: &World,
+        scope: &[EntityId],
+        words: &[&String],
+        action: Option<BuiltinAction>,
+    ) -> Option<Result<Vec<EntityId>, NounFail>> {
+        if !words.iter().any(|w| self.is_modifier(w)) {
+            return None;
+        }
+        let has = |set: &HashSet<String>| words.iter().any(|w| set.contains(*w));
+        let (mine, other, one) = (has(&self.my_words), has(&self.other_words), has(&self.one_words));
+        let ordinal = words.iter().find_map(|w| self.ordinals.get(*w).copied());
+        let count = words
+            .iter()
+            .filter(|w| !self.one_words.contains(**w))
+            .find_map(|w| self.numbers.get(*w).copied().or_else(|| w.parse::<u32>().ok()));
+        let rest: Vec<&String> = words.iter().copied().filter(|w| !self.is_modifier(w)).collect();
+        // They come before the name ("the second key", "two coins"), except
+        // "one" at the end ("the brass one"); a bare number names nothing.
+        let first_name = words.iter().position(|w| !self.is_modifier(w)).unwrap_or(words.len());
+        let misplaced = words.iter().enumerate().any(|(i, w)| {
+            i > first_name && self.is_modifier(w) && !(self.one_words.contains(*w) && i == words.len() - 1)
+        });
+        if misplaced || (rest.is_empty() && !one && !other) {
+            return None;
+        }
+        let things = |id: &EntityId| *id != PLAYER && world.def(*id).kind != eifgb_ir::EntityKind::Room;
+        let mut found: Vec<EntityId> = if !rest.is_empty() {
+            let m = self.match_scope(world, scope, &rest);
+            // "the brass one" stands in for the noun; "the dog one" isn't English.
+            let last = rest[rest.len() - 1];
+            if m.is_empty() || (one && m.iter().any(|id| world.def(*id).vocab.nouns.contains(last))) {
+                return None;
+            }
+            m
+        } else if one || other || ordinal.is_some() || count.is_some() {
+            // "the other one": things like the one just mentioned.
+            let Some(last) = world.state.mentioned.first() else { return Some(Err(NounFail::Missing)) };
+            let nouns = &world.def(*last).vocab.nouns;
+            scope.iter().copied().filter(things).filter(|id| world.def(*id).vocab.nouns.iter().any(|n| nouns.contains(n))).collect()
+        } else if mine {
+            world.inventory()
+        } else {
+            return Some(Err(NounFail::Missing));
+        };
+        if other {
+            found.retain(|id| !world.state.mentioned.contains(id));
+        }
+        if mine {
+            let held: Vec<EntityId> = found.iter().copied().filter(|id| world.is_within(*id, PLAYER)).collect();
+            if !held.is_empty() {
+                found = held;
             }
         }
+        if let Some(n) = ordinal {
+            let pick = if n == 0 { found.last() } else { found.get(n as usize - 1) };
+            return Some(pick.map(|id| vec![*id]).ok_or(NounFail::NotFound { unknown_word: None }));
+        }
+        if let Some(n) = count
+            && n > 1
+        {
+            found.truncate(n as usize);
+            return Some(if found.is_empty() { Err(NounFail::NotFound { unknown_word: None }) } else { Ok(found) });
+        }
+        Some(match found.len() {
+            0 => Err(NounFail::NotFound { unknown_word: None }),
+            1 => Ok(found),
+            _ => self.one_of(world, &found, action),
+        })
     }
 
     fn stem_in(&self, w: &str, vocab: &[String]) -> bool {
@@ -841,6 +1044,19 @@ impl Grammar {
         out
     }
 
+    /// Several things match: narrow them down, or ask which. Things that
+    /// can't be told apart (two gold coins) don't need asking about.
+    fn one_of(&self, world: &World, matches: &[EntityId], action: Option<BuiltinAction>) -> Result<Vec<EntityId>, NounFail> {
+        let narrowed = self.prefer(world, matches, action);
+        let name = |id: &EntityId| world.display_name(*id);
+        let interchangeable = |id: &EntityId| world.has(*id, Trait::Portable) && !world.has(*id, Trait::Door) && name(id) == name(&narrowed[0]);
+        if narrowed.len() == 1 || narrowed.iter().all(interchangeable) {
+            Ok(vec![narrowed[0]])
+        } else {
+            Err(NounFail::Ambiguous(narrowed))
+        }
+    }
+
     /// Narrows several matches using what makes sense for the verb, e.g.
     /// TAKE prefers things you aren't holding.
     fn prefer(&self, world: &World, matches: &[EntityId], action: Option<BuiltinAction>) -> Vec<EntityId> {
@@ -878,6 +1094,12 @@ impl Grammar {
                 scope.iter().copied().filter(|&id| portable(id) && !world.is_within(id, PLAYER)).collect()
             }
             (Some(BuiltinAction::Drop), _) => world.inventory(),
+            // X ALL: everything in sight, one after another.
+            (Some(BuiltinAction::Examine), None) => scope
+                .iter()
+                .copied()
+                .filter(|&id| id != PLAYER && world.def(id).kind != eifgb_ir::EntityKind::Room && !world.has(id, Trait::Scenery) && !world.is_hidden(id))
+                .collect(),
             (Some(BuiltinAction::PutIn | BuiltinAction::PutOn), Some(dest)) => world
                 .inventory()
                 .into_iter()

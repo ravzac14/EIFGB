@@ -58,7 +58,7 @@ unknown section or field is an error, not ignored, so a typo is caught.
   `faction` or the like goes under `characters:`, not `objects:`.
 - **Traits** say what a thing can do: `portable` (can be taken), `scenery`
   (described by the room, not listed), `container`, `supporter`,
-  `openable`, `lockable`, `door`, `wearable`, `edible`, `light_source`,
+  `openable`, `lockable`, `door`, `wearable`, `edible`, `drinkable`, `light_source`,
   `enterable`, `transparent`, `flammable`, `destructible`, `pushable`.
   Things without `portable` can't be picked up.
 - **State** is a map of values: `state: { locked: true, lit: false }`.
@@ -66,7 +66,8 @@ unknown section or field is an error, not ignored, so a typo is caught.
   of open, closed, locked and so on are added automatically: don't write
   them into the description.
 - **Exits:** `north: pantry`; `south: "The sea. Not tonight."` (always
-  blocked, with that message); or `{ to, through, when, blocked }`.
+  blocked, with that message); or `{ to, through, when, blocked, via }`.
+  `via: stairs` names a thing the way goes by, so CLIMB THE STAIRS works.
   Directions: north, south, east, west, northeast, northwest, southeast,
   southwest, up, down, in, out. Room descriptions end with "Known exits:"
   and the ways out open right now; `settings: { list_exits: false }` (or
@@ -74,6 +75,8 @@ unknown section or field is an error, not ignored, so a typo is caught.
 - **Doors:** an object with the `door` trait (usually `openable`, maybe
   `lockable` with `unlocks_with: <key id>`), placed `in:` one of the two
   rooms, and an exit `through:` it. The way back is added automatically.
+- **Aliases:** a top-level `aliases:` map gives the game's own words for
+  words it knows (`using: with`, `port: west`). Don't add verbs this way.
 - **Hidden things:** `state: { hidden: true }` with `revealed_by: search
   mat` (a verb and a thing's ID).
 - **Dark rooms:** `dark: true`. The player sees nothing, and can only

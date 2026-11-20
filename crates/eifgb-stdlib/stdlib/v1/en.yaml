@@ -10,7 +10,7 @@
 verbs:
   look:
     action: look
-    patterns: ["look", "l", "look around", "where am i"]
+    patterns: ["look", "l", "look around", "where am i", "what's here", "what is here", "what is this place", "where is this"]
   examine:
     action: examine
     patterns:
@@ -20,12 +20,38 @@ verbs:
       - "inspect {target}"
       - "describe {target}"
       - "check {target}"
+      - "what is {target}"
+      - "what are {target}"
+      - "what's {target}"
   inventory:
     action: inventory
-    patterns: ["inventory", "i", "inv"]
+    patterns:
+      - "inventory"
+      - "i"
+      - "inv"
+      - "check inventory"
+      - "check my inventory"
+      - "look at inventory"
+      - "show inventory"
+      - "what am i carrying"
+      - "what am i holding"
+      - "what do i have"
+      - "what have i got"
+      - "what's in my pockets"
+      - "items"
   go:
     action: go
     patterns: ["go {direction}", "walk {direction}", "climb {direction}", "{direction}"]
+  climb:
+    action: climb
+    patterns:
+      - "climb {target}"
+      - "climb up {target}"
+      - "climb down {target}"
+      - "scale {target}"
+      - "ascend {target}"
+      - "descend {target}"
+      - "shin up {target}"
   # Verb keys must not clash with event names (start, turn, parse_failed,
   # enter, leave), because handlers use both. Hence `go_through`, not `enter`.
   go_through:
@@ -46,7 +72,16 @@ verbs:
       - "climb onto {target}"
       - "climb up on {target}"
       - "climb up onto {target}"
-      - "climb {target}"
+      - "go up {target}"
+      - "go down {target}"
+      - "walk up {target}"
+      - "walk down {target}"
+      - "cross {target}"
+      - "go across {target}"
+      - "walk across {target}"
+      - "go along {target}"
+      - "walk along {target}"
+      - "go over {target}"
       - "sit on {target}"
       - "sit in {target}"
       - "stand on {target}"
@@ -106,12 +141,16 @@ verbs:
       - "put {target} inside {tool}"
       - "insert {target} in {tool}"
       - "insert {target} into {tool}"
+      - "drop {target} in {tool}"
+      - "drop {target} into {tool}"
   put_on:
     action: put_on
     patterns:
       - "put {target} on {tool}"
       - "put {target} onto {tool}"
       - "place {target} on {tool}"
+      - "drop {target} on {tool}"
+      - "drop {target} onto {tool}"
   open:
     action: open
     patterns: ["open {target}"]
@@ -153,6 +192,13 @@ verbs:
       - "chat"
       - "ask about {text}"
       - "tell about {text}"
+      - "hello {target}"
+      - "hi {target}"
+      - "hey {target}"
+      - "say hello to {target}"
+      - "say hi to {target}"
+      - "hello"
+      - "hi"
   wear:
     action: wear
     patterns: ["wear {target}", "put on {target}", "put {target} on"]
@@ -186,12 +232,108 @@ verbs:
       - "walk to {text}"
       - "go back to {text}"
       - "return to {text}"
+      - "go {text}"
+      - "walk {text}"
+      - "go in {text}"
+      - "go into {text}"
+      - "visit {text}"
   go_back:
     action: go_back
     patterns: ["go back", "back", "walk back", "return", "retreat", "go back the way i came", "turn back"]
   exits:
     action: exits
     patterns: ["exits", "list exits", "ways out", "where can i go", "which way can i go", "directions"]
+  who:
+    action: who
+    patterns: ["who is here", "who's here", "who else is here", "who is around", "who's around", "anyone here", "is anyone here", "is anybody here", "people"]
+  suggest:
+    action: suggest
+    patterns: ["what can i do", "what now", "what should i do", "what do i do", "what next", "now what", "options", "commands", "verbs"]
+  about:
+    action: about
+    patterns: ["about", "info", "information", "credits", "version", "author", "about this game", "about the game"]
+  drink:
+    action: drink
+    patterns: ["drink {target}", "drink from {target}", "sip {target}", "sip from {target}", "quaff {target}", "swallow {target}", "gulp {target}"]
+  wake:
+    action: wake
+    reach: false
+    patterns: ["wake {target}", "wake up {target}", "wake {target} up", "rouse {target}", "awaken {target}", "shake {target} awake"]
+  # More verbs with no built-in behaviour, for players to try and authors
+  # to hook into.
+  say:
+    patterns: ["say {text}", "say {text} to {target}", "speak {text}", "whisper {text}", "utter {text}"]
+    default: "You say it aloud. Nothing happens."
+    reach: false
+  cut:
+    patterns: ["cut {target}", "cut {target} with {tool}", "slice {target}", "slice {target} with {tool}", "chop {target}", "chop {target} with {tool}", "saw {target}", "saw {target} with {tool}", "cut through {target}", "cut through {target} with {tool}"]
+    default: "Cutting that won't help."
+  tie:
+    patterns: ["tie {target}", "tie {target} to {tool}", "attach {target} to {tool}", "fasten {target} to {tool}", "knot {target}", "tie up {target}", "tie {target} up"]
+    default: "You can't see how to tie that."
+  dig:
+    patterns: ["dig", "dig here", "dig {target}", "dig in {target}", "dig {target} with {tool}", "dig in {target} with {tool}", "dig a hole"]
+    default: "The ground is too hard to dig here."
+  knock:
+    patterns: ["knock on {target}", "knock at {target}", "knock {target}", "rap on {target}", "bang on {target}", "knock"]
+    default: "You knock. Nobody answers."
+  wave:
+    patterns: ["wave", "wave at {target}", "wave to {target}", "wave hello", "wave goodbye", "wave hello to {target}"]
+    default: "You wave. Nobody waves back."
+    reach: false
+  point:
+    patterns: ["point at {target}", "point to {target}", "point {target} at {tool}", "aim {target} at {tool}", "point"]
+    default: "You point. Nothing happens."
+    reach: false
+  jump:
+    patterns: ["jump", "hop", "leap", "jump up and down", "jump around", "skip"]
+    default: "You jump on the spot. Nothing happens."
+  sit:
+    patterns: ["sit", "sit down"]
+    default: "You sit for a moment, then get up again."
+  stand:
+    patterns: ["stand", "stand still"]
+    default: "You're standing already."
+  lie:
+    patterns: ["lie down", "lie", "lay down"]
+    default: "You lie down for a moment, then think better of it."
+  sleep:
+    patterns: ["sleep", "nap", "take a nap", "go to sleep", "doze"]
+    default: "You're not tired."
+  sing:
+    patterns: ["sing", "hum", "whistle", "sing a song"]
+    default: "You hum a little tune."
+  dance:
+    patterns: ["dance", "boogie", "do a dance"]
+    default: "You dance a few steps. Nobody's watching."
+  pray:
+    patterns: ["pray", "pray to {text}", "meditate"]
+    default: "Nothing answers."
+  cry:
+    patterns: ["cry", "weep", "sob"]
+    default: "You have a good cry. You feel a little better."
+  laugh:
+    patterns: ["laugh", "giggle", "chuckle", "smile", "grin"]
+    default: "You laugh to yourself."
+  yes:
+    patterns: ["yes", "y", "yeah", "yep", "sure", "ok", "okay"]
+    default: "That was a rhetorical question."
+  no:
+    patterns: ["no", "nope", "nah"]
+    default: "Fair enough."
+  thanks:
+    patterns: ["thanks", "thank you", "thank {target}", "thank you {target}", "cheers"]
+    default: "You're welcome."
+    reach: false
+  sorry:
+    patterns: ["sorry", "i'm sorry", "apologize", "apologise"]
+    default: "No harm done."
+  swear:
+    patterns: ["damn", "curse", "swear", "shit", "fuck", "bother", "blast"]
+    default: "Feel better?"
+  magic:
+    patterns: ["xyzzy", "plugh", "abracadabra", "hocus pocus", "open sesame"]
+    default: "You say the magic word. Nothing happens."
   score:
     action: score
     patterns: ["score"]
@@ -399,8 +541,10 @@ verbs:
       - "wave {target}"
       - "wave {target} at {tool}"
       - "thrust {target} at {tool}"
-      - "show {target} to {tool}"
       - "swing {target} at {tool}"
+  show:
+    action: brandish
+    patterns: ["show {target} to {tool}", "show {target}", "hold up {target}"]
   order:
     action: order
     reach: false
@@ -609,12 +753,28 @@ lexicon:
     out: out
     outside: out
   articles: [the, a, an, some]
-  filler: ["please", "try to", "i want to", "i'd like to", "let me", "i will", "i'll"]
+  filler: [
+    "please", "try to", "i want to", "i'd like to", "let me", "i will", "i'll", "can i", "could i", "may i",
+    "can we", "could we", "i try to", "try", "let's", "lets", "let us", "i need to", "i should", "i must",
+    "i wanna", "i'm going to", "i am going to", "how about i", "maybe", "just", "i", "we"
+  ]
+  trailing: ["please", "now", "again", "game", "the game", "for me", "thanks", "thank you", "then", "first", "here", "right now", "quickly", "please thanks"]
+  adverbs: [
+    closely, carefully, thoroughly, quickly, slowly, gently, softly, firmly, properly, briefly,
+    really, very, hard, harder, quietly, loudly, again, more, further, intently, cautiously
+  ]
+  my_words: [my, mine]
+  one_words: [one, ones]
+  other_words: [other, another]
+  ordinals: {
+    first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, last: 0,
+    1st: 1, 2nd: 2, 3rd: 3, 4th: 4, 5th: 5
+  }
   pronouns: [it, them, him, her]
   all_words: [all, everything]
   and_words: [and]
   except_words: [but, except, excluding, besides]
-  room_words: [room, here, area, surroundings, place, around]
+  room_words: [room, here, area, surroundings, place, around, floor, ground]
   numbers: {
     a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
     ten: 10, eleven: 11, twelve: 12, fifteen: 15, twenty: 20, thirty: 30, forty: 40, fifty: 50, few: 3, couple: 2
@@ -774,7 +934,7 @@ messages:
   npc.wakes: "${The(args.npc)} wakes with a start!"
   peek.through: "You peer through ${the(args.door)}${if args.place} into the ${args.place}${end}."
   peek.direction: "You peer ${args.direction}${if args.place}, into the ${args.place}${end}."
-  peek.no_way: "There's nothing to peek through that way."
+  peek.no_way: "You see nothing special that way."
   peek.not_door: "You can't see through ${the(args.target)}."
   peek.dark: "It's too dark to make anything out."
   peek.empty: "It looks empty."
@@ -1077,6 +1237,19 @@ messages:
   go.already_there: "You're already here."
   go.no_route: "You don't know the way to ${args.place} from here."
   go.no_back: "You haven't come from anywhere yet."
+  who.nobody: "There's nobody here but you."
+  who.list: "Here with you: ${args.list}."
+  suggest.list: "You could try: ${args.list}. Or look at anything that catches your eye: EXAMINE it."
+  about.text: "${args.title}${if args.author} by ${args.author}${end}, version ${args.version}."
+  drink.cannot: "That's not something you can drink."
+  drink.done: "You drink ${the(args.target)}."
+  drink.from: "You drink from ${the(args.target)}. It's refreshing."
+  climb.cannot: "You can't climb ${the(args.target)}."
+  wake.cannot: "${The(args.target)} isn't asleep."
+  wake.not_person: "That's not something that sleeps."
+  show.done: "${The(args.tool)} looks at ${the(args.target)}, but doesn't seem interested."
+  show.who: "Who do you want to show ${the(args.target)} to?"
+  examine.all_none: "There's nothing here to look at."
   score.report: "You have scored ${game.score}${if game.max_score} out of a possible ${game.max_score}${end}, in ${game.turn} turns."
   score.gained: "[Your score has gone up by ${args.points}.]"
   undo.done: "[Undone.]"

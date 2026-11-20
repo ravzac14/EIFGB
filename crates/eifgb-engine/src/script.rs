@@ -52,6 +52,14 @@ impl Ctx {
     pub fn text(self, name: &str, s: impl Into<String>) -> Self {
         self.value(name, Value::Str(s.into()))
     }
+
+    /// A text argument, if there is one by that name.
+    pub fn text_arg(&self, name: &str) -> Option<&str> {
+        self.args.iter().find_map(|(k, a)| match a {
+            Arg::Value(Value::Str(s)) if k == name => Some(s.as_str()),
+            _ => None,
+        })
+    }
 }
 
 /// The value a script snippet returned.

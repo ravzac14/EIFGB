@@ -252,9 +252,9 @@ impl<'a> Lowerer<'a> {
             },
             intro,
             vars: s.vars.into_iter().collect(),
+            lexicon: self.lower_aliases(&s.aliases, lexicon, &verbs, &entities),
             entities,
             verbs,
-            lexicon,
             messages,
             choices,
             handlers,
@@ -634,12 +634,12 @@ impl<'a> Lowerer<'a> {
             match exit {
                 src::OneExit::Short(s) if is_identifier(s.trim()) => {
                     if let Some(to) = self.room_ref(s.trim(), &epath) {
-                        exits.push(Exit { direction, to: Some(to), through: None, when: None, blocked: None });
+                        exits.push(Exit { direction, to: Some(to), through: None, when: None, blocked: None, via: Vec::new() });
                     }
                 }
                 src::OneExit::Short(msg) => {
                     let blocked = Some(self.text(msg, &epath));
-                    exits.push(Exit { direction, to: None, through: None, when: None, blocked });
+                    exits.push(Exit { direction, to: None, through: None, when: None, blocked, via: Vec::new() });
                 }
                 src::OneExit::Full(f) => {
                     let to = f.to.as_deref().and_then(|t| self.room_ref(t, &format!("{epath}.to")));
@@ -655,7 +655,15 @@ impl<'a> Lowerer<'a> {
                     if f.to.is_none() && (f.through.is_some() || f.when.is_some()) {
                         self.d.warn(&epath, "'through' and 'when' do nothing without 'to'");
                     }
-                    exits.push(Exit { direction, to, through, when, blocked });
+                    let via: Vec<EntityId> = f
+                        .via
+                        .as_ref()
+                        .map(|v| v.items().into_iter().filter_map(|t| self.entity_ref(t, &format!("{epath}.via"))).collect())
+                        .unwrap_or_default();
+                    if f.to.is_none() && !via.is_empty() {
+                        self.d.warn(&epath, "'via' does nothing without 'to'");
+                    }
+                    exits.push(Exit { direction, to, through, when, blocked, via });
                 }
             }
         }
@@ -1049,7 +1057,7 @@ impl<'a> Lowerer<'a> {
                 );
                 continue;
             }
-            back.push(Exit { direction: opposite, to: Some(a), through: Some(door), when: None, blocked: None });
+            back.push(Exit { direction: opposite, to: Some(a), through: Some(door), when: None, blocked: None, via: Vec::new() });
         }
     }
 
@@ -1599,6 +1607,56 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
+    }
+}
+
+impl Lowerer<'_> {
+    /// `aliases:`: the game's own words for words it knows. Each one is
+    /// swapped in wherever it appears in a command.
+    fn lower_aliases(&mut self, aliases: &indexmap::IndexMap<String, String>, mut lexicon: Lexicon, verbs: &[Verb], entities: &[Entity]) -> Lexicon {
+        if aliases.is_empty() {
+            return lexicon;
+        }
+        let mut known: HashSet<String> = HashSet::new();
+        for v in verbs {
+            for p in &v.patterns {
+                for t in &p.0 {
+                    if let PatternToken::Word(w) = t {
+                        known.insert(w.clone());
+                    }
+                }
+            }
+        }
+        for e in entities {
+            known.extend(e.vocab.nouns.iter().chain(&e.vocab.adjectives).cloned());
+            known.extend(e.name.to_lowercase().split_whitespace().map(str::to_string));
+        }
+        let lx = &lexicon;
+        let lists = [&lx.articles, &lx.pronouns, &lx.all_words, &lx.self_words, &lx.corpse_words, &lx.and_words, &lx.except_words, &lx.room_words, &lx.my_words, &lx.one_words, &lx.other_words];
+        known.extend(lists.into_iter().flatten().cloned());
+        known.extend(lx.directions.keys().cloned());
+        known.extend(lx.phrases.keys().flat_map(|k| k.split_whitespace().map(str::to_string)).collect::<Vec<_>>());
+        known.extend(lx.numbers.keys().chain(lx.durations.keys()).chain(lx.times.keys()).chain(lx.ordinals.keys()).cloned());
+        for (from, to) in aliases {
+            let path = format!("aliases.{from}");
+            let (from, to) = (from.trim().to_lowercase(), to.trim().to_lowercase());
+            if from.is_empty() || to.is_empty() {
+                self.d.error(&path, "an alias needs a word and the word it means");
+                continue;
+            }
+            if from == to {
+                self.d.warn(&path, "an alias for itself does nothing");
+                continue;
+            }
+            if let Some(w) = to.split_whitespace().find(|w| !known.contains(*w) && w.parse::<u32>().is_err()) {
+                self.d.warn(&path, format!("'{w}' isn't a word this game knows, so the alias won't help; aliases stand for words the game already understands"));
+            }
+            if known.contains(&from) {
+                self.d.warn(&path, format!("'{from}' already means something; the alias replaces it everywhere"));
+            }
+            lexicon.aliases.insert(from, to);
+        }
+        lexicon
     }
 }
 

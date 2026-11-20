@@ -760,6 +760,9 @@ pub enum Trait {
     Wearable,
     LightSource,
     Edible,
+    /// Something to drink: a potion, a flask of water, a fountain. Drinking
+    /// a portable one uses it up.
+    Drinkable,
     /// The player can get in or on it (a wardrobe, a bed, a boat). Needs
     /// `container` or `supporter`.
     Enterable,
@@ -774,7 +777,7 @@ pub enum Trait {
 }
 
 impl Trait {
-    pub const ALL: [Trait; 15] = [
+    pub const ALL: [Trait; 16] = [
         Trait::Portable,
         Trait::Scenery,
         Trait::Container,
@@ -785,6 +788,7 @@ impl Trait {
         Trait::Wearable,
         Trait::LightSource,
         Trait::Edible,
+        Trait::Drinkable,
         Trait::Enterable,
         Trait::Transparent,
         Trait::Flammable,
@@ -804,6 +808,7 @@ impl Trait {
             Trait::Wearable => "wearable",
             Trait::LightSource => "light_source",
             Trait::Edible => "edible",
+            Trait::Drinkable => "drinkable",
             Trait::Enterable => "enterable",
             Trait::Transparent => "transparent",
             Trait::Flammable => "flammable",
@@ -919,6 +924,10 @@ pub struct Exit {
     pub when: Option<Code>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked: Option<Text>,
+    /// Things the way goes by, so the player can say how they go: CLIMB
+    /// THE STAIRS, GO DOWN THE PATH, CROSS THE BRIDGE.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub via: Vec<EntityId>,
 }
 
 // --------------------------------------------------------------- text & code
@@ -1179,6 +1188,18 @@ pub enum BuiltinAction {
     WaitUntil,
     /// List the ways out of here.
     Exits,
+    /// Who else is here.
+    Who,
+    /// What the player could try here.
+    Suggest,
+    /// The game's title, author and version.
+    About,
+    /// Drink something `drinkable`.
+    Drink,
+    /// Climb something: a way out that goes `via` it, or something to get onto.
+    Climb,
+    /// Wake a sleeping character.
+    Wake,
 }
 
 impl BuiltinAction {
@@ -1196,6 +1217,9 @@ impl BuiltinAction {
                 | BuiltinAction::Journal
                 | BuiltinAction::Time
                 | BuiltinAction::Exits
+                | BuiltinAction::Who
+                | BuiltinAction::Suggest
+                | BuiltinAction::About
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )
@@ -1294,6 +1318,30 @@ pub struct Lexicon {
     /// Times of day by name: word → "dawn", "dusk" or a time ("12:00").
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub times: BTreeMap<String, String>,
+    /// "my hat": things the player has come first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub my_words: Vec<String>,
+    /// "the brass one": stands in for a thing's name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub one_words: Vec<String>,
+    /// "the other one": not the one just mentioned.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub other_words: Vec<String>,
+    /// "the second key": word → position, from 1.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub ordinals: BTreeMap<String, u32>,
+    /// Words that change nothing, dropped anywhere: "look closely at it".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub adverbs: Vec<String>,
+    /// Phrases dropped from the end of a command when it isn't understood
+    /// with them: "save game", "go east please".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trailing: Vec<String>,
+    /// The game's own words for words the game knows, anywhere in a
+    /// command: `using` → `with`, `port` → `west`. From the `aliases`
+    /// section of a game.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub aliases: BTreeMap<String, String>,
 }
 
 // ------------------------------------------------------------------ handlers

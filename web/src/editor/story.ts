@@ -312,6 +312,9 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
   // Variables.
   group("Variables", ...variablesSection(ctx));
 
+  // Aliases.
+  group("Words", ...aliasesSection(ctx));
+
   // Script files.
   const files = m.list(["scripts"]);
   const fileName = el("input", { type: "text", placeholder: "helpers", ariaLabel: "New script file's name" }) as HTMLInputElement;
@@ -376,6 +379,39 @@ function variablesSection(ctx: InspectorContext): HTMLElement[] {
       button("Add", () => {
         if (!name.value.trim()) return name.focus();
         ctx.change((x) => x.addVar(name.value, parseValue(value.value || "0")));
+      }),
+    ),
+  ];
+}
+
+/** The game's own words for words the game knows: `using` means `with`. */
+function aliasesSection(ctx: InspectorContext): HTMLElement[] {
+  const m = ctx.model;
+  const rows = m.aliases().map(([word, means]) => {
+    const input = el("input", { type: "text", value: means, ariaLabel: `What ${word} means` }) as HTMLInputElement;
+    input.addEventListener("input", () => ctx.change((x) => x.setAlias(word, input.value), { coalesce: `aliases.${word}`, redraw: false }));
+    return el(
+      "div",
+      { class: "var" },
+      el("code", { textContent: word }),
+      input,
+      button("✕", () => ctx.change((x) => x.deleteEntry("aliases", word)), "small"),
+    );
+  });
+  const word = el("input", { type: "text", placeholder: "using", ariaLabel: "New word" }) as HTMLInputElement;
+  const means = el("input", { type: "text", placeholder: "with", ariaLabel: "The word it means" }) as HTMLInputElement;
+  return [
+    help("Your own words for words the game already knows, used anywhere in a command: using → with, port → west, yoink → take."),
+    ...rows,
+    el(
+      "div",
+      { class: "add three" },
+      word,
+      means,
+      button("Add", () => {
+        if (!word.value.trim()) return word.focus();
+        if (!means.value.trim()) return means.focus();
+        ctx.change((x) => x.setAlias(word.value, means.value));
       }),
     ),
   ];

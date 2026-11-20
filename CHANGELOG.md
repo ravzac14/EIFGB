@@ -6,6 +6,37 @@ behave will be called out here.
 
 ## Unreleased
 
+- Players can talk more naturally:
+  - Lists with commas (TAKE THE KEY, THE COIN AND THE LAMP), MY HAT, THE
+    BRASS ONE, THE OTHER ONE, THE SECOND KEY, TWO COINS. Identical things
+    (two gold coins) no longer get "which do you mean?".
+  - Extra words are fine: CAN I GO EAST, TRY WEST, LET'S GO SOUTH, LOOK
+    CLOSELY AT IT, GO EAST PLEASE, SAVE GAME, TAKE IT AGAIN. UNDO UNDO
+    undoes twice.
+  - Questions: WHAT'S HERE, WHAT AM I CARRYING, CHECK INVENTORY, WHO IS
+    HERE, WHAT CAN I DO (suggestions for right now), ABOUT (title, author,
+    version).
+  - The floor: TAKE THE KEY FROM THE FLOOR, PUT IT ON THE GROUND. X ALL
+    looks at everything.
+  - LOOK UP / LOOK DOWN where there's no way says "You see nothing special
+    that way."
+  - A place's name goes there: KITCHEN, GO KITCHEN, next door or anywhere
+    visited.
+  - HELLO and HELLO KEEPER start a conversation; SAY XYZZY is a verb games
+    can hook.
+  - Short replies, which games can hook or reword, for JUMP, SIT, LIE
+    DOWN, SLEEP, SING, DANCE, PRAY, CRY, LAUGH, YES, NO, THANKS, SORRY,
+    XYZZY, and CUT, TIE, DIG, KNOCK, WAVE, POINT.
+  - DRINK (new trait `drinkable`), CLIMB, WAKE, and SHOW … TO ….
+- Exits can say what they go by: `via: stairs` makes CLIMB THE STAIRS, GO
+  DOWN THE STAIRS and CROSS THE BRIDGE work, and the staircase is there on
+  both sides. In the editor: **Goes by** on a way out.
+- `aliases:`: a game's own words for words it knows (`using: with`, `port:
+  west`), anywhere in a command. In the editor: **Words** in the game's
+  details.
+- Several commands now mean something: DANCE, SING, JUMP and the other
+  words above used to be "I don't know the verb". A game's `parse_failed`
+  handler no longer sees them; hook the verb instead (`on: { dance: ... }`).
 - More of what players type works:
   - AND joins commands: TAKE THE KEY AND OPEN THE DOOR. It still joins
     things, too: TAKE THE KEY AND THE LAMP, and now TAKE ALL BUT THE KEY.

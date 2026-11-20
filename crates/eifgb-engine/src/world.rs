@@ -346,7 +346,7 @@ impl World {
         out.push(ceiling);
         self.collect_visible(ceiling, &mut out);
         if ceiling == here {
-            for d in self.doors_of(here) {
+            for d in self.doors_of(here).into_iter().chain(self.landmarks_of(here)) {
                 if !out.contains(&d) && !self.is_hidden(d) {
                     out.push(d);
                 }
@@ -388,6 +388,49 @@ impl World {
         out
     }
 
+    /// Things this room's ways out go by (`via`): a staircase is in both
+    /// rooms it joins.
+    pub fn landmarks_of(&self, room: EntityId) -> Vec<EntityId> {
+        let mut out = Vec::new();
+        for e in &self.def(room).exits {
+            for &v in &e.via {
+                if !out.contains(&v) && self.def(v).kind != EntityKind::Room {
+                    out.push(v);
+                }
+            }
+        }
+        out
+    }
+
+    /// Rooms the player knows of: where they've been, and the rooms next to this one.
+    pub fn known_places(&self) -> Vec<EntityId> {
+        let mut out: Vec<EntityId> = self.state.visited.iter().copied().collect();
+        for e in &self.def(self.here()).exits {
+            if let Some(to) = e.to
+                && self.exit_visible(e)
+                && !out.contains(&to)
+            {
+                out.push(to);
+            }
+        }
+        out
+    }
+
+    /// Known rooms whose name has every one of the words ("kitchen", "the
+    /// front hall"); `extra` words (like "room") match any room.
+    pub fn places_named(&self, words: &[String], extra: &[String]) -> Vec<EntityId> {
+        if words.is_empty() {
+            return Vec::new();
+        }
+        self.known_places()
+            .into_iter()
+            .filter(|&r| {
+                let name: Vec<String> = self.def(r).name.to_lowercase().split(|c: char| !c.is_alphanumeric() && c != '\'').map(str::to_string).collect();
+                words.iter().all(|w| name.contains(w) || extra.contains(w)) && words.iter().any(|w| name.contains(w))
+            })
+            .collect()
+    }
+
     /// The door on the room's way out in that direction, if there's one.
     pub fn door_toward(&self, room: EntityId, dir: Direction) -> Option<EntityId> {
         self.def(room).exits.iter().filter(|e| e.direction == dir && self.exit_visible(e)).find_map(|e| e.through)
@@ -397,7 +440,7 @@ impl World {
     /// doors its exits use (a door's other side is present too).
     pub fn present(&self, room: EntityId) -> Vec<EntityId> {
         let mut out = self.contents(room);
-        for d in self.doors_of(room) {
+        for d in self.doors_of(room).into_iter().chain(self.landmarks_of(room)) {
             if !out.contains(&d) {
                 out.push(d);
             }

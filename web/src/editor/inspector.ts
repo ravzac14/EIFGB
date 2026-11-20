@@ -335,6 +335,35 @@ function exitPanel(panel: HTMLElement, ctx: InspectorContext, room: string, dir:
     doorForm(panel, ctx, e.door);
   }
 
+  // What the way goes by: CLIMB THE STAIRS, CROSS THE BRIDGE.
+  panel.append(el("h3", { textContent: "Goes by" }));
+  const via = e.via ?? [];
+  const nearby = m.things().filter((t) => (t.in === room || t.in === to) && !via.includes(t.id));
+  panel.append(
+    help("Something the way goes by, like stairs, a path or a bridge, so players can CLIMB THE STAIRS or CROSS THE BRIDGE instead of naming the direction. It counts as being on both sides."),
+    ...via.map((v) =>
+      el(
+        "div",
+        { class: "row" },
+        el("span", { textContent: m.thing(v)?.name ?? v }),
+        button("✕", () => ctx.change((x) => x.setVia(room, dir, via.filter((w) => w !== v))), "small"),
+      ),
+    ),
+  );
+  if (nearby.length) {
+    let pick = nearby[0].id;
+    panel.append(
+      el(
+        "div",
+        { class: "row" },
+        select(nearby.map((t): [string, string] => [t.id, t.name]), pick, (v) => (pick = v), "Thing the way goes by"),
+        button("Add", () => ctx.change((x) => x.setVia(room, dir, [...via, pick]))),
+      ),
+    );
+  } else if (!via.length) {
+    panel.append(help(`Add an object to ${from} (stairs, a path…) to choose it here.`));
+  }
+
   panel.append(
     el(
       "div",
@@ -635,6 +664,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   panel.append(
     ...trait("Can be worn", "wearable"),
     ...trait("Can be eaten", "edible"),
+    ...trait("Can be drunk", "drinkable", "DRINK it. Something you carry is used up; a fountain or a stream isn't."),
     ...trait("Gives light", "light_source", "Lights up dark rooms when it's lit."),
   );
   if (has("light_source")) panel.append(el("div", { class: "indent" }, state("Starts lit", "lit", t.lit)));

@@ -516,6 +516,9 @@ impl<H: ScriptHost> Game<H> {
             BuiltinAction::Journal => self.journal(),
             BuiltinAction::Time => self.tell_time(),
             BuiltinAction::Exits => self.exits_action(),
+            BuiltinAction::Who => self.who(),
+            BuiltinAction::Suggest => self.suggest(),
+            BuiltinAction::About => self.about(),
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }

@@ -823,6 +823,55 @@ Taken.
 - Messages to reword: `push.done`, `push.cant`, `push.carried`,
   `push.on_it`, `push.stuck`, `take.pushable` and `reach.high`.
 
+### Stairs, paths and bridges
+
+Players often say how they go rather than which way: CLIMB THE STAIRS, GO
+DOWN THE PATH, CROSS THE BRIDGE. Give the exit a `via`, naming the thing
+it goes by (or a list of them):
+
+```yaml
+rooms:
+  hall:
+    name: Front Hall
+    exits:
+      up: { to: attic, via: stairs }
+  attic:
+    name: Attic
+    exits:
+      down: { to: hall, via: stairs }
+objects:
+  stairs: { name: staircase, synonyms: [stairs, steps], in: hall, traits: [scenery] }
+```
+
+Now CLIMB THE STAIRS, GO UP THE STAIRS, TAKE THE STAIRS and USE THE STAIRS
+go up, and from the attic, GO DOWN THE STAIRS comes back. Like a door, the
+staircase is there on both sides of every way that goes by it, even though
+it's only `in:` the hall. In the editor, select the way out on the map and
+use **Goes by**.
+
+## Your own words: aliases
+
+Players type the words they know. If your game's players say "using"
+where the game expects "with", or a sailing game wants PORT for west, add
+an `aliases` section. Each word on the left means the words on the right,
+wherever it appears in a command:
+
+```yaml
+aliases:
+  using: with          # UNLOCK DOOR USING KEY
+  port: west           # PORT, GO PORT
+  starboard: east
+  yoink: take          # YOINK THE GEM
+  grab hold of: take
+```
+
+An alias stands for words the game already knows: a verb, a direction, a
+thing's name, or a word like "all". The compiler warns when the right-hand
+side isn't a word the game knows, and when the left-hand side already
+means something (the alias then replaces it everywhere). For new verbs
+with their own behaviour, add a verb under `verbs:` instead. In the
+editor, aliases are under **Words** in the game's details.
+
 ## Timed events
 
 Timers make things happen after a number of **actions**. Any command
@@ -1617,6 +1666,25 @@ Players can type these in any game. Words in the second column mean the
 same thing; `…` is where the name of a thing or person goes. AND joins
 commands: TAKE THE KEY AND OPEN THE DOOR, as do THEN and full stops.
 
+Players can also talk the way they would to a person, and the game
+follows:
+
+- **Lists and picks:** TAKE THE KEY, THE COIN AND THE LAMP; TAKE ALL BUT
+  THE KEY; X MY HAT; X THE BRASS ONE; TAKE THE OTHER ONE; DROP THE SECOND
+  KEY; TAKE TWO COINS. Two things that can't be told apart (two gold coins)
+  don't get a "which do you mean?".
+- **Extra words are fine:** CAN I GO EAST, TRY WEST, LET'S GO SOUTH, LOOK
+  CLOSELY AT THE LAMP, GO EAST PLEASE, SAVE GAME, UNDO UNDO (twice), TAKE
+  IT AGAIN.
+- **Questions:** WHAT'S HERE, WHAT AM I CARRYING, WHO IS HERE, WHAT CAN I
+  DO.
+- **The room and the floor:** X ROOM, SEARCH HERE, TAKE THE KEY FROM THE
+  FLOOR, PUT IT ON THE GROUND (drops it).
+- **Small talk and the odd thing:** HELLO, JUMP, SIT, LIE DOWN, SLEEP,
+  SING, DANCE, PRAY, CRY, LAUGH, YES, NO, THANKS, SORRY, XYZZY and the
+  like get a short reply. Each is a verb you can hook (`on: { jump: ... }`)
+  or reword with its `default`. HELLO KEEPER talks to the keeper.
+
 #### Looking and moving
 
 | Command | Also | What it does |
@@ -1629,6 +1697,7 @@ commands: TAKE THE KEY AND OPEN THE DOOR, as do THEN and full stops.
 | GO THROUGH … | ENTER … | Goes through a door. |
 | GO TO … | WALK TO …, RETURN TO … | Walks to a place you've been, by the way you know, a turn a step. It stops if anything happens on the way, and UNDO takes the whole walk back. |
 | GO BACK | BACK, RETURN | Goes back to the room you just came from. |
+| KITCHEN | GO KITCHEN, ENTER KITCHEN | A place's name on its own goes there: next door, or anywhere you've been. |
 | GET IN … | SIT ON …, STAND ON …, CLIMB ON …, CLIMB INTO … | Gets into or onto something `enterable`. Standing on something reaches things up high. |
 | GET OUT | STAND UP | Gets out again. |
 | PEEK NORTH | LOOK NORTH, PEEK THROUGH … | Looks into the next room without going in. |
@@ -1650,6 +1719,12 @@ commands: TAKE THE KEY AND OPEN THE DOOR, as do THEN and full stops.
 | UNLOCK … / LOCK … | … WITH … | Unlocks or locks it, with the right key. |
 | WEAR … / TAKE OFF … | PUT ON …, REMOVE … | Puts clothing on or takes it off. |
 | EAT … | | Eats something edible. |
+| DRINK … | DRINK FROM …, SIP … | Drinks something `drinkable`. A drink you carry is used up; a fountain isn't. |
+| CLIMB … | CLIMB UP …, CLIMB DOWN …, SCALE … | Goes up or down a way that goes `via` it, or climbs onto something you can stand on. |
+| WAKE … | WAKE UP …, ROUSE … | Wakes someone who's asleep. |
+| SHOW … TO … | SHOW … | Shows someone something (and frightens them, if they fear it). |
+| SAY … | SAY … TO …, WHISPER … | Says something aloud, for your `on: { say: ... }` handlers (the words are `args.text`). |
+| CUT, TIE … TO …, DIG, KNOCK ON …, WAVE AT …, POINT AT … | CHOP, SLICE, ATTACH …, RAP ON … | Tries it out; the game decides if anything happens. |
 | INVENTORY | I | Lists what you carry. |
 | USE … | USE … ON …, USE … WITH … | Does what the thing is for: lights a lamp, wears a hat, eats food, opens a door (or goes through it once it's open). USE KEY ON DOOR unlocks it, and USE SWORD ON GOBLIN attacks. |
 | LIGHT … | TURN ON … | Lights a lamp, torch or candle. |
@@ -1707,6 +1782,9 @@ commands: TAKE THE KEY AND OPEN THE DOOR, as do THEN and full stops.
 | HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
 | JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them. |
 | TIME | WHAT TIME IS IT | The time of day, if the game keeps one. |
+| WHO IS HERE | WHO'S HERE, IS ANYONE HERE | Who else is in the room. |
+| WHAT CAN I DO | WHAT NOW, OPTIONS | A few things worth trying here, right now. |
+| ABOUT | INFO, CREDITS, VERSION | The game's title, author and version. |
 | QUIT | Q | Stops playing. |
 
 Some verbs exist so that players can try them and authors can respond:
@@ -1722,10 +1800,10 @@ end-of-turn event.
 
 **Top-level sections:** `format`, `game`, `settings`, `presentation`, `vars`, `player`, `rooms`,
 `objects`, `characters`, `verbs`, `choices`, `on`, `endings`, `timers`,
-`messages`, `scripts`.
+`messages`, `aliases`, `scripts`.
 
 **Traits:** `portable`, `scenery`, `container`, `supporter`, `openable`,
-`lockable`, `door`, `wearable`, `edible`, `light_source`, `enterable`,
+`lockable`, `door`, `wearable`, `edible`, `drinkable`, `light_source`, `enterable`,
 `transparent`, `flammable`, `destructible`, `pushable`. `high: true`
 puts a thing out of reach unless the player stands on something. `open` is shorthand for `state: { open: true }`. Things can
 also have a `size` (default 1) and a `capacity`; see

@@ -54,6 +54,9 @@ pub struct Source {
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, String>,
+    /// The game's own words for words the game knows: `using: with`.
+    #[serde(default)]
+    pub aliases: IndexMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -246,6 +249,9 @@ pub struct FullExit {
     pub when: Option<String>,
     #[serde(default)]
     pub blocked: Option<String>,
+    /// Things the way goes by: `via: stairs` lets CLIMB THE STAIRS go this way.
+    #[serde(default)]
+    pub via: Option<OneOrMany>,
 }
 
 /// An object or a character. Only characters may use `talk`.

@@ -81,6 +81,29 @@ const gateSide = black.doors()[0].in;
 const renamed = black.renameRoom(gateSide, "gate yard");
 assert.deepEqual(errors(black.toString()), [], `renamed ${gateSide} → ${renamed}`);
 
+// A way out that goes by something: CLIMB THE STAIRS. Aliases: the game's own words.
+{
+  const v = new Model(NEW_GAME);
+  const hall = v.start();
+  const loft = v.addRoom("Loft");
+  v.connect(hall, "up", loft);
+  const stairs = v.addThing("scenery", hall, "stairs");
+  v.setVia(hall, "up", [stairs]);
+  assert.deepEqual(v.exit(hall, "up"), { dir: "up", to: loft, door: undefined, via: [stairs], kind: "plain" });
+  assert.match(v.toString(), new RegExp(`up: \\{ to: ${loft}, via: ${stairs} \\}|up:\\n\\s+to: ${loft}\\n\\s+via: ${stairs}`));
+  v.setExit(hall, "up", loft);
+  assert.deepEqual(v.exit(hall, "up")?.via, [stairs], "changing where it goes keeps what it goes by");
+  v.setVia(hall, "up", []);
+  assert.equal(v.get(["rooms", hall, "exits", "up"]), loft, "back to a plain exit");
+  v.setAlias("Using", "with");
+  v.setAlias("port", "west");
+  assert.deepEqual(v.aliases(), [["using", "with"], ["port", "west"]]);
+  assert.deepEqual(errors(v.toString()), []);
+  v.deleteEntry("aliases", "using");
+  v.deleteEntry("aliases", "port");
+  assert.equal(v.get(["aliases"]), undefined);
+}
+
 assert.equal(slug("Dark Cellar!"), "dark_cellar");
 assert.equal(slug("1st floor"), "room_1st_floor");
 console.log("ok   editor model");

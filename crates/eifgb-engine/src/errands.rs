@@ -34,6 +34,8 @@ impl<H: ScriptHost> Game<H> {
                 self.msg("use.on_how", ctx);
                 return false;
             }
+        } else if self.way_via(t).is_some() {
+            (BuiltinAction::Enter, t, None)
         } else if w.has(t, Trait::LightSource) {
             (if lit(t) { BuiltinAction::Extinguish } else { BuiltinAction::Light }, t, None)
         } else if w.has(t, Trait::Wearable) && !w.flag(t, "worn") {
@@ -112,18 +114,9 @@ impl<H: ScriptHost> Game<H> {
         let here = self.world.here();
         let ctx = Ctx::new();
         let room_words = &self.world.story().lexicon.room_words;
-        // Rooms the player has been to whose name has every word.
-        let named: Vec<EntityId> = self
-            .world
-            .state
-            .visited
-            .iter()
-            .copied()
-            .filter(|&r| {
-                let name = name_words(&self.world.def(r).name);
-                !words.is_empty() && words.iter().all(|w| name.contains(w) || room_words.contains(w))
-            })
-            .collect();
+        // Rooms the player has been to, or can see from here, called that.
+        let extra = room_words.clone();
+        let named = self.world.places_named(words, &extra);
         if named.is_empty() {
             self.msg("go.unknown_place", &ctx);
             return false;
@@ -198,7 +191,9 @@ impl<H: ScriptHost> Game<H> {
             }
             for e in &w.def(r).exits {
                 let Some(to) = e.to else { continue };
-                if to == from || came.contains_key(&to) || !w.state.visited.contains(&to) || !w.exit_visible(e) {
+                // Only through places the player has been (the place itself may be new).
+                let known = w.state.visited.contains(&to) || (targets.contains(&to) && r == from);
+                if to == from || came.contains_key(&to) || !known || !w.exit_visible(e) {
                     continue;
                 }
                 came.insert(to, (r, e.direction));
@@ -309,7 +304,133 @@ impl<H: ScriptHost> Game<H> {
     }
 }
 
-/// A room name's words, lowercased.
-fn name_words(s: &str) -> Vec<String> {
-    s.to_lowercase().split(|c: char| !c.is_alphanumeric() && c != '\'').filter(|w| !w.is_empty()).map(str::to_string).collect()
+// ------------------------------------------------------ everyday verbs
+
+impl<H: ScriptHost> Game<H> {
+    /// DRINK X: a portable drink is used up; a fountain or stream isn't.
+    pub(crate) fn drink(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        if !self.world.has(t, Trait::Drinkable) {
+            self.msg("drink.cannot", ctx);
+            return false;
+        }
+        if self.world.has(t, Trait::Portable) {
+            self.msg("drink.done", ctx);
+            let _ = self.world.move_to(t, None);
+        } else {
+            self.msg("drink.from", ctx);
+        }
+        true
+    }
+
+    /// The way out of here that goes by `t` (`via`), if there is one.
+    pub(crate) fn way_via(&self, t: EntityId) -> Option<eifgb_ir::Exit> {
+        let here = self.world.here();
+        self.world.def(here).exits.iter().find(|e| e.to.is_some() && e.via.contains(&t) && self.world.exit_visible(e)).cloned()
+    }
+
+    /// CLIMB X: up (or down) a way out that goes by it, or onto it.
+    pub(crate) fn climb(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        if self.way_via(t).is_some() || self.world.has(t, Trait::Door) || self.world.has(t, Trait::Enterable) {
+            let cmd = Command { verb: 0, targets: vec![t], tool: None, text: None, direction: None, words: Vec::new() };
+            return self.builtin(BuiltinAction::Enter, Some(t), &cmd, ctx);
+        }
+        self.msg("climb.cannot", ctx);
+        false
+    }
+
+    /// WAKE X.
+    pub(crate) fn wake_action(&mut self, t: EntityId, ctx: &Ctx) -> bool {
+        if self.world.def(t).kind != EntityKind::Character || self.world.is_dead(t) || t == PLAYER {
+            self.msg("wake.not_person", ctx);
+            return false;
+        }
+        // The turn loop says "X wakes with a start!".
+        if !self.world.wake(t) {
+            self.msg("wake.cannot", ctx);
+            return false;
+        }
+        true
+    }
+
+    /// WHO IS HERE.
+    pub(crate) fn who(&mut self) {
+        let here: Vec<EntityId> = self
+            .world
+            .scope()
+            .into_iter()
+            .filter(|&c| c != PLAYER && self.world.def(c).kind == EntityKind::Character && !self.world.is_hidden(c) && !self.world.is_dead(c))
+            .collect();
+        if here.is_empty() {
+            return self.msg("who.nobody", &Ctx::new());
+        }
+        let list = self.list_a(&here);
+        self.msg("who.list", &Ctx::new().text("list", list));
+    }
+
+    /// WHAT CAN I DO: things worth trying here, right now.
+    pub(crate) fn suggest(&mut self) {
+        let w = &self.world;
+        let mut ideas: Vec<String> = Vec::new();
+        let name = |id: EntityId| w.def(id).name.to_uppercase();
+        for id in w.scope() {
+            if id == PLAYER || w.is_hidden(id) || w.def(id).kind == EntityKind::Room {
+                continue;
+            }
+            let d = w.def(id);
+            if d.kind == EntityKind::Character {
+                if d.talk.is_some() && !w.is_dead(id) {
+                    push_new(&mut ideas, format!("TALK TO {}", name(id)));
+                }
+                continue;
+            }
+            if w.has(id, Trait::Lockable) && w.flag(id, "locked") {
+                if d.unlocks_with.is_some_and(|k| w.is_within(k, PLAYER)) {
+                    push_new(&mut ideas, format!("UNLOCK {}", name(id)));
+                }
+            } else if w.has(id, Trait::Openable) && !w.flag(id, "open") {
+                push_new(&mut ideas, format!("OPEN {}", name(id)));
+            }
+            if w.has(id, Trait::Portable) && !w.is_within(id, PLAYER) {
+                push_new(&mut ideas, format!("TAKE {}", name(id)));
+            }
+            if w.has(id, Trait::LightSource) && !(w.flag(id, "lit") || w.flag(id, "on")) && w.is_within(id, PLAYER) {
+                push_new(&mut ideas, format!("LIGHT {}", name(id)));
+            }
+            if !w.state.known.contains(&id) && d.description.is_some() {
+                push_new(&mut ideas, format!("EXAMINE {}", name(id)));
+            }
+        }
+        let here = w.here();
+        for e in &w.def(here).exits {
+            if e.to.is_some_and(|r| !w.state.visited.contains(&r)) && w.exit_visible(e) {
+                push_new(&mut ideas, format!("GO {}", self.grammar.direction_word(e.direction).to_uppercase()));
+            }
+        }
+        if ideas.is_empty() {
+            push_new(&mut ideas, "LOOK".into());
+            push_new(&mut ideas, "INVENTORY".into());
+        }
+        if !w.story().hints.is_empty() {
+            push_new(&mut ideas, "HINT".into());
+        }
+        ideas.truncate(6);
+        let list = (self.grammar.lang().list_or)(&ideas);
+        self.msg("suggest.list", &Ctx::new().text("list", list));
+    }
+
+    /// ABOUT: the title, author and version.
+    pub(crate) fn about(&mut self) {
+        let m = &self.world.story().meta;
+        let ctx = Ctx::new()
+            .text("title", m.title.clone())
+            .text("author", m.author.clone().unwrap_or_default())
+            .text("version", m.version.clone());
+        self.msg("about.text", &ctx);
+    }
+}
+
+fn push_new(v: &mut Vec<String>, s: String) {
+    if !v.contains(&s) {
+        v.push(s);
+    }
 }

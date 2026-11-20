@@ -43,13 +43,14 @@ stay interchangeable.
 | `factions`   | Sides for characters: `hostile_to` (factions and/or `player`) and `eats_corpses`. See **Characters**. |
 | `goals`      | Goals for JOURNAL, in order: `text` (text), and optional Lua `when` and `done`, and `points`. See **Goals**. |
 | `clock`      | The time of day: `start` (a time), `minutes_per_turn` (default 1), `dawn` (default 6:00), `dusk` (default 18:00), `show` (default true). See **Time of day**. |
+| `aliases`    | The game's own words for words it knows: a map of word (or phrase) → words, swapped in wherever they appear in a command, before anything else (`using: with`, `port: west`). Lowercased; kept in the IR as `lexicon.aliases`. A right-hand word the game doesn't know (no verb pattern, direction, thing's name or lexicon word uses it) is a warning, and so is a left-hand word that already means something. An empty side is an error. |
 | `hints`      | Hints for HINT, by puzzle: `steps` (a non-empty list of text, a nudge first and the answer last) and an optional Lua `when`. HINT (verb `hint`: hint, hints, clue; out of the game, so it takes no turn) shows the next step of the first puzzle, in order, whose `when` is true (or that has none): `[hint.show]` with `args.hint`, `args.n` and `args.of`; when every step has been shown, the last repeats. None true `[hint.none]`; no `hints:` at all `[hint.none_in_game]`. How many steps of each have been shown is kept in the player's private `_hints` state, so it's saved and undone. |
 
 IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb IDs can't be event names (`start`, `turn`, `parse_failed`, `died`, `enter`, `leave`, `defeated`), because handlers are keyed by both.
 
 ## Entities
 
-- **Exits** take one of three forms. A room ID is a plain exit. A string is a blocked exit, with that string as the message. A map `{to, through, when, blocked}` handles doors and conditional exits.
+- **Exits** take one of three forms. A room ID is a plain exit. A string is a blocked exit, with that string as the message. A map `{to, through, when, blocked, via}` handles doors, conditional exits and the things a way goes by.
   A direction can also take a **list** of those forms, for several exits the same way. When the player goes that way, entries with `to` whose `when` holds (or that have no `when`) are candidates:
   - **One candidate:** the player goes there.
   - **Several, each through a different door:** the game asks "Which do you mean, the red door or the blue door?". The reply runs as GO THROUGH that door, and asking doesn't take a turn.
@@ -87,6 +88,8 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   - **There's no way back:** one is added in the opposite direction (north ↔ south, up ↔ down, in ↔ out, and so on).
   - **That direction already leads elsewhere:** the compiler warns and leaves the map alone.
 
+  **`via`** on an exit (a thing's ID, or a list) names what the way goes by: CLIMB THE STAIRS, GO UP/DOWN THE STAIRS, CROSS THE BRIDGE, GO ALONG/ACROSS/OVER THE PATH, TAKE THE PATH (when it isn't portable) and USE THE STAIRS leave by that exit, and CLIMB on something else is `[climb.cannot]`. Like a door, a `via` thing is present (in scope, listed) in every room whose exits go by it. `via` without `to` is a warning.
+
   **Doors are named by their way out, too:** a direction word counts as part of a door's name in the room where an exit in that direction goes through it, so UNLOCK NW DOOR and OPEN THE EAST DOOR pick the right one. When "Which do you mean…?" lists doors with the same name, each says which way it leads, "the door (northwest)" `[parser.door_way]`, and the reply can be just the direction. Elsewhere, a direction that names nothing here is "You can't see any such thing.", not an unknown word.
 
   The door is in scope, listed and described in every room it connects, so it can be examined, opened, closed, locked and unlocked from either side. Its `in:` only decides which room `:is_in` and scripts see as its location.
@@ -118,7 +121,7 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   - **Fields scripts add during play** are described as well.
   - **No repetition:** if a description already reads a field in a template (`self.fueled`, `world.door.locked`), that field isn't described again. For open and locked, reading either one counts.
   - **Wording** comes from the `state.*` messages, so it can be reworded.
-- **Traits** give built-in behaviour: `portable`, `scenery`, `container`, `supporter`, `open`, `openable`, `lockable`, `door`, `wearable`, `light_source`, `edible`.
+- **Traits** give built-in behaviour: `portable`, `scenery`, `container`, `supporter`, `open`, `openable`, `lockable`, `door`, `wearable`, `light_source`, `edible`, `drinkable` (DRINK: used up when portable).
 - **State** is a map of mutable fields on an entity. Built-in traits read these fields, e.g. `open`, `locked` and `hidden`.
 - **Parser vocabulary** comes from `name`, `synonyms` and `adjectives`. The adjectives are used for disambiguation.
 
@@ -347,6 +350,13 @@ reword any of them under `messages:`.
 | `where am i` / `exits` | LOOK / the ways out `[look.exits]` | EXITS (`exits`, a meta verb) takes no turn |
 | `use key on gate`, `use lamp`, `use coat` | UNLOCK, LIGHT (or PUT OUT if lit), WEAR… | USE (`use`) runs another verb, handlers and all: with a second thing, UNLOCK when it's the key, BURN when it's flammable and the first is lit, ATTACK with a weapon (`damage`) on a character, else GIVE; alone, by trait: light source, wearable, edible, open door (ENTER), openable (OPEN), enterable, a character with `talk`, something that `calls`. Otherwise `[use.how]` / `[use.on_how]` |
 | `go to the lighthouse`, `go back` | Walks there, a turn a step | GO TO (`go_to`) matches the names of visited rooms, nearest first, and walks the shortest way through visited rooms by visible exits. Rooms on the way show only their name; the walk stops when a step fails or anything but a title or notice is printed. GO BACK (`go_back`) walks to the room last walked out of. One UNDO takes back the whole walk. `[go.unknown_place, go.already_there, go.no_route, go.no_back]` |
+| `take the key, the coin and the lamp`, `x my hat`, `x the brass one`, `take the other one`, `drop the second key`, `take two coins` | Each thing; the held hat; the brass key; not the one just mentioned; the second match; two of them | Commas count as `and`. Lexicon `my_words` prefer held things, `one_words` stand in for a noun (after adjectives only), `other_words` leave out the last mentioned, `ordinals` (and `last`) pick by position, `numbers` before a name take that many. A bare number or ordinal names nothing. Matches that are portable, not doors and have the same name are interchangeable: the first is taken, with no question |
+| `can i go east`, `look closely at the lamp`, `go east please`, `save game`, `undo undo` | GO EAST; EXAMINE LAMP; GO EAST; SAVE; UNDO twice | More `filler`; lexicon `adverbs` are dropped anywhere (unless a name uses them); lexicon `trailing` words are dropped from the end when the command isn't understood with them; the same verb word repeated runs it that many times |
+| `what's here`, `what am i carrying`, `who is here`, `what can i do`, `about` | LOOK; INVENTORY; `[who.list]`/`[who.nobody]`; `[suggest.list]`; `[about.text]` | WHO (`who`), SUGGEST (`suggest`) and ABOUT (`about`) are meta: no turn. SUGGEST lists up to six: TALK TO characters with `talk`, UNLOCK (key held), OPEN, TAKE, LIGHT (held), EXAMINE (unknown things with a description), GO to unvisited rooms next door, and HINT if the game has hints |
+| `take key from the floor`, `put it on the ground` | Takes it; drops it | `floor` and `ground` (in `room_words`) are the room for any verb; PUT … ON/IN the room is DROP |
+| `kitchen`, `go kitchen`, `enter the kitchen` | GO TO THE KITCHEN | A place's name, as a whole command or after GO/WALK/GO INTO/VISIT, goes there: rooms visited, or next door by a visible exit. GO {text} only counts when it names a place (so `go east please` still goes east). Typo correction never turns a place name into a verb |
+| `hello`, `hello keeper`, `say xyzzy` | TALK (to the one person here), TALK TO KEEPER; the `say` verb | `say` is a hookable verb (`args.text`). Stock verbs with only a `default`: jump, sit, stand, lie, sleep, sing, dance, pray, cry, laugh, yes, no, thanks, sorry, swear, magic (xyzzy), and cut, tie, dig, knock, wave, point |
+| `drink potion`, `climb tree`, `wake guard`, `show hat to guard` | `[drink.done]` (removed) / `[drink.from]` (not portable); `[climb.cannot]`; wakes them (`[npc.wakes]`) or `[wake.cannot]`/`[wake.not_person]`; `[show.done]` | DRINK (`drink`, trait `drinkable`), CLIMB (`climb`), WAKE (`wake`). SHOW (`show`) is BRANDISH, but says `[show.done]` when nobody's frightened; with no one named, it's shown to the one person here, or `[show.who]` |
 | `wait 3`, `wait ten minutes`, `wait until dusk`, `wait until 9:30 pm` | Waits, quietly, then "Time passes." | WAIT FOR (`wait_for`) and WAIT UNTIL (`wait_until`) run WAIT turns, stopping at the first output. Lexicon `numbers`, `durations` (turn, minute, hour) and `times` (dawn, dusk, noon…). Minutes, hours and times need a clock `[wait.no_clock]`; at most 1000 turns; one UNDO for all of it. `[wait.how_long, wait.when, wait.already]` |
 | `again` / `g` | Repeats the last command | |
 

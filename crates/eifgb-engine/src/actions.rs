@@ -86,6 +86,9 @@ impl<H: ScriptHost> Game<H> {
                 true
             }
             (A::Use, Some(t)) => self.use_action(t, cmd.tool, ctx),
+            (A::Drink, Some(t)) => self.drink(t, ctx),
+            (A::Climb, Some(t)) => self.climb(t, ctx),
+            (A::Wake, Some(t)) => self.wake_action(t, ctx),
             (A::Go, _) => self.go(cmd, ctx),
             (A::Enter, Some(t)) => self.enter(t, ctx),
             (A::GetOut, t) => self.get_out(t),
@@ -502,7 +505,7 @@ impl<H: ScriptHost> Game<H> {
             .def(here)
             .exits
             .iter()
-            .filter(|e| e.through == Some(t) && e.to.is_some())
+            .filter(|e| (e.through == Some(t) || e.via.contains(&t)) && e.to.is_some())
             .cloned()
             .collect();
         if routes.is_empty() {
@@ -911,6 +914,10 @@ impl<H: ScriptHost> Game<H> {
         {
             return self.steal_action(Some(t), Some(f), ctx);
         }
+        // TAKE THE PATH: a way out that goes by it.
+        if from.is_none() && !self.world.has(t, Trait::Portable) && self.way_via(t).is_some() {
+            return self.enter(t, ctx);
+        }
         let w = &self.world;
         let fit = w.fits(t, PLAYER);
         let key = if let Some(f) = from
@@ -977,6 +984,10 @@ impl<H: ScriptHost> Game<H> {
             self.msg("action.nothing", ctx);
             return false;
         };
+        // PUT IT ON THE FLOOR: drop it.
+        if dest == self.world.here() {
+            return self.drop_thing(t, ctx);
+        }
         let w = &self.world;
         let key = if dest == t || w.is_within(dest, t) {
             Some("put.into_self")

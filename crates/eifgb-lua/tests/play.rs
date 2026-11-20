@@ -165,8 +165,8 @@ fn pronouns_refer_to_the_last_object() {
 #[test]
 fn unknown_verbs_suggest_what_works_here() {
     let mut g = game(lighthouse());
-    let out = say(&mut g, "dance");
-    assert!(out.contains("I don't know the verb \"dance\""), "{out}");
+    let out = say(&mut g, "frobnicate");
+    assert!(out.contains("I don't know the verb \"frobnicate\""), "{out}");
     assert!(out.contains("SEARCH"), "the tide pool handles SEARCH, so it should be suggested: {out}");
     assert_says(&mut g, "take zorkmid", "I don't know the word \"zorkmid\"");
     assert_says(&mut g, "take radio", "You can't see any such thing.");
@@ -184,7 +184,7 @@ fn chained_commands_stop_at_the_first_failure() {
     let mut g = game(lighthouse());
     let out = say(&mut g, "search pool. n then take can");
     assert!(out.contains("brass key") && out.contains("Base of the Lighthouse") && out.contains("Taken."), "{out}");
-    let out = say(&mut g, "dance. s");
+    let out = say(&mut g, "frobnicate. s");
     assert!(!out.contains("Rocky Shore"), "{out}");
 }
 
@@ -2717,7 +2717,7 @@ fn peeking_gives_an_impression_not_the_description() {
     assert_eq!(say(&mut g, "peek down"), "You peer down. It's too dark to make anything out.");
     assert_eq!(say(&mut g, "peek west"), "You peer west. It looks empty.");
     // No way through: no turn taken.
-    assert_eq!(say(&mut g, "peek east"), "There's nothing to peek through that way.");
+    assert_eq!(say(&mut g, "peek east"), "You see nothing special that way.");
 }
 
 #[test]
@@ -3928,9 +3928,10 @@ fn words_that_used_to_go_wrong() {
     let mut g = house();
     // EXITS isn't EXIT (go out), SING isn't S, BRIEF isn't BRIBE.
     assert_eq!(say(&mut g, "exits"), "Known exits: northwest, east and south.");
-    assert_says(&mut g, "sing", "I don't know the verb \"sing\"");
+    assert_says(&mut g, "sing", "You hum a little tune.");
     assert_says(&mut g, "brief", "I don't know the verb \"brief\"");
-    assert_eq!(g.input("exits").status.turns, 0, "EXITS takes no turn");
+    let turns = g.world().state.turn;
+    assert_eq!(g.input("exits").status.turns, turns, "EXITS takes no turn");
 }
 
 #[test]
@@ -3978,7 +3979,7 @@ fn the_room_is_something_to_look_at() {
 #[test]
 fn go_to_a_place_walks_the_known_way() {
     let mut g = quiet_house();
-    assert_says(&mut g, "go to the yard", "You don't know of anywhere called that.");
+    assert_says(&mut g, "go to the pantry", "You don't know of anywhere called that.");
     say(&mut g, "e");
     say(&mut g, "n");
     say(&mut g, "s");
@@ -4041,4 +4042,171 @@ fn waiting_without_a_clock_counts_turns() {
     assert_eq!(g.world().state.turn, 5);
     assert_says(&mut g, "wait an hour", "doesn't keep the time of day");
     assert_says(&mut g, "wait until dusk", "doesn't keep the time of day");
+}
+
+const MANOR: &str = "format: eifgb/0.1
+game: { id: manor, title: The Manor, author: A. Writer, version: '2', start: hall }
+rooms:
+  hall:
+    name: Front Hall
+    description: A dusty hall. A staircase climbs to the attic.
+    exits:
+      up: { to: attic, via: stairs }
+      east: kitchen
+      west: garden
+  attic: { name: Attic, description: Low beams., exits: { down: { to: hall, via: stairs } } }
+  kitchen: { name: Kitchen, description: Pots., exits: { west: hall } }
+  garden: { name: Garden, description: A fountain splashes., exits: { east: hall } }
+objects:
+  stairs: { name: staircase, synonyms: [stairs, steps], in: hall, traits: [scenery] }
+  brass_key: { name: brass key, in: hall, traits: [portable] }
+  iron_key: { name: iron key, in: hall, traits: [portable] }
+  coin1: { name: gold coin, in: hall, traits: [portable] }
+  coin2: { name: gold coin, in: hall, traits: [portable] }
+  hat: { name: hat, in: hall, traits: [portable, wearable] }
+  potion: { name: blue potion, in: hall, traits: [portable, drinkable] }
+  fountain: { name: fountain, in: garden, traits: [scenery, drinkable] }
+  tree: { name: oak tree, in: garden, traits: [scenery] }
+characters:
+  guard:
+    name: guard
+    in: kitchen
+    state: { asleep: true }
+aliases:
+  using: with
+  port: west
+  nab hold of: take
+";
+
+fn manor() -> Game<LuaHost> {
+    let out = compile_str(MANOR);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn commas_my_one_other_and_counting() {
+    let mut g = manor();
+    assert_eq!(say(&mut g, "take the brass key, the iron key, and the hat"), "brass key: Taken.\niron key: Taken.\nhat: Taken.");
+    assert_says(&mut g, "x the brass one", "the brass key");
+    assert_says(&mut g, "x the other one", "the iron key");
+    assert_says(&mut g, "x my hat", "the hat");
+    assert_eq!(say(&mut g, "drop the second key"), "Dropped.");
+    assert!(!g.world().is_within(g.world().story().entity_by_key("iron_key").unwrap(), eifgb_engine::ir::PLAYER));
+    assert_eq!(say(&mut g, "take two coins"), "gold coin: Taken.\ngold coin: Taken.");
+    // Two coins that can't be told apart: no need to ask which.
+    say(&mut g, "drop coins");
+    assert_eq!(say(&mut g, "take coin"), "Taken.");
+    // "call dog one two three": a name, not a count.
+}
+
+#[test]
+fn extra_words_players_add() {
+    let mut g = manor();
+    assert_says(&mut g, "look closely at the hat", "nothing special about the hat");
+    assert_says(&mut g, "can i go east", "Kitchen");
+    assert_says(&mut g, "try west", "Front Hall");
+    assert_says(&mut g, "let's go west", "Garden");
+    assert_says(&mut g, "go east please", "Front Hall");
+    assert_says(&mut g, "save game", "[Saved.]");
+    assert_eq!(say(&mut g, "take hat. take it again"), "Taken.\nYou already have the hat.");
+    assert_eq!(say(&mut g, "undo undo").matches("[Undone.]").count(), 2);
+}
+
+#[test]
+fn questions_players_ask() {
+    let mut g = manor();
+    assert!(say(&mut g, "what's here").starts_with("Front Hall"));
+    say(&mut g, "take hat");
+    assert_eq!(say(&mut g, "what am i carrying"), "You're carrying a hat.");
+    assert_eq!(say(&mut g, "check inventory"), "You're carrying a hat.");
+    assert_eq!(say(&mut g, "who is here"), "There's nobody here but you.");
+    assert_says(&mut g, "what can i do", "TAKE BRASS KEY");
+    assert_eq!(say(&mut g, "about"), "The Manor by A. Writer, version 2.");
+    let turns = g.world().state.turn;
+    say(&mut g, "who's here");
+    say(&mut g, "what can i do");
+    assert_eq!(g.world().state.turn, turns, "questions take no turn");
+    assert_eq!(say(&mut g, "look down"), "You see nothing special that way.");
+}
+
+#[test]
+fn the_floor_is_the_room() {
+    let mut g = manor();
+    assert_eq!(say(&mut g, "take coin from the floor"), "Taken.");
+    assert_eq!(say(&mut g, "put it on the floor"), "Dropped.");
+    assert_eq!(say(&mut g, "take hat. drop it on the ground"), "Taken.\nDropped.");
+    assert_says(&mut g, "x all", "hat: You see nothing special about the hat.");
+}
+
+#[test]
+fn place_names_and_landmarks() {
+    let mut g = manor();
+    // Next door, not visited yet: still somewhere to go.
+    assert_says(&mut g, "garden", "A fountain splashes.");
+    assert_says(&mut g, "hall", "Front Hall");
+    assert_says(&mut g, "go kitchen", "Pots.");
+    assert_says(&mut g, "go to the garden", "Front Hall\nGarden");
+    say(&mut g, "e");
+    // The stairs: on both sides of the way up.
+    assert_says(&mut g, "climb the stairs", "Attic");
+    assert_says(&mut g, "go down the stairs", "Front Hall");
+    assert_says(&mut g, "take the steps", "Attic");
+    assert_says(&mut g, "use the staircase", "Front Hall");
+}
+
+#[test]
+fn talking_and_everyday_verbs() {
+    let mut g = manor();
+    assert_says(&mut g, "hello", "There's nobody here to talk to.");
+    assert_says(&mut g, "drink potion", "You drink the blue potion.");
+    assert_says(&mut g, "x potion", "You can't see any such thing.");
+    say(&mut g, "w");
+    assert_says(&mut g, "drink from the fountain", "You drink from the fountain. It's refreshing.");
+    assert_says(&mut g, "climb tree", "You can't climb the oak tree.");
+    for (line, reply) in [
+        ("say xyzzy", "You say it aloud."),
+        ("xyzzy", "magic word"),
+        ("jump", "You jump"),
+        ("sit down", "You sit"),
+        ("dance", "You dance"),
+        ("sing", "You hum"),
+        ("cut tree", "Cutting that won't help."),
+        ("dig", "too hard to dig"),
+        ("knock on the tree", "Nobody answers."),
+        ("wave at the tree", "You wave."),
+        ("point at the tree", "You point."),
+        ("tie tree to fountain", "You can't see how to tie that."),
+        ("thanks", "You're welcome."),
+        ("yes", "rhetorical"),
+    ] {
+        assert_says(&mut g, line, reply);
+    }
+}
+
+#[test]
+fn waking_and_showing() {
+    let mut g = manor();
+    say(&mut g, "take hat");
+    // Sneaking in doesn't wake the guard.
+    say(&mut g, "sneak east");
+    assert_eq!(say(&mut g, "wake the guard"), "The guard wakes with a start!");
+    assert_eq!(say(&mut g, "wake guard"), "The guard isn't asleep.");
+    assert_eq!(say(&mut g, "show hat to guard"), "The guard looks at the hat, but doesn't seem interested.");
+    assert_eq!(say(&mut g, "show hat"), "The guard looks at the hat, but doesn't seem interested.");
+    assert_eq!(say(&mut g, "wake hat"), "That's not something that sleeps.");
+}
+
+#[test]
+fn games_can_add_their_own_words() {
+    let mut g = manor();
+    // aliases: using → with, port → west, nab hold of → take
+    assert_says(&mut g, "port", "Garden");
+    assert_says(&mut g, "e", "Front Hall");
+    assert_eq!(say(&mut g, "nab hold of the hat"), "Taken.");
+    assert_says(&mut g, "take brass key", "Taken.");
+    let out = compile_str(&MANOR.replace("  port: west", "  port: larboard\n  take: eat"));
+    let warnings: Vec<String> = out.diagnostics.iter().map(|d| d.message.clone()).collect();
+    assert!(warnings.iter().any(|w| w.contains("'larboard' isn't a word this game knows")), "{warnings:?}");
+    assert!(warnings.iter().any(|w| w.contains("'take' already means something")), "{warnings:?}");
 }

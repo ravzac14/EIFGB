@@ -25,6 +25,8 @@ export interface Exit {
   door?: string;
   /** For a blocked exit: what the player is told. */
   blocked?: string;
+  /** Things the way goes by (`via`): CLIMB THE STAIRS. */
+  via?: string[];
   /**
    * `plain` (a room), `door`, `blocked` (a message), or `advanced`
    * (conditions, or several exits one way): shown, but edited as text.
@@ -314,9 +316,11 @@ export class Model {
         const to = str(v.get("to"));
         const through = str(v.get("through"));
         const blocked = str(v.get("blocked"));
-        const simple = v.items.every((i) => ["to", "through"].includes(String(isScalar(i.key) ? i.key.value : i.key)));
-        if (simple && to) out.push({ dir, to, door: through, kind: through ? "door" : "plain" });
-        else out.push({ dir, to, door: through, blocked, kind: "advanced" });
+        const rawVia = v.get("via");
+        const via = isSeq(rawVia) ? rawVia.items.map((i) => str(i)).filter((s): s is string => !!s) : str(rawVia) ? [str(rawVia)!] : [];
+        const simple = v.items.every((i) => ["to", "through", "via"].includes(String(isScalar(i.key) ? i.key.value : i.key)));
+        if (simple && to) out.push({ dir, to, door: through, via, kind: through ? "door" : "plain" });
+        else out.push({ dir, to, door: through, blocked, via, kind: "advanced" });
       } else if (isSeq(v)) {
         // Several exits one way: show the first that leads somewhere.
         const first = v.items.map((i) => (isMap(i) ? str(i.get("to")) : str(i))).find((t) => t && rooms.has(t));
@@ -1118,7 +1122,36 @@ export class Model {
 
   /** A plain exit, or one through a door. Replaces whatever was that way. */
   setExit(room: string, dir: Direction, to: string, door?: string) {
-    this.set(["rooms", room, "exits", dir], door ? { to, through: door } : to);
+    const via = this.exit(room, dir)?.via ?? [];
+    this.writeExit(room, dir, to, door, via);
+  }
+
+  /** What a way out goes by (`via`): things players can name to go that way. */
+  setVia(room: string, dir: Direction, via: string[]) {
+    const e = this.exit(room, dir);
+    if (!e?.to || e.kind === "advanced") return;
+    this.writeExit(room, dir, e.to, e.door, via);
+  }
+
+  private writeExit(room: string, dir: Direction, to: string, door: string | undefined, via: string[]) {
+    if (!door && !via.length) return this.set(["rooms", room, "exits", dir], to);
+    const v: Record<string, unknown> = { to };
+    if (door) v.through = door;
+    if (via.length === 1) v.via = via[0];
+    else if (via.length) v.via = via;
+    this.set(["rooms", room, "exits", dir], v);
+  }
+
+  /** The game's aliases: its own words for words the game knows. */
+  aliases(): [string, string][] {
+    return this.keys("aliases").map((k) => [k, str(this.get(["aliases", k])) ?? ""]);
+  }
+
+  setAlias(word: string, means: string) {
+    word = word.trim().toLowerCase();
+    if (!word) return;
+    if (!this.map(["aliases"])) this.addSection("aliases", {}, ["verbs", "messages", "settings", "game"]);
+    this.doc.setIn(["aliases", word], means.trim().toLowerCase());
   }
 
   setBlocked(room: string, dir: Direction, message: string) {

@@ -21,6 +21,7 @@
   var back = 0;
   var engine = null;
   var key = "eifgb-page:";
+  var gameFiles = {};
 
   function say(text, cls) {
     var p = document.createElement("p");
@@ -28,6 +29,27 @@
     if (cls) p.className = cls;
     log.append(p);
     return p;
+  }
+
+  // A picture: from the game's own files (kept inside this page) or the web.
+  function picture(l) {
+    var f = document.createElement("figure");
+    f.className = "picture";
+    var file = l.picture || "";
+    var src = /^https:\/\//i.test(file) ? file : (gameFiles[file] || "").indexOf("data:image/") === 0 ? gameFiles[file] : null;
+    if (src) {
+      var img = document.createElement("img");
+      img.src = src;
+      img.alt = l.text;
+      f.append(img);
+    } else {
+      var p = document.createElement("p");
+      p.className = "notice";
+      p.textContent = "[Picture: " + l.text + "]";
+      f.append(p);
+    }
+    log.append(f);
+    return f;
   }
 
   // Kept in this browser; private windows and some local files can't keep
@@ -52,7 +74,7 @@
     var first = null;
     for (var i = 0; i < o.lines.length; i++) {
       var l = o.lines[i];
-      var p = say(l.text, l.kind === "text" ? "" : l.kind);
+      var p = l.kind === "picture" ? picture(l) : say(l.text, l.kind === "text" ? "" : l.kind);
       first = first || p;
     }
     var s = o.status;
@@ -85,7 +107,8 @@
 
   function start(fresh) {
     log.replaceChildren();
-    var loaded = engine.load(JSON.parse($("eifgb-game").textContent), "game.yaml", Math.floor(Math.random() * 4294967296));
+    gameFiles = JSON.parse($("eifgb-game").textContent);
+    var loaded = engine.load(gameFiles, "game.yaml", Math.floor(Math.random() * 4294967296));
     if (!loaded.output) {
       say("This game has mistakes and can't be played:", "error");
       loaded.diagnostics.forEach(function (d) {

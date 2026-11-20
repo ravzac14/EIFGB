@@ -24,6 +24,12 @@ function project(dir) {
       const p = join(d, name);
       if (statSync(p).isDirectory()) walk(p);
       else if (/\.(ya?ml|lua)$/.test(name) || name === "walkthrough.txt") files[relative(dir, p).split("\\").join("/")] = readFileSync(p, "utf8");
+      // Pictures, as data: URLs, as the site keeps them.
+      else if (/\.(png|jpe?g|gif|webp|svg)$/i.test(name)) {
+        const ext = name.split(".").pop().toLowerCase();
+        const type = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" }[ext];
+        files[relative(dir, p).split("\\").join("/")] = `data:${type};base64,${readFileSync(p).toString("base64")}`;
+      }
     }
   };
   walk(dir);

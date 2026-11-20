@@ -3,6 +3,7 @@
 
 import { unzipSync, strFromU8 } from "fflate";
 import type { Files } from "./engine.ts";
+import { IMAGE, dataUrl } from "./pictures.ts";
 
 const TEXT = /\.(ya?ml|lua)$/i;
 const SKIP = /(^|\/)(\.|__MACOSX\/)/;
@@ -20,15 +21,15 @@ export function normalize(raw: Map<string, string>): Files | string {
   const dir = entry[0].includes("/") ? entry[0].slice(0, entry[0].lastIndexOf("/") + 1) : "";
   const files: Files = {};
   for (const [p, t] of entries) {
-    if (!p.startsWith(dir) || !TEXT.test(p)) continue;
+    if (!p.startsWith(dir) || !(TEXT.test(p) || IMAGE.test(p))) continue;
     files[p === entry[0] ? "game.yaml" : p.slice(dir.length)] = t;
   }
   return files;
 }
 
 function unzipInto(bytes: Uint8Array, into: Map<string, string>) {
-  const unzipped = unzipSync(bytes, { filter: (f) => TEXT.test(f.name) });
-  for (const [name, data] of Object.entries(unzipped)) into.set(name, strFromU8(data));
+  const unzipped = unzipSync(bytes, { filter: (f) => TEXT.test(f.name) || IMAGE.test(f.name) });
+  for (const [name, data] of Object.entries(unzipped)) into.set(name, IMAGE.test(name) ? dataUrl(name, data) : strFromU8(data));
 }
 
 async function fromZip(file: File, into: Map<string, string>) {
@@ -52,6 +53,7 @@ export async function fromFileList(list: FileList | File[]): Promise<Files | str
   for (const f of Array.from(list)) {
     if (/\.zip$/i.test(f.name)) await fromZip(f, raw);
     else if (TEXT.test(f.name)) raw.set(f.webkitRelativePath || f.name, await f.text());
+    else if (IMAGE.test(f.name)) raw.set(f.webkitRelativePath || f.name, dataUrl(f.name, new Uint8Array(await f.arrayBuffer())));
   }
   return normalize(raw);
 }
@@ -65,6 +67,7 @@ export async function fromDrop(dt: DataTransfer): Promise<Files | string> {
       const path = entry.fullPath.replace(/^\//, "");
       if (/\.zip$/i.test(file.name)) await fromZip(file, raw);
       else if (TEXT.test(file.name)) raw.set(path, await file.text());
+      else if (IMAGE.test(file.name)) raw.set(path, dataUrl(file.name, new Uint8Array(await file.arrayBuffer())));
     } else if (entry.isDirectory) {
       const reader = (entry as FileSystemDirectoryEntry).createReader();
       // readEntries returns batches until it returns none.

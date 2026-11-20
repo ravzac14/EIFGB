@@ -6,6 +6,12 @@ behave will be called out here.
 
 ## Unreleased
 
+- Pictures: a room, object or character can have a `picture` (a file
+  beside the game, or an https address) and `alt` words for players who
+  can't see it. A room's shows above its description and with the map; a
+  thing's when it's examined, for clues the player has to see. In the
+  editor: a **Picture** section on each, and **Add component → Picture**.
+  The Small House starter has a note on the fridge to look at.
 - Players can talk more naturally:
   - Lists with commas (TAKE THE KEY, THE COIN AND THE LAMP), MY HAT, THE
     BRASS ONE, THE OTHER ONE, THE SECOND KEY, TWO COINS. Identical things

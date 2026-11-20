@@ -104,6 +104,7 @@ impl<'a> Lowerer<'a> {
             talk: None,
             capacity: s.player.capacity.and_then(|c| c.limit()),
             size: s.player.size.unwrap_or(1),
+            picture: None,
             revealed_by: vec![],
             handlers: vec![],
             npc: None,
@@ -583,6 +584,7 @@ impl<'a> Lowerer<'a> {
             talk: None,
             capacity: None,
             size: 1,
+            picture: self.picture(r.picture.as_ref(), &format!("{path}.picture")),
             revealed_by: vec![],
             handlers,
             npc: None,
@@ -853,6 +855,7 @@ impl<'a> Lowerer<'a> {
             talk,
             capacity: t.capacity,
             size: t.size.unwrap_or(1),
+            picture: self.picture(t.picture.as_ref(), &format!("{path}.picture")),
             revealed_by,
             handlers,
             npc,
@@ -1535,6 +1538,41 @@ impl<'a> Lowerer<'a> {
             hex.is_some()
         });
         Presentation { theme, accent }
+    }
+
+    /// `picture: hall.jpg`, or `{ file: hall.jpg, alt: "..." }`. A file must
+    /// be in the game's folder; a web address must be https.
+    fn picture(&mut self, p: Option<&src::PictureSrc>, path: &str) -> Option<Picture> {
+        let (file, alt) = match p? {
+            src::PictureSrc::File(f) => (f.trim().to_string(), None),
+            src::PictureSrc::Full { file, alt } => (file.trim().to_string(), alt.as_ref().map(|a| a.trim().to_string()).filter(|a| !a.is_empty())),
+        };
+        if file.is_empty() {
+            self.d.error(path, "a picture needs a file");
+            return None;
+        }
+        let web = file.starts_with("https://") || file.starts_with("http://");
+        if !web {
+            match files::normalize(&file) {
+                Err(e) => {
+                    self.d.error(path, e);
+                    return None;
+                }
+                Ok(_) if !self.files.exists(&files::sibling(self.entry, &file)) => {
+                    self.d.warn(path, format!("there's no picture file '{file}' beside the game"));
+                }
+                Ok(_) => {}
+            }
+            if !file.rsplit('.').next().is_some_and(|e| ["png", "jpg", "jpeg", "gif", "webp", "svg"].contains(&e.to_ascii_lowercase().as_str())) {
+                self.d.warn(path, "a picture should be a .png, .jpg, .gif, .webp or .svg file");
+            }
+        } else if file.starts_with("http://") {
+            self.d.warn(path, "web pages on https can't show pictures from http:// addresses; use https://");
+        }
+        if alt.is_none() {
+            self.d.warn(path, "say what the picture shows, with 'alt', for players who can't see it");
+        }
+        Some(Picture { file, alt })
     }
 
     fn load_scripts(&mut self, paths: &[String]) -> Vec<Script> {

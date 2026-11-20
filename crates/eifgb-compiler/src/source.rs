@@ -218,6 +218,20 @@ pub struct Room {
     pub exits: IndexMap<String, Exit>,
     #[serde(default)]
     pub on: IndexMap<String, String>,
+    #[serde(default)]
+    pub picture: Option<PictureSrc>,
+}
+
+/// `picture: hall.jpg`, or `picture: { file: hall.jpg, alt: "..." }`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum PictureSrc {
+    File(String),
+    Full {
+        file: String,
+        #[serde(default)]
+        alt: Option<String>,
+    },
 }
 
 /// An exit is written as a room ID (`north: hall`), a blocked message
@@ -259,6 +273,8 @@ pub struct FullExit {
 #[serde(deny_unknown_fields)]
 pub struct Thing {
     pub name: String,
+    #[serde(default)]
+    pub picture: Option<PictureSrc>,
     #[serde(default)]
     pub synonyms: Vec<String>,
     #[serde(default)]

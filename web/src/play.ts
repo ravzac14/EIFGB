@@ -1,6 +1,7 @@
 // The player: loads a game (bundled, or one you loaded), plays it, keeps an
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
+import { figure, pictureSrc } from "./pictures.ts";
 import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
@@ -107,6 +108,8 @@ let last: Output | null = null;
 /** For a game from a link: where it's from, said above the story. */
 let from: string | null = null;
 let over = false;
+/** The picture of the room the player is in, if it has one. */
+let roomPicture: { text: string; picture?: string } | null = null;
 const history: string[] = [];
 let back = 0;
 
@@ -140,11 +143,18 @@ function show(o: Output): HTMLElement | null {
   const first = log.lastElementChild;
   const typed = settings.get().reveal === "typewriter";
   // Choices are numbered lines; the player types the number.
-  for (const l of o.lines) {
+  for (const [i, l] of o.lines.entries()) {
+    if (l.kind === "picture") {
+      log.append(figure(pictureSrc(l.picture ?? "", files), l.text));
+      // A room's picture, right after its name: shown with the map too.
+      if (o.lines[i - 1]?.kind === "title") roomPicture = l;
+      continue;
+    }
+    if (l.kind === "title") roomPicture = null;
     const p = say(l.text, l.kind === "text" ? "" : l.kind);
     if (typed) typeOut(p);
   }
-  speak(o.lines.filter((l) => l.kind !== "error").map((l) => l.text), settings.get().speech, meta?.language ?? "en");
+  speak(o.lines.filter((l) => l.kind !== "error").map((l) => (l.kind === "picture" ? `Picture: ${l.text}` : l.text)), settings.get().speech, meta?.language ?? "en");
   status(o);
   last = o;
   refreshMap();
@@ -237,6 +247,8 @@ function refreshMap() {
   const m = engine.map();
   if ("error" in m) return;
   drawMap(mapBody, m, author);
+  mapBody.querySelector("figure.picture")?.remove();
+  if (roomPicture) mapBody.prepend(figure(pictureSrc(roomPicture.picture ?? "", files), roomPicture.text));
 }
 
 function showMap(open: boolean, remember = true) {
@@ -255,6 +267,10 @@ function transcriptText(): string {
   for (const node of log.children) {
     const e = node as HTMLElement;
     if (e.classList.contains("diagnostics")) continue;
+    if (e.classList.contains("picture")) {
+      lines.push(`[Picture: ${e.querySelector("img")?.alt ?? e.textContent?.replace(/^\[Picture: |\]$/g, "") ?? ""}]`);
+      continue;
+    }
     const text = e.textContent?.trim() ?? "";
     if (!text) continue;
     if (e.classList.contains("cmd")) lines.push("", `> ${text}`);

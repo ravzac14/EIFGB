@@ -447,6 +447,9 @@ pub struct Entity {
     /// How much room this takes up in a container or in the player's hands.
     #[serde(default = "one", skip_serializing_if = "is_one")]
     pub size: u32,
+    /// A picture: shown above a room's description, or when a thing is examined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub picture: Option<Picture>,
     /// Actions that reveal this entity while it's `hidden`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revealed_by: Vec<ActionRule>,
@@ -711,6 +714,16 @@ fn one() -> u32 {
 
 fn is_one(n: &u32) -> bool {
     *n == 1
+}
+
+/// A picture: a file in the game's folder (`pictures/hall.jpg`) or a web address.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Picture {
+    /// As written: a path relative to the game's folder, or an `https://` address.
+    pub file: String,
+    /// Words for players who can't see it: screen readers, and the terminal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alt: Option<String>,
 }
 
 impl Entity {

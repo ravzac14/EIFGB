@@ -849,6 +849,43 @@ staircase is there on both sides of every way that goes by it, even though
 it's only `in:` the hall. In the editor, select the way out on the map and
 use **Goes by**.
 
+## Pictures
+
+A room, an object or a character can have a `picture`. A room's is shown
+under its name, above its description (and with the map, while the
+player is there). A thing's is shown when the player examines it, which
+makes pictures good for clues the player has to see for themselves: a
+photograph, a map, a painting, a note.
+
+```yaml
+rooms:
+  hall:
+    name: Front Hall
+    picture: { file: pictures/hall.jpg, alt: "A long hall, its wallpaper peeling." }
+objects:
+  note:
+    name: note
+    in: kitchen
+    traits: [scenery]
+    picture:
+      file: pictures/fridge_note.svg
+      alt: 'A sticky note: "Keys live on the hook. NOT down the back of the sofa."'
+```
+
+- **`file`** is a picture beside `game.yaml` (a `.png`, `.jpg`, `.gif`,
+  `.webp` or `.svg`), or an `https://` address. `picture: pictures/hall.jpg`
+  on its own works too.
+- **`alt`** says what the picture shows, for players who can't see it:
+  screen readers, read aloud, and the terminal, which prints
+  `[Picture: …]`. If the picture holds a clue, put the clue in `alt` too.
+  The compiler warns when it's missing.
+- A thing with a picture and no `description` shows just the picture.
+- In the editor, every room, object and character has a **Picture**
+  section: choose a file (it's made smaller, to fit in the browser, and
+  kept with the game) or paste a web address. **Add component → Picture**
+  adds something to look at. Downloads, single web pages and links to a
+  game's folder all bring their pictures along.
+
 ## Your own words: aliases
 
 Players type the words they know. If your game's players say "using"
@@ -1800,7 +1837,8 @@ end-of-turn event.
 
 **Top-level sections:** `format`, `game`, `settings`, `presentation`, `vars`, `player`, `rooms`,
 `objects`, `characters`, `verbs`, `choices`, `on`, `endings`, `timers`,
-`messages`, `aliases`, `scripts`.
+`messages`, `aliases`, `scripts`. Rooms, objects and characters can have a
+`picture` (`{ file, alt }`).
 
 **Traits:** `portable`, `scenery`, `container`, `supporter`, `openable`,
 `lockable`, `door`, `wearable`, `edible`, `drinkable`, `light_source`, `enterable`,

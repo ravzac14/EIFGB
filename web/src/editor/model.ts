@@ -151,6 +151,7 @@ export const KINDS = {
   supporter: { name: "table", traits: ["supporter", "scenery"] },
   key: { name: "key", traits: ["portable"] },
   light: { name: "lamp", traits: ["portable", "light_source"] },
+  picture: { name: "photograph", traits: ["portable"] },
 } as const;
 export type Kind = keyof typeof KINDS;
 
@@ -1140,6 +1141,23 @@ export class Model {
     if (via.length === 1) v.via = via[0];
     else if (via.length) v.via = via;
     this.set(["rooms", room, "exits", dir], v);
+  }
+
+  /** A room's, object's or character's picture. */
+  picture(owner: string[]): { file: string; alt: string } | null {
+    const v = this.get([...owner, "picture"]);
+    if (typeof v === "string") return { file: v, alt: "" };
+    if (v && typeof v === "object" && typeof (v as { file?: unknown }).file === "string") {
+      const p = v as { file: string; alt?: unknown };
+      return { file: p.file, alt: typeof p.alt === "string" ? p.alt : "" };
+    }
+    return null;
+  }
+
+  /** Sets (or with null, removes) a picture, and what it shows. */
+  setPicture(owner: string[], file: string | null, alt: string) {
+    if (!file) return this.set([...owner, "picture"], undefined);
+    this.set([...owner, "picture"], alt.trim() ? { file, alt } : file);
   }
 
   /** The game's aliases: its own words for words the game knows. */

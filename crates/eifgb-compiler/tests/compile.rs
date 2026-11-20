@@ -585,3 +585,35 @@ fn presentation_is_passed_on_and_checked() {
     assert!(w.iter().any(|w| w.contains("'red' isn't a colour")), "{w:#?}");
     assert_error(&with("presentation: { font: comic }\n"), "font");
 }
+
+// ------------------------------------------------------------- pictures
+
+#[test]
+fn pictures_are_checked() {
+    use eifgb_compiler::MemFiles;
+    let game = r#"
+format: eifgb/0.1
+game: { id: t, title: T, version: "1", start: hall }
+rooms:
+  hall: { name: Hall, picture: { file: pictures/hall.jpg, alt: "A dusty hall." } }
+  yard: { name: Yard, picture: pictures/missing.png }
+  attic: { name: Attic, picture: { file: notes.txt, alt: "Notes." } }
+objects:
+  photo: { name: photo, in: hall, picture: { file: "https://example.com/p.jpg", alt: "Three children." } }
+  map: { name: map, in: hall, picture: { file: "http://example.com/m.txt", alt: "A map." } }
+  bad: { name: bad, in: hall, picture: "../secret.png" }
+"#;
+    let files = MemFiles::new().with("game.yaml", game).with("pictures/hall.jpg", "data:image/jpeg;base64,AAAA");
+    let out = compile(&files, "game.yaml");
+    let ws = warnings(&out);
+    let has = |s: &str| ws.iter().any(|w| w.contains(s));
+    assert!(has("rooms.yard.picture: there's no picture file 'pictures/missing.png' beside the game"), "{ws:#?}");
+    assert!(has("rooms.yard.picture: say what the picture shows"), "{ws:#?}");
+    assert!(has("objects.map.picture: web pages on https can't show pictures from http://"), "{ws:#?}");
+    assert!(has("rooms.attic.picture: a picture should be a .png"), "{ws:#?}");
+    assert_error(&out, "objects.bad.picture");
+    let ok = compile(&MemFiles::new().with("game.yaml", &game.replace("  bad: { name: bad, in: hall, picture: \"../secret.png\" }\n", "")).with("pictures/hall.jpg", "x"), "game.yaml");
+    let story = ok.story.unwrap();
+    let hall = story.entity(story.entity_by_key("hall").unwrap());
+    assert_eq!(hall.picture, Some(Picture { file: "pictures/hall.jpg".into(), alt: Some("A dusty hall.".into()) }));
+}

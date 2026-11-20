@@ -4,6 +4,7 @@
 
 import type { Files } from "./engine.ts";
 import { fromZipBytes } from "./files.ts";
+import { dataUrl, picturesOf } from "./pictures.ts";
 
 /** Biggest download we'll take for one file. */
 const LIMIT = 5 * 1024 * 1024;
@@ -121,6 +122,17 @@ export async function fetchGame(input: string): Promise<Files> {
   await Promise.all(
     scripts.map(async (p) => {
       files[p] = await text(new URL(p, where.url).href);
+    }),
+  );
+  // Pictures beside the game: a missing one just isn't shown.
+  await Promise.all(
+    (await picturesOf(yamlText)).filter(safe).map(async (p) => {
+      try {
+        const bytes = new Uint8Array(await (await get(new URL(p, where.url).href)).arrayBuffer());
+        if (bytes.length <= LIMIT) files[p] = dataUrl(p, bytes);
+      } catch {
+        /* the compiler warns about it */
+      }
     }),
   );
   return files;

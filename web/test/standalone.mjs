@@ -10,7 +10,12 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 const web = fileURLToPath(new URL("..", import.meta.url));
 const dir = `${web}../spec/templates/locked_dungeon/`;
-const files = { "game.yaml": readFileSync(`${dir}game.yaml`, "utf8") };
+// With a picture of the cell, kept inside the page.
+const cellPicture = "data:image/svg+xml;base64,PHN2Zy8+";
+const files = {
+  "game.yaml": readFileSync(`${dir}game.yaml`, "utf8").replace(/\n  cell:\n/, '\n  cell:\n    picture: { file: pictures/cell.svg, alt: "Straw on a stone floor." }\n'),
+  "pictures/cell.svg": cellPicture,
+};
 const steps = readFileSync(`${dir}walkthrough.txt`, "utf8").split("\n").filter((l) => l.trim() && !l.startsWith("#"));
 const { standalonePage, classicLoader } = await import("../src/standalone.ts");
 const engine = { loader: readFileSync(`${web}public/wasm/eifgb.mjs`, "utf8"), wasm: new Uint8Array(readFileSync(`${web}public/wasm/eifgb_web.wasm`)) };
@@ -50,6 +55,9 @@ await started();
 assert.equal(document.title, "The Locked Door");
 assert.match($("#log").textContent, /You wake on cold straw/);
 assert.match($("#status").textContent, /Your Cell · Turn 0/);
+const img = $("#log figure.picture img");
+assert.equal(img?.src, cellPicture, "the room's picture, from inside the page");
+assert.equal(img.alt, "Straw on a stone floor.");
 
 // Part way, then the page is opened again: it carries on.
 type(steps[0]);

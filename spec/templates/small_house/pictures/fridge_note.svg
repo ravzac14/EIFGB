@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="300" viewBox="0 0 320 300">
+  <rect x="20" y="16" width="280" height="268" rx="4" fill="#fff59d" stroke="#d4c25a" stroke-width="2" transform="rotate(-2 160 150)"/>
+  <circle cx="160" cy="30" r="9" fill="#e53935"/>
+  <g font-family="Comic Sans MS, Segoe Print, cursive" fill="#33415c" transform="rotate(-2 160 150)">
+    <text x="44" y="82" font-size="26">Note to self:</text>
+    <text x="44" y="130" font-size="22">Keys live on the hook.</text>
+    <text x="44" y="166" font-size="22">NOT down the back</text>
+    <text x="44" y="200" font-size="22">of the sofa. Again.</text>
+    <path d="M44 236 q40 -18 80 0 t80 0" fill="none" stroke="#33415c" stroke-width="3"/>
+  </g>
+</svg>

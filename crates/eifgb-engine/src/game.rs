@@ -35,12 +35,17 @@ pub enum LineKind {
     Ending,
     /// A script error. Shown so authors can fix it; play carries on.
     Error,
+    /// A picture: `picture` is the file or address, `text` what it shows.
+    Picture,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Line {
     pub kind: LineKind,
     pub text: String,
+    /// For a picture: its file (relative to the game's folder) or web address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picture: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -233,8 +238,16 @@ impl<H: ScriptHost> Game<H> {
     pub(crate) fn push(&mut self, kind: LineKind, text: impl Into<String>) {
         let text = text.into();
         if !text.trim().is_empty() {
-            self.out.lines.push(Line { kind, text });
+            self.out.lines.push(Line { kind, text, picture: None });
         }
+    }
+
+    /// Shows an entity's picture, if it has one. Returns whether it did.
+    pub(crate) fn show_picture(&mut self, id: EntityId) -> bool {
+        let Some(p) = self.world.def(id).picture.clone() else { return false };
+        let text = p.alt.unwrap_or_else(|| self.world.def(id).name.clone());
+        self.out.lines.push(Line { kind: LineKind::Picture, text, picture: Some(p.file) });
+        true
     }
 
     pub(crate) fn msg(&mut self, key: &str, ctx: &Ctx) {

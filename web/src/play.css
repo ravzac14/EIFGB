@@ -27,6 +27,9 @@
 .log .choice { margin: 0 0 0.3em; padding-left: 1em; }
 .log .choice + :not(.choice) { margin-top: 0.7em; }
 .log .cmd { color: var(--accent); margin-top: 1.3em; }
+figure.picture { margin: 0.4em 0 0.9em; }
+figure.picture img { display: block; max-width: 100%; max-height: 60vh; height: auto; border-radius: 6px; border: 1px solid var(--line, rgba(127,127,127,.3)); }
+figure.picture p { margin: 0; }
 .log .cmd::before { content: "> "; }
 /* Parchment: room names in small capitals, and a drop capital on the
    first line after each one. flow-root keeps a short line from letting

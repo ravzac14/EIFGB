@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { zipSync, strToU8 } from "fflate";
 import { normalize, fromFileList } from "../src/files.ts";
+import { dataBytes, isPicture, pictureSrc, picturesOf } from "../src/pictures.ts";
 
 const m = (o) => new Map(Object.entries(o));
 
@@ -23,4 +24,22 @@ assert.deepEqual(normalize(m({ "g\\game.yaml": "g", "__MACOSX/g/game.yaml": "jun
 const zip = zipSync({ "campfire/game.yaml": strToU8("z"), "campfire/scripts/fire.lua": strToU8("f") });
 const file = new File([zip], "campfire.zip");
 assert.deepEqual(await fromFileList([file]), { "game.yaml": "z", "scripts/fire.lua": "f" });
+// Pictures come along as data: URLs, and go back out as the same bytes.
+const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
+const withPic = zipSync({ "g/game.yaml": strToU8("z"), "g/pictures/hall.png": png, "g/notes.txt": strToU8("skip") });
+const loaded = await fromFileList([new File([withPic], "g.zip")]);
+assert.deepEqual(Object.keys(loaded).sort(), ["game.yaml", "pictures/hall.png"]);
+assert.match(loaded["pictures/hall.png"], /^data:image\/png;base64,/);
+assert.ok(isPicture("pictures/hall.png", loaded["pictures/hall.png"]));
+assert.deepEqual(dataBytes(loaded["pictures/hall.png"]), png);
+// Where a picture is shown from: the project's copy, or https.
+assert.equal(pictureSrc("pictures/hall.png", loaded), loaded["pictures/hall.png"]);
+assert.equal(pictureSrc("https://example.com/a.jpg", {}), "https://example.com/a.jpg");
+assert.equal(pictureSrc("http://example.com/a.jpg", {}), null);
+assert.equal(pictureSrc("pictures/gone.png", loaded), null);
+// The pictures a game names, for fetching beside a linked game.
+assert.deepEqual(
+  await picturesOf("rooms:\n  a: { name: A, picture: a.jpg }\nobjects:\n  p: { name: P, picture: { file: pics/p.png, alt: x } }\n  q: { name: Q, picture: https://x.org/q.png }\n"),
+  ["a.jpg", "pics/p.png"],
+);
 console.log("ok   files");

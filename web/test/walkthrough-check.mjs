@@ -13,15 +13,17 @@ const engine = await loadEngine(new URL("../public/wasm/", import.meta.url));
 const dir = `${root}spec/templates/small_house/`;
 const game = readFileSync(`${dir}game.yaml`, "utf8");
 const steps = readFileSync(`${dir}walkthrough.txt`, "utf8");
+// The starter's picture, as the site keeps it.
+const pics = { "pictures/fridge_note.svg": `data:image/svg+xml;base64,${readFileSync(`${dir}pictures/fridge_note.svg`).toString("base64")}` };
 
 // No walkthrough: nothing to say.
-assert.equal(engine.check({ "game.yaml": game }).walkthrough, undefined);
+assert.equal(engine.check({ ...pics, "game.yaml": game }).walkthrough, undefined);
 // One that wins.
-let c = engine.check({ "game.yaml": game, "walkthrough.txt": steps });
+let c = engine.check({ ...pics, "game.yaml": game, "walkthrough.txt": steps });
 assert.deepEqual(c.walkthrough, { result: "win", steps: 8, line: 9, problem: null });
 assert.equal(c.diagnostics.length, 0);
 // The keys no longer open the door: still going at the end, and a warning under Problems.
-c = engine.check({ "game.yaml": game.replace("unlocks_with: keys", "unlocks_with: toast"), "walkthrough.txt": steps });
+c = engine.check({ ...pics, "game.yaml": game.replace("unlocks_with: keys", "unlocks_with: toast"), "walkthrough.txt": steps });
 assert.equal(c.walkthrough.result, "unfinished");
 assert.deepEqual(
   c.diagnostics.map((d) => [d.severity, d.path]),
@@ -29,16 +31,16 @@ assert.deepEqual(
 );
 assert.match(c.diagnostics[0].message, /no longer wins: after its 8 commands the game is still going/);
 // An ending that isn't a win, with where it happened.
-c = engine.check({ "game.yaml": game.replace("kind: win", "kind: loss"), "walkthrough.txt": steps });
+c = engine.check({ ...pics, "game.yaml": game.replace("kind: win", "kind: loss"), "walkthrough.txt": steps });
 assert.equal(c.walkthrough.result, "loss");
 assert.match(c.walkthrough.problem, /at line 9 \(s\) the game ends in a loss/);
 // A broken game isn't played at all.
-c = engine.check({ "game.yaml": game.replace("start: bedroom", "start: nowhere"), "walkthrough.txt": steps });
+c = engine.check({ ...pics, "game.yaml": game.replace("start: bedroom", "start: nowhere"), "walkthrough.txt": steps });
 assert.equal(c.walkthrough, undefined);
 // The game in progress isn't disturbed by a check.
 engine.load({ "game.yaml": game }, "game.yaml", 1);
 engine.input("s");
-engine.check({ "game.yaml": game, "walkthrough.txt": steps });
+engine.check({ ...pics, "game.yaml": game, "walkthrough.txt": steps });
 assert.match(engine.input("look").status.room, /Hallway/);
 
 // Test play records what's typed, from the start only.
@@ -71,7 +73,7 @@ assert.equal(saved.length, 1);
 assert.match(saved[0], /^# Recorded in test play, \d{4}-\d\d-\d\d\./);
 assert.equal(saved[0].split("\n").slice(1).join("\n"), "s\ne\nsearch sofa\ntake keys\nw\nunlock door\nopen door\ns\n");
 // What's saved wins, as the check sees it.
-assert.equal(engine.check({ "game.yaml": game, "walkthrough.txt": saved[0] }).walkthrough.result, "win");
+assert.equal(engine.check({ ...pics, "game.yaml": game, "walkthrough.txt": saved[0] }).walkthrough.result, "win");
 // Started somewhere else: not a walkthrough.
 await tp.start("kitchen");
 type("e");

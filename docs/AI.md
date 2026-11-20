@@ -75,6 +75,8 @@ unknown section or field is an error, not ignored, so a typo is caught.
 - **Doors:** an object with the `door` trait (usually `openable`, maybe
   `lockable` with `unlocks_with: <key id>`), placed `in:` one of the two
   rooms, and an exit `through:` it. The way back is added automatically.
+- **Pictures:** `picture: { file: pictures/hall.jpg, alt: "What it shows" }`
+  on a room, object or character. Always write `alt`, with any clue in it.
 - **Aliases:** a top-level `aliases:` map gives the game's own words for
   words it knows (`using: with`, `port: west`). Don't add verbs this way.
 - **Hidden things:** `state: { hidden: true }` with `revealed_by: search

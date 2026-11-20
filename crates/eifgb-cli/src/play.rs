@@ -44,6 +44,7 @@ fn show(out: &Output, color: bool) {
             LineKind::Choice => println!("  {text}"),
             LineKind::Ending => println!("\n{bold}{text}{reset}"),
             LineKind::Error => println!("{red}{text}{reset}"),
+            LineKind::Picture => println!("{dim}[Picture: {text}]{reset}"),
         }
     }
 }
@@ -97,7 +98,7 @@ pub fn play(story: Story, commands: Option<&Path>, seed: Option<u64>, save_file:
             && let Err(e) = std::fs::write(&save_path, data)
         {
             let text = format!("[couldn't write {}: {e}]", save_path.display());
-            out.lines.push(eifgb_engine::Line { kind: LineKind::Error, text });
+            out.lines.push(eifgb_engine::Line { kind: LineKind::Error, text, picture: None });
         }
         show(&out, color);
         if out.restore_requested {

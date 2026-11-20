@@ -8,10 +8,12 @@ export interface Diagnostic {
   path: string;
   message: string;
 }
-export type LineKind = "banner" | "title" | "text" | "notice" | "choice" | "ending" | "error";
+export type LineKind = "banner" | "title" | "text" | "notice" | "choice" | "ending" | "error" | "picture";
 export interface Line {
   kind: LineKind;
   text: string;
+  /** For a picture: its file in the project, or a web address. `text` says what it shows. */
+  picture?: string;
 }
 export interface Status {
   room: string;

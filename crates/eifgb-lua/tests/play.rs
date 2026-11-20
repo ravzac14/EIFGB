@@ -4210,3 +4210,25 @@ fn games_can_add_their_own_words() {
     assert!(warnings.iter().any(|w| w.contains("'larboard' isn't a word this game knows")), "{warnings:?}");
     assert!(warnings.iter().any(|w| w.contains("'take' already means something")), "{warnings:?}");
 }
+
+#[test]
+fn pictures_show_with_rooms_and_when_examined() {
+    let src = HOUSE.split("timers:").next().unwrap().replace(
+        "    description: A dusty hall.\n",
+        "    description: A dusty hall.\n    picture: { file: \"https://example.com/hall.jpg\", alt: \"A long, dusty hall.\" }\n",
+    ) + "  photo: { name: photograph, in: hall, picture: { file: \"https://example.com/p.jpg\", alt: \"Three children on a beach.\" } }\n";
+    let out = compile_str(&src);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    let look = g.input("look");
+    assert_eq!(look.lines[1].kind, LineKind::Picture, "the room's picture comes right after its name");
+    assert_eq!(look.lines[1].picture.as_deref(), Some("https://example.com/hall.jpg"));
+    assert_eq!(look.lines[1].text, "A long, dusty hall.");
+    let x = g.input("x photograph");
+    assert_eq!(x.lines.len(), 1, "a picture with no description says nothing else: {:?}", x.lines);
+    assert_eq!(x.lines[0].text, "Three children on a beach.");
+    // Walking through on the way somewhere shows only names.
+    say(&mut g, "e");
+    say(&mut g, "n");
+    say(&mut g, "s");
+    assert!(!g.input("go to the pantry").lines.iter().any(|l| l.kind == LineKind::Picture));
+}

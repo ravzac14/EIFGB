@@ -6,6 +6,7 @@ import {
   type Behavior, type Direction, type Exit, type Kind, type Model, type Person, type Thing,
 } from "./model.ts";
 import { THING_DRAG, factionHue } from "./map.ts";
+import { pictureSection } from "./picture-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, roomName, select, type InspectorContext } from "./ui.ts";
@@ -204,6 +205,7 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
     ),
     colourPicker(ctx, id),
+    ...pictureSection(ctx, ["rooms", id], "room"),
     el("h3", { textContent: "Ways out" }),
   );
   if (exits.length) panel.append(el("ul", { class: "exits" }, ...exits.map((e) => exitLine(ctx, id, e))));
@@ -451,6 +453,7 @@ export const KIND_LABEL: Record<Kind, string> = {
   supporter: "A surface (table, shelf)",
   key: "A key",
   light: "A light (lamp, torch)",
+  picture: "A picture to look at (photo, map, painting)",
 };
 
 function icon(t: Thing): string {
@@ -626,6 +629,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       multiline: true,
       placeholder: "What the player sees when they examine it.",
     }),
+    ...pictureSection(ctx, ["objects", id], "thing"),
     ...field("Other words for it", t.synonyms.join(", "), (v) => ctx.change((x) => x.setList(["objects", id, "synonyms"], v.split(",")), { coalesce: `tsyn:${id}`, redraw: false }), {
       placeholder: "money, treasure",
       help: "Words in its name already work. Separate others with commas.",
@@ -872,6 +876,7 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       multiline: true,
       placeholder: "What the player sees when they look at them.",
     }),
+    ...pictureSection(ctx, p, "character"),
     ...field("Other words for them", c.synonyms.join(", "), (v) => ctx.change((x) => x.setList([...p, "synonyms"], v.split(",")), { coalesce: `csyn:${id}`, redraw: false }), {
       placeholder: "woman, crone",
     }),

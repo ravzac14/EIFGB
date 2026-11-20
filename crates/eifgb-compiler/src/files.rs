@@ -11,6 +11,11 @@ use std::path::PathBuf;
 pub trait FileProvider {
     /// Reads a file by its project-relative, `/`-separated path.
     fn read(&self, path: &str) -> Result<String, String>;
+
+    /// Whether a file is there (pictures aren't text, so they aren't read).
+    fn exists(&self, path: &str) -> bool {
+        self.read(path).is_ok()
+    }
 }
 
 /// Checks a project-relative path and normalizes it. Absolute paths,
@@ -77,6 +82,10 @@ impl FileProvider for DirFiles {
         let p = normalize(path)?;
         let full = self.root.join(&p);
         std::fs::read_to_string(&full).map_err(|e| format!("{p}: {e}"))
+    }
+
+    fn exists(&self, path: &str) -> bool {
+        normalize(path).is_ok_and(|p| self.root.join(p).is_file())
     }
 }
 

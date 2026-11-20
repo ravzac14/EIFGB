@@ -40,7 +40,7 @@ rooms:
 
   kitchen:
     name: Kitchen
-    description: A tidy kitchen that smells of yesterday's coffee.
+    description: A tidy kitchen that smells of yesterday's coffee. A note is stuck to the fridge.
     exits:
       east: hallway
 
@@ -75,6 +75,17 @@ objects:
     state: { locked: true }
     unlocks_with: keys
     description: Your front door, locked.
+
+  # A picture: EXAMINE NOTE shows it. `alt` says what it shows, for
+  # players who can't see it.
+  note:
+    name: note
+    synonyms: [sticky note, fridge note]
+    in: kitchen
+    traits: [scenery]
+    picture:
+      file: pictures/fridge_note.svg
+      alt: 'A yellow sticky note in your handwriting: "Note to self: Keys live on the hook. NOT down the back of the sofa. Again."'
 
   toast:
     name: slice of toast

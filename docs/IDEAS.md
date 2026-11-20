@@ -44,11 +44,6 @@ Everything from the first list has now been built:
 - **"What did players try?":** test play keeps the commands the game
   didn't understand, and suggests objects or synonyms to add.
 
-## The player
-
-- **Room pictures:** an optional `picture:` per room, shown above its
-  description and in the map panel.
-
 ## The website
 
 - **A featured game** at the top of the gallery.

@@ -2,6 +2,7 @@
 // the drawer (problems, and the game file). Projects are kept in the
 // browser with the games you've loaded, so they're on the home page too.
 
+import { dataBytes, isPicture, pictureSrc, shrink } from "../pictures.ts";
 import { zipSync, strToU8 } from "fflate";
 import { loadEngine, type Diagnostic, type Engine, type Files } from "../engine.ts";
 import { fromFileList } from "../files.ts";
@@ -239,6 +240,13 @@ function inspectorContext(model: Model): InspectorContext {
     verbs,
     openFile,
     addScriptFile,
+    addPicture,
+    pictureUrl: (file) => pictureSrc(file, project.files),
+    dropPicture: (file) => {
+      if (project.files[file] === undefined || model?.toString().includes(file)) return;
+      const { [file]: _gone, ...rest } = project.files;
+      change(() => (project = { ...project, files: rest }));
+    },
     roomColour: (id) => positions.get(id)?.colour,
     setRoomColour: (id, colour) =>
       change(() => {
@@ -248,6 +256,22 @@ function inspectorContext(model: Model): InspectorContext {
         positions.set(id, colour ? { ...rest, colour } : rest);
       }),
   };
+}
+
+/** A picture the author chose, made small, under pictures/. Returns its path. */
+async function addPicture(file: File, base: string): Promise<string | null> {
+  let shrunk;
+  try {
+    shrunk = await shrink(file);
+  } catch {
+    $("saved").textContent = "That picture couldn't be opened.";
+    return null;
+  }
+  const ext = shrunk.name.split(".").pop()!.toLowerCase();
+  let path = `pictures/${slug(base, "picture")}.${ext}`;
+  for (let i = 2; project.files[path] !== undefined && project.files[path] !== shrunk.url; i++) path = `pictures/${slug(base, "picture")}_${i}.${ext}`;
+  project = { ...project, files: { ...project.files, [path]: shrunk.url } };
+  return path;
 }
 
 /** A new Lua file under scripts/, listed in the game's `scripts:`. */
@@ -529,7 +553,7 @@ $("download").addEventListener("click", () => {
   const errors = problems.filter((p) => p.severity === "error").length;
   const zip = button("Download the files (.zip)", () => {
     const id = gameId();
-    downloadBlob(new Blob([zipSync(Object.fromEntries(Object.entries(project.files).map(([p, t]) => [`${id}/${p}`, strToU8(t)])))], { type: "application/zip" }), `${id}.zip`);
+    downloadBlob(new Blob([zipSync(Object.fromEntries(Object.entries(project.files).map(([p, t]) => [`${id}/${p}`, (isPicture(p, t) && dataBytes(t)) || strToU8(t)])))], { type: "application/zip" }), `${id}.zip`);
     dialog.close();
   });
   const page = button(

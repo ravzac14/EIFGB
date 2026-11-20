@@ -9,6 +9,7 @@
 
 import type { Engine, Files, Output, Walkthrough } from "../engine.ts";
 import { Model } from "./model.ts";
+import { figure, pictureSrc } from "../pictures.ts";
 
 /** The walkthrough's file, as in the example games and starter templates. */
 export const WALKTHROUGH = "walkthrough.txt";
@@ -213,7 +214,10 @@ export class TestPlay {
 
   private show(o: Output) {
     // Choices are numbered lines; the player types the number.
-    for (const l of o.lines) this.say(l.text, l.kind === "text" ? "" : l.kind);
+    for (const l of o.lines) {
+      if (l.kind === "picture") this.log.append(figure(pictureSrc(l.picture ?? "", this.startedWith ?? {}), l.text));
+      else this.say(l.text, l.kind === "text" ? "" : l.kind);
+    }
     if (o.ended === "win") this.won = true;
     if (o.ended) this.say(`That's an ending${o.ending ? ` (${o.ending})` : ""}. UNDO goes back a move; Start over plays again.`, "notice");
     const s = o.status;

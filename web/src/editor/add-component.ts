@@ -75,6 +75,32 @@ export const COMPONENTS: Component[] = [
     },
   },
   {
+    id: "picture",
+    name: "Picture",
+    about: "Something the player has to see: a photograph, a map, a painting with a clue in it. EXAMINE shows the picture.",
+    form: (h, done) => {
+      let where = suggestedRoom(h);
+      const place = select(
+        [...h.model.rooms().map((r): [string, string] => [r.id, r.name]), ["player", "Carried by the player at the start"]],
+        where,
+        (v) => (where = v),
+        "Room to add it to",
+      );
+      const name = text("Its name", "photograph, old map, portrait…", "photograph");
+      const add = button(
+        "Add the picture",
+        () => {
+          let id = "";
+          h.change((x) => (id = x.addThing("picture", where || null, name.value.trim() || "photograph")));
+          done();
+          h.select({ kind: "thing", id });
+        },
+        "primary",
+      );
+      return [...field("What is it?", name), ...field("Which room is it in?", place), el("div", { class: "row" }, add)];
+    },
+  },
+  {
     id: "character",
     name: "Character",
     about: "Someone (or something) with a mind of its own: to talk to, trade with, follow or fight.",
@@ -351,7 +377,7 @@ export function openAddComponent(dialog: HTMLDialogElement, h: AddHost) {
               return;
             }
             // Rooms come first: a game with none has nowhere to put things.
-            if (["object", "character", "door"].includes(c.id) && !h.model.roomIds().length) {
+            if (["object", "character", "door", "picture"].includes(c.id) && !h.model.roomIds().length) {
               h.notice("Add a room first.");
               return done();
             }

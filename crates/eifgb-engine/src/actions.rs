@@ -222,6 +222,7 @@ impl<H: ScriptHost> Game<H> {
         if self.passing {
             return;
         }
+        self.show_picture(here);
         // Shut inside something: that's all there is to see.
         let ceiling = self.world.ceiling();
         if ceiling != here {
@@ -346,11 +347,12 @@ impl<H: ScriptHost> Game<H> {
             return true;
         }
         let description = def.description.clone();
+        let pictured = self.show_picture(t);
         let before = self.out.lines.len();
         match &description {
             Some(d) => self.render_line(LineKind::Text, d, &Ctx::new().this(t)),
             None if t == PLAYER => self.msg("examine.self", &Ctx::new()),
-            None if !self.state_notes(t).is_empty() => {}
+            None if pictured || !self.state_notes(t).is_empty() => {}
             None => self.msg("examine.default", &Ctx::new().entity("target", t)),
         }
         let described = self.out.lines.len() > before;

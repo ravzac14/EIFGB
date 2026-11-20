@@ -31,6 +31,12 @@ export interface InspectorContext {
   openFile(path: string): void;
   /** Adds a script file to the game; returns its path. */
   addScriptFile(name: string): string | null;
+  /** Adds a picture file to the game (made small); returns its path. */
+  addPicture(file: File, base: string): Promise<string | null>;
+  /** Where to show a picture from: the project's copy, or its web address. */
+  pictureUrl(file: string): string | null;
+  /** Deletes a picture file nothing uses any more. */
+  dropPicture(file: string): void;
   /** A room's colour on the map (kept in map.yaml), or undefined. */
   roomColour(id: string): string | undefined;
   setRoomColour(id: string, colour: string | null): void;

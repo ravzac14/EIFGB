@@ -70,6 +70,9 @@ impl GameState {
         let mut visited = BTreeSet::new();
         visited.insert(story.meta.start);
         let start = story.clock.as_ref().map_or(0, |c| u64::from(c.start));
+        // Timers running from the start; a range picks its first wait now.
+        let mut rng = Rng::new(seed);
+        let timers = story.timers.iter().filter(|t| t.running).map(|t| (t.key.clone(), crate::game::timer_wait(t, &mut rng))).collect();
         GameState {
             turn: 0,
             score: 0,
@@ -80,16 +83,11 @@ impl GameState {
                 .map(|e| EntityState { location: e.location, state: e.state.clone(), capacity: e.capacity })
                 .collect(),
             visited,
-            rng: Rng::new(seed),
+            rng,
             ending: None,
             choice: None,
             mentioned: Vec::new(),
-            timers: story
-                .timers
-                .iter()
-                .filter(|t| t.running)
-                .map(|t| (t.key.clone(), u64::from(t.schedule.actions())))
-                .collect(),
+            timers,
             // The player knows what they start out holding.
             known: story.entities.iter().enumerate().filter(|(_, e)| e.location == Some(PLAYER)).map(|(i, _)| EntityId(i as u32)).collect(),
             clock: start,

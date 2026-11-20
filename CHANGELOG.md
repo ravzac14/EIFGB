@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- Timers can go off at random: `after: 3-8` or `every: 5-10` picks a
+  random number of turns in the range, again each time for `every`. The
+  same seed plays the same way, so walkthroughs still replay. In the
+  editor, type a range in the timer's turns.
 - Feeling your way in the dark: things the player has seen (or put down,
   or felt for) can still be reached in the dark, so TAKE KEY and LIGHT THE
   CANDLE WITH THE LIGHTER work. FEEL AROUND finds what's within reach,

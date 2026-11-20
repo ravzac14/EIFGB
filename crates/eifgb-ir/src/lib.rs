@@ -113,6 +113,10 @@ fn is_zero(n: &i64) -> bool {
     *n == 0
 }
 
+fn is_zero_u32(n: &u32) -> bool {
+    *n == 0
+}
+
 /// Minutes in a day.
 pub const DAY: u32 = 24 * 60;
 
@@ -263,6 +267,10 @@ pub const PLAYER_FACTION: &str = "player";
 pub struct Timer {
     pub key: String,
     pub schedule: Schedule,
+    /// For `after` and `every`: up to this many more actions, picked at
+    /// random each time it's set going (`every: 5-10` is 5 with a spread of 5).
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub spread: u32,
     /// Whether it's counting from the start of the game.
     pub running: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

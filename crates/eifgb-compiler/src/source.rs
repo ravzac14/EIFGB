@@ -222,6 +222,15 @@ pub struct Room {
     pub picture: Option<PictureSrc>,
 }
 
+/// A number of actions: `5`, or a range to pick from at random, `5-10`
+/// (also `5 to 10`, `5..10`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum Actions {
+    Exactly(i64),
+    Text(String),
+}
+
 /// `picture: hall.jpg`, or `picture: { file: hall.jpg, alt: "..." }`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
@@ -594,12 +603,14 @@ pub enum TimeOfDay {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Timer {
-    /// Fires once, this many actions after it starts.
+    /// Fires once, this many actions after it starts: `5`, or a random
+    /// number in a range, `5-10`.
     #[serde(default)]
-    pub after: Option<u32>,
-    /// Fires every this many actions, until stopped.
+    pub after: Option<Actions>,
+    /// Fires every this many actions (or a random number in a range, each
+    /// time), until stopped.
     #[serde(default)]
-    pub every: Option<u32>,
+    pub every: Option<Actions>,
     /// Fires each day when the clock reaches this time ("19:00", "dusk").
     #[serde(default)]
     pub at: Option<TimeOfDay>,

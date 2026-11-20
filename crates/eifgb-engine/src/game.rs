@@ -821,12 +821,13 @@ impl<H: ScriptHost> Game<H> {
     // ------------------------------------------------------------ timers
 
     fn start_timer(&mut self, key: &str) {
-        let Some(t) = self.world.story().timers.iter().find(|t| t.key == key) else { return };
+        let Some(t) = self.world.story().timers.iter().find(|t| t.key == key).cloned() else { return };
         if self.world.state.timers.contains_key(key) {
             return;
         }
         let offset = u64::from(self.in_action);
-        let due = self.world.state.turn + offset + u64::from(t.schedule.actions());
+        let wait = timer_wait(&t, &mut self.world.state.rng);
+        let due = self.world.state.turn + offset + wait;
         self.world.state.timers.insert(key.to_string(), due);
     }
 
@@ -869,8 +870,9 @@ impl<H: ScriptHost> Game<H> {
                 Schedule::After(_) => {
                     self.world.state.timers.remove(&t.key);
                 }
-                Schedule::Every(n) => {
-                    self.world.state.timers.insert(t.key.clone(), now + u64::from(n));
+                Schedule::Every(_) => {
+                    let wait = timer_wait(&t, &mut self.world.state.rng);
+                    self.world.state.timers.insert(t.key.clone(), now + wait);
                 }
             }
             if let Some(w) = &t.when
@@ -1079,4 +1081,11 @@ impl<H: ScriptHost> Game<H> {
             .collect();
         (self.grammar.lang().list_and)(&names)
     }
+}
+
+/// How many actions until a timer goes off: its `after` or `every`, plus,
+/// for a range (`5-10`), a random part of its spread.
+pub(crate) fn timer_wait(t: &eifgb_ir::Timer, rng: &mut crate::rng::Rng) -> u64 {
+    let base = u64::from(t.schedule.actions());
+    if t.spread == 0 { base } else { base + rng.range(0, i64::from(t.spread)) as u64 }
 }

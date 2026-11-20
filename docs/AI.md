@@ -106,7 +106,8 @@ unknown section or field is an error, not ignored, so a typo is caught.
   graph under `choices:`: a `start` node, and `nodes` with `text` and
   `options`, each option with `text` and any of `say`, `do`, `goto`, `end`.
   Players answer by typing the option's number.
-- **Timers:** under `timers:`, `after: N` (or `every: N`) actions, with
+- **Timers:** under `timers:`, `after: N` (or `every: N`) actions, where N
+  can be a range for a random wait (`every: 5-10`), with
   `say`, `do` (Lua), `when` and `end` (an ending ID).
 - **Goals:** under `goals:`, each with `text` for the JOURNAL, and Lua
   `when` (added once true; omit for from the start) and `done` (done once

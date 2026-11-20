@@ -1319,9 +1319,28 @@ impl<'a> Lowerer<'a> {
             if let Err(e) = check_id(key) {
                 self.d.error(&path, e);
             }
-            let schedule = match (t.after, t.every, &t.at) {
-                (Some(n), None, None) => Schedule::After(n),
-                (None, Some(n), None) => Schedule::Every(n),
+            let mut spread = 0;
+            let mut actions = |a: &src::Actions, field: &str, this: &mut Self| -> Option<u32> {
+                match actions_range(a) {
+                    Ok((lo, hi)) => {
+                        spread = hi - lo;
+                        Some(lo)
+                    }
+                    Err(e) => {
+                        this.d.error(format!("{path}.{field}"), e);
+                        None
+                    }
+                }
+            };
+            let schedule = match (&t.after, &t.every, &t.at) {
+                (Some(a), None, None) => match actions(a, "after", self) {
+                    Some(n) => Schedule::After(n),
+                    None => continue,
+                },
+                (None, Some(a), None) => match actions(a, "every", self) {
+                    Some(n) => Schedule::Every(n),
+                    None => continue,
+                },
                 (None, None, Some(at)) => {
                     let Some(clock) = clock else {
                         self.d.error(format!("{path}.at"), "'at' needs the game to keep time; add a 'clock:' section with the time it starts");
@@ -1381,6 +1400,7 @@ impl<'a> Lowerer<'a> {
             out.push(Timer {
                 key: key.clone(),
                 schedule,
+                spread,
                 running: t.running.unwrap_or(started_by.is_empty()),
                 started_by,
                 stopped_by,
@@ -1744,7 +1764,37 @@ fn vocab(name: &str, synonyms: &[String], adjectives: &[String]) -> Vocab {
     v
 }
 
-/// Calls `f` on every Lua snippet in the story, including the ones inside templates.
+/// `5`, or `5-10` (`5 to 10`, `5..10`): the fewest and most actions.
+fn actions_range(a: &src::Actions) -> Result<(u32, u32), String> {
+    let bad = || "a number of turns, like 5, or a range to pick from at random, like 5-10".to_string();
+    let (lo, hi) = match a {
+        src::Actions::Exactly(n) => (*n, *n),
+        src::Actions::Text(s) => {
+            let s = s.trim();
+            let parts: Vec<&str> = if let Some((a, b)) = s.split_once("..") {
+                vec![a, b]
+            } else if let Some((a, b)) = s.split_once(" to ") {
+                vec![a, b]
+            } else {
+                s.splitn(2, '-').collect()
+            };
+            let num = |p: &str| p.trim().trim_start_matches('=').parse::<i64>().map_err(|_| bad());
+            match parts[..] {
+                [one] => (num(one)?, num(one)?),
+                [a, b] => (num(a)?, num(b)?),
+                _ => return Err(bad()),
+            }
+        }
+    };
+    if lo < 1 {
+        return Err("the number of actions must be at least 1".into());
+    }
+    if hi < lo {
+        return Err(format!("the range goes from {lo} down to {hi}; put the smaller number first"));
+    }
+    Ok((lo as u32, hi.min(i64::from(u32::MAX)) as u32))
+}
+
 /// A time as written in the game file, in minutes after midnight.
 pub(crate) fn parse_time(t: &src::TimeOfDay) -> Result<u32, String> {
     match t {
@@ -1753,6 +1803,7 @@ pub(crate) fn parse_time(t: &src::TimeOfDay) -> Result<u32, String> {
     }
 }
 
+/// Calls `f` on every Lua snippet in the story, including the ones inside templates.
 pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
     fn text(t: &Text, f: &mut dyn FnMut(&Code)) {
         for seg in &t.0 {

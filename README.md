@@ -960,7 +960,7 @@ timers:
 
 | Field | Meaning |
 |---|---|
-| `after: N` / `every: N` / `at: time` | Fire once N actions after starting, every N actions, or each day the clock reaches a time (`"19:00"`, `"7:30 pm"`, `dawn` or `dusk`; needs a [clock](#time-of-day)). Exactly one is required. |
+| `after: N` / `every: N` / `at: time` | Fire once N actions after starting, every N actions, or each day the clock reaches a time (`"19:00"`, `"7:30 pm"`, `dawn` or `dusk`; needs a [clock](#time-of-day)). Exactly one is required. N can be a range, like `every: 5-10`: a random number of actions in it, picked again each time, so the player can't count on it. |
 | `started_by`, `stopped_by` | Rules like `revealed_by`: `"<verb> <object>"`, `"(<category>) <object>"`, or a list. Starting a timer that's already running doesn't reset it. |
 | `running` | Whether it counts from the start of the game. Defaults to `true`, or `false` if it has `started_by`. |
 | `when` | A Lua condition checked when it's due. If false, this firing is skipped. |

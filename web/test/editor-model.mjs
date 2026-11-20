@@ -129,6 +129,24 @@ assert.deepEqual(errors(black.toString()), [], `renamed ${gateSide} → ${rename
   assert.equal(renameInCode("vars", "gold", "coins")("vars.gold = vars.gold + vars.golden"), "vars.coins = vars.coins + vars.golden");
 }
 
+// A timer's turns, as typed: a number, or a range for a random wait.
+const { turns } = await import("../src/editor/story.ts");
+assert.equal(turns("5"), 5);
+assert.equal(turns(" 5 - 10 "), "5-10");
+assert.equal(turns("3 to 8"), "3-8");
+assert.equal(turns("4-4"), 4);
+assert.equal(turns("10-5"), null);
+assert.equal(turns("0"), null);
+assert.equal(turns("soon"), null);
+{
+  const tm = new Model(NEW_GAME);
+  const id = tm.addTimer("drip");
+  tm.set(["timers", id, "after"], undefined);
+  tm.set(["timers", id, "every"], turns("2-4"));
+  assert.match(tm.toString(), /every: 2-4/);
+  assert.deepEqual(errors(tm.toString()), []);
+}
+
 assert.equal(slug("Dark Cellar!"), "dark_cellar");
 assert.equal(slug("1st floor"), "room_1st_floor");
 console.log("ok   editor model");

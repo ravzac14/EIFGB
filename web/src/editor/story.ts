@@ -502,26 +502,36 @@ function ruleBuilder(ctx: InspectorContext, path: string[], label: string, none:
   ];
 }
 
+/** Turns as typed: 5, or a range, "5-10" (also "5 to 10"); null if it isn't one. */
+export function turns(s: string): number | string | null {
+  const m = /^\s*(\d+)\s*(?:(?:-|to|\.\.)\s*(\d+)\s*)?$/.exec(s);
+  if (!m) return null;
+  const lo = Number(m[1]);
+  const hi = m[2] === undefined ? lo : Number(m[2]);
+  if (lo < 1 || hi < lo) return null;
+  return hi === lo ? lo : `${lo}-${hi}`;
+}
+
 export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   const m = ctx.model;
   const p = ["timers", id];
   const every = m.get([...p, "every"]);
   const at = m.get([...p, "at"]);
-  const mode = at !== undefined ? "at" : typeof every === "number" ? "every" : "after";
+  const mode = at !== undefined ? "at" : every !== undefined ? "every" : "after";
   const count = (mode === "at" ? at : mode === "every" ? every : m.get([...p, "after"])) as number | string | undefined;
-  const n = el("input", { type: "text", inputMode: mode === "at" ? "text" : "numeric", value: count === undefined ? "" : String(count), ariaLabel: mode === "at" ? "Time of day" : "Turns" }) as HTMLInputElement;
+  const n = el("input", { type: "text", inputMode: "text", value: count === undefined ? "" : String(count), ariaLabel: mode === "at" ? "Time of day" : "Turns" }) as HTMLInputElement;
   const clocked = m.get(["clock"]) !== undefined;
   const modes: [string, string][] = [["after", "Once, after"], ["every", "Every"], ...(clocked || mode === "at" ? [["at", "Each day at"] as [string, string]] : [])];
   const how = select(modes, mode, (v) =>
     ctx.change((x) => {
-      const k = Number.parseInt(n.value, 10) || 5;
+      const k = turns(n.value) ?? 5;
       for (const f of ["after", "every", "at"]) x.set([...p, f], undefined);
       x.set([...p, v], v === "at" ? "dusk" : k);
     }), "How often");
   n.addEventListener("input", () => {
     if (mode === "at") return ctx.change((x) => x.set([...p, "at"], n.value.trim() || undefined), { coalesce: `${id}.n`, redraw: false });
-    const k = Number.parseInt(n.value, 10);
-    if (k >= 1) ctx.change((x) => x.set([...p, mode], k), { coalesce: `${id}.n`, redraw: false });
+    const k = turns(n.value);
+    if (k !== null) ctx.change((x) => x.set([...p, mode], k), { coalesce: `${id}.n`, redraw: false });
   });
   const endings = m.ids("endings");
   const str = (k: string) => String(m.get([...p, k]) ?? "");
@@ -533,7 +543,7 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
     help(
       mode === "at"
         ? "A time like 19:00 or 7:30 pm, or dawn or dusk. It goes off each day the clock gets there, until it's stopped."
-        : `Turns are commands that take time: LOOK and SAVE don't count.${clocked ? " With the time of day kept, “Each day at” goes off at a time instead." : ""}`,
+        : `A number, or a range like 5-10 for a random number of turns${mode === "every" ? ", picked again each time" : ""}. Turns are commands that take time: LOOK and SAVE don't count.${clocked ? " With the time of day kept, “Each day at” goes off at a time instead." : ""}`,
     ),
     ...ruleBuilder(ctx, [...p, "started_by"], "It starts when the player", "(when the game starts)"),
     ...ruleBuilder(ctx, [...p, "stopped_by"], "It stops when the player", "(never)"),

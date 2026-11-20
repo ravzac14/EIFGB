@@ -178,7 +178,7 @@ A handler can be a block of statements or a single expression.
 A timer fires after a number of **actions**: commands that took a turn.
 Parse failures and meta commands (SAVE, UNDO, SCORE…) don't count.
 
-- **Schedule:** `after: N` (once), `every: N` (repeating), or `at: <time>` (each day the clock passes that time; also `dawn` or `dusk`; needs `clock:`), exactly one. N ≥ 1.
+- **Schedule:** `after: N` (once), `every: N` (repeating), or `at: <time>` (each day the clock passes that time; also `dawn` or `dusk`; needs `clock:`), exactly one. N ≥ 1. N can be a range, `5-10` (or `5 to 10`, `5..10`): the wait is picked at random in it, from the game's seeded random numbers, each time the timer is set going (at the start, when started, and after each `every` firing). The IR keeps the smallest as the schedule and the difference as `spread`; a timer without a range draws no random numbers. A range that runs backwards, starts below 1, or isn't numbers is an error.
 - **Start:** `running` (default `true`, or `false` when `started_by` is given) starts it with the game. `started_by` and `stopped_by` take the same rules as `revealed_by`, including categories. They're checked when the action happens and isn't blocked by a `before_` handler. Starting a running timer leaves it alone.
 - **Counting:** a timer started during an action counts the actions after it. One started outside an action (the `start` handler, or a choice) counts from the next action.
 - **Firing:** due timers fire at the end of the turn, after `turn` handlers, in declaration order. `when` (Lua) is checked first; if false, the firing is skipped, and an `after` timer is then done. Then `say`, `do`, and `end` (an ending ID). Firing stops once an ending is requested.

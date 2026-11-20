@@ -4310,3 +4310,41 @@ fn some_things_can_always_be_found_in_the_dark() {
     assert_says(&mut g, "take candle", "It's too dark to see.");
     assert_eq!(say(&mut g, "feel for the candle"), "Taken.");
 }
+
+#[test]
+fn timers_can_go_off_at_random_within_a_range() {
+    // Every 2 to 4 turns: the gaps are random, but always in range, and the
+    // same seed plays the same way.
+    let gaps = |seed: u64| {
+        let src = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\ntimers:\n  drip:\n    every: 2-4\n    say: Drip.\n";
+        let mut g = Game::new(compile_str(src).story.unwrap(), LuaHost::new().unwrap(), seed).unwrap();
+        g.start();
+        let mut at = Vec::new();
+        for turn in 1..=60 {
+            if g.input("wait").text().contains("Drip.") {
+                at.push(turn);
+            }
+        }
+        at.windows(2).map(|w| w[1] - w[0]).chain(at.first().copied()).collect::<Vec<i32>>()
+    };
+    let a = gaps(1);
+    assert!(a.iter().all(|g| (2..=4).contains(g)), "{a:?}");
+    assert!(a.iter().any(|&g| g != a[0]), "not always the same gap: {a:?}");
+    assert_eq!(gaps(1), a, "the same seed, the same timings");
+    assert_ne!(gaps(7), a, "another seed, other timings");
+}
+
+#[test]
+fn a_random_timer_is_saved_and_undone_like_any_other() {
+    let src = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\ntimers:\n  bell:\n    after: 3-9\n    say: A bell rings.\n";
+    let mut g = game(compile_str(src).story.unwrap());
+    let due = g.world().state.timers["bell"];
+    assert!((3..=9).contains(&due), "{due}");
+    let saved = g.world().save();
+    say(&mut g, "wait");
+    say(&mut g, "undo");
+    assert_eq!(g.world().state.timers["bell"], due);
+    let mut h = game(compile_str(src).story.unwrap());
+    h.restore(&saved);
+    assert_eq!(h.world().state.timers["bell"], due);
+}

@@ -337,6 +337,20 @@ fn timers_are_checked() {
     assert_error(&t("after: 3, every: 2, say: x"), "use only one of");
     assert_error(&t("say: x"), "needs 'after");
     assert_error(&t("after: 0, say: x"), "at least 1");
+    // A range: the fewest actions, and up to how many more.
+    for (body, schedule, spread) in [
+        ("every: 5-10, say: x", Schedule::Every(5), 5),
+        ("after: '3 to 4', say: x", Schedule::After(3), 1),
+        ("after: 2..2, say: x", Schedule::After(2), 0),
+        ("every: '7', say: x", Schedule::Every(7), 0),
+    ] {
+        let out = t(body);
+        let timer = &out.story.as_ref().unwrap_or_else(|| panic!("{body}: {:#?}", out.diagnostics)).timers[0];
+        assert_eq!((timer.schedule, timer.spread), (schedule, spread), "{body}");
+    }
+    assert_error(&t("every: 10-5, say: x"), "put the smaller number first");
+    assert_error(&t("every: 0-5, say: x"), "at least 1");
+    assert_error(&t("every: soon, say: x"), "a range to pick from at random");
     assert_error(&t("after: 3, end: bom"), "did you mean 'boom'?");
     assert_error(&t("after: 3, started_by: kick fuze, say: x"), "did you mean 'fuse'?");
     let quiet = t("after: 3");

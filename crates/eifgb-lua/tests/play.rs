@@ -4232,3 +4232,16 @@ fn pictures_show_with_rooms_and_when_examined() {
     say(&mut g, "s");
     assert!(!g.input("go to the pantry").lines.iter().any(|l| l.kind == LineKind::Picture));
 }
+
+#[test]
+fn commands_not_understood_say_why() {
+    let mut g = game(lighthouse());
+    let kind = |o: &Output| o.missed.as_ref().map(|m| (m.kind, m.word.clone(), m.verb.clone()));
+    assert_eq!(kind(&g.input("frobnicate the pool")), Some(("unknown_verb", Some("frobnicate".into()), None)));
+    assert_eq!(kind(&g.input("take zorkmid")), Some(("unknown_word", Some("zorkmid".into()), Some("take".into()))));
+    assert_eq!(kind(&g.input("take waves")), Some(("scenery", Some("waves".into()), Some("take".into()))));
+    assert_eq!(kind(&g.input("take radio")), Some(("not_here", None, Some("take".into()))));
+    assert_eq!(g.input("look").missed, None);
+    // The game's own parse_failed handler answered it: nothing to fix.
+    assert_eq!(g.input("swim").missed, None);
+}

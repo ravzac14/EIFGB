@@ -35,6 +35,13 @@ export interface Output {
   save: string | null;
   restore_requested: boolean;
   quit_requested: boolean;
+  /** Set when the command wasn't understood: why, for the editor to suggest a fix. */
+  missed?: Missed;
+}
+export interface Missed {
+  kind: "unknown_verb" | "unknown_word" | "scenery" | "not_here" | "partial" | "no_pronoun" | "other";
+  word?: string;
+  verb?: string;
 }
 /** What the player has seen of the map (see `eifgb_map` in the bridge). */
 export interface PlayerMap {

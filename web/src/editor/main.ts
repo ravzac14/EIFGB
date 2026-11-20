@@ -65,6 +65,32 @@ const testPlay = new TestPlay($("panel-play"), {
     change(() => {
       project = { ...project, files: { ...project.files, [WALKTHROUGH]: text } };
     }),
+  thingsIn: (room) =>
+    model
+      ? [
+          ...model.things().filter((t) => model!.roomOf(t.id) === room).map((t) => ({ id: t.id, name: t.name, section: "objects" as const })),
+          ...model.doors().filter((d) => model!.exits(room).some((e) => e.door === d.id)).map((d) => ({ id: d.id, name: d.name, section: "objects" as const })),
+          ...model.characterIds().filter((c) => model!.character(c)?.in === room).map((c) => ({ id: c, name: model!.character(c)!.name, section: "characters" as const })),
+        ]
+      : [],
+  verbWords: () => {
+    const std = verbs.map((v) => v.example.split(" ")[0]);
+    const own = model?.ids("verbs") ?? [];
+    return [...new Set([...std, ...own, "look", "inventory", "wait"])].filter((w) => /^[a-z]+$/.test(w)).sort();
+  },
+  addSynonym: (section, id, word) =>
+    change((m) => m.setList([section, id, "synonyms"], [...m.list([section, id, "synonyms"]), word])),
+  addAlias: (word, means) => change((m) => m.setAlias(word, means)),
+  addVerb: (word) => {
+    let id = "";
+    change((m) => (id = m.addVerb(word)));
+    select({ kind: "verb", id });
+  },
+  addScenery: (room, word) => {
+    let id = "";
+    change((m) => (id = m.addThing("scenery", room, word)));
+    select({ kind: "thing", id });
+  },
 });
 
 /** Every file of the project at one moment: what undo goes back to. */

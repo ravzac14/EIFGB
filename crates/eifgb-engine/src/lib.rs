@@ -35,7 +35,7 @@ pub mod state;
 pub mod text;
 pub mod world;
 
-pub use game::{Game, Line, LineKind, Output, Status};
+pub use game::{Game, Line, LineKind, Missed, Output, Status};
 
 pub use eifgb_ir as ir;
 pub use script::{Arg, Ctx, Effect, Outcome, ScriptError, ScriptHost, ScriptValue};

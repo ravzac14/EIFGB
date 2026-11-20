@@ -73,6 +73,25 @@ pub struct Output {
     /// Set after RESTORE: the host should fetch a save and pass it to [`Game::restore`].
     pub restore_requested: bool,
     pub quit_requested: bool,
+    /// Set when the command wasn't understood (and no `parse_failed`
+    /// handler answered it): why, for an editor to suggest a fix.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub missed: Option<Missed>,
+}
+
+/// Why a command wasn't understood.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Missed {
+    /// `unknown_verb`, `unknown_word` (a word nothing has), `scenery` (a word
+    /// only in the room's description), `not_here`, `partial` (the verb, but
+    /// not the rest), `no_pronoun` or `other`.
+    pub kind: &'static str,
+    /// The word that wasn't understood, where there is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub word: Option<String>,
+    /// The verb, when that much was understood.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verb: Option<String>,
 }
 
 impl Output {
@@ -430,6 +449,17 @@ impl<H: ScriptHost> Game<H> {
         if self.out.lines.len() > before {
             return;
         }
+        let verb = toks.first().filter(|w| self.grammar.is_verb_word(w)).cloned();
+        let scenery_word = toks.iter().skip(1).find(|w| self.grammar.describes_here(&self.world, w)).cloned();
+        self.out.missed = Some(match &f {
+            Failure::UnknownVerb { word } => Missed { kind: "unknown_verb", word: Some(word.clone()), verb: None },
+            Failure::UnknownWord { word } => Missed { kind: "unknown_word", word: Some(word.clone()), verb },
+            Failure::Scenery => Missed { kind: "scenery", word: scenery_word, verb },
+            Failure::NotHere => Missed { kind: "not_here", word: None, verb },
+            Failure::Partial { verb: v } => Missed { kind: "partial", word: None, verb: Some(v.clone()) },
+            Failure::NoPronoun => Missed { kind: "no_pronoun", word: None, verb },
+            _ => Missed { kind: "other", word: None, verb },
+        });
         match f {
             Failure::Empty => self.msg("parser.empty", &ctx),
             Failure::UnknownVerb { word } => {

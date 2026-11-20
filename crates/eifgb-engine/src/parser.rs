@@ -965,6 +965,16 @@ impl Grammar {
             || (self.lang.stems)(w).iter().any(|s| self.described_words.contains(s))
     }
 
+    /// Whether a command can start with this word.
+    pub fn is_verb_word(&self, w: &str) -> bool {
+        self.verb_words.contains(w)
+    }
+
+    /// Whether the room the player is in describes the word (it's scenery).
+    pub fn describes_here(&self, world: &World, w: &str) -> bool {
+        !self.articles.contains(w) && self.describes(world.here(), w)
+    }
+
     /// Whether `id`'s description uses the word, or another form of it.
     fn describes(&self, id: EntityId, w: &str) -> bool {
         let set = &self.described[id.index()];

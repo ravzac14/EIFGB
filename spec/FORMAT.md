@@ -50,6 +50,7 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
 
 ## Entities
 
+- **Not understood:** when a command fails to parse and no `parse_failed` handler prints anything, the output's `missed` says why: `{ kind, word?, verb? }`, with `kind` one of `unknown_verb`, `unknown_word`, `scenery` (the word is only in the room's description), `not_here`, `partial`, `no_pronoun` or `other`. The editor's test play lists these with fixes.
 - **Pictures:** rooms, objects and characters take `picture`: a file path relative to `game.yaml` or an `https://` address, or `{ file, alt }`. The compiler errors on unsafe paths (`..`, absolute), and warns when the file isn't there, isn't `.png/.jpg/.jpeg/.gif/.webp/.svg`, is `http://`, or has no `alt`. The engine shows a room's picture after its title in LOOK (not while passing through on GO TO), and a thing's at the start of EXAMINE; a thing with a picture and no description says nothing else. Output: a line of kind `picture`, with `picture` (the file as written) and `text` (the `alt`, or the name). Web hosts keep pictures in a project as `data:` URLs, under their paths.
 - **Exits** take one of three forms. A room ID is a plain exit. A string is a blocked exit, with that string as the message. A map `{to, through, when, blocked, via}` handles doors, conditional exits and the things a way goes by.
   A direction can also take a **list** of those forms, for several exits the same way. When the player goes that way, entries with `to` whose `when` holds (or that have no `when`) are candidates:

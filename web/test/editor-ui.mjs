@@ -623,6 +623,30 @@ const tpLine = tp.querySelector(".tp-prompt input");
 tpLine.value = "look";
 tp.querySelector(".tp-prompt").requestSubmit();
 assert.match(tp.querySelector(".tp-log").textContent, /> ?look|look/);
+// What wasn't understood is kept, with a fix for each.
+const tpSay = (text) => {
+  tpLine.value = text;
+  tp.querySelector(".tp-prompt").requestSubmit();
+};
+assert.ok(tp.querySelector(".tp-misses").hidden, "nothing yet");
+tpSay("yoink everything");
+tpSay("yoink everything");
+tpSay("x zorkmid");
+const misses = tp.querySelector(".tp-misses");
+assert.equal(misses.hidden, false);
+assert.match(misses.querySelector("summary").textContent, /Not understood \(2\)/, "the same miss is kept once");
+assert.match(misses.textContent, /“yoink” isn't a verb this game knows/);
+assert.match(misses.textContent, /“zorkmid” isn't a name for anything here/);
+const yoink = [...misses.querySelectorAll("li")].find((li) => li.textContent.includes("yoink"));
+yoink.querySelector("select").value = "take";
+[...yoink.querySelectorAll("button")].find((b) => b.textContent === "Make it mean that").click();
+assert.match(yaml(), /aliases:\n\s+yoink: take/);
+assert.match(misses.querySelector("summary").textContent, /Not understood \(1\)/);
+const zork = [...misses.querySelectorAll("li")].find((li) => li.textContent.includes("zorkmid"));
+[...zork.querySelectorAll("button")].find((b) => b.textContent === "Add it as something here").click();
+assert.match(yaml(), /\n  zorkmid:\n\s+name: zorkmid/);
+assert.ok(misses.hidden, "all fixed");
+$("#tab-play").click();
 // Start in another room: select it on the map first.
 press($(`#map [data-room="${eastRoom}"]`));
 const startIn = [...tp.querySelectorAll(".tp-bar button")].find((b) => b.textContent.startsWith("Start in"));

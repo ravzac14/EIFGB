@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- Test play keeps what the game didn't understand, under **Not
+  understood**, each with a fix: add the word as another name for
+  something in that room, make an unknown verb mean one the game knows,
+  or add the word as an object.
 - Renaming in the editor reaches everything: changing a room's, object's
   or character's ID updates every reference (exits, doors, `via`, keys,
   reveal and timer rules, characters' things) and the Lua code that names

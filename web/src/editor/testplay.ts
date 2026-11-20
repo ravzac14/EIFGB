@@ -7,7 +7,7 @@
 // game's walkthrough.txt; the editor's check replays it after every edit
 // and says here (and under Problems) when it no longer wins.
 
-import type { Engine, Files, Output, Walkthrough } from "../engine.ts";
+import type { Engine, Files, Missed, Output, Walkthrough } from "../engine.ts";
 import { Model } from "./model.ts";
 import { figure, pictureSrc } from "../pictures.ts";
 
@@ -28,6 +28,23 @@ export interface TestPlayHost {
   showProblems(): void;
   /** Writes walkthrough.txt. */
   saveWalkthrough(text: string): void;
+  /** What's in a room, to add a word to. */
+  thingsIn(room: string): { id: string; name: string; section: "objects" | "characters" }[];
+  /** Words a new word could mean: verbs the game knows. */
+  verbWords(): string[];
+  /** Fixes for what wasn't understood. */
+  addSynonym(section: "objects" | "characters", id: string, word: string): void;
+  addAlias(word: string, means: string): void;
+  addVerb(word: string): void;
+  addScenery(room: string, word: string): void;
+}
+
+/** A command test play didn't understand, kept until it's fixed or dismissed. */
+interface Miss {
+  command: string;
+  room: string | null;
+  roomName: string;
+  missed: Missed;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...kids: (Node | string)[]): HTMLElementTagNameMap[K] {
@@ -58,6 +75,9 @@ export class TestPlay {
   private won = false;
   private record: HTMLButtonElement;
   private walk: HTMLElement;
+  /** What wasn't understood, this session. */
+  private misses: Miss[] = [];
+  private missBox: HTMLDetailsElement;
 
   private host: TestPlayHost;
 
@@ -102,7 +122,8 @@ export class TestPlay {
       if (!getSelection()?.toString() && !this.form.hidden) this.line.focus({ preventScroll: true });
     });
     this.log.append(el("p", { className: "dim", textContent: "Play your game here while you work on it. Press Start over to begin." }));
-    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.record, this.status), this.walk, this.stale, this.log, this.form);
+    this.missBox = el("details", { className: "tp-misses", hidden: true });
+    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.record, this.status), this.walk, this.missBox, this.stale, this.log, this.form);
     this.walkthrough("none");
     this.update();
   }
@@ -205,7 +226,104 @@ export class TestPlay {
       this.played.push(text);
       this.update();
     }
-    this.show(this.engine.input(text));
+    const room = this.here;
+    const o = this.engine.input(text);
+    this.show(o);
+    if (o.missed && text) this.missed({ command: text, room, roomName: o.status.room, missed: o.missed });
+  }
+
+  /** Remembers a command that wasn't understood (once for each word and room). */
+  private missed(m: Miss) {
+    const same = (a: Miss) => a.missed.kind === m.missed.kind && (a.missed.word ?? a.command) === (m.missed.word ?? m.command) && a.room === m.room;
+    if (this.misses.some(same)) return;
+    this.misses.push(m);
+    this.drawMisses();
+  }
+
+  private drawMisses() {
+    const box = this.missBox;
+    const wasOpen = box.open;
+    box.hidden = !this.misses.length;
+    box.replaceChildren(el("summary", { textContent: `Not understood (${this.misses.length})` }));
+    box.append(el("p", { className: "dim", textContent: "Commands the game didn't understand, and a way to fix each. Players will try them too." }));
+    const list = el("ul");
+    for (const m of this.misses) list.append(this.missRow(m));
+    box.append(list);
+    box.open = wasOpen || this.misses.length === 1;
+  }
+
+  private missRow(m: Miss): HTMLElement {
+    const row = el("li", {});
+    const drop = () => {
+      this.misses = this.misses.filter((x) => x !== m);
+      this.drawMisses();
+    };
+    const done = (what: string) => {
+      drop();
+      this.say(`(${what}. Start over to play with it.)`, "notice");
+    };
+    const btn = (label: string, fn: () => void) => {
+      const b = el("button", { type: "button", textContent: label });
+      b.addEventListener("click", fn);
+      return b;
+    };
+    const pick = (options: [string, string][], label: string) => {
+      const s = el("select", {});
+      s.setAttribute("aria-label", label);
+      for (const [v, t] of options) s.append(el("option", { value: v, textContent: t }));
+      return s;
+    };
+    const word = m.missed.word ?? "";
+    const where = m.roomName ? ` (in ${m.roomName})` : "";
+    row.append(el("code", { textContent: `> ${m.command}` }), where, " ");
+    const fix = el("div", { className: "tp-fix" });
+    switch (m.missed.kind) {
+      case "unknown_word": {
+        row.append(`“${word}” isn't a name for anything here.`);
+        const things = m.room ? this.host.thingsIn(m.room) : [];
+        if (things.length) {
+          const s = pick(things.map((t) => [`${t.section}:${t.id}`, t.name]), `What “${word}” is`);
+          fix.append(
+            "It means ",
+            s,
+            btn("Add the word", () => {
+              const [section, id] = s.value.split(":") as ["objects" | "characters", string];
+              this.host.addSynonym(section, id, word);
+              done(`“${word}” is another name for ${things.find((t) => `${t.section}:${t.id}` === s.value)?.name}`);
+            }),
+          );
+        }
+        if (m.room) fix.append(btn("Add it as something here", () => (this.host.addScenery(m.room!, word), done(`Added a ${word} to ${m.roomName}`))));
+        break;
+      }
+      case "unknown_verb": {
+        row.append(`“${word}” isn't a verb this game knows.`);
+        const s = pick(this.host.verbWords().map((v) => [v, v.toUpperCase()]), `What “${word}” means`);
+        fix.append(
+          "It means ",
+          s,
+          btn("Make it mean that", () => (this.host.addAlias(word, s.value), done(`“${word}” now means ${s.value.toUpperCase()}`))),
+          " or ",
+          btn("Add a new verb", () => (this.host.addVerb(word), drop())),
+        );
+        break;
+      }
+      case "scenery":
+        row.append(word ? `“${word}” is in the description, but isn't something the player can handle.` : "Those words are only in the room's description.");
+        if (m.room && word) fix.append(btn("Make it an object", () => (this.host.addScenery(m.room!, word), done(`Added a ${word} to ${m.roomName}`))));
+        break;
+      case "not_here":
+        row.append("That's in the game, but not here.");
+        break;
+      case "partial":
+        row.append(`The game understood ${m.missed.verb ? `“${m.missed.verb.toUpperCase()}”` : "the start"}, but not the rest.`);
+        break;
+      default:
+        row.append("The game didn't understand it.");
+    }
+    fix.append(btn("Dismiss", drop));
+    row.append(fix);
+    return row;
   }
 
   private say(text: string, cls = "") {

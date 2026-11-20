@@ -427,6 +427,14 @@ Problems that says where it stopped working. The walkthrough is
 always uses the same random numbers as the check, so what you recorded
 plays the same way again.
 
+Test play also keeps a list of what the game **didn't understand**, under
+**Not understood**: a word that isn't a name for anything ("x lantern"),
+a verb the game doesn't know ("yoink the gem"), or a word that's only in
+a room's description. Each has a fix a click away: add the word as
+another name for something in that room, make the verb mean one the game
+knows (an [alias](#your-own-words-aliases)), or add it as an object.
+Players will try the same things.
+
 That's a complete game. Compare yours with
 [`spec/examples/midnight_snack/game.yaml`](spec/examples/midnight_snack/game.yaml).
 

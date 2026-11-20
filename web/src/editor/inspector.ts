@@ -7,6 +7,7 @@ import {
 } from "./model.ts";
 import { THING_DRAG, factionHue } from "./map.ts";
 import { pictureSection } from "./picture-ui.ts";
+import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, roomName, select, type InspectorContext } from "./ui.ts";
@@ -205,6 +206,7 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
     ),
     colourPicker(ctx, id),
+    ...roomBehaviour(ctx, id),
     ...pictureSection(ctx, ["rooms", id], "room"),
     el("h3", { textContent: "Ways out" }),
   );
@@ -677,6 +679,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     help("In a dark room, players can always reach it (a light switch by the door, matches by the bed). Other things they can reach once they've seen them, or felt around for them."),
   );
   panel.append(...trait("Burns", "flammable"), ...trait("Can be smashed", "destructible"));
+  panel.append(...thingBehaviour(ctx, id, t.traits));
   if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
 

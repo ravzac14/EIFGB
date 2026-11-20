@@ -465,6 +465,10 @@ impl ScriptHost for LuaHost {
                             "max_score" => w.story().meta.max_score.map_or(mlua::Value::Nil, mlua::Value::Integer),
                             "title" => mlua::Value::String(lua.create_string(&w.story().meta.title)?),
                             "id" => mlua::Value::String(lua.create_string(&w.story().meta.id)?),
+                            "weather" => match w.state.weather.clone().or_else(|| w.story().weather.as_ref().map(|x| x.start.clone())) {
+                                Some(k) => mlua::Value::String(lua.create_string(&k)?),
+                                None => mlua::Value::Nil,
+                            },
                             other => return Err(rt(format!("game.{other} doesn't exist"))),
                         })
                     })?,
@@ -686,6 +690,19 @@ impl ScriptHost for LuaHost {
                             None => mlua::Value::Nil,
                             Some(done) => mlua::Value::String(lua.create_string(if done { "done" } else { "active" })?),
                         })
+                    })?,
+                )?;
+                h.set(
+                    "set_weather",
+                    scope.create_function(move |_, key: String| {
+                        let known = world.borrow().story().weather.as_ref().map(|w| w.kinds.iter().any(|k| k.key == key));
+                        match known {
+                            None => return Err(rt("set_weather: the game has no weather; add a 'weather:' section")),
+                            Some(false) => return Err(rt(format!("set_weather: there's no kind of weather called '{key}'"))),
+                            Some(true) => {}
+                        }
+                        effects.borrow_mut().push(Effect::Weather(key));
+                        Ok(())
                     })?,
                 )?;
                 for (name, done) in [("start_goal", false), ("complete_goal", true)] {

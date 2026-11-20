@@ -857,6 +857,15 @@ impl World {
         }
     }
 
+    /// The player's companion: one that takes their orders, or follows
+    /// them about. The player knows it's there, even in the dark.
+    pub fn companion(&self, id: EntityId) -> bool {
+        id != PLAYER
+            && self.def(id).kind == EntityKind::Character
+            && !self.is_dead(id)
+            && (self.obeys(id) || self.def(id).npc.as_ref().is_some_and(|n| n.behavior == Behavior::Follower))
+    }
+
     /// Takes the player's orders: tamed, or `obeys`.
     pub fn obeys(&self, id: EntityId) -> bool {
         self.is_tamed(id) || self.def(id).npc.as_ref().is_some_and(|n| n.obeys)

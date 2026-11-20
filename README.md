@@ -867,6 +867,81 @@ staircase is there on both sides of every way that goes by it, even though
 it's only `in:` the hall. In the editor, select the way out on the map and
 use **Goes by**.
 
+## How things behave
+
+A few fields give things the behaviour players expect, with no scripts.
+
+```yaml
+rooms:
+  camp:
+    name: Camp
+    outdoors: true                    # the weather shows here
+    sound: The stream babbles.        # LISTEN here, and from next door
+    smell: Woodsmoke drifts past.
+objects:
+  candle: { name: candle, in: camp, traits: [portable, light_source], needs_flame: true, fuel: 20 }
+  matches:
+    name: box of matches
+    in: camp
+    traits: [portable, light_source]
+    fuel: 2                           # burns for 2 turns…
+    burns_away: true                  # …then it's gone
+    spent: The match burns down to your fingers.
+  bottle: { name: glass bottle, in: camp, traits: [portable], holds_liquid: true }
+  stream: { name: stream, in: camp, traits: [scenery], liquid: water }
+  rope: { name: old rope, in: camp, traits: [portable], uses: 3, breaks: The rope frays and snaps. }
+  safe: { name: safe, in: shed, traits: [container, openable, lockable], state: { locked: true }, code: 4512 }
+  note: { name: note, in: shed, traits: [portable], text: '"The code is 4512."' }
+```
+
+- **Flames:** a light that `needs_flame` (a candle, a torch) lights only
+  from something burning: LIGHT THE CANDLE WITH THE MATCHES (a lighter or
+  match you're holding is struck first), or with any flame in hand. STRIKE
+  and FLICK light things too.
+- **Fuel:** a light with `fuel` burns for that many turns, flickers two
+  turns before the end ("It won't last much longer."), then goes out, or
+  is gone if it `burns_away`. Its `fuel` state counts down, so a script can
+  refill it: `world.lamp.fuel = 20`.
+- **Liquids:** something that `holds_liquid` (start it full with
+  `full_of: water`) can be filled from anything with a `liquid`: FILL THE
+  BOTTLE FROM THE STREAM. Then POUR OUT THE WATER, POUR THE BOTTLE INTO THE
+  BUCKET, DRINK THE WATER, or POUR THE WATER ON THE FIRE: water puts out
+  fires and flames, and so does any liquid whose source `douses`. "The
+  water" means the bottle with water in it. Its `liquid` state says what's
+  in it; lists say "a glass bottle (full of water)".
+- **Wear:** something with `uses` breaks after being used that many
+  times as a tool (a key, a knife), or by one of your verbs' handlers.
+  `breaks` says how.
+- **Codes:** something lockable with a `code` unlocks when the player
+  types it: TYPE 4512, ENTER 4512 ON THE KEYPAD, OPEN THE SAFE WITH 4512.
+  Hide the code in a clue, or a [picture](#pictures).
+- **Writing:** `text` is what READ shows (a book, a note, a sign), apart
+  from what EXAMINE says about the thing itself.
+- **Sounds and smells:** LISTEN and SMELL say a room's `sound` and
+  `smell`, those of what's in it, and those of the rooms next door ("From
+  the north: Bats squeak."). LISTEN TO THE CLOCK gives the clock's.
+- **Companions in the dark:** a character carrying a lit lamp lights the
+  room they're in. Companions (who follow the player, or obey them) are
+  known even in the dark, and one that `sees_in_dark` can be sent for
+  what the player can't see: REX, FETCH THE BONE.
+
+### Weather
+
+```yaml
+weather:
+  start: clear
+  changes: 20-40          # turns; a range picks at random. Leave it out: scripts only.
+  kinds:
+    clear: { describe: The sky is clear., begins: The clouds blow away. }
+    rain:  { describe: Rain patters on the leaves., begins: It starts to rain. }
+```
+
+Rooms that are `outdoors` add the weather's `describe` to their
+description, and a player outdoors is told its `begins` when it changes.
+Scripts read `game.weather` and change it with `set_weather("rain")`, and
+descriptions can depend on it: `${if game.weather == "rain"}The path is
+muddy.${end}`. In the editor: **Weather** in the game's details.
+
 ## Pictures
 
 A room, an object or a character can have a `picture`. A room's is shown
@@ -966,6 +1041,7 @@ timers:
 | `when` | A Lua condition checked when it's due. If false, this firing is skipped. |
 | `say`, `do`, `end` | What happens: print text, run Lua, end the game. Any combination. |
 | `say_again` | Said instead of `say` every time after the first: `say: Thunder rolls in the distance.`, then `say_again: More thunder.` Leave it out to say the same each time. |
+| `chance` | The chance it goes off each time it's due: `chance: 10%`. With `every: 1`, something that might happen any turn. |
 | `heard_in` | Where `say` is heard: a room, a list of rooms, or a thing (a clock, heard wherever it is). Elsewhere the timer still goes off (its `do` and `end` happen), just unannounced. `say_again` starts after the first time it's heard. |
 | `noise: { at, loudness, faction }` | A noise that hunters within `loudness` rooms (of `faction` only, if given) come to investigate. `at` is a room, or a thing (the noise is wherever it is); without it, wherever the player is. See [Tricks players can find](#tricks-players-can-find). |
 
@@ -1821,6 +1897,11 @@ follows:
 | UNLOCK … / LOCK … | … WITH … | Unlocks or locks it, with the right key. |
 | WEAR … / TAKE OFF … | PUT ON …, REMOVE … | Puts clothing on or takes it off. |
 | EAT … | | Eats something edible. |
+| READ … | | What's written on it (its `text`), or a look at it. |
+| FILL … FROM … | FILL … WITH …, DIP … IN … | Fills something that holds a liquid. |
+| POUR OUT … | POUR … INTO …, POUR … ON …, EMPTY … | Pours a liquid out, into something, or on a fire. |
+| TYPE 4512 | ENTER 4512 ON …, DIAL …, OPEN … WITH 4512 | Enters a code. |
+| LISTEN / SMELL | LISTEN TO …, SMELL … | What can be heard or smelt here, and from next door. |
 | DRINK … | DRINK FROM …, SIP … | Drinks something `drinkable`. A drink you carry is used up; a fountain isn't. |
 | CLIMB … | CLIMB UP …, CLIMB DOWN …, SCALE … | Goes up or down a way that goes `via` it, or climbs onto something you can stand on. |
 | WAKE … | WAKE UP …, ROUSE … | Wakes someone who's asleep. |

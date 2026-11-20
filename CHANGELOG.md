@@ -6,6 +6,24 @@ behave will be called out here.
 
 ## Unreleased
 
+- How things behave, with no scripts needed:
+  - Flames: `needs_flame` lights (candles) light only from something
+    burning; LIGHT THE CANDLE WITH THE MATCHES strikes the match first.
+  - Fuel: `fuel` lights burn down, flicker, and go out, or are gone with
+    `burns_away` (matches).
+  - Liquids: `holds_liquid` and `liquid: water`; FILL, POUR, DRINK, and
+    POUR THE WATER ON THE FIRE.
+  - Wear: `uses` and `breaks`.
+  - Codes: `code: 4512` on a lockable thing; TYPE 4512.
+  - Writing: `text`, for READ.
+  - Sounds and smells: `sound`, `smell`; LISTEN and SMELL reach next door.
+  - Weather: a `weather:` section, `outdoors` rooms, `game.weather` and
+    `set_weather`.
+  - Timers can go off by `chance: 10%`.
+  - Companions are known in the dark, and one that sees in the dark can
+    fetch what the player can't see.
+- READ is now its own verb (it was a synonym for EXAMINE); LISTEN and SMELL
+  are built in. Games' handlers for them still come first.
 - Scripts can light and darken rooms: `world.cellar.dark = false`. When
   the light changes from a script or timer (or a lamp running dry), the
   room is described at once, or the darkness is. Scenery that's only a

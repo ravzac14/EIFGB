@@ -183,12 +183,6 @@ characters:
 # need to be listed here.
 
 verbs:
-  fill:
-    patterns:
-      - "fill {target} with {tool}"
-      - "pour {tool} into {target}"
-      - "refuel {target} with {tool}"
-    default: "You can't fill that."
   tune:
     patterns: ["tune {target}", "tune {target} to {text}"]
     default: "There's nothing to tune."

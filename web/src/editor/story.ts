@@ -2,6 +2,7 @@
 // conversations (choices), custom verbs, variables and script files.
 
 import { EVENTS } from "./model.ts";
+import { weatherSection } from "./world-ui.ts";
 import { boolField, button, check, el, field, help, numField, select, type InspectorContext } from "./ui.ts";
 
 // ------------------------------------------------------------ scripts
@@ -315,6 +316,9 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
   // Aliases.
   group("Words", ...aliasesSection(ctx));
 
+  // Weather.
+  group("Weather", ...weatherSection(ctx));
+
   // Script files.
   const files = m.list(["scripts"]);
   const fileName = el("input", { type: "text", placeholder: "helpers", ariaLabel: "New script file's name" }) as HTMLInputElement;
@@ -578,6 +582,10 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
       help: "Optional. Leave it empty to say the same thing every time.",
     }),
     ...heardIn(ctx, p),
+    ...field("Chance each time it's due (%)", String(m.get([...p, "chance"]) ?? "").replace(/%$/, ""), (v) => {
+      const n = Number.parseInt(v, 10);
+      ctx.change((x) => x.set([...p, "chance"], Number.isFinite(n) && n >= 0 && n <= 100 && n !== 100 ? `${n}%` : undefined), { coalesce: `${id}.chance`, redraw: false });
+    }, { placeholder: "100", help: "Something that might happen any turn: every 1 turn, with a chance of 10%. Empty: it always goes off." }),
     el("label", { textContent: "Then ends the game with" }),
     select([["", "(nothing: the game goes on)"], ...endings.map((e): [string, string] => [e, e.replace(/_/g, " ")])], str("end"), (v) => ctx.change((x) => x.set([...p, "end"], v || undefined)), "Ending"),
     el(

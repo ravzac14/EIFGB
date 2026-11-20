@@ -77,6 +77,11 @@ unknown section or field is an error, not ignored, so a typo is caught.
   rooms, and an exit `through:` it. The way back is added automatically.
 - **Pictures:** `picture: { file: pictures/hall.jpg, alt: "What it shows" }`
   on a room, object or character. Always write `alt`, with any clue in it.
+- **Behaviour without scripts:** `needs_flame`, `fuel`, `burns_away` on
+  light sources; `holds_liquid`/`full_of` and `liquid: water` for liquids;
+  `uses`/`breaks`; `code` on lockable things; `text` for READ; `sound` and
+  `smell`; `outdoors` rooms with a top-level `weather:`. Timers take
+  `chance: 10%`.
 - **Aliases:** a top-level `aliases:` map gives the game's own words for
   words it knows (`using: with`, `port: west`). Don't add verbs this way.
 - **Hidden things:** `state: { hidden: true }` with `revealed_by: search

@@ -50,6 +50,12 @@ pub struct GameState {
     /// Timers that have gone off at least once (for `say_again`).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fired: BTreeSet<String>,
+    /// The weather now (None: the story's `start`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weather: Option<String>,
+    /// The action when the weather next turns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weather_due: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -106,6 +112,8 @@ impl GameState {
             came_from: None,
             located: BTreeMap::new(),
             fired: BTreeSet::new(),
+            weather: None,
+            weather_due: None,
         }
     }
 }

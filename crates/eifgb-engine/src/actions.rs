@@ -18,7 +18,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// [`World::door_blocked`]: crate::World::door_blocked
 const BUILTIN_STATE: &[&str] = &[
     "open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with", "asleep",
-    "sees_in_dark",
+    "sees_in_dark", "fuel", "uses", "liquid", "dark",
 ];
 
 /// One thing the automatic state descriptions can say.
@@ -86,7 +86,26 @@ impl<H: ScriptHost> Game<H> {
                 true
             }
             (A::Use, Some(t)) => self.use_action(t, cmd.tool, ctx),
+            (A::Drink, Some(t)) if self.world.def(t).holds_liquid => self.drink_from(t, ctx),
+            (A::Drink, Some(t)) if self.world.def(t).liquid_source.is_some() => {
+                self.msg("drink.from", ctx);
+                true
+            }
             (A::Drink, Some(t)) => self.drink(t, ctx),
+            (A::Read, Some(t)) => match self.read(t, ctx) {
+                Some(ok) => ok,
+                None => self.examine(t),
+            },
+            (A::Listen, Some(t)) => self.sense(t, false, ctx),
+            (A::Listen, None) => self.sense_around(false, ctx),
+            (A::Smell, Some(t)) => self.sense(t, true, ctx),
+            (A::Smell, None) => self.sense_around(true, ctx),
+            (A::Fill, Some(t)) => self.fill(t, cmd.tool, ctx),
+            (A::Pour, Some(t)) => self.pour(t, cmd.tool, ctx),
+            (A::EnterCode, t) => {
+                let text = cmd.text.clone().unwrap_or_default();
+                self.enter_code(t, &text, ctx)
+            }
             (A::Climb, Some(t)) => self.climb(t, ctx),
             (A::Wake, Some(t)) => self.wake_action(t, ctx),
             (A::FeelAround, _) => self.feel_around(ctx),
@@ -94,6 +113,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Go, _) => self.go(cmd, ctx),
             (A::Enter, Some(t)) => self.enter(t, ctx),
             (A::GetOut, t) => self.get_out(t),
+            (A::Empty, Some(t)) if self.world.def(t).holds_liquid => self.pour(t, cmd.tool, ctx),
             (A::Empty, Some(t)) => self.empty(t, cmd.tool, ctx),
             (A::Examine, Some(t)) => self.examine(t),
             (A::Take, Some(t)) => self.take(t, cmd.tool, ctx),
@@ -144,6 +164,13 @@ impl<H: ScriptHost> Game<H> {
             (A::Order, Some(t)) => self.order_action(t, cmd.text.as_deref(), ctx),
             (A::Brandish, Some(t)) => self.brandish_action(t, cmd.tool, ctx),
             (A::Burn, Some(t)) => self.burn_action(t, cmd.tool, ctx),
+            (A::Douse, Some(t)) if cmd.tool.is_some_and(|w| self.world.def(w).holds_liquid) => match cmd.tool {
+                Some(w) if self.liquid_in(w).is_some() => self.douse_with_liquid(t, w, ctx),
+                _ => {
+                    self.msg("pour.empty", &ctx.clone().entity("target", cmd.tool.unwrap_or(t)));
+                    false
+                }
+            },
             (A::Douse, Some(t)) => self.douse(t, cmd.tool, ctx),
             (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
             (A::SetTrap, Some(t)) => self.set_trap(t, ctx),
@@ -246,6 +273,8 @@ impl<H: ScriptHost> Game<H> {
         if let Some(d) = &description {
             self.render_line(LineKind::Text, d, &Ctx::new().this(here));
         }
+        // Outdoors: the weather.
+        self.describe_weather();
         let described = self.out.lines.len() > before;
         // Things that won't be listed (scenery) still get their state
         // mentioned, unless the room description already covers it.
@@ -679,6 +708,9 @@ impl<H: ScriptHost> Game<H> {
         if w.flag(id, "worn") {
             notes.push(StateNote::Builtin("worn"));
         }
+        if w.def(id).holds_liquid && matches!(w.get(id, "liquid"), Some(Value::Str(s)) if !s.is_empty()) {
+            notes.push(StateNote::Builtin("full"));
+        }
         if w.is_asleep(id) && !w.is_dead(id) {
             notes.push(StateNote::Builtin("asleep"));
         }
@@ -730,7 +762,17 @@ impl<H: ScriptHost> Game<H> {
         }
         for (field, value) in &w.state.entities[id.index()].state {
             if BUILTIN_STATE.contains(&field.as_str()) || field.starts_with('_') || (is_door && field == "blocked") {
-                continue;
+                // A game's own `fuel`, `uses` or `liquid` field is described like any other.
+                let builtin = match field.as_str() {
+                    "fuel" => w.def(id).fuel.is_some(),
+                    "uses" => w.def(id).uses.is_some(),
+                    "liquid" => w.def(id).holds_liquid,
+                    "dark" => w.def(id).kind == EntityKind::Room,
+                    _ => true,
+                };
+                if builtin {
+                    continue;
+                }
             }
             match value {
                 Value::Bool(on) => {
@@ -772,6 +814,14 @@ impl<H: ScriptHost> Game<H> {
         self.state_notes(id)
             .into_iter()
             .filter_map(|n| match n {
+                // "full of water": the liquid's name follows.
+                StateNote::Builtin("full") => {
+                    let full = self.world.story().messages.get("state.tag.full").and_then(Text::as_literal)?;
+                    match self.world.get(id, "liquid") {
+                        Some(Value::Str(l)) => Some(format!("{full} {l}")),
+                        _ => None,
+                    }
+                }
                 StateNote::Builtin(t) => {
                     self.world.story().messages.get(&format!("state.tag.{t}")).and_then(Text::as_literal)
                 }
@@ -926,11 +976,25 @@ impl<H: ScriptHost> Game<H> {
             self.msg(if on { "light.already" } else { "extinguish.not_lit" }, ctx);
             return false;
         }
+        if on && self.fuel_left(t) == Some(0) {
+            self.msg("fuel.empty", ctx);
+            return false;
+        }
+        // A candle needs a flame: the tool, or something burning in hand.
+        let flame = if on && self.world.def(t).needs_flame {
+            match self.flame_for(t, ctx.arg_entity("tool"), ctx) {
+                Ok(f) => Some(f),
+                Err(()) => return false,
+            }
+        } else {
+            None
+        };
         let was_dark = self.world.in_darkness();
-        // Switch-style lights keep `on`; everything else is `lit`.
-        let field = if self.world.get(t, "on").is_some() { "on" } else { "lit" };
-        self.world.set(t, field, Value::Bool(on));
-        self.msg(if on { "light.done" } else { "extinguish.done" }, ctx);
+        self.set_lit(t, on);
+        match flame {
+            Some(f) => self.msg("light.with", &ctx.clone().entity("tool", f)),
+            None => self.msg(if on { "light.done" } else { "extinguish.done" }, ctx),
+        }
         if was_dark != self.world.in_darkness() {
             self.look();
         }

@@ -50,29 +50,6 @@ Everything from the first list has now been built:
 - **Commands that remember:** TAKE ALL THEN GO NORTH works; extend it to
   AGAIN with a new object ("again, with the iron key").
 
-## The world
-
-- **A chance each turn:** a timer `chance: 10%` for things that might
-  happen any turn (a bat flies past), alongside ranges.
-- **Lights that need a flame:** LIGHT THE CANDLE WITH THE LIGHTER only
-  works if the lighter is burning, and matches burn out after a few turns.
-- **Fuel and burning out:** lamps with `fuel` that run down a turn at a
-  time, with a warning before they go out.
-- **Weather and seasons:** a game-wide `weather` that timers change, read
-  by descriptions (`${if weather == "rain"}`) and outdoor rooms.
-- **Sounds and smells from nearby rooms:** LISTEN and SMELL pick up what's
-  next door ("You hear water dripping to the north").
-- **Liquids:** filling a bottle from a stream, pouring water on a fire,
-  and containers that only hold liquids.
-- **Things that wear out or break:** a rope that frays, a key that snaps
-  in the lock, with `uses: 3`.
-- **Followers in the dark:** a dog that leads the way through dark rooms,
-  or a character carrying a lamp who lights the room they're in.
-- **Locked by code:** a safe or keypad that opens with a number (OPEN SAFE
-  WITH 4512, TYPE 4512), with the code in a clue, maybe a picture.
-- **Reading:** a `text` on books and notes that READ shows, separate from
-  what EXAMINE says about the thing itself.
-
 ## The editor
 
 - **A picture library:** reuse a picture across rooms and things, and see

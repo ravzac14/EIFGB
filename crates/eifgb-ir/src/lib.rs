@@ -91,6 +91,33 @@ pub struct Story {
     /// The time of day, if the game keeps one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clock: Option<Clock>,
+    /// The weather, if the game has some: outdoor rooms describe it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weather: Option<Weather>,
+}
+
+/// The weather: kinds, the one it starts as, and how often it changes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Weather {
+    pub start: String,
+    pub kinds: Vec<WeatherKind>,
+    /// Changes to another kind, at random, every this many actions (and up
+    /// to `spread` more). None: only scripts change it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub every: Option<u32>,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub spread: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WeatherKind {
+    pub key: String,
+    /// Added to outdoor rooms' descriptions: "Rain drums on the leaves."
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub describe: Option<Text>,
+    /// Said, outdoors, when the weather turns to this: "It starts to rain."
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub begins: Option<Text>,
 }
 
 /// Something the player is trying to do, listed by JOURNAL. It's added
@@ -285,6 +312,9 @@ pub struct Timer {
     /// Said instead of `say` every time after the first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub say_again: Option<Text>,
+    /// The chance, in percent, that it goes off when it's due. None: always.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chance: Option<u32>,
     /// Rooms (or things, heard in whatever room they're in) where `say`
     /// is shown. Empty: everywhere.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -508,6 +538,48 @@ pub struct Entity {
     /// seen it first (a light switch by the door, a candle by the bed).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub findable_in_dark: bool,
+    /// Light sources: lit only from a flame (a candle, a torch), not on
+    /// their own (a lighter, a match, a torch with a switch).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub needs_flame: bool,
+    /// Light sources: how many actions it burns for; the `fuel` state
+    /// counts down while it's lit. None: for ever.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel: Option<u32>,
+    /// Light sources: gone when its fuel runs out (a match), rather than out.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub burns_away: bool,
+    /// Said when its fuel runs out, instead of the standard message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spent: Option<Text>,
+    /// What LISTEN hears of it, here or (for a room) from next door.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound: Option<Text>,
+    /// What SMELL smells of it, here or (for a room) from next door.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smell: Option<Text>,
+    /// Where a liquid comes from (a stream, a well, a barrel): its name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liquid_source: Option<String>,
+    /// Can be filled with a liquid (a bottle, a bucket); the `liquid` state
+    /// says with what.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub holds_liquid: bool,
+    /// How many times it can be used before it breaks (the `uses` state).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uses: Option<u32>,
+    /// Said when it breaks, instead of the standard message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breaks: Option<Text>,
+    /// Locked with a code (a safe, a keypad door): what to type to unlock it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    /// What's written on it, for READ: a book, a note, a sign.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub writing: Option<Text>,
+    /// Rooms: out of doors, where the weather is.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub outdoors: bool,
     /// What its tracks look like ("paw prints"). Characters only; None means
     /// its faction's, or "footprints".
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1236,6 +1308,18 @@ pub enum BuiltinAction {
     FeelAround,
     /// Feel around for something, and take it: FEEL FOR THE KEY.
     FeelFor,
+    /// READ a book, a note, a sign: its `writing`.
+    Read,
+    /// LISTEN: sounds here and next door.
+    Listen,
+    /// SMELL: smells here and next door.
+    Smell,
+    /// FILL a bottle from a stream.
+    Fill,
+    /// POUR what's in something out, or on something.
+    Pour,
+    /// TYPE 4512 (on the keypad): a code.
+    EnterCode,
 }
 
 impl BuiltinAction {

@@ -377,6 +377,7 @@ impl<H: ScriptHost> Game<H> {
                 }
                 Effect::StartGoal(k) => self.start_goal(&k),
                 Effect::CompleteGoal(k) => self.complete_goal(&k),
+                Effect::Weather(k) => self.set_weather(&k),
                 Effect::Npc(event) => self.narrate(&event),
             }
         }
@@ -702,7 +703,8 @@ impl<H: ScriptHost> Game<H> {
         let pointless_attack = verb.action == VerbAction::Builtin(BuiltinAction::Attack)
             && target.is_some_and(|t| self.world.health(t).is_none() && !self.world.is_invincible(t));
         let quiet = !reveals.is_empty()
-            && (pointless_attack || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search)));
+            && (pointless_attack
+                || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search | BuiltinAction::Smell | BuiltinAction::Listen | BuiltinAction::Read)));
 
         let before_action = self.out.lines.len();
         let ok = match self.handlers(target, here, Phase::On, &verb.key).into_iter().next() {
@@ -720,6 +722,24 @@ impl<H: ScriptHost> Game<H> {
             },
         };
 
+        // A tool that wears out: a use for each time it's used.
+        if ok {
+            let tool = match verb.action {
+                VerbAction::Builtin(BuiltinAction::Unlock | BuiltinAction::Lock) => {
+                    cmd.tool.or_else(|| target.and_then(|t| self.world.def(t).unlocks_with).filter(|k| self.world.is_within(*k, PLAYER)))
+                }
+                VerbAction::Builtin(
+                    BuiltinAction::Light | BuiltinAction::Burn | BuiltinAction::Attack | BuiltinAction::Douse | BuiltinAction::Climb | BuiltinAction::Use,
+                )
+                => cmd.tool,
+                // A game's own verb, done by its handler: what it was done with, or to.
+                VerbAction::Script => cmd.tool.filter(|t| self.world.def(*t).uses.is_some()).or(target.filter(|t| self.world.def(*t).uses.is_some())),
+                _ => None,
+            };
+            if let Some(t) = tool {
+                self.wear_out(t);
+            }
+        }
         if let Some(t) = target {
             self.timer_rules(&verb.key, t);
         }
@@ -814,6 +834,8 @@ impl<H: ScriptHost> Game<H> {
         self.npc_turns();
         self.report_traps();
         self.fires();
+        self.burn_fuel();
+        self.weather_turn();
         if self.end_requested.is_some() {
             return;
         }
@@ -884,6 +906,12 @@ impl<H: ScriptHost> Game<H> {
                     let wait = timer_wait(&t, &mut self.world.state.rng);
                     self.world.state.timers.insert(t.key.clone(), now + wait);
                 }
+            }
+            // A chance: it may not go off this time.
+            if let Some(c) = t.chance
+                && self.world.state.rng.range(1, 100) > i64::from(c)
+            {
+                continue;
             }
             if let Some(w) = &t.when
                 && !self.run(w, &Ctx::new()).truthy()

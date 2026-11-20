@@ -1183,7 +1183,7 @@ verbs:
 #[test]
 fn custom_verbs_check_reach_too() {
     let src = format!(
-        "{CONTAINERS}  label: {{ name: label, in: case, traits: [scenery] }}\nverbs:\n  polish: {{ patterns: ['polish {{target}}'], default: \"It gleams.\" }}\n  read: {{ patterns: ['read {{target}}'], reach: false }}\n"
+        "{CONTAINERS}  label: {{ name: label, in: case, traits: [scenery] }}\nverbs:\n  polish: {{ patterns: ['polish {{target}}'], default: \"It gleams.\" }}\n  squint: {{ patterns: ['squint at {{target}}'], reach: false }}\n"
     )
     .replace("objects:\n", "objects:\n");
     // `verbs:` must come after `objects:` entries; CONTAINERS ends with objects, so append works.
@@ -1194,7 +1194,7 @@ fn custom_verbs_check_reach_too() {
     assert_says(&mut g, "kick jewel", "You can't reach the jewel: the glass case is closed.");
     assert_says(&mut g, "polish jewel", "You can't reach the jewel: the glass case is closed.");
     // Verbs marked `reach: false` work through glass, as does LISTEN.
-    assert_says(&mut g, "read label", "Nothing happens.");
+    assert_says(&mut g, "squint at label", "Nothing happens.");
     assert_says(&mut g, "listen to jewel", "You hear nothing unusual.");
     say(&mut g, "open case");
     assert_says(&mut g, "polish jewel", "It gleams.");
@@ -4461,4 +4461,168 @@ fn a_light_that_is_only_light_isnt_something_to_feel_for() {
     assert!(out.contains("You know where to feel for a brass key."), "{out}");
     assert!(!out.contains("lightning"), "{out}");
     assert!(!say(&mut g, "feel around").contains("lightning"));
+}
+
+// ------------------------------------------------------------ the world
+
+const WORLD: &str = "format: eifgb/0.1
+game: { id: w, title: W, version: '1', start: camp }
+weather:
+  start: clear
+  changes: 4-6
+  kinds:
+    clear: { describe: The sky is clear., begins: The clouds blow away. }
+    rain: { describe: Rain patters on the leaves., begins: It starts to rain. }
+rooms:
+  camp:
+    name: Camp
+    outdoors: true
+    description: A clearing by a stream.
+    sound: The stream babbles.
+    exits: { north: cave, east: shed }
+  cave:
+    name: Cave
+    dark: true
+    description: A low cave. Bats hang overhead.
+    sound: Bats squeak.
+    smell: A musty smell of bats.
+    exits: { south: camp }
+  shed:
+    name: Shed
+    description: A tool shed.
+    exits: { west: camp }
+objects:
+  stream: { name: stream, synonyms: [water], in: camp, traits: [scenery], liquid: water }
+  bottle: { name: glass bottle, in: camp, traits: [portable], holds_liquid: true }
+  matches: { name: box of matches, synonyms: [match, matches], in: camp, traits: [portable, light_source], fuel: 2, burns_away: true, spent: \"The match burns down to your fingers. Ouch.\" }
+  candle: { name: candle, in: camp, traits: [portable, light_source], needs_flame: true, fuel: 5 }
+  campfire: { name: campfire, synonyms: [fire], in: camp, traits: [scenery, light_source], state: { lit: true } }
+  rope: { name: old rope, in: camp, traits: [portable], uses: 2, breaks: The rope frays and snaps., on: { tie: 'say(\"You tie the rope to the tree, then untie it.\")' } }
+  tree: { name: tree, in: camp, traits: [scenery] }
+  safe: { name: safe, in: shed, traits: [container, openable, lockable, scenery], state: { locked: true }, code: 4512 }
+  gold: { name: gold bar, in: safe, traits: [portable] }
+  note: { name: note, in: shed, traits: [portable], description: A scrap of paper with writing on it., text: '\"The code is 4512.\"' }
+verbs:
+  tie: { patterns: [\"tie {target} to {tool}\"], default: \"You tie it.\" }
+";
+const COMPANIONS: &str = "format: eifgb/0.1
+game: { id: f, title: F, version: '1', start: camp }
+rooms:
+  camp: { name: Camp, description: A camp., exits: { north: cave } }
+  cave: { name: Cave, dark: true, description: A low cave., exits: { south: camp } }
+objects:
+  lamp: { name: lamp, in: guide, traits: [portable, light_source], state: { lit: true } }
+  bone: { name: bone, in: cave, traits: [portable] }
+characters:
+  guide: { name: guide, in: camp, behavior: follower }
+  dog: { name: dog, in: camp, behavior: follower, obeys: true, sees_in_dark: true }
+";
+
+fn world_game() -> Game<LuaHost> {
+    // Calm: the weather stays put, except in its own test.
+    let out = compile_str(&WORLD.replace("  changes: 4-6\n", ""));
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+#[test]
+fn candles_need_a_flame_and_lights_burn_out() {
+    let mut g = world_game();
+    say(&mut g, "take candle");
+    assert_says(&mut g, "light candle", "You'll need a flame to light the candle.");
+    say(&mut g, "take matches");
+    // The matches are struck first, then light the candle.
+    assert_eq!(say(&mut g, "light candle with matches"), "(first lighting the box of matches)\nYou light the candle with the box of matches.");
+    assert_says(&mut g, "wait", "The match burns down to your fingers. Ouch.");
+    let matches = g.world().story().entity_by_key("matches").unwrap();
+    assert_eq!(g.world().location(matches), None, "burnt away");
+    assert_says(&mut g, "wait", "The candle flickers. It won't last much longer.");
+    say(&mut g, "wait");
+    assert_says(&mut g, "wait", "The candle sputters and goes out.");
+    assert_says(&mut g, "light candle", "has nothing left to burn");
+}
+
+#[test]
+fn liquids_fill_pour_drink_and_douse() {
+    let mut g = world_game();
+    say(&mut g, "take bottle");
+    assert_says(&mut g, "fill bottle", "What do you want to fill the glass bottle with?");
+    assert_eq!(say(&mut g, "stream"), "You fill the glass bottle with water.");
+    assert_says(&mut g, "i", "a glass bottle (full of water)");
+    // "The water" is what's in the bottle, not the stream.
+    assert_eq!(say(&mut g, "pour water on fire"), "You pour the water over the campfire, and it hisses out.");
+    assert_says(&mut g, "x bottle", "nothing special");
+    say(&mut g, "fill bottle from stream");
+    assert_eq!(say(&mut g, "drink water"), "You drink the water.");
+    say(&mut g, "fill bottle with water");
+    assert_eq!(say(&mut g, "pour out the water"), "You pour the water out of the glass bottle.");
+    assert_says(&mut g, "pour bottle", "is empty");
+}
+
+#[test]
+fn things_wear_out() {
+    let mut g = world_game();
+    say(&mut g, "take rope");
+    assert_eq!(say(&mut g, "tie rope to tree"), "You tie the rope to the tree, then untie it.");
+    assert_eq!(say(&mut g, "tie rope to tree"), "You tie the rope to the tree, then untie it.\nThe rope frays and snaps.");
+    assert!(!say(&mut g, "i").contains("rope"), "snapped");
+}
+
+#[test]
+fn codes_reading_and_senses() {
+    let mut g = world_game();
+    assert_eq!(say(&mut g, "listen"), "The stream babbles.\nFrom the north: Bats squeak.");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "read note"), "\"The code is 4512.\"");
+    assert_eq!(say(&mut g, "x note"), "A scrap of paper with writing on it.");
+    assert_eq!(say(&mut g, "type 1111"), "You enter 1111. Nothing happens.");
+    assert_eq!(say(&mut g, "open safe with 4512"), "You enter 4512. The safe clicks open.");
+    assert_says(&mut g, "open safe", "gold bar");
+    say(&mut g, "w");
+    say(&mut g, "n");
+    assert_eq!(say(&mut g, "smell"), "A musty smell of bats.");
+    assert_says(&mut g, "read note", "It's too dark to see.");
+}
+
+#[test]
+fn the_weather_changes_and_outdoor_rooms_say_so() {
+    let mut g = game(compile_str(WORLD).story.unwrap());
+    assert_says(&mut g, "look", "A clearing by a stream. The sky is clear.");
+    let mut said = Vec::new();
+    for _ in 0..12 {
+        let out = say(&mut g, "wait");
+        if out.contains("It starts to rain.") || out.contains("The clouds blow away.") {
+            said.push(out);
+        }
+    }
+    assert!(said.len() >= 2, "changes every 4 to 6 turns: {said:?}");
+    // Scripts read and set it.
+    let story = compile_str(&WORLD.replace("    sound: The stream babbles.", "    sound: The stream babbles.\n    on: { enter: 'set_weather(\"rain\")' }")).story.unwrap();
+    let mut h = game(story);
+    say(&mut h, "e");
+    assert_says(&mut h, "w", "It starts to rain.");
+    assert_says(&mut h, "look", "Rain patters on the leaves.");
+}
+
+#[test]
+fn a_timer_can_go_off_by_chance() {
+    let src = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\ntimers:\n  bat:\n    every: 1\n    chance: 25%\n    say: A bat flits past.\n";
+    let mut g = game(compile_str(src).story.unwrap());
+    let n = (0..200).filter(|_| g.input("wait").text().contains("bat")).count();
+    assert!((25..=75).contains(&n), "about a quarter of 200: {n}");
+    assert!(compile_str(&src.replace("25%", "150%")).story.is_none());
+}
+
+#[test]
+fn companions_in_the_dark() {
+    let mut g = game(compile_str(COMPANIONS).story.unwrap());
+    // A guide carrying a lamp lights the room they're in.
+    assert_says(&mut g, "n", "A low cave.");
+    let out = compile_str(&COMPANIONS.replace("  guide: { name: guide, in: camp, behavior: follower }\n", "").replace("in: guide", "in: camp"));
+    let mut h = game(out.story.unwrap());
+    // The dog, known in the dark, sees what the player can't.
+    assert_says(&mut h, "n", "The dog arrives.");
+    assert_says(&mut h, "dog, fetch bone", "The dog goes to fetch the bone.");
+    assert_says(&mut h, "wait", "The dog drops the bone at your feet.");
+    assert_eq!(say(&mut h, "take bone"), "Taken.");
 }

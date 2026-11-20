@@ -191,7 +191,7 @@ pub fn puzzles(story: &Story) -> Puzzles {
                     held_by.get_or_insert(h);
                 } else if flag(h, "locked") {
                     let key = keys_for(h);
-                    if !(key.is_some_and(|k| present.contains(&k)) || mentioned(h)) {
+                    if !(key.is_some_and(|k| present.contains(&k)) || mentioned(h) || def(h).code.is_some()) {
                         ok = false;
                     }
                     shut_in.get_or_insert(h);
@@ -221,7 +221,11 @@ pub fn puzzles(story: &Story) -> Puzzles {
             } else if hidden {
                 steps.push(Step { kind: "find", id: def(i).key.clone(), text: format!("{}: {}.", by_script(story, &live_code, &def(i).key), a(&name(i))) });
             } else if let Some(c) = shut_in {
-                let how = keys_for(c).map_or("by a script".to_string(), |k| format!("with {}", the(&name(k))));
+                let how = match (keys_for(c), &def(c).code) {
+                    (Some(k), _) => format!("with {}", the(&name(k))),
+                    (None, Some(code)) => format!("with the code {code}"),
+                    (None, None) => "by a script".to_string(),
+                };
                 steps.push(Step { kind: "find", id: def(i).key.clone(), text: format!("Unlock {} {how}: {}.", the(&name(c)), a(&name(i))) });
             } else if let Some(h) = held_by.filter(|_| def(i).kind != EntityKind::Character) {
                 steps.push(Step { kind: "find", id: def(i).key.clone(), text: format!("Get {} from {}.", the(&name(i)), the(&name(h))) });
@@ -245,6 +249,7 @@ pub fn puzzles(story: &Story) -> Puzzles {
                     if locked {
                         match keys_for(d) {
                             Some(k) if present.contains(&k) => how = Some(format!("Unlock {} with {}", the(&name(d)), the(&name(k)))),
+                            _ if def(d).code.is_some() => how = Some(format!("Enter the code {} on {}", def(d).code.clone().unwrap_or_default(), the(&name(d)))),
                             _ if mentioned(d) => how = Some(format!("A script opens {}", the(&name(d)))),
                             _ => continue,
                         }
@@ -362,7 +367,7 @@ pub fn puzzles(story: &Story) -> Puzzles {
             problems.push(PuzzleProblem { id: e.key.clone(), what: "thing", message: format!("{} opens nothing: nothing has `unlocks_with: {}`.", cap(&the(&e.name)), e.key) });
         }
         // Locked, with no key and no script.
-        if flag(i, "locked") && e.unlocks_with.is_none() && !anywhere(i) {
+        if flag(i, "locked") && e.unlocks_with.is_none() && e.code.is_none() && !anywhere(i) {
             problems.push(PuzzleProblem { id: e.key.clone(), what: "thing", message: format!("{} is locked, and there's no key for it.", cap(&the(&e.name))) });
         }
     }

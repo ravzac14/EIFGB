@@ -67,7 +67,7 @@ fn lighthouse_compiles_without_errors_or_warnings() {
     assert!(south.to.is_none() && south.blocked.is_some());
 
     // Author verbs come first, then the standard library's.
-    assert_eq!(story.verbs[0].key, "fill");
+    assert_eq!(story.verbs[0].key, "tune");
     assert_eq!(story.verbs[0].origin, VerbOrigin::Author);
     assert!(story.verbs.iter().any(|v| v.key == "take" && v.origin == VerbOrigin::Stdlib));
 
@@ -298,9 +298,9 @@ fn door_hidden_sides_are_checked() {
 #[test]
 fn author_verbs_win_over_stdlib_synonyms() {
     let story = with("").story.unwrap();
-    assert_eq!(story.lexicon.phrases.get("read").map(String::as_str), Some("examine"));
-    let story = with("verbs:\n  read: { patterns: ['read {target}'] }\n").story.unwrap();
-    assert!(!story.lexicon.phrases.contains_key("read"), "the author's READ replaces the synonym");
+    assert_eq!(story.lexicon.phrases.get("study").map(String::as_str), Some("examine"));
+    let story = with("verbs:\n  study: { patterns: ['study {target}'] }\n").story.unwrap();
+    assert!(!story.lexicon.phrases.contains_key("study"), "the author's STUDY replaces the synonym");
     assert!(story.lexicon.phrases.contains_key("grab"), "other synonyms stay");
 }
 
@@ -633,4 +633,26 @@ objects:
     let story = ok.story.unwrap();
     let hall = story.entity(story.entity_by_key("hall").unwrap());
     assert_eq!(hall.picture, Some(Picture { file: "pictures/hall.jpg".into(), alt: Some("A dusty hall.".into()) }));
+}
+
+#[test]
+fn world_fields_are_checked() {
+    let warned = |extra: &str, needle: &str| {
+        let out = with(extra);
+        assert!(warnings(&out).iter().any(|w| w.contains(needle)), "{needle}: {:#?}", out.diagnostics);
+    };
+    warned("objects:\n  rock: { name: rock, in: hall, fuel: 3 }\n", "objects.rock.fuel: only matters for a light_source");
+    warned("objects:\n  box: { name: box, in: hall, code: 12 }\n", "objects.box.code: a code unlocks something lockable");
+    warned("objects:\n  m: { name: match, in: hall, traits: [light_source], burns_away: true }\n", "does nothing without 'fuel'");
+    assert_error(&with("objects:\n  cup: { name: cup, in: hall, full_of: tea }\n"), "only something that `holds_liquid` can start full");
+    assert_error(&with("objects:\n  rope: { name: rope, in: hall, uses: 0 }\n"), "uses must be at least 1");
+    assert_error(&with("weather: { start: snow, kinds: { rain: {}, clear: {} } }\n"), "weather.start: no kind of weather called 'snow'");
+    assert_error(&with("timers:\n  t: { every: 1, chance: lots, say: x }\n"), "a whole percentage");
+    // A safe with a code needs no key.
+    let safe = with("objects:\n  safe: { name: safe, in: hall, traits: [container, openable, lockable], state: { locked: true }, code: \"0042\" }\n");
+    assert!(warnings(&safe).is_empty(), "{:#?}", safe.diagnostics);
+    let story = safe.story.unwrap();
+    assert_eq!(story.entity(story.entity_by_key("safe").unwrap()).code.as_deref(), Some("0042"));
+    let w = with("weather: { start: clear, changes: 10-20, kinds: { clear: { describe: Clear. }, rain: {} } }\n").story.unwrap().weather.unwrap();
+    assert_eq!((w.start.as_str(), w.every, w.spread, w.kinds.len()), ("clear", Some(10), 10, 2));
 }

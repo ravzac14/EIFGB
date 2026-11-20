@@ -371,7 +371,7 @@ impl World {
         let here = self.here();
         self.ids()
             .filter(|&t| t != PLAYER && self.def(t).kind != EntityKind::Room && !self.is_hidden(t) && !self.is_within(t, PLAYER))
-            .filter(|&t| self.state.located.get(&t) == Some(&here) || self.def(t).findable_in_dark)
+            .filter(|&t| self.state.located.get(&t) == Some(&here) || self.def(t).findable_in_dark || self.companion(t))
             .filter(|&t| self.touchable_here(t))
             .collect()
     }

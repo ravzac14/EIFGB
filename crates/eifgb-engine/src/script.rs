@@ -53,6 +53,14 @@ impl Ctx {
         self.value(name, Value::Str(s.into()))
     }
 
+    /// An entity argument, if there is one by that name.
+    pub fn arg_entity(&self, name: &str) -> Option<EntityId> {
+        self.args.iter().find_map(|(k, a)| match a {
+            Arg::Entity(e) if k == name => Some(*e),
+            _ => None,
+        })
+    }
+
     /// A text argument, if there is one by that name.
     pub fn text_arg(&self, name: &str) -> Option<&str> {
         self.args.iter().find_map(|(k, a)| match a {
@@ -116,6 +124,8 @@ pub enum Effect {
     CompleteGoal(String),
     /// A character moved or attacked; the engine describes it if the player can see.
     Npc(crate::npc::NpcEvent),
+    /// Change the weather to this kind.
+    Weather(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

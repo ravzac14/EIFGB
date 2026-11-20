@@ -210,6 +210,7 @@ function env.open_choice(key) H.open_choice(key) end
 function env.start_timer(key) H.start_timer(key) end
 function env.stop_timer(key) H.stop_timer(key) end
 function env.start_goal(key) H.start_goal(key) end
+function env.set_weather(key) H.set_weather(key) end
 function env.complete_goal(key) H.complete_goal(key) end
 -- Moves the clock on: pass_time(30), or set_clock("6:00") for the next 6:00.
 function env.pass_time(minutes)

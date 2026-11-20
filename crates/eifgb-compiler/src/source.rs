@@ -51,6 +51,8 @@ pub struct Source {
     pub goals: IndexMap<String, Goal>,
     #[serde(default)]
     pub clock: Option<Clock>,
+    #[serde(default)]
+    pub weather: Option<Weather>,
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, String>,
@@ -220,6 +222,47 @@ pub struct Room {
     pub on: IndexMap<String, String>,
     #[serde(default)]
     pub picture: Option<PictureSrc>,
+    #[serde(default)]
+    pub sound: Option<String>,
+    #[serde(default)]
+    pub smell: Option<String>,
+    #[serde(default)]
+    pub outdoors: bool,
+}
+
+/// A code, written as a number or as text: `code: 4512`, `code: "0042"`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum CodeText {
+    Number(u64),
+    Text(String),
+}
+
+/// `weather:` the kinds there are, the first, and how often it changes.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Weather {
+    pub start: String,
+    pub kinds: IndexMap<String, WeatherKind>,
+    #[serde(default)]
+    pub changes: Option<Actions>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WeatherKind {
+    #[serde(default)]
+    pub describe: Option<String>,
+    #[serde(default)]
+    pub begins: Option<String>,
+}
+
+/// A chance in percent: `25`, or `"25%"`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum Chance {
+    Number(f64),
+    Text(String),
 }
 
 /// A number of actions: `5`, or a range to pick from at random, `5-10`
@@ -388,6 +431,35 @@ pub struct Thing {
     /// Objects: found by feel in the dark, even if never seen.
     #[serde(default)]
     pub findable_in_dark: bool,
+    #[serde(default)]
+    pub needs_flame: bool,
+    #[serde(default)]
+    pub fuel: Option<u32>,
+    #[serde(default)]
+    pub burns_away: bool,
+    #[serde(default)]
+    pub spent: Option<String>,
+    #[serde(default)]
+    pub sound: Option<String>,
+    #[serde(default)]
+    pub smell: Option<String>,
+    /// A liquid comes from it: `liquid: water`.
+    #[serde(default)]
+    pub liquid: Option<String>,
+    #[serde(default)]
+    pub holds_liquid: bool,
+    /// Starts filled with this liquid.
+    #[serde(default)]
+    pub full_of: Option<String>,
+    #[serde(default)]
+    pub uses: Option<u32>,
+    #[serde(default)]
+    pub breaks: Option<String>,
+    #[serde(default)]
+    pub code: Option<CodeText>,
+    /// What's written on it, for READ.
+    #[serde(default)]
+    pub text: Option<String>,
     /// What its tracks look like ("paw prints").
     #[serde(default)]
     pub prints: Option<String>,
@@ -630,6 +702,9 @@ pub struct Timer {
     /// Said instead of `say` from the second time it goes off.
     #[serde(default)]
     pub say_again: Option<String>,
+    /// The chance it goes off when due: `25%` or `25`.
+    #[serde(default)]
+    pub chance: Option<Chance>,
     /// Where it's heard: a room, or a thing (heard wherever it is), or a
     /// list. Anywhere else it goes off unannounced.
     #[serde(default)]

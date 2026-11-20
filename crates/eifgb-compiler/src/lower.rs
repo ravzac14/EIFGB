@@ -118,6 +118,19 @@ impl<'a> Lowerer<'a> {
             nameable: false,
             high: false,
             findable_in_dark: false,
+            needs_flame: false,
+            fuel: None,
+            burns_away: false,
+            spent: None,
+            liquid_source: None,
+            holds_liquid: false,
+            uses: None,
+            breaks: None,
+            code: None,
+            writing: None,
+            sound: None,
+            smell: None,
+            outdoors: false,
             prints: None,
             leaves_tracks: true,
             diggable: false,
@@ -217,6 +230,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         let clock = s.clock.as_ref().and_then(|c| self.lower_clock(c));
+        let weather = s.weather.as_ref().and_then(|w| self.lower_weather(w));
         let timers = self.lower_timers(&s.timers, &endings, clock.as_ref());
         for t in &timers {
             if let Some(f) = t.noise.as_ref().and_then(|n| n.faction.as_ref())
@@ -268,6 +282,7 @@ impl<'a> Lowerer<'a> {
             hints,
             goals,
             clock,
+            weather,
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -599,6 +614,19 @@ impl<'a> Lowerer<'a> {
             nameable: false,
             high: false,
             findable_in_dark: false,
+            needs_flame: false,
+            fuel: None,
+            burns_away: false,
+            spent: None,
+            liquid_source: None,
+            holds_liquid: false,
+            uses: None,
+            breaks: None,
+            code: None,
+            writing: None,
+            sound: self.text_opt(r.sound.as_deref(), &format!("{path}.sound")),
+            smell: self.text_opt(r.smell.as_deref(), &format!("{path}.smell")),
+            outdoors: r.outdoors,
             prints: None,
             leaves_tracks: !r.trackless,
             diggable: r.diggable,
@@ -766,7 +794,7 @@ impl<'a> Lowerer<'a> {
             Some(id)
         });
         // Only when no key was named at all: a misspelled key already has its own error.
-        if has(Trait::Lockable) && t.unlocks_with.is_none() && state.get("locked") == Some(&Value::Bool(true)) {
+        if has(Trait::Lockable) && t.unlocks_with.is_none() && t.code.is_none() && state.get("locked") == Some(&Value::Bool(true)) {
             self.d.warn(&path, "starts locked but has no 'unlocks_with', so only a script can unlock it");
         }
 
@@ -843,6 +871,45 @@ impl<'a> Lowerer<'a> {
         }
         let hostile = npc.as_ref().is_some_and(|n| n.behavior.hostile());
         let damage = t.damage.or(if hostile { Some(1) } else { None });
+        // Light, fuel, liquids, wear, codes.
+        let light = traits.contains(&Trait::LightSource);
+        for (field, set) in [("needs_flame", t.needs_flame), ("fuel", t.fuel.is_some()), ("burns_away", t.burns_away), ("spent", t.spent.is_some())] {
+            if set && !light {
+                self.d.warn(format!("{path}.{field}"), "only matters for a light_source");
+            }
+        }
+        if t.fuel == Some(0) {
+            self.d.error(format!("{path}.fuel"), "fuel must be at least 1; to start it empty, set `state: { fuel: 0 }`");
+        }
+        if t.burns_away && t.fuel.is_none() {
+            self.d.warn(format!("{path}.burns_away"), "does nothing without 'fuel': it says it's gone when its fuel runs out");
+        }
+        if t.full_of.is_some() && !t.holds_liquid {
+            self.d.error(format!("{path}.full_of"), "only something that `holds_liquid` can start full");
+        }
+        if t.liquid.is_some() && t.holds_liquid {
+            self.d.warn(format!("{path}.liquid"), "is a source of liquid and holds liquid; a source never runs dry, so it doesn't need to");
+        }
+        if t.uses == Some(0) {
+            self.d.error(format!("{path}.uses"), "uses must be at least 1");
+        }
+        if t.code.is_some() && !traits.contains(&Trait::Lockable) {
+            self.d.warn(format!("{path}.code"), "a code unlocks something lockable; add `lockable` (and `state: { locked: true }`)");
+        }
+        if let Some(src::CodeText::Text(c)) = &t.code
+            && c.trim().is_empty()
+        {
+            self.d.error(format!("{path}.code"), "a code can't be empty");
+        }
+        if let Some(f) = t.fuel {
+            state.entry("fuel".into()).or_insert(Value::Int(i64::from(f)));
+        }
+        if let Some(u) = t.uses {
+            state.entry("uses".into()).or_insert(Value::Int(i64::from(u)));
+        }
+        if let Some(l) = &t.full_of {
+            state.entry("liquid".into()).or_insert(Value::Str(l.trim().to_lowercase()));
+        }
         Entity {
             key: key.into(),
             kind,
@@ -871,6 +938,22 @@ impl<'a> Lowerer<'a> {
             nameable: t.nameable,
             high: t.high && kind == EntityKind::Object,
             findable_in_dark: t.findable_in_dark && kind == EntityKind::Object,
+            needs_flame: t.needs_flame,
+            fuel: t.fuel,
+            burns_away: t.burns_away,
+            spent: self.text_opt(t.spent.as_deref(), &format!("{path}.spent")),
+            sound: self.text_opt(t.sound.as_deref(), &format!("{path}.sound")),
+            smell: self.text_opt(t.smell.as_deref(), &format!("{path}.smell")),
+            liquid_source: t.liquid.as_ref().map(|l| l.trim().to_lowercase()).filter(|l| !l.is_empty()),
+            holds_liquid: t.holds_liquid,
+            uses: t.uses,
+            breaks: self.text_opt(t.breaks.as_deref(), &format!("{path}.breaks")),
+            code: t.code.as_ref().map(|c| match c {
+                src::CodeText::Number(n) => n.to_string(),
+                src::CodeText::Text(s) => s.trim().to_string(),
+            }),
+            writing: self.text_opt(t.text.as_deref(), &format!("{path}.text")),
+            outdoors: false,
             prints: t.prints.clone().filter(|_| is_char),
             leaves_tracks: t.leaves_tracks.unwrap_or(true),
             diggable: false,
@@ -1407,6 +1490,19 @@ impl<'a> Lowerer<'a> {
                 when: t.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
                 say: self.text_opt(t.say.as_deref(), &format!("{path}.say")),
                 say_again: self.text_opt(t.say_again.as_deref(), &format!("{path}.say_again")),
+                chance: t.chance.as_ref().and_then(|c| {
+                    let n = match c {
+                        src::Chance::Number(n) => Some(*n),
+                        src::Chance::Text(s) => s.trim().trim_end_matches('%').trim().parse::<f64>().ok(),
+                    };
+                    match n {
+                        Some(n) if (0.0..=100.0).contains(&n) && n.fract() == 0.0 => Some(n as u32),
+                        _ => {
+                            self.d.error(format!("{path}.chance"), "a chance is a whole percentage from 0 to 100: 25%, or 25");
+                            None
+                        }
+                    }
+                }),
                 heard_in: {
                     let heard: Vec<EntityId> = t
                         .heard_in
@@ -1574,6 +1670,42 @@ impl<'a> Lowerer<'a> {
             hex.is_some()
         });
         Presentation { theme, accent }
+    }
+
+    /// `weather:` its kinds, the one it starts as, and how often it changes.
+    fn lower_weather(&mut self, w: &src::Weather) -> Option<Weather> {
+        if w.kinds.is_empty() {
+            self.d.error("weather.kinds", "list the kinds of weather there can be: clear, rain, fog…");
+            return None;
+        }
+        let kinds: Vec<WeatherKind> = w
+            .kinds
+            .iter()
+            .map(|(k, v)| WeatherKind {
+                key: k.clone(),
+                describe: self.text_opt(v.describe.as_deref(), &format!("weather.kinds.{k}.describe")),
+                begins: self.text_opt(v.begins.as_deref(), &format!("weather.kinds.{k}.begins")),
+            })
+            .collect();
+        if !kinds.iter().any(|k| k.key == w.start) {
+            let hint = did_you_mean(&w.start, kinds.iter().map(|k| k.key.as_str()));
+            self.d.error("weather.start", format!("no kind of weather called '{}'{hint}", w.start));
+            return None;
+        }
+        let (every, spread) = match &w.changes {
+            None => (None, 0),
+            Some(a) => match actions_range(a) {
+                Ok((lo, hi)) => (Some(lo), hi - lo),
+                Err(e) => {
+                    self.d.error("weather.changes", e);
+                    (None, 0)
+                }
+            },
+        };
+        if every.is_some() && kinds.len() < 2 {
+            self.d.warn("weather.changes", "with only one kind of weather, it has nothing to change to");
+        }
+        Some(Weather { start: w.start.clone(), kinds, every, spread })
     }
 
     /// `picture: hall.jpg`, or `{ file: hall.jpg, alt: "..." }`. A file must

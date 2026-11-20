@@ -244,9 +244,11 @@ impl<H: ScriptHost> Game<H> {
     /// Describes what a character did, if the player is there to see it.
     pub(crate) fn narrate(&mut self, event: &NpcEvent) {
         let here = self.world.here();
-        // In the dark, whoever it is, it's just "something".
+        // In the dark, whoever it is, it's just "something"; but the player
+        // knows their own companions.
         let dark = self.world.in_darkness();
-        let who = |c: Ctx, key: &str, id: EntityId| if dark && id != PLAYER { c.text(key, "something") } else { c.entity(key, id) };
+        let known: Vec<EntityId> = (0..self.world.story().entities.len() as u32).map(EntityId).filter(|&c| self.world.companion(c)).collect();
+        let who = |c: Ctx, key: &str, id: EntityId| if dark && id != PLAYER && !known.contains(&id) { c.text(key, "something") } else { c.entity(key, id) };
         match *event {
             NpcEvent::Moved { npc, from, to, direction } => {
                 if from == here {
@@ -337,6 +339,10 @@ impl<H: ScriptHost> Game<H> {
                 if room == here {
                     let key = if brought { "npc.brings" } else { "npc.grabs" };
                     self.msg(key, &Ctx::new().entity("npc", npc).entity("target", item));
+                    // At the player's feet: they know where it is, light or dark.
+                    if brought {
+                        self.world.state.located.insert(item, here);
+                    }
                 }
             }
             NpcEvent::Searched { npc, room } => {
@@ -698,7 +704,19 @@ impl<H: ScriptHost> Game<H> {
             .name_matches(&self.world, &rest)
             .into_iter()
             .find(|&e| e != npc)
-            .or_else(|| self.grammar.name_matches_in(&self.world, &rest, &everyone).into_iter().find(|&e| e != npc));
+            .or_else(|| self.grammar.name_matches_in(&self.world, &rest, &everyone).into_iter().find(|&e| e != npc))
+            .or_else(|| {
+                // A companion that sees in the dark finds what the player can't.
+                if !(self.world.in_darkness() && self.world.sees_in_dark(npc)) {
+                    return None;
+                }
+                let here = self.world.here();
+                let around: Vec<EntityId> = (0..self.world.story().entities.len() as u32)
+                    .map(EntityId)
+                    .filter(|&i| i != npc && self.world.room_of(i) == Some(here) && !self.world.is_hidden(i) && self.world.def(i).kind != EntityKind::Room)
+                    .collect();
+                self.grammar.name_matches_in(&self.world, &rest, &around).into_iter().next()
+            });
         let dir = rest.iter().find_map(|w| self.grammar_direction(w));
         let pacifist = self.world.def(npc).npc.as_ref().is_some_and(|n| n.pacifist);
         match verb.as_str() {

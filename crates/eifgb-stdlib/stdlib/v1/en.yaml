@@ -586,6 +586,8 @@ verbs:
       - "turn {target} on"
       - "switch on {target}"
       - "switch {target} on"
+      - "strike {target}"
+      - "flick {target}"
   extinguish:
     action: extinguish
     patterns:
@@ -680,12 +682,59 @@ verbs:
     patterns: ["touch {target}", "feel {target}", "rub {target}", "pat {target}"]
     default: "You feel nothing unexpected."
   smell:
-    patterns: ["smell {target}", "sniff {target}", "smell", "sniff"]
-    default: "You smell nothing unexpected."
+    action: smell
+    reach: false
+    patterns: ["smell {target}", "sniff {target}", "smell", "sniff", "smell the air", "sniff the air"]
   listen:
-    patterns: ["listen to {target}", "listen"]
-    default: "You hear nothing unusual."
+    action: listen
+    patterns: ["listen to {target}", "listen", "listen carefully"]
     reach: false          # you can hear through glass
+  read:
+    action: read
+    reach: false
+    patterns: ["read {target}", "read {target} aloud", "read out {target}", "peruse {target}"]
+  fill:
+    action: fill
+    patterns:
+      - "fill {target} with {tool}"
+      - "fill {target} from {tool}"
+      - "fill {target} at {tool}"
+      - "fill {target} in {tool}"
+      - "dip {target} in {tool}"
+      - "dip {target} into {tool}"
+      - "refill {target} from {tool}"
+      - "refill {target} with {tool}"
+      - "refuel {target} with {tool}"
+      - "top up {target} with {tool}"
+      # POUR THE BOTTLE INTO THE BUCKET fills the bucket from the bottle.
+      - "pour {tool} into {target}"
+      - "pour {tool} in {target}"
+      - "tip {tool} into {target}"
+  pour:
+    action: pour
+    patterns:
+      - "pour {target}"
+      - "pour out {target}"
+      - "pour {target} out"
+      - "spill {target}"
+  enter_code:
+    action: enter_code
+    reach: false
+    patterns:
+      - "type {text}"
+      - "type {text} on {target}"
+      - "type {text} into {target}"
+      - "enter {text} on {target}"
+      - "enter {text} into {target}"
+      - "dial {text}"
+      - "dial {text} on {target}"
+      - "key in {text}"
+      - "punch in {text}"
+      - "open {target} with {text}"
+      - "unlock {target} with {text}"
+      - "set {target} to {text}"
+      - "try {text} on {target}"
+      - "press {text} on {target}"
   taste:
     patterns: ["taste {target}", "lick {target}"]
     default: "You'd rather not."
@@ -714,7 +763,6 @@ lexicon:
     study: examine
     observe: examine
     view: examine
-    read: examine
     look over: examine
     throw away: drop
     head: go
@@ -833,6 +881,41 @@ messages:
   feel.not_found: "You feel around, but find nothing like that."
   feel.found_one: "You find ${the(args.target)} by touch."
   feel.contents: "In ${the(args.target)} you feel ${args.list}."
+  light.first: "(first lighting ${the(args.tool)})"
+  light.with: "You light ${the(args.target)} with ${the(args.tool)}."
+  light.no_flame: "You'll need a flame to light ${the(args.target)}."
+  light.tool_not_lit: "${The(args.tool)} isn't burning."
+  fuel.empty: "${The(args.target)} has nothing left to burn."
+  fuel.low: "${The(args.target)} flickers. It won't last much longer."
+  fuel.out: "${The(args.target)} sputters and goes out."
+  fuel.gone: "${The(args.target)} burns away to nothing."
+  wear.breaks: "${The(args.target)} breaks, and you throw away what's left of it."
+  fill.cant: "You can't fill ${the(args.target)}."
+  fill.already: "${The(args.target)} is already full."
+  fill.not_source: "There's nothing to fill it with in ${the(args.tool)}."
+  fill.no_source: "There's nothing here to fill it with."
+  fill.done: "You fill ${the(args.target)} with ${args.liquid}."
+  pour.cant: "There's nothing in ${the(args.target)} to pour."
+  pour.empty: "${The(args.target)} is empty."
+  pour.out: "You pour the ${args.liquid} out of ${the(args.target)}."
+  pour.into: "You pour the ${args.liquid} into ${the(args.tool)}."
+  pour.not_into: "You can't pour anything into ${the(args.tool)}."
+  pour.full: "${The(args.tool)} is already full."
+  pour.doused: "You pour the ${args.liquid} over ${the(args.target)}, and it hisses out."
+  pour.no_douse: "You pour the ${args.liquid} over ${the(args.target)}. It does nothing to the flames."
+  drink.liquid: "You drink the ${args.liquid}."
+  code.nowhere: "There's nothing here to enter a code into."
+  code.wrong: "You enter ${args.code}. Nothing happens."
+  code.right: "You enter ${args.code}. ${The(args.target)} clicks open."
+  code.already: "${The(args.target)} is already unlocked."
+  read.dark: "It's too dark to read."
+  listen.nothing: "You hear nothing unusual."
+  listen.next_door: "From the ${args.direction}: ${args.what}"
+  smell.nothing: "You smell nothing unexpected."
+  smell.next_door: "From the ${args.direction}: ${args.what}"
+  state.full: "It's full of ${args.target.liquid}."
+  state.here.full: "${The(args.target)} is full of ${args.target.liquid}."
+  state.tag.full: "full of"
   feel.on_top: "On ${the(args.target)} you feel ${args.list}."
   # Light through an open way between a dark room and a lit one. The lists
   # are made of the phrases below: "the north and above".

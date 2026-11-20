@@ -1031,16 +1031,19 @@ impl Grammar {
             let corpse_word = |s: &str| (dead && self.corpse_words.contains(s)) || world.named_word(id, s);
             // "the north door": a door named by the way it leads from here.
             let door_way = |s: &str| self.direction_of(s).is_some_and(|d| world.door_toward(world.here(), d) == Some(id));
+            // "the water": a bottle with water in it.
+            let liquid = |s: &str| world.def(id).holds_liquid && matches!(world.get(id, "liquid"), Some(eifgb_ir::Value::Str(l)) if l.split_whitespace().any(|w| w == s));
             let known = |w: &str| {
-                let check =
-                    |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s) || door_way(s);
+                let check = |s: &str| {
+                    v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s) || door_way(s) || liquid(s)
+                };
                 check(w) || (self.lang.stems)(w).iter().any(|s| check(s))
             };
-            if v.is_empty() || !words.iter().all(|w| known(w)) {
+            if (v.is_empty() && !world.def(id).holds_liquid) || !words.iter().all(|w| known(w)) {
                 continue;
             }
             let last = words[words.len() - 1];
-            let noun = |s: &str| v.nouns.iter().any(|n| n == s) || corpse_word(s);
+            let noun = |s: &str| v.nouns.iter().any(|n| n == s) || corpse_word(s) || liquid(s);
             let noun_last = noun(last) || (self.lang.stems)(last).iter().any(|s| noun(s));
             let score = if noun_last { 2 } else { 1 };
             if score > best_score {
@@ -1083,7 +1086,13 @@ impl Grammar {
             Some(BuiltinAction::TakeOff) => matches.iter().filter(|id| world.flag(**id, "worn")).copied().collect(),
             _ => Vec::new(),
         };
-        if filtered.is_empty() { matches.to_vec() } else { filtered }
+        let filtered = if filtered.is_empty() { matches.to_vec() } else { filtered };
+        // "the water": what's in the bottle in hand, rather than the stream it came from.
+        let poured: Vec<EntityId> = filtered.iter().copied().filter(|&id| world.def(id).holds_liquid && held(&id)).collect();
+        if !poured.is_empty() && filtered.iter().all(|&id| poured.contains(&id) || world.def(id).liquid_source.is_some()) {
+            return poured;
+        }
+        filtered
     }
 
     /// What "all" means for a verb. With a second object, TAKE ALL FROM X

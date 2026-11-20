@@ -1429,6 +1429,30 @@ Nineteen features reward players who try something clever:
   Something with `findable_in_dark: true` can always be reached in the
   dark, seen or not: a light switch by the door, the matches by the bed.
 
+  **Light from scripts.** A room's darkness can change: scripts read and
+  set `world.cellar.dark`. When the light changes some way other than the
+  player's own LIGHT or PUT OUT (a timer, a script, a lamp running dry),
+  the room is described at once, or the darkness is. A flash of lightning
+  that lights the cellar for one turn:
+
+  ```yaml
+  timers:
+    storm:
+      every: 3-8
+      say: Lightning flashes through the grating!
+      do: |
+        world.cellar.dark = false
+        start_timer("storm_dark")
+    storm_dark:               # one turn later
+      after: 1
+      running: false
+      do: world.cellar.dark = true
+  ```
+
+  Scenery that's only a light, a `light_source` with no `description`
+  (moonlight through a window), lights the room but isn't something to
+  feel for in the dark.
+
   Characters are as blind in the dark as the player, unless they have
   `sees_in_dark: true` (or their faction does). A blind character in an
   unlit room can't see the player to attack or hunt them, witness what

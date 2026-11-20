@@ -83,7 +83,14 @@ impl GameState {
             entities: story
                 .entities
                 .iter()
-                .map(|e| EntityState { location: e.location, state: e.state.clone(), capacity: e.capacity })
+                .map(|e| {
+                    // A dark room's darkness is state too, so scripts can read and change it.
+                    let mut state = e.state.clone();
+                    if e.dark {
+                        state.insert("dark".into(), Value::Bool(true));
+                    }
+                    EntityState { location: e.location, state, capacity: e.capacity }
+                })
                 .collect(),
             visited,
             rng,

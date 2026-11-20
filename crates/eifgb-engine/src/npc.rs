@@ -559,10 +559,20 @@ impl World {
         (self.has(id, eifgb_ir::Trait::LightSource) && (self.flag(id, "lit") || self.flag(id, "on"))) || self.on_fire(id)
     }
 
-    /// Whether `room` can be seen in: it isn't `dark`, or a burning light
+    /// Whether a room is dark without a light: its `dark` state, which
+    /// starts as the room's `dark` and scripts can change
+    /// (`world.cellar.dark = false` while lightning flashes).
+    pub fn is_dark_room(&self, room: EntityId) -> bool {
+        match self.get(room, "dark") {
+            Some(Value::Bool(b)) => *b,
+            _ => self.def(room).dark,
+        }
+    }
+
+    /// Whether `room` can be seen in: it isn't dark, or a burning light
     /// is there in plain sight (lying about, or carried by anyone).
     pub fn is_lit(&self, room: EntityId) -> bool {
-        !self.def(room).dark
+        !self.is_dark_room(room)
             || (0..self.story().entities.len() as u32)
                 .map(EntityId)
                 .any(|i| self.room_of(i) == Some(room) && self.is_burning(i) && self.in_plain_sight(i))

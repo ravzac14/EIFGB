@@ -4388,3 +4388,77 @@ fn a_timer_can_be_heard_only_in_some_places() {
     say(&mut h, "s");
     assert!(!say(&mut h, "wait").contains("bell"), "the clock's in the tower now");
 }
+
+const FLASH: &str = "format: eifgb/0.1
+game: { id: f, title: F, version: '1', start: cellar }
+rooms:
+  cellar:
+    name: Cellar
+    dark: true
+    description: A damp cellar. A key glints on a shelf.
+objects:
+  key: { name: brass key, in: cellar, traits: [portable] }
+timers:
+  storm:
+    every: 3
+    say: Lightning flashes through the grating!
+    do: |
+      world.cellar.dark = false
+      start_timer(\"storm_dark\")
+  storm_dark:
+    after: 1
+    running: false
+    do: world.cellar.dark = true
+";
+const FLASH_OBJECT: &str = "format: eifgb/0.1
+game: { id: f, title: F, version: '1', start: cellar }
+rooms:
+  cellar:
+    name: Cellar
+    dark: true
+    description: A damp cellar. A key glints on a shelf.
+objects:
+  lightning:
+    name: flash of lightning
+    in: cellar
+    traits: [scenery, light_source]
+    state: { lit: false }
+  key: { name: brass key, in: cellar, traits: [portable] }
+timers:
+  storm:
+    every: 3
+    say: Lightning flashes through the grating!
+    do: |
+      world.lightning.lit = true
+      start_timer(\"storm_dark\")
+  storm_dark:
+    after: 1
+    running: false
+    do: world.lightning.lit = false
+";
+
+#[test]
+fn scripts_can_light_a_room_and_it_shows_at_once() {
+    let mut g = game(compile_str(FLASH).story.unwrap());
+    assert_eq!(g.world().get(g.world().story().entity_by_key("cellar").unwrap(), "dark"), Some(&eifgb_engine::ir::Value::Bool(true)), "scripts can read it");
+    say(&mut g, "wait");
+    say(&mut g, "wait");
+    // The flash: the room is described straight away, with no LOOK.
+    assert_eq!(say(&mut g, "wait"), "Time passes.\nLightning flashes through the grating!\nCellar\nA damp cellar. A key glints on a shelf.\nYou can see a brass key here.\nThere's no obvious way out.");
+    // One turn of light, then the dark again, said so.
+    assert_eq!(say(&mut g, "take key"), "Taken.\nDarkness\nIt's pitch dark. You can't see a thing.");
+    // UNDO puts the light back, and shows it.
+    assert_says(&mut g, "undo", "A damp cellar.");
+}
+
+#[test]
+fn a_light_that_is_only_light_isnt_something_to_feel_for() {
+    let mut g = game(compile_str(FLASH_OBJECT).story.unwrap());
+    for _ in 0..4 {
+        say(&mut g, "wait");
+    }
+    let out = say(&mut g, "look");
+    assert!(out.contains("You know where to feel for a brass key."), "{out}");
+    assert!(!out.contains("lightning"), "{out}");
+    assert!(!say(&mut g, "feel around").contains("lightning"));
+}

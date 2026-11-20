@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- Scripts can light and darken rooms: `world.cellar.dark = false`. When
+  the light changes from a script or timer (or a lamp running dry), the
+  room is described at once, or the darkness is. Scenery that's only a
+  light (a light source with no description) isn't something to feel for.
 - A timer can be heard only in some places: `heard_in: tower` (a room, a
   list of them, or a thing such as a clock, heard wherever it is).
   Elsewhere it goes off unannounced. In the editor: "It's heard".

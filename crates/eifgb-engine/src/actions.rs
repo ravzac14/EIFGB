@@ -202,6 +202,7 @@ impl<H: ScriptHost> Game<H> {
 
     pub(crate) fn look(&mut self) {
         let here = self.world.here();
+        self.seen_dark = Some(self.world.in_darkness());
         if self.world.in_darkness() {
             self.msg_kind(LineKind::Title, "look.dark_title", &Ctx::new());
             self.msg("look.dark", &Ctx::new());

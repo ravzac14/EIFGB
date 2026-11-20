@@ -123,6 +123,9 @@ pub struct Game<H: ScriptHost> {
     pub(crate) quiet_wait: bool,
     /// What the player was holding when this input began.
     held_before: Vec<EntityId>,
+    /// Whether the room was dark when it was last described: when that
+    /// changes some other way (a script, a timer), it's described again.
+    pub(crate) seen_dark: Option<bool>,
     /// Set while the player SNEAKs, so arriving doesn't wake anyone.
     pub(crate) sneaking: bool,
     /// Set while the player PUSHes something into the next room: it goes
@@ -155,6 +158,7 @@ impl<H: ScriptHost> Game<H> {
             passing: false,
             quiet_wait: false,
             held_before: Vec::new(),
+            seen_dark: None,
             heard_nearby: None,
             sneaking: false,
             pushing: None,
@@ -242,6 +246,12 @@ impl<H: ScriptHost> Game<H> {
     }
 
     fn finish(&mut self) -> Output {
+        // The light changed without the room being described (a timer, a
+        // script, a lamp running dry): describe it, or the darkness.
+        let dark = self.world.in_darkness();
+        if self.seen_dark.is_some_and(|was| was != dark) && self.world.state.ending.is_none() && self.world.state.choice.is_none() {
+            self.look();
+        }
         // What the player can see, they'll know where to find in the dark;
         // and what they put down in the dark, too.
         self.world.note_seen();

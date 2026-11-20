@@ -376,8 +376,18 @@ impl World {
             .collect()
     }
 
+    /// Scenery that's only a light, with nothing to describe: a flash of
+    /// lightning, moonlight through a window. It isn't something to feel for.
+    pub fn just_light(&self, t: EntityId) -> bool {
+        let d = self.def(t);
+        self.has(t, Trait::Scenery) && self.has(t, Trait::LightSource) && d.description.is_none() && !d.findable_in_dark
+    }
+
     /// Whether a thing is here, and not shut away in something closed.
     pub fn touchable_here(&self, t: EntityId) -> bool {
+        if self.just_light(t) {
+            return false;
+        }
         let here = self.here();
         let mut cur = self.location(t);
         while let Some(c) = cur {
@@ -406,7 +416,7 @@ impl World {
         }
         let here = self.here();
         for t in self.scope() {
-            if t != PLAYER && self.def(t).kind != EntityKind::Room && !self.is_within(t, PLAYER) && self.room_of(t) == Some(here) {
+            if t != PLAYER && self.def(t).kind != EntityKind::Room && !self.is_within(t, PLAYER) && self.room_of(t) == Some(here) && !self.just_light(t) {
                 self.state.located.insert(t, here);
             }
         }

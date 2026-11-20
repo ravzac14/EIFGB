@@ -388,6 +388,11 @@ impl World {
         out
     }
 
+    /// The door on the room's way out in that direction, if there's one.
+    pub fn door_toward(&self, room: EntityId, dir: Direction) -> Option<EntityId> {
+        self.def(room).exits.iter().filter(|e| e.direction == dir && self.exit_visible(e)).find_map(|e| e.through)
+    }
+
     /// Everything physically present in a room: its contents, plus the
     /// doors its exits use (a door's other side is present too).
     pub fn present(&self, room: EntityId) -> Vec<EntityId> {

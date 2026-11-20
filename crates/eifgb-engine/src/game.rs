@@ -354,7 +354,7 @@ impl<H: ScriptHost> Game<H> {
         match parsed {
             Parsed::Command(cmd) => self.execute(cmd),
             Parsed::Ambiguous { before, after, options } => {
-                let names: Vec<String> = options.iter().map(|id| self.the(*id)).collect();
+                let names = self.which_names(&options);
                 let list = (self.grammar.lang().list_or)(&names);
                 self.msg("parser.ambiguous", &Ctx::new().text("options", list));
                 self.pending = Some(Pending::Which { before, after, options });
@@ -376,6 +376,27 @@ impl<H: ScriptHost> Game<H> {
                 false
             }
         }
+    }
+
+    /// How "Which do you mean…?" names each option. Doors that share a
+    /// name say which way they lead: "the door (northwest)".
+    pub(crate) fn which_names(&mut self, options: &[EntityId]) -> Vec<String> {
+        let names: Vec<String> = options.iter().map(|id| self.the(*id)).collect();
+        let here = self.world.here();
+        let exits = self.world.def(here).exits.clone();
+        let mut out = Vec::new();
+        for (i, &id) in options.iter().enumerate() {
+            let twin = names.iter().enumerate().any(|(j, n)| j != i && *n == names[i]);
+            let way = exits.iter().find(|e| e.through == Some(id) && self.world.exit_visible(e)).map(|e| e.direction);
+            out.push(match way {
+                Some(d) if twin => {
+                    let ctx = Ctx::new().text("name", names[i].clone()).text("way", self.grammar.direction_word(d));
+                    self.msg_str("parser.door_way", &ctx)
+                }
+                _ => names[i].clone(),
+            });
+        }
+        out
     }
 
     /// Steps 7 and 9 of the fallback chain: first the author's

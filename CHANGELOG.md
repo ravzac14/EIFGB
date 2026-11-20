@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- Doors can be named by the way they lead: UNLOCK NW DOOR, OPEN THE EAST
+  DOOR. When two doors have the same name, "Which do you mean?" says
+  which way each one goes, and NORTHWEST is enough as a reply.
 - ASK and TELL start a conversation, like TALK TO: ASK KEEPER, ASK
   KEEPER ABOUT THE GATE, TELL KEEPER ABOUT THE STORM. With only one person
   here to talk to, TALK or ASK ABOUT THE GATE needs no name. (ASK … TO is

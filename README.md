@@ -233,6 +233,11 @@ through the pantry door too, without you changing it, and the door can be
 examined, closed and locked from inside the pantry. If a room has no exit
 back at all, one is added in the opposite direction.
 
+Players can name a door by the way it leads, too: with two doors in a
+room, UNLOCK NORTH DOOR picks the right one, and if they just type UNLOCK
+DOOR the game asks "Which do you mean, the door (north) or the door
+(east)?".
+
 If you'd rather describe states yourself, turn the automatic descriptions
 off with a top-level `settings` section:
 

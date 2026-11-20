@@ -87,6 +87,8 @@ IDs are `snake_case`. Rooms, objects and characters share one namespace. Verb ID
   - **There's no way back:** one is added in the opposite direction (north ↔ south, up ↔ down, in ↔ out, and so on).
   - **That direction already leads elsewhere:** the compiler warns and leaves the map alone.
 
+  **Doors are named by their way out, too:** a direction word counts as part of a door's name in the room where an exit in that direction goes through it, so UNLOCK NW DOOR and OPEN THE EAST DOOR pick the right one. When "Which do you mean…?" lists doors with the same name, each says which way it leads, "the door (northwest)" `[parser.door_way]`, and the reply can be just the direction. Elsewhere, a direction that names nothing here is "You can't see any such thing.", not an unknown word.
+
   The door is in scope, listed and described in every room it connects, so it can be examined, opened, closed, locked and unlocked from either side. Its `in:` only decides which room `:is_in` and scripts see as its location.
 - **Blocked doors are held shut.** The `blocked` state means barred, bolted or wedged, so a blocked door is always closed:
   - `true`: it won't open from either side. "The trapdoor won't open."

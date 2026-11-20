@@ -528,7 +528,7 @@ impl<H: ScriptHost> Game<H> {
         else {
             return false;
         };
-        let names: Vec<String> = doors.iter().map(|d| self.the(*d)).collect();
+        let names = self.which_names(doors);
         let list = (self.grammar.lang().list_or)(&names);
         self.msg("parser.ambiguous", &Ctx::new().text("options", list));
         self.pending = Some(Pending::Which { before: lead, after: Vec::new(), options: doors.to_vec() });

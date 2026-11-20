@@ -669,7 +669,7 @@ impl Grammar {
                 let named = |w: &str| (0..world.story().entities.len() as u32).any(|i| world.named_word(EntityId(i), w));
                 let unknown = words
                     .iter()
-                    .find(|w| !self.vocab_words.contains(**w) && !self.stem_known(w) && !named(w))
+                    .find(|w| !self.vocab_words.contains(**w) && !self.stem_known(w) && !named(w) && self.direction_of(w).is_none())
                     .map(|w| (*w).clone());
                 Err(NounFail::NotFound { unknown_word: unknown })
             }
@@ -746,8 +746,11 @@ impl Grammar {
             let dead = world.is_dead(id);
             // "corpse" for the dead; a name the player gave it, as a noun.
             let corpse_word = |s: &str| (dead && self.corpse_words.contains(s)) || world.named_word(id, s);
+            // "the north door": a door named by the way it leads from here.
+            let door_way = |s: &str| self.direction_of(s).is_some_and(|d| world.door_toward(world.here(), d) == Some(id));
             let known = |w: &str| {
-                let check = |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s);
+                let check =
+                    |s: &str| v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s) || door_way(s);
                 check(w) || (self.lang.stems)(w).iter().any(|s| check(s))
             };
             if v.is_empty() || !words.iter().all(|w| known(w)) {

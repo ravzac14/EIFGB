@@ -848,6 +848,7 @@ messages:
   ending.died: "You have died."
   parser.partial: "I only understood you as far as wanting to ${args.verb}."
   parser.ambiguous: "Which do you mean, ${args.options}?"
+  parser.door_way: "${args.name} (${args.way})"
   parser.need_target: "What do you want to ${args.verb}?"
   parser.need_tool: "What do you want to ${args.verb} ${the(args.target)} ${args.word}?"
   parser.no_pronoun: "I'm not sure what you're referring to."

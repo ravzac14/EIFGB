@@ -294,6 +294,46 @@ fn asking_with_two_people_here_says_which() {
     assert_eq!(g.input("ask bob about the weather").options, vec!["Bye"]);
 }
 
+const DOOR_WAYS: &str = "format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall:
+    name: Hall
+    exits:
+      northwest: { to: study, through: study_door }
+      east: { to: kitchen, through: kitchen_door }
+      south: yard
+  study: { name: Study, exits: { southeast: hall } }
+  kitchen: { name: Kitchen, exits: { west: hall } }
+  yard: { name: Yard, exits: { north: hall } }
+objects:
+  key: { name: brass key, in: hall, traits: [portable] }
+  study_door:
+    name: door
+    in: hall
+    traits: [door, openable, lockable]
+    state: { locked: true }
+    unlocks_with: key
+  kitchen_door:
+    name: door
+    in: hall
+    traits: [door, openable]
+";
+
+#[test]
+fn doors_can_be_named_by_the_way_they_lead() {
+    let out = compile_str(DOOR_WAYS);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    say(&mut g, "take key");
+    assert_says(&mut g, "unlock door", "Which do you mean, the door (northwest) or the door (east)?");
+    assert_says(&mut g, "northwest", "You unlock the door");
+    assert_says(&mut g, "open the east door", "You open the door.");
+    assert_says(&mut g, "open nw door", "You open the door.");
+    assert_says(&mut g, "x the north door", "You can't see any such thing.");
+    say(&mut g, "nw");
+    assert_says(&mut g, "close the southeast door", "You close the door.");
+}
+
 #[test]
 fn undo_works_inside_a_choice() {
     let mut g = game(lighthouse());
@@ -1329,9 +1369,9 @@ fn description_words_refer_to_what_they_describe() {
     // A description word from another room: known, but not here.
     assert_says(&mut g, "x bench", "You can't see any such thing.");
     assert_says(&mut g, "x zorkmid", "I don't know the word \"zorkmid\".");
-    // Stopwords and directions never match.
+    // Stopwords never match. Directions are known words (they name doors: "the north door").
     assert_says(&mut g, "x against", "I don't know the word");
-    assert_says(&mut g, "x north", "I don't know the word");
+    assert_says(&mut g, "x north", "You can't see any such thing.");
 }
 
 #[test]

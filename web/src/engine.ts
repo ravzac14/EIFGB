@@ -46,6 +46,8 @@ export interface Meta {
   title: string;
   author: string | null;
   version: string;
+  /** The game's language, like "en". */
+  language?: string;
   /** The game's own look (`presentation:` in game.yaml), if it chose one. */
   presentation?: Presentation | null;
   /** Every ending's key, from `endings:`. */

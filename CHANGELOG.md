@@ -6,6 +6,13 @@ behave will be called out here.
 
 ## Unreleased
 
+- Read aloud, in *Text and colours* while playing: new text is spoken
+  with your browser's own voices, at normal speed, slower or faster.
+  Escape stops it. Off unless you turn it on.
+- A *Very large* text size.
+- For screen readers: the map is described in words (where you are, the
+  places you've been and their ways out), the story is marked with the
+  game's language, and the home page's demo has a proper label.
 - Goals: a `goals:` section, each with text, and conditions for when it's
   added and when it's done. JOURNAL lists them, and a notice says when one
   is added or done. In the editor: Add component → Goal.

@@ -49,7 +49,6 @@ Everything from the first list has now been built:
 
 ## The player
 
-- **Read aloud:** speak new text with the browser's own voices.
 - **Room pictures:** an optional `picture:` per room, shown above its
   description and in the map panel.
 

@@ -76,6 +76,7 @@
 :root[data-width="wide"] { --measure: 54rem; }
 :root[data-size="small"] { --text: 1rem; }
 :root[data-size="large"] { --text: 1.3rem; }
+:root[data-size="xlarge"] { --text: 1.6rem; }
 
 * { box-sizing: border-box; }
 /* `hidden` always hides, even on elements whose class sets a display. */

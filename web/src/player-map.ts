@@ -135,6 +135,21 @@ function wrap(name: string, width: number): string[] {
   return b ? [a, b] : [a];
 }
 
+/**
+ * The map in words, for screen readers: where you are, then each place
+ * you've been and its ways out ("Kitchen: north to the Hall; east, not
+ * visited yet").
+ */
+export function mapDescription(map: PlayerMap, names = new Map(map.rooms.map((r) => [r.id, r.name]))): string {
+  const places = map.rooms.map((r) => {
+    const ways = map.exits
+      .filter((e) => e.from === r.id)
+      .map((e) => `${e.dir}${e.to ? ` to ${names.get(e.to) ?? e.to}` : ", not visited yet"}${e.closed ? ` (${e.door ?? "door"} closed)` : ""}`);
+    return `${r.name}${r.id === map.here ? " (you're here)" : ""}${ways.length ? `: ${ways.join("; ")}` : ""}`;
+  });
+  return `Map of the ${map.rooms.length === 1 ? "place" : `${map.rooms.length} places`} you've been. ${places.join(". ")}.`;
+}
+
 /** Draws the map into `into` (replacing what's there) and scrolls the current room into view. */
 export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, Place>) {
   const pos = placeRooms(map, author);
@@ -143,8 +158,8 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
   const minX = Math.min(...ps.map((p) => p.x - boxOf(p).w / 2)) - pad, minY = Math.min(...ps.map((p) => p.y - boxOf(p).h / 2)) - pad;
   const w = Math.max(...ps.map((p) => p.x + boxOf(p).w / 2)) + pad - minX, h = Math.max(...ps.map((p) => p.y + boxOf(p).h / 2)) + pad - minY;
   const root = svg("svg", { viewBox: `${minX} ${minY} ${w} ${h}`, width: w, height: h, role: "img", class: "pmap" });
-  root.setAttribute("aria-label", `Map of the ${map.rooms.length === 1 ? "place" : `${map.rooms.length} places`} you've been`);
   const names = new Map(map.rooms.map((r) => [r.id, r.name]));
+  root.setAttribute("aria-label", mapDescription(map, names));
   const here = pos.get(map.here);
 
   const lines = svg("g", { class: "ways" });

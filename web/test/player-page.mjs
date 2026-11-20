@@ -86,5 +86,34 @@ assert.match($("#log").textContent.slice(-200), /Shelves of jars[^]*Known exits/
 // The settings dialog offers it here, on the play page.
 $("#settings-open").click();
 assert.ok($("#setting-reveal"), "Text appears is offered while playing");
+$("#settings-dialog")?.close?.();
+localStorage.removeItem("eifgb:settings");
+
+// Read aloud: new text is spoken with the browser's voices, a reply at a
+// time; Escape stops it. Without a voice, the setting isn't offered.
+$("#settings-open").click();
+assert.equal($("#setting-speech"), null, "no speech in this browser: not offered");
+const spoken = [];
+let cancels = 0;
+window.SpeechSynthesisUtterance = globalThis.SpeechSynthesisUtterance = class {
+  constructor(text) {
+    this.text = text;
+  }
+};
+window.speechSynthesis = globalThis.speechSynthesis = { speak: (u) => spoken.push(u), cancel: () => cancels++ };
+$("#settings-open").click();
+assert.ok($("#setting-speech"), "Read aloud is offered while playing");
+type("look");
+assert.equal(spoken.length, 0, "off unless chosen");
+localStorage.setItem("eifgb:settings", JSON.stringify({ speech: "slow" }));
+type("look");
+assert.ok(spoken.some((u) => /Shelves of jars/.test(u.text)), spoken.map((u) => u.text).join(" | "));
+assert.ok(!spoken.some((u) => u.text === "look"), "the command itself isn't read");
+assert.equal(spoken[0].rate, 0.8);
+assert.equal(spoken[0].lang, "en");
+assert.equal($("#log").lang, "en", "the story is marked with its language");
+const before = cancels;
+document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+assert.equal(cancels, before + 1, "Escape stops reading");
 localStorage.removeItem("eifgb:settings");
 console.log("ok   player page");

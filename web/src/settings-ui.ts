@@ -1,5 +1,6 @@
 // The "Text and colours" dialog, shared by every page.
 import { applySettings, getGameLook, settings, type Settings } from "./store.ts";
+import { canSpeak, stopSpeaking } from "./speech.ts";
 // A typeface made for legibility, served with the site (not from a font service).
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
@@ -15,15 +16,16 @@ const CHOICES: { [K in keyof Settings]: [Settings[K], string][] } = {
     ["amber", "Terminal (amber)"],
     ["contrast", "High contrast"],
   ],
-  size: [["small", "Small"], ["medium", "Medium"], ["large", "Large"]],
+  size: [["small", "Small"], ["medium", "Medium"], ["large", "Large"], ["xlarge", "Very large"]],
   face: [["serif", "Book"], ["sans", "Plain"], ["legible", "Very legible"]],
   spacing: [["normal", "Normal"], ["relaxed", "Roomy"]],
   width: [["narrow", "Narrow"], ["medium", "Medium"], ["wide", "Wide"]],
   reveal: [["instant", "All at once"], ["typewriter", "Letter by letter"]],
+  speech: [["off", "Off"], ["on", "Read new text aloud"], ["slow", "Read aloud, slower"], ["fast", "Read aloud, faster"]],
 };
-const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width", reveal: "Text appears" };
+const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width", reveal: "Text appears", speech: "Read aloud" };
 /** Settings that only mean something while playing: shown on the play page. */
-const PLAYER_ONLY = new Set<keyof Settings>(["reveal"]);
+const PLAYER_ONLY = new Set<keyof Settings>(["reveal", "speech"]);
 
 export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
   applySettings();
@@ -36,6 +38,7 @@ export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
     dialog.append(close, h);
     for (const key of Object.keys(CHOICES) as (keyof Settings)[]) {
       if (PLAYER_ONLY.has(key) && !document.getElementById("log")) continue;
+      if (key === "speech" && !canSpeak()) continue;
       const row = document.createElement("div");
       row.className = "row";
       const label = document.createElement("label");
@@ -60,9 +63,17 @@ export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
         const next = { ...settings.get(), [key]: select.value };
         settings.set(next);
         applySettings(next);
+        if (key === "speech") stopSpeaking();
       });
       row.append(label, select);
       dialog.append(row);
+      if (key === "speech") {
+        const note = Object.assign(document.createElement("p"), {
+          className: "help dim",
+          textContent: "Uses your browser's own voices. Escape stops reading. Screen readers already read new text, so you won't need this with one.",
+        });
+        dialog.append(note);
+      }
     }
   };
   opener.addEventListener("click", () => {

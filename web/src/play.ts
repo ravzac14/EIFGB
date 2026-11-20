@@ -4,6 +4,7 @@ import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type O
 import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
+import { speak, stopSpeaking } from "./speech.ts";
 import { feedbackButton, feedbackContext } from "./feedback.ts";
 import { fetchGame, resolve } from "./remote.ts";
 
@@ -143,6 +144,7 @@ function show(o: Output): HTMLElement | null {
     const p = say(l.text, l.kind === "text" ? "" : l.kind);
     if (typed) typeOut(p);
   }
+  speak(o.lines.filter((l) => l.kind !== "error").map((l) => l.text), settings.get().speech, meta?.language ?? "en");
   status(o);
   last = o;
   refreshMap();
@@ -203,6 +205,8 @@ function skipTyping() {
   typingFrame = 0;
 }
 for (const type of ["keydown", "pointerdown"]) document.addEventListener(type, () => typing.length && skipTyping(), true);
+// Escape stops reading aloud.
+document.addEventListener("keydown", (e) => e.key === "Escape" && stopSpeaking());
 
 /**
  * Scrolls down to show what's new: as far as the bottom of the page, but
@@ -328,6 +332,8 @@ function begin(): boolean {
   }
   meta = loaded.meta;
   setGameLook(meta.presentation);
+  // Screen readers (and Read aloud) pronounce the story in its own language.
+  log.lang = meta.language ?? "en";
   if (from) {
     const p = say(`This game comes from ${from}, not from this site. `, "notice");
     p.append(el("a", { href: SAFETY, target: "_blank", rel: "noopener", textContent: "Is that safe?" }));

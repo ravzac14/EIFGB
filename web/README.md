@@ -133,7 +133,13 @@ light, dark, sepia, parchment, terminal, amber, contrast; the player's
 painting with a small inline script. One more setting, *Text appears*
 (`reveal`), is only offered on the play page: "Letter by letter" types new
 lines out in `src/play.ts`, with the untyped rest of a line on the page but
-see-through, so layout, screen readers and the transcript are unaffected. The legible typeface is the
+see-through, so layout, screen readers and the transcript are unaffected.
+*Read aloud* (`speech`), also only on the play page and only where the
+browser has voices, speaks each reply with the Web Speech API
+(`src/speech.ts`): a new reply stops the last, and Escape stops it. The
+story's log is marked with the game's language (`meta.language`) for
+screen readers and voices alike, and the player's map has a description
+in words (`mapDescription` in `src/player-map.ts`). The legible typeface is the
 `@fontsource/atkinson-hyperlegible` package, served with the site.
 
 The home page's demo game is `src/demo/game.yaml`; the engine loads the

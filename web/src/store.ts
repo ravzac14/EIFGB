@@ -36,12 +36,14 @@ function remove(key: string) {
 // ------------------------------------------------------------- settings
 
 export type Theme = "auto" | "light" | "dark" | "sepia" | "parchment" | "terminal" | "amber" | "contrast";
-export type Size = "small" | "medium" | "large";
+export type Size = "small" | "medium" | "large" | "xlarge";
 export type Face = "serif" | "sans" | "legible";
 export type Spacing = "normal" | "relaxed";
 export type Width = "narrow" | "medium" | "wide";
 /** How new text appears in the player: all at once, or typed out letter by letter. */
 export type Reveal = "instant" | "typewriter";
+/** Whether the player reads new text aloud, and how fast. */
+export type Speech = "off" | "on" | "slow" | "fast";
 export interface Settings {
   theme: Theme;
   size: Size;
@@ -49,8 +51,9 @@ export interface Settings {
   spacing: Spacing;
   width: Width;
   reveal: Reveal;
+  speech: Speech;
 }
-const DEFAULTS: Settings = { theme: "auto", size: "medium", face: "serif", spacing: "normal", width: "medium", reveal: "instant" };
+const DEFAULTS: Settings = { theme: "auto", size: "medium", face: "serif", spacing: "normal", width: "medium", reveal: "instant", speech: "off" };
 
 export const settings = {
   get: (): Settings => ({ ...DEFAULTS, ...read<Partial<Settings>>("settings", {}) }),

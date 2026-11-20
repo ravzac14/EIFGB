@@ -66,4 +66,9 @@ assert.match(box.querySelector(".room.coloured").getAttribute("style"), /--tint:
 assert.equal(box.querySelector(".room.here title").textContent, "Attic (you are here)");
 assert.equal(box.querySelectorAll("[role=button], [tabindex]").length, 0, "nothing on the map is clickable");
 assert.ok(box.querySelector(".stub"), "unexplored ways are drawn");
+// In words too, for screen readers.
+const words = box.querySelector("svg").getAttribute("aria-label");
+assert.match(words, /^Map of the 3 places you've been\. /);
+assert.match(words, /Attic \(you're here\)/);
+assert.match(words, /not visited yet/);
 console.log("ok   player map");

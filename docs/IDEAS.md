@@ -33,6 +33,75 @@ Everything from the first list has now been built:
 - **Fire and smashing:** `flammable`, `destructible`, SET … ALIGHT, SMASH,
   spreading next door, scorching, smoke, and `douses`.
 
+## Players
+
+- **WHERE IS THE KEY / FIND THE KEEPER:** where the player last saw it
+  ("You last saw the keeper in the lamp room"), using what the game
+  already remembers; GO TO THE KEEPER walks there.
+- **UNDO 3:** take back several turns at once.
+- **OOPS and "Did you mean…?":** OOPS LANTERN fixes the misspelled word
+  in the last command, and near misses too uncertain to fix silently ask.
+- **VERBOSE / BRIEF:** describe rooms in full on every visit, or only the
+  first time.
+- **RECAP:** what's happened so far and where things stand, for a player
+  coming back to a game after a week.
+- **ASK ABOUT goes to the topic:** ASK KEEPER ABOUT THE GATE opens the
+  conversation at the option that mentions the gate.
+- **Commands that remember:** TAKE ALL THEN GO NORTH works; extend it to
+  AGAIN with a new object ("again, with the iron key").
+
+## The world
+
+- **A chance each turn:** a timer `chance: 10%` for things that might
+  happen any turn (a bat flies past), alongside ranges.
+- **Lights that need a flame:** LIGHT THE CANDLE WITH THE LIGHTER only
+  works if the lighter is burning, and matches burn out after a few turns.
+- **Fuel and burning out:** lamps with `fuel` that run down a turn at a
+  time, with a warning before they go out.
+- **Weather and seasons:** a game-wide `weather` that timers change, read
+  by descriptions (`${if weather == "rain"}`) and outdoor rooms.
+- **Sounds and smells from nearby rooms:** LISTEN and SMELL pick up what's
+  next door ("You hear water dripping to the north").
+- **Liquids:** filling a bottle from a stream, pouring water on a fire,
+  and containers that only hold liquids.
+- **Things that wear out or break:** a rope that frays, a key that snaps
+  in the lock, with `uses: 3`.
+- **Followers in the dark:** a dog that leads the way through dark rooms,
+  or a character carrying a lamp who lights the room they're in.
+- **Locked by code:** a safe or keypad that opens with a number (OPEN SAFE
+  WITH 4512, TYPE 4512), with the code in a clue, maybe a picture.
+- **Reading:** a `text` on books and notes that READ shows, separate from
+  what EXAMINE says about the thing itself.
+
+## The editor
+
+- **A picture library:** reuse a picture across rooms and things, and see
+  how much space a game's pictures take in the browser.
+- **Find in game:** search every room, thing and script for a word.
+- **Map tidy-up:** lay out rooms neatly by their directions, and spot
+  exits that cross or overlap.
+- **Undo history:** a list of recent changes to step back to, not only one
+  at a time.
+- **Playtest from a save:** start test play from any point a recording
+  reached, without replaying from the start.
+- **Hints from the puzzle chain:** draft HINT steps from the Puzzles tab
+  ("Search the worn mat…").
+- **Timer timeline:** when each timer can go off, and what it does, in
+  turns and (with a clock) hours.
+
+## The player
+
+- **Bookmarks in the story:** mark a moment and jump back to read it.
+- **A notebook:** players can type NOTE … to keep their own notes with
+  their save.
+- **Achievements:** optional `achievements:` a game can award, shown
+  with the endings found.
+
 ## The website
 
 - **A featured game** at the top of the gallery.
+- **Ratings and play counts** for gallery games, kept privately in each
+  browser first.
+- **A "Game jam" page:** a theme, a deadline, and the entries.
+- **Translations:** the player's and editor's own words in other
+  languages, starting from the stdlib's language files.

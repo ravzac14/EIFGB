@@ -141,7 +141,20 @@ function save() {
 function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: boolean } = {}) {
   if (!model) return;
   const before = snapshot();
+  model.lastRename = null;
   fn(model);
+  // A rename reaches the script files, and a room keeps its place on the map.
+  const renamed = model.lastRename as Model["lastRename"];
+  if (renamed) {
+    const files = { ...project.files };
+    for (const [p, t] of Object.entries(files)) if (p.endsWith(".lua")) files[p] = renamed.code(t);
+    project = { ...project, files };
+    const at = renamed.kind === "entity" ? positions.get(renamed.old) : undefined;
+    if (at) {
+      positions.set(renamed.next, at);
+      positions.delete(renamed.old);
+    }
+  }
   const after = snapshot();
   if (!sameFiles(before.files, after.files)) {
     const now = Date.now();

@@ -2,7 +2,7 @@
 // results compile. Run: node test/editor-model.mjs
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { Model, NEW_GAME, slug } from "../src/editor/model.ts";
+import { Model, NEW_GAME, renameInCode, slug } from "../src/editor/model.ts";
 import { loadEngine } from "../src/engine.ts";
 
 const engine = await loadEngine(new URL("../public/wasm/", import.meta.url));
@@ -102,6 +102,31 @@ assert.deepEqual(errors(black.toString()), [], `renamed ${gateSide} → ${rename
   v.deleteEntry("aliases", "using");
   v.deleteEntry("aliases", "port");
   assert.equal(v.get(["aliases"]), undefined);
+}
+
+// Rename everywhere: references, rules and Lua code follow a new ID.
+{
+  const r = new Model(example("lighthouse"));
+  assert.equal(r.renameThing("brass_key", "tide_key"), "tide_key");
+  const t = r.toString();
+  assert.doesNotMatch(t, /brass_key/, "no reference to the old ID is left");
+  assert.match(t, /unlocks_with: tide_key/);
+  assert.match(t, /world\.tide_key\.hidden = false/, "in a handler");
+  assert.match(t, /\$\{if world\.tide_key\.hidden\}/, "in a description's template");
+  assert.equal(r.lastRename?.kind, "entity");
+  assert.equal(r.lastRename.code("if world.brass_key then x = world['brass_key'] end"), "if world.tide_key then x = world['tide_key'] end");
+  assert.equal(r.renameRoom("shore", "beach"), "beach");
+  assert.match(r.toString(), /here == world\.beach/);
+  assert.doesNotMatch(r.toString(), /: shore\b|world\.shore\b/);
+  assert.equal(r.renameEntry("endings", "saved", "rescued"), "rescued");
+  assert.match(r.toString(), /end_game\("rescued"\)/);
+  assert.equal(r.renameEntry("verbs", "tune", "adjust"), "adjust");
+  assert.match(r.toString(), /adjust: open_choice\("radio_dial"\)/, "the verb's handlers follow it");
+  assert.equal(r.renameEntry("choices", "radio_dial", "dial"), "dial");
+  assert.match(r.toString(), /open_choice\("dial"\)/);
+  assert.deepEqual(errors(r.toString(), helpers), []);
+  assert.equal(renameInCode("timers", "storm", "gale")('start_timer("storm"); stop_timer( "storm" ); timer_left("stormy")'), 'start_timer("gale"); stop_timer( "gale" ); timer_left("stormy")');
+  assert.equal(renameInCode("vars", "gold", "coins")("vars.gold = vars.gold + vars.golden"), "vars.coins = vars.coins + vars.golden");
 }
 
 assert.equal(slug("Dark Cellar!"), "dark_cellar");

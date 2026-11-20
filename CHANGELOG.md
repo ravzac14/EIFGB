@@ -6,6 +6,13 @@ behave will be called out here.
 
 ## Unreleased
 
+- Renaming in the editor reaches everything: changing a room's, object's
+  or character's ID updates every reference (exits, doors, `via`, keys,
+  reveal and timer rules, characters' things) and the Lua code that names
+  it (`world.hall`), in game.yaml and in script files, and the room keeps
+  its place on the map. Renaming an ending, conversation, timer, goal or
+  verb updates `end_game("…")`, `open_choice("…")`, `start_timer("…")`,
+  `start_goal("…")` and a verb's handlers. One UNDO takes it all back.
 - Pictures: a room, object or character can have a `picture` (a file
   beside the game, or an https address) and `alt` words for players who
   can't see it. A room's shows above its description and with the map; a

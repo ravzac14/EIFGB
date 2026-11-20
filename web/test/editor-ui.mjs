@@ -493,6 +493,26 @@ assert.doesNotMatch(yaml(), /scripts:/);
 $("#redo").click();
 assert.ok(projectFiles()["scripts/helpers.lua"]);
 
+// Renaming something reaches the script files too, and UNDO takes it all back.
+deselect();
+[...document.querySelectorAll("#inspector .thing")].find((r) => r.textContent.includes("scripts/helpers.lua")).click();
+assert.equal($("#file").value, "scripts/helpers.lua");
+$("#yaml").value = "function shine()\n  say(world.treasure.name)\nend\n";
+$("#yaml").dispatchEvent(new Event("input"));
+await tick(700);
+// The coin is in the chest: up to the room the chest is in.
+let coinRoom = "treasure";
+for (let i = 0; i < 5 && !$(`#map [data-room="${coinRoom}"]`); i++) coinRoom = projectFiles()["game.yaml"].match(new RegExp(`\\n  ${coinRoom}:\\n(?:    .*\\n)*?    in: (\\w+)`))[1];
+press($(`#map [data-room="${coinRoom}"]`));
+rows().find((r) => r.textContent.includes("silver coin")).click();
+inputIn("Thing ID").value = "loot";
+buttonIn("Rename").click();
+assert.match(projectFiles()["game.yaml"], /\n  loot:\n\s+name: silver coin/);
+assert.equal(projectFiles()["scripts/helpers.lua"], "function shine()\n  say(world.loot.name)\nend\n");
+$("#undo").click();
+assert.equal(projectFiles()["scripts/helpers.lua"], "function shine()\n  say(world.treasure.name)\nend\n");
+$("#redo").click();
+
 await tick(1500);
 assert.doesNotMatch($("#panel-problems").textContent, /Error/, $("#panel-problems").textContent);
 

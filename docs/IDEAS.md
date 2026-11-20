@@ -39,8 +39,6 @@ Everything from the first list has now been built:
 
 - **A puzzle chain view:** what unlocks what (key → door → room →
   ending), flagging endings nobody can reach and keys that open nothing.
-- **Rename everywhere:** change an id and every reference follows: exits,
-  `unlocks_with`, scripts and `map.yaml`.
 - **"What did players try?":** test play keeps the commands the game
   didn't understand, and suggests objects or synonyms to add.
 

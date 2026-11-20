@@ -58,6 +58,38 @@ export interface Door {
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : isScalar(v) && typeof v.value === "string" ? v.value : undefined);
 
 /** A readable ID from a name: "Dark Cellar" → "dark_cellar". */
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * How Lua code refers to something by its ID, rewritten for a rename:
+ * `world.hall`, `vars.gold`, `end_game("won")` and so on. For game.yaml's
+ * scripts and the project's .lua files alike.
+ */
+export function renameInCode(kind: RenameKind, old: string, next: string): (code: string) => string {
+  const o = esc(old);
+  const call = (fns: string[]) => new RegExp(`\\b(${fns.join("|")})(\\s*\\(\\s*)(["'])${o}\\3`, "g");
+  const rules: [RegExp, string][] =
+    kind === "entity"
+      ? [
+          [new RegExp(`\\bworld(\\s*)\\.(\\s*)${o}\\b`, "g"), `world$1.$2${next}`],
+          [new RegExp(`\\bworld\\[(\\s*)(["'])${o}\\2(\\s*)\\]`, "g"), `world[$1$2${next}$2$3]`],
+        ]
+      : kind === "vars"
+        ? [[new RegExp(`\\bvars(\\s*)\\.(\\s*)${o}\\b`, "g"), `vars$1.$2${next}`], [new RegExp(`\\bvars\\[(["'])${o}\\1\\]`, "g"), `vars[$1${next}$1]`]]
+        : kind === "endings"
+          ? [[call(["end_game"]), `$1$2$3${next}$3`]]
+          : kind === "choices"
+            ? [[call(["open_choice"]), `$1$2$3${next}$3`]]
+            : kind === "timers"
+              ? [[call(["start_timer", "stop_timer", "timer_left"]), `$1$2$3${next}$3`]]
+              : kind === "goals"
+                ? [[call(["start_goal", "complete_goal"]), `$1$2$3${next}$3`], [new RegExp(`\\bgoals(\\s*)\\.(\\s*)${o}\\b`, "g"), `goals$1.$2${next}`]]
+                : [];
+  return (code) => rules.reduce((s, [re, to]) => s.replace(re, to), code);
+}
+
+export type RenameKind = "entity" | "vars" | "endings" | "choices" | "timers" | "goals" | "verbs" | "hints";
+
 export function slug(name: string, fallback = "room"): string {
   let s = name
     .normalize("NFKD")
@@ -509,7 +541,13 @@ export class Model {
     this.tidyState(["objects", id]);
   }
 
-  /** Renames a thing's ID, and what refers to it: `in:`, keys, and reveal rules. */
+  /**
+   * The last rename, for what's outside the game file: the editor rewrites
+   * the .lua files with `code`, and moves a room's place on the map.
+   */
+  lastRename: { kind: RenameKind; old: string; next: string; code: (s: string) => string } | null = null;
+
+  /** Renames a thing's ID, and everything that refers to it. */
   renameThing(old: string, next: string): string | null {
     next = slug(next, "thing");
     if (next === old) return old;
@@ -518,8 +556,63 @@ export class Model {
     const pair = objects?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
     if (!pair) return null;
     pair.key = new Scalar(next);
-    this.retarget(old, next);
+    this.renameEntityRefs(old, next);
     return next;
+  }
+
+  /**
+   * Every reference to an entity's ID: exits (to, through, via), `in`,
+   * keys, characters' things and areas, noises, door sides, the start
+   * room, rules ("search mat"), and Lua code anywhere in the file.
+   */
+  private renameEntityRefs(old: string, next: string) {
+    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden"]);
+    const RULES = new Set(["revealed_by", "started_by", "stopped_by"]);
+    const code = renameInCode("entity", old, next);
+    const rule = (s: string) => s.replace(new RegExp(`^(\\s*(?:\\([^)]*\\)|[\\w-]+)\\s+)${esc(old)}(\\s*)$`), `$1${next}$2`);
+    const visit = (node: unknown, key: string | null) => {
+      if (isMap(node)) {
+        for (const p of node.items) {
+          const k = String(isScalar(p.key) ? p.key.value : p.key);
+          if (isScalar(p.value) || isSeq(p.value) || isMap(p.value)) visit(p.value, k);
+        }
+      } else if (isSeq(node)) {
+        for (const item of node.items) visit(item, key);
+      } else if (isScalar(node) && typeof node.value === "string") {
+        const v = node.value;
+        if (key && REFS.has(key)) {
+          if (v === old) node.value = next;
+        } else if (key && RULES.has(key)) node.value = rule(v);
+        else {
+          const out = code(v);
+          if (out !== v) node.value = out;
+        }
+      }
+    };
+    visit(this.doc.contents, null);
+    const start = this.doc.getIn(["game", "start"], true);
+    if (isScalar(start) && start.value === old) start.value = next;
+    // Exits written as just a room: `north: hall`.
+    for (const id of this.roomIds()) {
+      for (const p of this.map(["rooms", id, "exits"])?.items ?? []) {
+        if (isScalar(p.value) && p.value.value === old) p.value.value = next;
+        if (isSeq(p.value)) for (const i of p.value.items) if (isScalar(i) && i.value === old) i.value = next;
+      }
+    }
+    this.lastRename = { kind: "entity", old, next, code };
+  }
+
+  /** Applies a code rewrite to every string in the game file. */
+  private rewriteCode(code: (s: string) => string) {
+    const visit = (node: unknown) => {
+      if (isMap(node)) for (const p of node.items) visit(p.value);
+      else if (isSeq(node)) for (const i of node.items) visit(i);
+      else if (isScalar(node) && typeof node.value === "string") {
+        const out = code(node.value);
+        if (out !== node.value) node.value = out;
+      }
+    };
+    visit(this.doc.contents);
   }
 
   /** Points `in:`, `unlocks_with` and `revealed_by` rules at `next` (or drops them, for null). */
@@ -634,11 +727,7 @@ export class Model {
     const pair = this.map(["characters"])?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
     if (!pair) return null;
     pair.key = new Scalar(next);
-    // What it carries.
-    for (const o of this.objectIds()) {
-      const v = this.doc.getIn(["objects", o, "in"], true);
-      if (isScalar(v) && v.value === old) v.value = next;
-    }
+    this.renameEntityRefs(old, next);
     return next;
   }
 
@@ -873,6 +962,20 @@ export class Model {
     };
     if (section === "endings") for (const t of this.keys("timers")) swap(["timers", t, "end"]);
     if (section === "choices") for (const c of this.characterIds()) swap(["characters", c, "talk"]);
+    // A verb's handlers, everywhere: `on: { ring: ... }`.
+    if (section === "verbs") {
+      const owners: string[][] = [[], ...this.roomIds().map((r) => ["rooms", r]), ...this.objectIds().map((o) => ["objects", o]), ...this.characterIds().map((c) => ["characters", c])];
+      for (const o of owners) {
+        for (const phase of ["", "before_", "after_"]) {
+          const p = this.map([...o, "on"])?.items.find((i) => (isScalar(i.key) ? i.key.value : i.key) === `${phase}${old}`);
+          if (p) p.key = new Scalar(`${phase}${next}`);
+        }
+      }
+    }
+    const kind = section as RenameKind;
+    const code = renameInCode(kind, old, next);
+    this.rewriteCode(code);
+    this.lastRename = { kind, old, next, code };
     return next;
   }
 
@@ -1064,7 +1167,7 @@ export class Model {
     const pair = rooms?.items.find((p) => (isScalar(p.key) ? p.key.value : p.key) === old) as Pair | undefined;
     if (!pair) return null;
     pair.key = new Scalar(next);
-    this.replaceRefs(old, next);
+    this.renameEntityRefs(old, next);
     return next;
   }
 

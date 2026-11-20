@@ -99,7 +99,6 @@ Everything from the first list has now been built:
 
 ## The website
 
-- **A featured game** at the top of the gallery.
 - **Ratings and play counts** for gallery games, kept privately in each
   browser first.
 - **A "Game jam" page:** a theme, a deadline, and the entries.

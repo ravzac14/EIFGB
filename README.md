@@ -1091,6 +1091,12 @@ before it's added, then `"active"`, then `"done"`.
 In the web editor, add one with **Add component → Goal**, or under
 **Goals** in the game's details.
 
+Players can also keep notes of their own, in any game: NOTE THE GUARD
+SLEEPS AFTER DARK. A note is the rest of the line exactly as typed, it
+takes no turn, and JOURNAL (or NOTES) lists them under the goals. Notes
+are kept with the game's saves, but UNDO and RESTART leave them alone:
+they're the player's, not the story's.
+
 ## Time of day
 
 A game can keep a clock that moves on with each turn:
@@ -1963,7 +1969,9 @@ follows:
 | SCORE | | Shows your score, if the game keeps one. |
 | HELP | | A short guide to playing. |
 | HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
-| JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them. |
+| JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them, and your notes. |
+| NOTE … | JOT DOWN …, WRITE DOWN …, MAKE A NOTE … | Writes a note of your own, word for word: NOTE The code might be 4512. Takes no turn. |
+| NOTES | MY NOTES, NOTEBOOK | Your notes, numbered. ERASE NOTE 2 rubs one out; CLEAR NOTES rubs out all of them. |
 | TIME | WHAT TIME IS IT | The time of day, if the game keeps one. |
 | WHO IS HERE | WHO'S HERE, IS ANYONE HERE | Who else is in the room. |
 | WHAT CAN I DO | WHAT NOW, OPTIONS | A few things worth trying here, right now. |

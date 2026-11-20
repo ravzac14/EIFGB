@@ -249,6 +249,12 @@ verbs:
   suggest:
     action: suggest
     patterns: ["what can i do", "what now", "what should i do", "what do i do", "what next", "now what", "options", "commands", "verbs"]
+  notes:
+    action: notes
+    patterns: ["notes", "my notes", "read notes", "read my notes", "show notes", "notebook", "read notebook"]
+  erase_note:
+    action: erase_note
+    patterns: ["erase note {text}", "delete note {text}", "remove note {text}", "rub out note {text}", "cross out note {text}", "forget note {text}", "erase notes", "delete notes", "clear notes", "erase all notes", "delete all notes"]
   about:
     action: about
     patterns: ["about", "info", "information", "credits", "version", "author", "about this game", "about the game"]
@@ -817,6 +823,7 @@ lexicon:
     closely, carefully, thoroughly, quickly, slowly, gently, softly, firmly, properly, briefly,
     really, very, hard, harder, quietly, loudly, again, more, further, intently, cautiously
   ]
+  note_words: ["note", "jot down", "jot", "write down", "make a note", "make a note of"]
   my_words: [my, mine]
   one_words: [one, ones]
   other_words: [other, another]
@@ -1366,7 +1373,15 @@ messages:
   journal.done_goal: "✓ ${args.goal}"
   journal.all_done: "You've done everything you set out to do, for now."
   journal.empty: "You've nothing in particular to do yet. Have a look around."
-  journal.none_in_game: "This game doesn't keep a journal. Look around, and see what you can find."
+  journal.none_in_game: "This game doesn't keep a journal of goals. You can keep notes of your own, though: NOTE and then anything you like."
+  journal.notes: "Your notes:"
+  journal.note: "${args.n}. ${args.note}"
+  note.added: "[Noted, as note ${args.n}.${if args.first} NOTES or JOURNAL shows them; ERASE NOTE ${args.n} rubs one out.${end}]"
+  note.what: "Type NOTE and then your note: NOTE the guard sleeps after dark."
+  notes.none: "You haven't written any notes. Type NOTE and then anything: NOTE the code might be 4512."
+  note.erased: "[Note ${args.n} rubbed out.]"
+  note.no_such: "There's no note ${args.which}. NOTES lists them, numbered."
+  notes.cleared: "[All your notes rubbed out.]"
   clock.now: "It's ${args.time}${if args.day > 1}, on day ${args.day}${end}."
   clock.none: "There's no telling the time here."
   help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, SAVE and RESTORE keep your place, and HINT helps if you're stuck."

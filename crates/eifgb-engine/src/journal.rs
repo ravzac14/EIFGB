@@ -166,8 +166,16 @@ impl<H: ScriptHost> Game<H> {
     /// JOURNAL: the goals still to do, then those done.
     pub(crate) fn journal(&mut self) {
         if self.world.story().goals.is_empty() {
-            return self.msg("journal.none_in_game", &Ctx::new());
+            if self.world.state.notes.is_empty() {
+                return self.msg("journal.none_in_game", &Ctx::new());
+            }
+            return self.show_notes(false);
         }
+        self.journal_goals();
+        self.show_notes(false);
+    }
+
+    fn journal_goals(&mut self) {
         let goals = self.world.story().goals.clone();
         let (mut open, mut done) = (Vec::new(), Vec::new());
         for g in &goals {
@@ -195,6 +203,72 @@ impl<H: ScriptHost> Game<H> {
                 let text = self.render_str(&g.text, &Ctx::new());
                 self.msg("journal.done_goal", &Ctx::new().text("goal", text));
             }
+        }
+    }
+
+    // ------------------------------------------------------------- notes
+
+    /// A note, if the line is one: NOTE THE CODE IS 4512 (or the lexicon's
+    /// other `note_words`). The rest of the line, as typed.
+    pub(crate) fn note_in(&self, line: &str) -> Option<String> {
+        let t = line.trim();
+        let lower = t.to_lowercase();
+        // NOTE on its own: how to write one, unless something here is called a note.
+        if self.world.story().lexicon.note_words.contains(&lower) && self.grammar.name_matches(&self.world, std::slice::from_ref(&lower)).is_empty() {
+            return Some(String::new());
+        }
+        let lead = self.world.story().lexicon.note_words.iter().filter(|w| {
+            lower.starts_with(w.as_str()) && lower[w.len()..].chars().next().is_some_and(|c| c.is_whitespace() || c == ':')
+        });
+        let w = lead.max_by_key(|w| w.len())?;
+        let rest = t[w.len()..].trim_start_matches([' ', ':', '\t']).trim();
+        // "note that the code…": the "that" isn't part of it.
+        let rest = rest.strip_prefix("that ").or_else(|| rest.strip_prefix("That ")).unwrap_or(rest).trim();
+        Some(rest.to_string())
+    }
+
+    pub(crate) fn add_note(&mut self, note: String) {
+        if note.is_empty() {
+            return self.msg("note.what", &Ctx::new());
+        }
+        let first = self.world.state.notes.is_empty();
+        self.world.state.notes.push(note);
+        let n = self.world.state.notes.len() as i64;
+        self.msg_kind(LineKind::Notice, "note.added", &Ctx::new().value("n", Value::Int(n)).value("first", Value::Bool(first)));
+    }
+
+    /// NOTES, or the end of JOURNAL. `asked`: said even when there are none.
+    pub(crate) fn show_notes(&mut self, asked: bool) {
+        let notes = self.world.state.notes.clone();
+        if notes.is_empty() {
+            if asked {
+                self.msg("notes.none", &Ctx::new());
+            }
+            return;
+        }
+        self.msg("journal.notes", &Ctx::new());
+        for (i, n) in notes.iter().enumerate() {
+            self.msg("journal.note", &Ctx::new().value("n", Value::Int(i as i64 + 1)).text("note", n.clone()));
+        }
+    }
+
+    /// ERASE NOTE 2, ERASE NOTES.
+    pub(crate) fn erase_note(&mut self, which: &str) {
+        let which = which.trim().trim_start_matches('#');
+        if which.is_empty() || matches!(which, "all" | "everything" | "notes" | "them" | "all notes") {
+            if self.world.state.notes.is_empty() {
+                return self.msg("notes.none", &Ctx::new());
+            }
+            self.world.state.notes.clear();
+            return self.msg("notes.cleared", &Ctx::new());
+        }
+        let n = which.parse::<usize>().ok().or_else(|| self.world.story().lexicon.numbers.get(which).map(|&n| n as usize));
+        match n.filter(|&n| n >= 1 && n <= self.world.state.notes.len()) {
+            Some(n) => {
+                self.world.state.notes.remove(n - 1);
+                self.msg("note.erased", &Ctx::new().value("n", Value::Int(n as i64)));
+            }
+            None => self.msg("note.no_such", &Ctx::new().text("which", which.to_string())),
         }
     }
 

@@ -69,8 +69,6 @@ Everything from the first list has now been built:
 ## The player
 
 - **Bookmarks in the story:** mark a moment and jump back to read it.
-- **A notebook:** players can type NOTE … to keep their own notes with
-  their save.
 - **Achievements:** optional `achievements:` a game can award, shown
   with the endings found.
 

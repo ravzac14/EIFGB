@@ -123,6 +123,8 @@ pub struct Game<H: ScriptHost> {
     pub(crate) quiet_wait: bool,
     /// What the player was holding when this input began.
     held_before: Vec<EntityId>,
+    /// A meta command's free text (ERASE NOTE 2).
+    last_text: Option<String>,
     /// Whether the room was dark when it was last described: when that
     /// changes some other way (a script, a timer), it's described again.
     pub(crate) seen_dark: Option<bool>,
@@ -158,6 +160,7 @@ impl<H: ScriptHost> Game<H> {
             passing: false,
             quiet_wait: false,
             held_before: Vec::new(),
+            last_text: None,
             seen_dark: None,
             heard_nearby: None,
             sneaking: false,
@@ -200,6 +203,8 @@ impl<H: ScriptHost> Game<H> {
         self.held_before = self.world.ids().filter(|&t| t != PLAYER && self.world.is_within(t, PLAYER)).collect();
         if self.world.state.choice.is_some() {
             self.choice_input(line);
+        } else if let Some(note) = self.note_in(line) {
+            self.add_note(note);
         } else {
             let line = self.addressed(line);
             let commands = self.grammar.split_commands(&line);
@@ -218,8 +223,13 @@ impl<H: ScriptHost> Game<H> {
     /// Loads a save the host fetched after `restore_requested`.
     pub fn restore(&mut self, json: &str) -> Output {
         self.out = Output::default();
+        let notes = self.world.state.notes.clone();
         match self.world.restore(json) {
             Ok(()) => {
+                // The notebook stays the player's: an older save doesn't take notes away.
+                if !notes.is_empty() {
+                    self.world.state.notes = notes;
+                }
                 self.pending = None;
                 self.msg_kind(LineKind::Notice, "restore.done", &Ctx::new());
                 self.look();
@@ -510,6 +520,7 @@ impl<H: ScriptHost> Game<H> {
         if let VerbAction::Builtin(a) = verb.action
             && a.is_meta()
         {
+            self.last_text = cmd.text.clone();
             return self.meta(a);
         }
         if self.world.state.ending.is_some() {
@@ -555,7 +566,9 @@ impl<H: ScriptHost> Game<H> {
             }
             BuiltinAction::Undo => {
                 self.pending = None;
+                let notes = self.world.state.notes.clone();
                 if self.world.undo() {
+                    self.world.state.notes = notes;
                     self.msg_kind(LineKind::Notice, "undo.done", &ctx);
                     self.look();
                     if self.world.state.choice.is_some() {
@@ -571,7 +584,9 @@ impl<H: ScriptHost> Game<H> {
             }
             BuiltinAction::Restore => self.out.restore_requested = true,
             BuiltinAction::Restart => {
+                let notes = std::mem::take(&mut self.world.state.notes);
                 self.world.restart(self.seed);
+                self.world.state.notes = notes;
                 self.pending = None;
                 self.last = None;
                 self.intro();
@@ -585,6 +600,11 @@ impl<H: ScriptHost> Game<H> {
             BuiltinAction::Who => self.who(),
             BuiltinAction::Suggest => self.suggest(),
             BuiltinAction::About => self.about(),
+            BuiltinAction::Notes => self.show_notes(true),
+            BuiltinAction::EraseNote => {
+                let which = self.last_text.take().unwrap_or_default();
+                self.erase_note(&which);
+            }
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }

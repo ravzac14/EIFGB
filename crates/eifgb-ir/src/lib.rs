@@ -1320,6 +1320,10 @@ pub enum BuiltinAction {
     Pour,
     /// TYPE 4512 (on the keypad): a code.
     EnterCode,
+    /// The player's notes.
+    Notes,
+    /// Erase a note (or all of them).
+    EraseNote,
 }
 
 impl BuiltinAction {
@@ -1340,6 +1344,8 @@ impl BuiltinAction {
                 | BuiltinAction::Who
                 | BuiltinAction::Suggest
                 | BuiltinAction::About
+                | BuiltinAction::Notes
+                | BuiltinAction::EraseNote
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )
@@ -1438,6 +1444,10 @@ pub struct Lexicon {
     /// Times of day by name: word → "dawn", "dusk" or a time ("12:00").
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub times: BTreeMap<String, String>,
+    /// How a note starts: NOTE THE CODE IS 4512. The rest of the line, as
+    /// typed, is the note.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub note_words: Vec<String>,
     /// "my hat": things the player has come first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub my_words: Vec<String>,

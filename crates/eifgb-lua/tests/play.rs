@@ -3798,7 +3798,7 @@ fn scripts_see_goals_and_mistakes_are_reported() {
     assert!(out.diagnostics.iter().any(|d| d.path == "goals.ring.text"), "{:#?}", out.diagnostics);
     // A game without goals says so.
     let mut g = game(compile_str(&GOALS[..GOALS.find("goals:").unwrap()].replace("; complete_goal(\"ring\")", "")).story.unwrap());
-    assert!(say(&mut g, "journal").starts_with("This game doesn't keep a journal."));
+    assert!(say(&mut g, "journal").starts_with("This game doesn't keep a journal of goals."));
 }
 
 // ---------------------------------------------------------------- clock
@@ -4625,4 +4625,37 @@ fn companions_in_the_dark() {
     assert_says(&mut h, "dog, fetch bone", "The dog goes to fetch the bone.");
     assert_says(&mut h, "wait", "The dog drops the bone at your feet.");
     assert_eq!(say(&mut h, "take bone"), "Taken.");
+}
+
+#[test]
+fn players_keep_notes_of_their_own() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/templates/small_house");
+    let story = || compile(&DirFiles { root: root.clone() }, "game.yaml").story.unwrap();
+    let mut g = game(story());
+    assert_says(&mut g, "notes", "You haven't written any notes.");
+    assert_says(&mut g, "note", "Type NOTE and then your note");
+    // As typed: capitals and punctuation kept; no turn taken.
+    assert_says(&mut g, "Note: the code might be 4512. Try the safe!", "[Noted, as note 1. NOTES or JOURNAL shows them");
+    assert_eq!(say(&mut g, "jot down Guard sleeps after dark"), "[Noted, as note 2.]");
+    assert_eq!(g.world().state.turn, 0);
+    assert_eq!(say(&mut g, "notes"), "Your notes:\n1. the code might be 4512. Try the safe!\n2. Guard sleeps after dark");
+    // JOURNAL: the goals, then the notes.
+    assert!(say(&mut g, "journal").ends_with("Your notes:\n1. the code might be 4512. Try the safe!\n2. Guard sleeps after dark"));
+    // UNDO and RESTART leave them alone; saves keep them.
+    say(&mut g, "wait");
+    say(&mut g, "undo");
+    say(&mut g, "restart");
+    assert_says(&mut g, "notes", "2. Guard sleeps after dark");
+    let saved = g.world().save();
+    let mut h = game(story());
+    h.restore(&saved);
+    assert_says(&mut h, "notes", "1. the code might be 4512.");
+    assert_eq!(say(&mut h, "erase note 1"), "[Note 1 rubbed out.]");
+    assert_eq!(say(&mut h, "notes"), "Your notes:\n1. Guard sleeps after dark");
+    assert_says(&mut h, "erase note 7", "There's no note 7.");
+    assert_eq!(say(&mut h, "clear notes"), "[All your notes rubbed out.]");
+    // NOTE on its own, with a note in the room, looks at the note.
+    say(&mut h, "s");
+    say(&mut h, "w");
+    assert_says(&mut h, "note", "sticky note");
 }

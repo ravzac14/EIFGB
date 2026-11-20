@@ -6,6 +6,10 @@ behave will be called out here.
 
 ## Unreleased
 
+- Players can keep notes: NOTE THE CODE MIGHT BE 4512 writes one, word for
+  word, with no turn taken. JOURNAL and NOTES list them; ERASE NOTE 2 and
+  CLEAR NOTES rub them out. They're kept with saves, and UNDO and RESTART
+  leave them alone.
 - How things behave, with no scripts needed:
   - Flames: `needs_flame` lights (candles) light only from something
     burning; LIGHT THE CANDLE WITH THE MATCHES strikes the match first.

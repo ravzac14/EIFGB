@@ -56,6 +56,10 @@ pub struct GameState {
     /// The action when the weather next turns.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weather_due: Option<u64>,
+    /// The player's own notes (NOTE …), as typed. Kept with saves, and
+    /// through UNDO and RESTART: they're the player's, not the story's.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -114,6 +118,7 @@ impl GameState {
             fired: BTreeSet::new(),
             weather: None,
             weather_due: None,
+            notes: Vec::new(),
         }
     }
 }

@@ -4365,3 +4365,26 @@ fn a_timer_can_say_something_else_after_the_first_time() {
     let mut k = game(compile_str(&src("")).story.unwrap());
     assert!(fired(&mut k).iter().all(|t| t.ends_with("Thunder rolls in the distance.")));
 }
+
+#[test]
+fn a_timer_can_be_heard_only_in_some_places() {
+    let src = |heard: &str| format!(
+        "format: eifgb/0.1\ngame: {{ id: t, title: T, version: '1', start: hall }}\nrooms:\n  hall: {{ name: Hall, exits: {{ north: tower }} }}\n  tower: {{ name: Tower, exits: {{ south: hall }} }}\nobjects:\n  clock: {{ name: clock, in: hall, traits: [portable] }}\nvars: {{ chimes: 0 }}\ntimers:\n  chime:\n    every: 2\n    heard_in: {heard}\n    say: The bell tolls.\n    say_again: The bell tolls again.\n    do: vars.chimes = vars.chimes + 1\n"
+    );
+    let mut g = game(compile_str(&src("tower")).story.unwrap());
+    say(&mut g, "wait");
+    assert!(!say(&mut g, "wait").contains("bell"), "not heard in the hall");
+    assert_eq!(g.world().state.vars["chimes"], eifgb_engine::ir::Value::Int(1), "but it went off");
+    say(&mut g, "n");
+    // The first time it's heard is the first time.
+    assert_says(&mut g, "wait", "The bell tolls.");
+    say(&mut g, "wait");
+    assert_says(&mut g, "wait", "The bell tolls again.");
+    // A thing: heard wherever it is.
+    let mut h = game(compile_str(&src("clock")).story.unwrap());
+    say(&mut h, "take clock");
+    assert_says(&mut h, "n", "The bell tolls.");
+    say(&mut h, "drop clock");
+    say(&mut h, "s");
+    assert!(!say(&mut h, "wait").contains("bell"), "the clock's in the tower now");
+}

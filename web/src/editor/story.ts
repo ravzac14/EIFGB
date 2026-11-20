@@ -502,6 +502,29 @@ function ruleBuilder(ctx: InspectorContext, path: string[], label: string, none:
   ];
 }
 
+/** Where a timer's message is heard: rooms, or things (heard wherever they are). */
+function heardIn(ctx: InspectorContext, p: string[]): HTMLElement[] {
+  const m = ctx.model;
+  const raw = m.get([...p, "heard_in"]);
+  const list = (Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : []).filter((v): v is string => typeof v === "string");
+  const write = (next: string[]) => ctx.change((x) => x.set([...p, "heard_in"], next.length === 0 ? undefined : next.length === 1 ? next[0] : next));
+  const nameOf = (id: string) => m.room(id)?.name ?? m.thing(id)?.name ?? id;
+  const options: [string, string][] = [
+    ...m.rooms().filter((r) => !list.includes(r.id)).map((r): [string, string] => [r.id, r.name]),
+    ...m.things().filter((t) => !list.includes(t.id)).map((t): [string, string] => [t.id, `${t.name} (wherever it is)`]),
+  ];
+  let pick = options[0]?.[0] ?? "";
+  return [
+    el("label", { textContent: "It's heard" }),
+    ...(list.length
+      ? list.map((id) => el("div", { class: "row" }, el("span", { textContent: `In ${nameOf(id)}` }), button("✕", () => write(list.filter((x) => x !== id)), "small")))
+      : [help("Everywhere. Add a room to be heard only there (it still goes off elsewhere, quietly), or a thing, like a clock, to be heard wherever it is.")]),
+    ...(options.length
+      ? [el("div", { class: "row" }, select(options, pick, (v) => (pick = v), "Where it's heard"), button("Add", () => pick && write([...list, pick])))]
+      : []),
+  ];
+}
+
 /** Turns as typed: 5, or a range, "5-10" (also "5 to 10"); null if it isn't one. */
 export function turns(s: string): number | string | null {
   const m = /^\s*(\d+)\s*(?:(?:-|to|\.\.)\s*(\d+)\s*)?$/.exec(s);
@@ -554,6 +577,7 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
       placeholder: "More thunder.",
       help: "Optional. Leave it empty to say the same thing every time.",
     }),
+    ...heardIn(ctx, p),
     el("label", { textContent: "Then ends the game with" }),
     select([["", "(nothing: the game goes on)"], ...endings.map((e): [string, string] => [e, e.replace(/_/g, " ")])], str("end"), (v) => ctx.change((x) => x.set([...p, "end"], v || undefined)), "Ending"),
     el(

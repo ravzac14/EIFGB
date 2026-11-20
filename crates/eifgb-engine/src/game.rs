@@ -880,10 +880,15 @@ impl<H: ScriptHost> Game<H> {
             {
                 continue;
             }
-            // The first time, `say`; after that, `say_again` if there is one.
-            let again = !self.world.state.fired.insert(t.key.clone());
-            if let Some(s) = t.say_again.as_ref().filter(|_| again).or(t.say.as_ref()) {
-                self.render_line(LineKind::Text, s, &Ctx::new());
+            // Heard only where it's heard (a room, or wherever a thing is).
+            let here = self.world.here();
+            let heard = t.heard_in.is_empty() || t.heard_in.iter().any(|&h| h == here || self.world.room_of(h) == Some(here));
+            // The first time it's heard, `say`; after that, `say_again` if there is one.
+            if heard && (t.say.is_some() || t.say_again.is_some()) {
+                let again = !self.world.state.fired.insert(t.key.clone());
+                if let Some(s) = t.say_again.as_ref().filter(|_| again).or(t.say.as_ref()) {
+                    self.render_line(LineKind::Text, s, &Ctx::new());
+                }
             }
             if let Some(r) = &t.run {
                 self.run(r, &Ctx::new());

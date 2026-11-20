@@ -566,7 +566,7 @@ export class Model {
    * room, rules ("search mat"), and Lua code anywhere in the file.
    */
   private renameEntityRefs(old: string, next: string) {
-    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden"]);
+    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in"]);
     const RULES = new Set(["revealed_by", "started_by", "stopped_by"]);
     const code = renameInCode("entity", old, next);
     const rule = (s: string) => s.replace(new RegExp(`^(\\s*(?:\\([^)]*\\)|[\\w-]+)\\s+)${esc(old)}(\\s*)$`), `$1${next}$2`);

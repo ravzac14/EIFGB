@@ -6,6 +6,9 @@ behave will be called out here.
 
 ## Unreleased
 
+- A timer can be heard only in some places: `heard_in: tower` (a room, a
+  list of them, or a thing such as a clock, heard wherever it is).
+  Elsewhere it goes off unannounced. In the editor: "It's heard".
 - Timers can say something else after the first time: `say_again`. In the
   editor: "After the first time, it says". Left empty, `say` plays every
   time.

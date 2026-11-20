@@ -351,6 +351,9 @@ fn timers_are_checked() {
     assert_error(&t("every: 10-5, say: x"), "put the smaller number first");
     assert_error(&t("every: 0-5, say: x"), "at least 1");
     assert_error(&t("every: soon, say: x"), "a range to pick from at random");
+    assert_eq!(t("every: 2, say: x, heard_in: [hall, fuse]").story.unwrap().timers[0].heard_in.len(), 2);
+    assert_error(&t("every: 2, say: x, heard_in: attic"), "heard_in");
+    assert!(warnings(&t("every: 2, heard_in: hall, end: boom")).iter().any(|w| w.contains("heard_in: does nothing without 'say'")));
     assert_error(&t("after: 3, end: bom"), "did you mean 'boom'?");
     assert_error(&t("after: 3, started_by: kick fuze, say: x"), "did you mean 'fuse'?");
     let quiet = t("after: 3");

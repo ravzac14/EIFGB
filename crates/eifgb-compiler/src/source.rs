@@ -630,6 +630,10 @@ pub struct Timer {
     /// Said instead of `say` from the second time it goes off.
     #[serde(default)]
     pub say_again: Option<String>,
+    /// Where it's heard: a room, or a thing (heard wherever it is), or a
+    /// list. Anywhere else it goes off unannounced.
+    #[serde(default)]
+    pub heard_in: Option<OneOrMany>,
     #[serde(default, rename = "do")]
     pub run: Option<String>,
     /// Ends the game with this ending.

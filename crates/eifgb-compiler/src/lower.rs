@@ -1407,6 +1407,18 @@ impl<'a> Lowerer<'a> {
                 when: t.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
                 say: self.text_opt(t.say.as_deref(), &format!("{path}.say")),
                 say_again: self.text_opt(t.say_again.as_deref(), &format!("{path}.say_again")),
+                heard_in: {
+                    let heard: Vec<EntityId> = t
+                        .heard_in
+                        .iter()
+                        .flat_map(|h| h.items())
+                        .filter_map(|r| self.entity_ref(r, &format!("{path}.heard_in")))
+                        .collect();
+                    if !heard.is_empty() && t.say.is_none() && t.say_again.is_none() {
+                        self.d.warn(format!("{path}.heard_in"), "does nothing without 'say': it says where the timer's message is heard");
+                    }
+                    heard
+                },
                 run: t.run.as_deref().map(|r| self.code(r, &format!("{path}.do"))),
                 end,
                 noise,

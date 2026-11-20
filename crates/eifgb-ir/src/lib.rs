@@ -285,6 +285,10 @@ pub struct Timer {
     /// Said instead of `say` every time after the first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub say_again: Option<Text>,
+    /// Rooms (or things, heard in whatever room they're in) where `say`
+    /// is shown. Empty: everywhere.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heard_in: Vec<EntityId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run: Option<Code>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

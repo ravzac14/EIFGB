@@ -16,6 +16,7 @@
 //! * [`game`]: the turn loop, which is the entry point for hosts;
 //! * [`npc`]: what characters do on their turn: moving and fighting;
 //! * [`journal`]: goals for the JOURNAL, and the time of day;
+//! * `recall`: WHERE IS, RECAP, UNDO 3, OOPS, AGAIN WITH and ASK ABOUT a topic;
 //! * [`lang`]: language rules such as stemming, articles and lists.
 
 mod actions;
@@ -28,6 +29,7 @@ pub mod tracks;
 mod peek;
 mod fire;
 mod errands;
+mod recall;
 mod nature;
 pub mod parser;
 pub mod rng;

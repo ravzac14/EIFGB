@@ -6,6 +6,23 @@ behave will be called out here.
 
 ## Unreleased
 
+- Help for players, in every game:
+  - WHERE IS THE KEY (or FIND THE KEEPER) says where you last saw it, and
+    GO TO THE KEEPER walks you there. It's a reminder, not a hint: it only
+    knows what you've seen.
+  - UNDO 3 takes back three moves at once.
+  - OOPS LANTERN fixes the word the game didn't know in your last command,
+    and a slip too close to more than one word asks "Did you mean TAKE?"
+    instead of giving up.
+  - BRIEF stops describing places you've already been; VERBOSE goes back.
+  - RECAP sums up where things stand, for coming back to a game after a
+    while. A restored game mentions it.
+  - ASK THE KEEPER ABOUT THE GATE goes straight to the part of the
+    conversation about the gate.
+  - AGAIN WITH THE IRON KEY repeats your last command with something else.
+- BRIEF is now a command, so it's no longer an unknown word.
+- Fixed: FEEL FOR THE COIN in the dark no longer counts everything else
+  there as found.
 - Players can keep notes: NOTE THE CODE MIGHT BE 4512 writes one, word for
   word, with no turn taken. JOURNAL and NOTES list them; ERASE NOTE 2 and
   CLEAR NOTES rub them out. They're kept with saves, and UNDO and RESTART

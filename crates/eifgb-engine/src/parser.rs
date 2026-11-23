@@ -222,6 +222,33 @@ fn closest<'a>(word: &str, candidates: impl IntoIterator<Item = &'a String>) -> 
     if tie { None } else { best.map(|(_, c)| c) }
 }
 
+/// Words a typo might have meant, when [`closest`] can't be sure: the
+/// nearest few (ties included), allowing one more slip in longer words.
+fn near_misses(word: &str, candidates: &[String]) -> Vec<String> {
+    let n = word.chars().count();
+    if n < 3 || word.starts_with(ENTITY_TOKEN) || word.chars().all(|c| c.is_ascii_digit()) {
+        return Vec::new();
+    }
+    let limit = match n {
+        ..=4 => 1,
+        5..=7 => 2,
+        _ => 3,
+    };
+    let mut near: Vec<(usize, &String)> = candidates
+        .iter()
+        .filter(|c| c.chars().count() > 1)
+        .map(|c| (distance(word, c), c))
+        .filter(|&(d, _)| d > 0 && d <= limit)
+        .collect();
+    let Some(best) = near.iter().map(|&(d, _)| d).min() else { return Vec::new() };
+    near.retain(|&(d, _)| d == best);
+    let mut out: Vec<String> = near.into_iter().map(|(_, c)| c.clone()).collect();
+    out.sort();
+    out.dedup();
+    out.truncate(3);
+    out
+}
+
 impl Grammar {
     pub fn new(story: &Story) -> Grammar {
         let lx = &story.lexicon;
@@ -408,6 +435,73 @@ impl Grammar {
         out
     }
 
+    /// Verbs (and directions) a word that isn't one might have meant, for
+    /// "Did you mean…?". None for a word that names something.
+    pub fn verb_guesses(&self, word: &str) -> Vec<String> {
+        let names = |w: &str| self.vocab_words.contains(w) || self.corpse_words.contains(w);
+        if names(word) || (self.lang.stems)(word).iter().any(|s| names(s)) {
+            return Vec::new();
+        }
+        let mut starts: Vec<String> =
+            self.verb_words.iter().chain(self.directions.keys()).chain(self.phrases.iter().map(|(k, _)| &k[0])).cloned().collect();
+        starts.sort();
+        starts.dedup();
+        near_misses(word, &starts)
+    }
+
+    /// Names of things here a word might have meant.
+    pub fn noun_guesses(&self, world: &World, word: &str) -> Vec<String> {
+        let vocab: Vec<String> = world
+            .scope()
+            .into_iter()
+            .flat_map(|e| {
+                let v = &world.def(e).vocab;
+                v.nouns.iter().chain(&v.adjectives).cloned().collect::<Vec<_>>()
+            })
+            .collect();
+        near_misses(word, &vocab)
+    }
+
+    /// AGAIN WITH THE IRON KEY: the last command's words with a different
+    /// object, as the readings worth trying, best first. After a linking
+    /// word it's the second object ("unlock door with brass key", "again
+    /// with the iron key"), or a new way of putting it ("put coin in box",
+    /// "again on the table"), or added ("unlock door", "again with the
+    /// key"), or else the first object ("put coin in box", "again with the
+    /// ring"). Without one, it's the first object.
+    pub fn swap_object(&self, world: &World, last: &[String], new: &[String]) -> Vec<Vec<String>> {
+        let mut cands = self.candidates(world.story(), last);
+        cands.sort_by_key(|c| std::cmp::Reverse(c.specificity));
+        // The reading that made sense then; the thing may be gone by now.
+        let ok = cands.iter().position(|c| self.resolve_candidate(world, last, c).is_ok()).unwrap_or(0);
+        let Some(c) = cands.get(ok) else { return Vec::new() };
+        let splice = |(s, e): (usize, usize), words: &[String]| -> Vec<String> {
+            last[..s].iter().chain(words).chain(&last[e..]).cloned().collect()
+        };
+        let link = |w: &String| self.pattern_words.contains(w) && !self.vocab_words.contains(w) && !self.articles.contains(w);
+        let mut out = Vec::new();
+        let rest = match new.first().filter(|w| link(w)) {
+            Some(w) => {
+                let rest = &new[1..];
+                match c.caps.tool {
+                    Some((s, e)) if s > 0 && last[s - 1] == *w => out.push(splice((s, e), rest)),
+                    Some((s, e)) if s > 0 && link(&last[s - 1]) => out.push(splice((s - 1, e), new)),
+                    Some(span) => out.push(splice(span, rest)),
+                    None => out.push(last.iter().chain(new).cloned().collect()),
+                }
+                rest
+            }
+            None => new,
+        };
+        if let Some(span) = c.caps.target.or(c.caps.tool)
+            && !rest.is_empty()
+        {
+            out.push(splice(span, rest));
+        }
+        out.retain(|w| w.as_slice() != last);
+        out
+    }
+
     fn is_known_start(&self, w: &str) -> bool {
         self.verb_words.contains(w) || self.directions.contains_key(w) || self.phrases.iter().any(|(k, _)| k[0] == w)
     }
@@ -418,9 +512,15 @@ impl Grammar {
         while let Some(f) = self.filler.iter().find(|f| toks.len() > f.len() && toks.starts_with(f)) {
             toks.drain(..f.len());
         }
-        // "look closely at the lamp": adverbs change nothing (unless they're a name).
+        // "look closely at the lamp": adverbs change nothing (unless they're a
+        // name, or the command itself: AGAIN WITH THE KEY).
         if toks.len() > 1 {
-            let kept: Vec<String> = toks.iter().filter(|w| !self.adverbs.contains(*w) || self.vocab_words.contains(*w)).cloned().collect();
+            let kept: Vec<String> = toks
+                .iter()
+                .enumerate()
+                .filter(|(i, w)| !self.adverbs.contains(*w) || self.vocab_words.contains(*w) || (*i == 0 && self.verb_words.contains(*w)))
+                .map(|(_, w)| w.clone())
+                .collect();
             if !kept.is_empty() {
                 toks = kept;
             }
@@ -755,7 +855,7 @@ impl Grammar {
                 for part in phrase[i + 1..].split(|w| self.and_words.contains(w)) {
                     let part: Vec<&String> = part.iter().filter(|w| !self.articles.contains(*w)).collect();
                     if !part.is_empty() {
-                        left_out.extend(self.match_scope(world, &items, &part));
+                        left_out.extend(self.match_scope(world, &items, &part, true));
                     }
                 }
                 let rest: Vec<EntityId> = items.into_iter().filter(|id| !left_out.contains(id)).collect();
@@ -763,7 +863,7 @@ impl Grammar {
             }
         }
         // "the key and the lamp": each of them, unless one thing is called that.
-        if words.iter().any(|w| self.and_words.contains(*w)) && self.match_scope(world, &scope, &words).is_empty() {
+        if words.iter().any(|w| self.and_words.contains(*w)) && self.match_scope(world, &scope, &words, true).is_empty() {
             let mut out = Vec::new();
             for part in phrase.split(|w| self.and_words.contains(w)) {
                 if part.iter().all(|w| self.articles.contains(w)) {
@@ -798,7 +898,7 @@ impl Grammar {
             }
         }
 
-        let mut matches = self.match_scope(world, &scope, &words);
+        let mut matches = self.match_scope(world, &scope, &words, true);
         // The room itself: "x room", "search here", "look at the hall".
         if matches.is_empty()
             && matches!(action, Some(BuiltinAction::Examine | BuiltinAction::Search))
@@ -848,7 +948,7 @@ impl Grammar {
                 .collect();
             if let Some(fixed) = fixed {
                 let refs: Vec<&String> = fixed.iter().collect();
-                matches = self.match_scope(world, &scope, &refs);
+                matches = self.match_scope(world, &scope, &refs, true);
             }
         }
 
@@ -911,7 +1011,7 @@ impl Grammar {
         }
         let things = |id: &EntityId| *id != PLAYER && world.def(*id).kind != eifgb_ir::EntityKind::Room;
         let mut found: Vec<EntityId> = if !rest.is_empty() {
-            let m = self.match_scope(world, scope, &rest);
+            let m = self.match_scope(world, scope, &rest, true);
             // "the brass one" stands in for the noun; "the dog one" isn't English.
             let last = rest[rest.len() - 1];
             if m.is_empty() || (one && m.iter().any(|id| world.def(*id).vocab.nouns.contains(last))) {
@@ -1018,21 +1118,35 @@ impl Grammar {
         if words.is_empty() {
             return Vec::new();
         }
-        self.match_scope(world, among, &words)
+        self.match_scope(world, among, &words, true)
     }
 
-    fn match_scope(&self, world: &World, scope: &[EntityId], words: &[&String]) -> Vec<EntityId> {
+    /// Like [`Grammar::name_matches_in`], for things out of sight: by the
+    /// names they always have, and the ones the player gave them, not by
+    /// how they are now ("the body", "the water"), which the player can't
+    /// know.
+    pub fn remembered_matches(&self, world: &World, phrase: &[String], among: &[EntityId]) -> Vec<EntityId> {
+        let words: Vec<&String> = phrase.iter().filter(|w| !self.articles.contains(*w)).collect();
+        if words.is_empty() {
+            return Vec::new();
+        }
+        self.match_scope(world, among, &words, false)
+    }
+
+    /// `live`: also by how things are now (dead, full of water, the door to
+    /// the north from here).
+    fn match_scope(&self, world: &World, scope: &[EntityId], words: &[&String], live: bool) -> Vec<EntityId> {
         let mut best_score = 0;
         let mut out = Vec::new();
         for &id in scope {
             let v = &world.def(id).vocab;
-            let dead = world.is_dead(id);
+            let dead = live && world.is_dead(id);
             // "corpse" for the dead; a name the player gave it, as a noun.
             let corpse_word = |s: &str| (dead && self.corpse_words.contains(s)) || world.named_word(id, s);
             // "the north door": a door named by the way it leads from here.
-            let door_way = |s: &str| self.direction_of(s).is_some_and(|d| world.door_toward(world.here(), d) == Some(id));
+            let door_way = |s: &str| live && self.direction_of(s).is_some_and(|d| world.door_toward(world.here(), d) == Some(id));
             // "the water": a bottle with water in it.
-            let liquid = |s: &str| world.def(id).holds_liquid && matches!(world.get(id, "liquid"), Some(eifgb_ir::Value::Str(l)) if l.split_whitespace().any(|w| w == s));
+            let liquid = |s: &str| live && world.def(id).holds_liquid && matches!(world.get(id, "liquid"), Some(eifgb_ir::Value::Str(l)) if l.split_whitespace().any(|w| w == s));
             let known = |w: &str| {
                 let check = |s: &str| {
                     v.nouns.iter().any(|n| n == s) || v.adjectives.iter().any(|a| a == s) || corpse_word(s) || door_way(s) || liquid(s)
@@ -1135,7 +1249,7 @@ impl Grammar {
         if words.is_empty() {
             return None;
         }
-        let hits = self.match_scope(world, options, &words);
+        let hits = self.match_scope(world, options, &words, true);
         (hits.len() == 1).then(|| hits[0])
     }
 
@@ -1191,6 +1305,15 @@ mod tests {
         assert_eq!(distance("tkae", "take"), 1);
         assert_eq!(distance("serch", "search"), 1);
         assert_eq!(distance("north", "north"), 0);
+    }
+
+    #[test]
+    fn near_misses_include_ties() {
+        let words: Vec<String> = ["take", "talk", "search", "x"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(near_misses("tak", &words), vec!["take".to_string(), "talk".to_string()]);
+        assert_eq!(near_misses("sarch", &words), vec!["search".to_string()]);
+        assert!(near_misses("xyzzy", &words).is_empty());
+        assert!(near_misses("ta", &words).is_empty());
     }
 
     #[test]

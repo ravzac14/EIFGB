@@ -1324,6 +1324,16 @@ pub enum BuiltinAction {
     Notes,
     /// Erase a note (or all of them).
     EraseNote,
+    /// WHERE IS THE KEY: where the player last saw something.
+    WhereIs,
+    /// OOPS LANTERN: the misspelled word in the last command, fixed.
+    Oops,
+    /// Describe every room in full, every time.
+    Verbose,
+    /// Describe rooms in full only the first time.
+    Brief,
+    /// What's happened so far, and where things stand.
+    Recap,
 }
 
 impl BuiltinAction {
@@ -1346,6 +1356,11 @@ impl BuiltinAction {
                 | BuiltinAction::About
                 | BuiltinAction::Notes
                 | BuiltinAction::EraseNote
+                | BuiltinAction::WhereIs
+                | BuiltinAction::Oops
+                | BuiltinAction::Verbose
+                | BuiltinAction::Brief
+                | BuiltinAction::Recap
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )
@@ -1448,6 +1463,12 @@ pub struct Lexicon {
     /// typed, is the note.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub note_words: Vec<String>,
+    /// "yes", "y": the answer to "Did you mean…?".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub yes_words: Vec<String>,
+    /// "no", "nope": turning down a "Did you mean…?" (not "n", which is north).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub no_words: Vec<String>,
     /// "my hat": things the player has come first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub my_words: Vec<String>,

@@ -1879,7 +1879,7 @@ follows:
 | SEARCH … | LOOK IN …, LOOK UNDER …, LOOK BEHIND … | Looks closely, and can turn up hidden things. |
 | N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT | NORTH, GO NORTH, CLIMB UP, … | Goes that way. |
 | GO THROUGH … | ENTER … | Goes through a door. |
-| GO TO … | WALK TO …, RETURN TO … | Walks to a place you've been, by the way you know, a turn a step. It stops if anything happens on the way, and UNDO takes the whole walk back. |
+| GO TO … | WALK TO …, RETURN TO … | Walks to a place you've been, by the way you know, a turn a step. It stops if anything happens on the way, and UNDO takes the whole walk back. GO TO THE KEEPER goes to where you last saw them. |
 | GO BACK | BACK, RETURN | Goes back to the room you just came from. |
 | KITCHEN | GO KITCHEN, ENTER KITCHEN | A place's name on its own goes there: next door, or anywhere you've been. |
 | GET IN … | SIT ON …, STAND ON …, CLIMB ON …, CLIMB INTO … | Gets into or onto something `enterable`. Standing on something reaches things up high. |
@@ -1932,7 +1932,7 @@ follows:
 
 | Command | Also | What it does |
 |---|---|---|
-| TALK TO … | SPEAK TO …, GREET …, ASK …, TELL …, ASK … ABOUT …, TELL … ABOUT … | Starts a conversation. With one person here to talk to, TALK or ASK ABOUT … needs no name. |
+| TALK TO … | SPEAK TO …, GREET …, ASK …, TELL …, ASK … ABOUT …, TELL … ABOUT … | Starts a conversation. With one person here to talk to, TALK or ASK ABOUT … needs no name. ASK THE KEEPER ABOUT THE GATE goes straight to the option that mentions the gate, when just one does. |
 | GIVE … TO … | HAND … TO …, FEED … TO … | Hands something over: a gift, or food for an animal. |
 | BRIBE … | PAY 5 TO …, BRIBE … WITH 5 | Pays someone off. |
 | TELL … TO … | ORDER … TO …, ASK … TO … | Gives an order to someone who'll take it: TELL THE DOG TO FETCH THE STICK. |
@@ -1962,12 +1962,16 @@ follows:
 |---|---|---|
 | WAIT | Z | Lets a turn go by. |
 | WAIT 3 | WAIT 10 MINUTES, WAIT AN HOUR, WAIT UNTIL DUSK, WAIT UNTIL 9:30 PM | Waits a while, stopping as soon as anything happens. Minutes, hours and times of day need a [clock](#time-of-day). |
-| AGAIN | G | Repeats your last command. |
-| UNDO | | Takes back your last turn. |
+| AGAIN | G | Repeats your last command. AGAIN WITH THE IRON KEY, or AGAIN, THE PEAR, repeats it with something else. |
+| UNDO | UNDO 3, TAKE BACK 3 | Takes back your last move, or several. |
+| OOPS … | | Fixes the word the game didn't know in your last command: after TAKE THE LANTREN, OOPS LANTERN. When a slip is too close to more than one word to fix by itself, the game asks "Did you mean TAKE?": answer YES, or the word. |
 | SAVE / RESTORE | LOAD | Saves your place, or goes back to a save. |
 | RESTART | | Starts the game again. |
 | SCORE | | Shows your score, if the game keeps one. |
 | HELP | | A short guide to playing. |
+| RECAP | SUMMARY, REMIND ME, WHERE WAS I | Where things stand: where you are, what you carry, your score and goals, and your last few moves. For coming back to a game after a while. |
+| WHERE IS … | FIND …, WHERE DID I LEAVE … | Where you last saw something or someone: "You last saw the old keeper in the Base of the Lighthouse." GO TO THE KEEPER walks you there. A reminder, not a hint: it only knows what you've seen, so it never tells you where something has gone since, or what's become of it. |
+| BRIEF / VERBOSE | | BRIEF names places you've been before without describing them again (LOOK still does); VERBOSE, the default, always describes them. Kept with saves, and through UNDO and RESTART. |
 | HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
 | JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them, and your notes. |
 | NOTE … | JOT DOWN …, WRITE DOWN …, MAKE A NOTE … | Writes a note of your own, word for word: NOTE The code might be 4512. Takes no turn. |

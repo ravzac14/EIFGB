@@ -255,6 +255,30 @@ verbs:
   erase_note:
     action: erase_note
     patterns: ["erase note {text}", "delete note {text}", "remove note {text}", "rub out note {text}", "cross out note {text}", "forget note {text}", "erase notes", "delete notes", "clear notes", "erase all notes", "delete all notes"]
+  where_is:
+    action: where_is
+    patterns:
+      - "where is {text}"
+      - "where's {text}"
+      - "where are {text}"
+      - "where did i see {text}"
+      - "where did i leave {text}"
+      - "where did i put {text}"
+      - "where did i last see {text}"
+      - "find {text}"
+      - "locate {text}"
+  oops:
+    action: oops
+    patterns: ["oops {text}", "oops"]
+  verbose:
+    action: verbose
+    patterns: ["verbose", "verbose mode", "long descriptions", "full descriptions", "describe rooms"]
+  brief:
+    action: brief
+    patterns: ["brief", "brief mode", "short descriptions", "superbrief"]
+  recap:
+    action: recap
+    patterns: ["recap", "summary", "summarize", "summarise", "remind me", "where was i", "what was i doing", "what's happened", "what has happened", "story so far", "so far"]
   about:
     action: about
     patterns: ["about", "info", "information", "credits", "version", "author", "about this game", "about the game"]
@@ -345,7 +369,7 @@ verbs:
     patterns: ["score"]
   undo:
     action: undo
-    patterns: ["undo"]
+    patterns: ["undo", "undo {text}", "take back {text}"]
   save:
     action: save
     patterns: ["save"]
@@ -746,7 +770,7 @@ verbs:
     default: "You'd rather not."
   again:
     action: again
-    patterns: ["again", "g"]
+    patterns: ["again", "g", "again {text}", "g {text}"]
   quit:
     action: quit
     patterns: ["quit", "q"]
@@ -823,6 +847,8 @@ lexicon:
     closely, carefully, thoroughly, quickly, slowly, gently, softly, firmly, properly, briefly,
     really, very, hard, harder, quietly, loudly, again, more, further, intently, cautiously
   ]
+  yes_words: ["yes", "y", "yeah", "yep", "sure", "ok", "okay"]
+  no_words: ["no", "nope", "nah"]
   note_words: ["note", "jot down", "jot", "write down", "make a note", "make a note of"]
   my_words: [my, mine]
   one_words: [one, ones]
@@ -876,6 +902,32 @@ messages:
   parser.empty: "Pardon?"
   parser.unknown_verb: "I don't know the verb \"${args.word}\". Things to try here: ${args.suggestions}."
   parser.unknown_word: "I don't know the word \"${args.word}\"."
+  parser.guess: "I don't know the word \"${args.word}\". Did you mean ${args.options}?"
+  parser.guess_no: "Then try putting it another way."
+  parser.guess_which: "Which: ${args.options}?"
+  oops.nothing: "There's no misspelled word to fix."
+  oops.what: "Type OOPS and then the word you meant instead of \"${args.word}\": OOPS LANTERN."
+  again.cannot: "There's nothing in your last command to swap for that."
+  where.what: "Where is what?"
+  where.unknown: "You haven't seen anything like that."
+  where.carried: "You're carrying ${the(args.target)}."
+  where.here: "${The(args.target)} is right here."
+  where.gone: "${The(args.target)} was here when you last looked, but isn't now."
+  where.seen: "You last saw ${the(args.target)} in the ${args.place}.${if args.go} GO TO ${args.typed} takes you there.${end}"
+  where.place: "The ${args.place} is somewhere you know: GO TO ${args.typed} takes you there."
+  where.place_here: "You're in the ${args.place}."
+  go.to_thing: "(to the ${args.place}, where you last saw ${the(args.target)})"
+  brief.on: "[Brief: places you've been before are named, but described in full only the first time. LOOK describes one again; VERBOSE goes back.]"
+  verbose.on: "[Verbose: every place is described in full, every time.]"
+  recap.so_far: "The story so far: ${args.turns} ${if args.turns == 1}move${else}moves${end}${if args.places > 1}, and ${args.places} places visited${end}."
+  recap.where: "You're in the ${args.place}."
+  recap.carrying: "You're carrying ${args.list}."
+  recap.empty_handed: "You aren't carrying anything."
+  recap.score: "Your score is ${game.score}${if game.max_score} out of ${game.max_score}${end}."
+  recap.done: "Done so far: ${args.list}."
+  recap.to_do: "Still to do: ${args.list}."
+  recap.recent: "Your last few moves: ${args.list}."
+  recap.notes: "You've written ${args.n} ${if args.n == 1}note${else}notes${end}: NOTES shows them."
   parser.not_here: "You can't see any such thing."
   parser.scenery: "That's just part of the scenery."
   parser.dark: "It's too dark to see."
@@ -1357,9 +1409,10 @@ messages:
   score.report: "You have scored ${game.score}${if game.max_score} out of a possible ${game.max_score}${end}, in ${game.turn} turns."
   score.gained: "[Your score has gone up by ${args.points}.]"
   undo.done: "[Undone.]"
+  undo.done_many: "[Took back ${args.n} moves.${if args.short} That's as far back as UNDO goes.${end}]"
   undo.none: "There's nothing to undo."
   save.done: "[Saved.]"
-  restore.done: "[Restored.]"
+  restore.done: "[Restored.${if args.recap} RECAP sums up where things stand.${end}]"
   restore.none: "There's no saved game."
   restore.failed: "That save couldn't be restored: ${args.reason}"
   hint.show: "${if args.of > 1}(Hint ${args.n} of ${args.of}) ${end}${args.hint}"
@@ -1384,7 +1437,7 @@ messages:
   notes.cleared: "[All your notes rubbed out.]"
   clock.now: "It's ${args.time}${if args.day > 1}, on day ${args.day}${end}."
   clock.none: "There's no telling the time here."
-  help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, SAVE and RESTORE keep your place, and HINT helps if you're stuck."
+  help.text: "Type short commands like LOOK, EXAMINE the DOOR (or X DOOR), TAKE the KEY, OPEN the BOX, GO NORTH (or just N) and TALK TO someone. INVENTORY (or I) lists what you carry, UNDO takes back a move, SAVE and RESTORE keep your place, HINT helps if you're stuck, and RECAP sums up where things stand."
   ending.win: "*** You have won ***"
   ending.loss: "*** You have lost ***"
   ending.neutral: "*** The End ***"

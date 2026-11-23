@@ -33,22 +33,10 @@ Everything from the first list has now been built:
 - **Fire and smashing:** `flammable`, `destructible`, SET … ALIGHT, SMASH,
   spreading next door, scorching, smoke, and `douses`.
 
-## Players
-
-- **WHERE IS THE KEY / FIND THE KEEPER:** where the player last saw it
-  ("You last saw the keeper in the lamp room"), using what the game
-  already remembers; GO TO THE KEEPER walks there.
-- **UNDO 3:** take back several turns at once.
-- **OOPS and "Did you mean…?":** OOPS LANTERN fixes the misspelled word
-  in the last command, and near misses too uncertain to fix silently ask.
-- **VERBOSE / BRIEF:** describe rooms in full on every visit, or only the
-  first time.
-- **RECAP:** what's happened so far and where things stand, for a player
-  coming back to a game after a week.
-- **ASK ABOUT goes to the topic:** ASK KEEPER ABOUT THE GATE opens the
-  conversation at the option that mentions the gate.
-- **Commands that remember:** TAKE ALL THEN GO NORTH works; extend it to
-  AGAIN with a new object ("again, with the iron key").
+The player commands from the next list are built too: WHERE IS and GO TO
+a thing, UNDO 3, OOPS and "Did you mean…?", BRIEF and VERBOSE, RECAP, ASK
+ABOUT going to the topic, and AGAIN WITH (see the command reference in the
+README).
 
 ## The editor
 

@@ -106,6 +106,9 @@ pub(crate) enum Pending {
     Which { before: Vec<String>, after: Vec<String>, options: Vec<EntityId> },
     /// We asked "what do you want to take?"; the reply completes the command.
     Noun { prefix: Vec<String> },
+    /// We asked "Did you mean TAKE?" about `word` in `toks`; YES, or one of
+    /// the `options`, runs the command with it fixed.
+    Guess { toks: Vec<String>, word: String, options: Vec<String> },
 }
 
 pub struct Game<H: ScriptHost> {
@@ -123,8 +126,20 @@ pub struct Game<H: ScriptHost> {
     pub(crate) quiet_wait: bool,
     /// What the player was holding when this input began.
     held_before: Vec<EntityId>,
+    /// Where the player was, and what they could see, when this input
+    /// began: if it's gone by the end (eaten, burnt) and they're still
+    /// there, they saw it go, and WHERE IS knows.
+    seen_before: (Option<EntityId>, Vec<EntityId>),
     /// A meta command's free text (ERASE NOTE 2).
-    last_text: Option<String>,
+    pub(crate) last_text: Option<String>,
+    /// The last command that wasn't understood, and the word that wasn't,
+    /// for OOPS.
+    pub(crate) oops: Option<(Vec<String>, String)>,
+    /// What the player asked about (ASK KEEPER ABOUT THE GATE): the
+    /// conversation opens at the option that mentions it.
+    pub(crate) topic: Option<String>,
+    /// Arriving somewhere already visited, in BRIEF mode: no description.
+    pub(crate) briefly: bool,
     /// Whether the room was dark when it was last described: when that
     /// changes some other way (a script, a timer), it's described again.
     pub(crate) seen_dark: Option<bool>,
@@ -160,7 +175,11 @@ impl<H: ScriptHost> Game<H> {
             passing: false,
             quiet_wait: false,
             held_before: Vec::new(),
+            seen_before: (None, Vec::new()),
             last_text: None,
+            oops: None,
+            topic: None,
+            briefly: false,
             seen_dark: None,
             heard_nearby: None,
             sneaking: false,
@@ -201,6 +220,7 @@ impl<H: ScriptHost> Game<H> {
     pub fn input(&mut self, line: &str) -> Output {
         self.out = Output::default();
         self.held_before = self.world.ids().filter(|&t| t != PLAYER && self.world.is_within(t, PLAYER)).collect();
+        self.seen_before = (Some(self.world.here()), self.world.scope());
         if self.world.state.choice.is_some() {
             self.choice_input(line);
         } else if let Some(note) = self.note_in(line) {
@@ -212,7 +232,14 @@ impl<H: ScriptHost> Game<H> {
                 self.msg("parser.empty", &Ctx::new());
             }
             for toks in commands {
-                if !self.command(toks) {
+                let turn = self.world.state.turn;
+                let typed = toks.join(" ");
+                let go_on = self.command(toks);
+                // For RECAP: the moves that took a turn, as typed.
+                if self.world.state.turn > turn {
+                    self.remember_move(typed);
+                }
+                if !go_on {
                     break;
                 }
             }
@@ -223,15 +250,19 @@ impl<H: ScriptHost> Game<H> {
     /// Loads a save the host fetched after `restore_requested`.
     pub fn restore(&mut self, json: &str) -> Output {
         self.out = Output::default();
-        let notes = self.world.state.notes.clone();
+        let (notes, brief) = (self.world.state.notes.clone(), self.world.state.brief);
         match self.world.restore(json) {
             Ok(()) => {
                 // The notebook stays the player's: an older save doesn't take notes away.
                 if !notes.is_empty() {
                     self.world.state.notes = notes;
                 }
+                self.world.state.brief = brief;
                 self.pending = None;
-                self.msg_kind(LineKind::Notice, "restore.done", &Ctx::new());
+                self.oops = None;
+                // Coming back to a game: RECAP is there to say where things stand.
+                let recap = self.world.state.turn > 0;
+                self.msg_kind(LineKind::Notice, "restore.done", &Ctx::new().value("recap", Value::Bool(recap)));
                 self.look();
                 if self.world.state.choice.is_some() {
                     self.show_options();
@@ -266,6 +297,12 @@ impl<H: ScriptHost> Game<H> {
         // and what they put down in the dark, too.
         self.world.note_seen();
         let here = self.world.here();
+        let (was, seen) = std::mem::take(&mut self.seen_before);
+        for t in seen {
+            if was == Some(here) && self.world.location(t).is_none() {
+                self.world.state.located.remove(&t);
+            }
+        }
         for t in std::mem::take(&mut self.held_before) {
             if !self.world.is_within(t, PLAYER) && self.world.touchable_here(t) {
                 self.world.state.located.insert(t, here);
@@ -397,7 +434,7 @@ impl<H: ScriptHost> Game<H> {
 
     /// Runs one command. Returns false when the rest of a chained input
     /// should be skipped.
-    fn command(&mut self, toks: Vec<String>) -> bool {
+    pub(crate) fn command(&mut self, toks: Vec<String>) -> bool {
         let toks = self.grammar.normalize(toks);
         let parsed = match self.pending.take() {
             Some(Pending::Which { before, after, options }) => {
@@ -410,6 +447,12 @@ impl<H: ScriptHost> Game<H> {
                     }
                     None => self.grammar.parse(&self.world, &toks),
                 }
+            }
+            Some(Pending::Guess { toks: was, word, options }) => {
+                if let Some(fixed) = self.guess_reply(&toks, &was, &word, &options) {
+                    return fixed;
+                }
+                self.grammar.parse(&self.world, &toks)
             }
             Some(Pending::Noun { prefix }) => {
                 let mut merged = prefix;
@@ -484,6 +527,32 @@ impl<H: ScriptHost> Game<H> {
         }
         let verb = toks.first().filter(|w| self.grammar.is_verb_word(w)).cloned();
         let scenery_word = toks.iter().skip(1).find(|w| self.grammar.describes_here(&self.world, w)).cloned();
+        // For OOPS, and "Did you mean…?" when a fix is too uncertain to make.
+        match &f {
+            Failure::UnknownVerb { word } | Failure::UnknownWord { word } => {
+                self.oops = Some((toks.to_vec(), word.clone()));
+                let mut guesses = match f {
+                    // A short word on its own is too little to go on: NOD isn't NO or NOW.
+                    Failure::UnknownVerb { .. } if toks.len() == 1 && word.chars().count() <= 4 => Vec::new(),
+                    Failure::UnknownVerb { .. } if toks.first() == Some(word) => self.grammar.verb_guesses(word),
+                    _ => self.grammar.noun_guesses(&self.world, word),
+                };
+                // Only guesses that make a command: TAK CAN is TAKE CAN, not TALK CAN.
+                guesses.retain(|g| {
+                    let fixed: Vec<String> = toks.iter().map(|t| if t == word { g.clone() } else { t.clone() }).collect();
+                    !matches!(self.grammar.parse(&self.world, &fixed), Parsed::Fail(_))
+                });
+                if !guesses.is_empty() {
+                    self.out.missed = Some(Missed { kind: if matches!(f, Failure::UnknownVerb { .. }) { "unknown_verb" } else { "unknown_word" }, word: Some(word.clone()), verb: None });
+                    let shown: Vec<String> = guesses.iter().map(|g| g.to_uppercase()).collect();
+                    let list = (self.grammar.lang().list_or)(&shown);
+                    self.msg("parser.guess", &ctx.text("word", word.clone()).text("options", list));
+                    self.pending = Some(Pending::Guess { toks: toks.to_vec(), word: word.clone(), options: guesses });
+                    return;
+                }
+            }
+            _ => self.oops = None,
+        }
         self.out.missed = Some(match &f {
             Failure::UnknownVerb { word } => Missed { kind: "unknown_verb", word: Some(word.clone()), verb: None },
             Failure::UnknownWord { word } => Missed { kind: "unknown_word", word: Some(word.clone()), verb },
@@ -523,6 +592,7 @@ impl<H: ScriptHost> Game<H> {
             self.last_text = cmd.text.clone();
             return self.meta(a);
         }
+        self.oops = None;
         if self.world.state.ending.is_some() {
             self.msg_kind(LineKind::Notice, "ending.options", &Ctx::new());
             return false;
@@ -556,7 +626,10 @@ impl<H: ScriptHost> Game<H> {
         let ctx = Ctx::new();
         match action {
             BuiltinAction::Again => {
+                let with = self.last_text.take();
                 return match self.last.clone() {
+                    // AGAIN WITH THE IRON KEY: the same, with something else.
+                    Some(words) if with.is_some() => self.again_with(words, with.as_deref().unwrap_or("")),
                     Some(words) => self.command(words),
                     None => {
                         self.msg("parser.empty", &ctx);
@@ -566,16 +639,27 @@ impl<H: ScriptHost> Game<H> {
             }
             BuiltinAction::Undo => {
                 self.pending = None;
-                let notes = self.world.state.notes.clone();
-                if self.world.undo() {
-                    self.world.state.notes = notes;
-                    self.msg_kind(LineKind::Notice, "undo.done", &ctx);
+                // UNDO 3: several moves at once.
+                let wanted = self.last_text.take().and_then(|t| self.count_in(&t)).unwrap_or(1).max(1);
+                let mut done = 0;
+                self.keep_players(|g| {
+                    while done < wanted && g.world.undo() {
+                        done += 1;
+                    }
+                });
+                if done == 0 {
+                    self.msg("undo.none", &ctx);
+                } else {
+                    if wanted == 1 {
+                        self.msg_kind(LineKind::Notice, "undo.done", &ctx);
+                    } else {
+                        let c = Ctx::new().value("n", Value::Int(done as i64)).value("short", Value::Bool(done < wanted));
+                        self.msg_kind(LineKind::Notice, "undo.done_many", &c);
+                    }
                     self.look();
                     if self.world.state.choice.is_some() {
                         self.show_options();
                     }
-                } else {
-                    self.msg("undo.none", &ctx);
                 }
             }
             BuiltinAction::Save => {
@@ -584,10 +668,10 @@ impl<H: ScriptHost> Game<H> {
             }
             BuiltinAction::Restore => self.out.restore_requested = true,
             BuiltinAction::Restart => {
-                let notes = std::mem::take(&mut self.world.state.notes);
-                self.world.restart(self.seed);
-                self.world.state.notes = notes;
+                let seed = self.seed;
+                self.keep_players(|g| g.world.restart(seed));
                 self.pending = None;
+                self.oops = None;
                 self.last = None;
                 self.intro();
             }
@@ -605,6 +689,19 @@ impl<H: ScriptHost> Game<H> {
                 let which = self.last_text.take().unwrap_or_default();
                 self.erase_note(&which);
             }
+            BuiltinAction::WhereIs => {
+                let what = self.last_text.take().unwrap_or_default();
+                self.where_is(&what);
+            }
+            BuiltinAction::Oops => {
+                let word = self.last_text.take().unwrap_or_default();
+                return self.oops_action(&word);
+            }
+            BuiltinAction::Verbose | BuiltinAction::Brief => {
+                self.world.state.brief = action == BuiltinAction::Brief;
+                self.msg_kind(LineKind::Notice, if self.world.state.brief { "brief.on" } else { "verbose.on" }, &ctx);
+            }
+            BuiltinAction::Recap => self.recap(),
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }
@@ -994,7 +1091,20 @@ impl<H: ScriptHost> Game<H> {
         let Some(idx) = self.world.story().choices.iter().position(|c| c.key == key) else { return };
         let start = self.world.story().choices[idx].start;
         self.world.state.choice = Some(ChoiceCursor { choice: ChoiceId(idx as u32), node: start });
+        let topic = self.topic.take();
+        let shown = self.out.lines.len();
         self.enter_node();
+        // ASK ABOUT THE GATE: straight to what was asked about, without
+        // listing the options first.
+        if let Some(i) = topic.and_then(|t| self.topic_option(&t)) {
+            let mut n = 0;
+            self.out.lines.retain(|l| {
+                n += 1;
+                n <= shown || l.kind != LineKind::Choice
+            });
+            self.out.options.clear();
+            self.take_option(i, None);
+        }
     }
 
     fn enter_node(&mut self) {
@@ -1032,7 +1142,7 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// The open node's options whose `when` is true, as (index, text).
-    fn visible_options(&mut self) -> Vec<(usize, String)> {
+    pub(crate) fn visible_options(&mut self) -> Vec<(usize, String)> {
         let Some(cur) = self.world.state.choice else { return Vec::new() };
         let node = self.world.story().choice(cur.choice).nodes[cur.node as usize].clone();
         let mut out = Vec::new();
@@ -1071,6 +1181,7 @@ impl<H: ScriptHost> Game<H> {
                 BuiltinAction::Undo | BuiltinAction::Save | BuiltinAction::Restore | BuiltinAction::Restart | BuiltinAction::Quit
             )
         {
+            self.last_text = cmd.text.clone();
             self.meta(a);
             return;
         }
@@ -1094,15 +1205,23 @@ impl<H: ScriptHost> Game<H> {
         };
 
         let before = self.world.state.clone();
+        self.take_option(vis[pick].0, Some(before));
+    }
+
+    /// Carries out an option of the open node (by its index there). With
+    /// `before`, it's a step of its own for UNDO.
+    pub(crate) fn take_option(&mut self, index: usize, before: Option<crate::state::GameState>) {
         let cur = self.world.state.choice.expect("a choice is open");
-        let opt = self.world.story().choice(cur.choice).nodes[cur.node as usize].options[vis[pick].0].clone();
+        let opt = self.world.story().choice(cur.choice).nodes[cur.node as usize].options[index].clone();
         if let Some(s) = &opt.say {
             self.render_line(LineKind::Text, s, &Ctx::new());
         }
         if let Some(r) = &opt.run {
             self.run(r, &Ctx::new());
         }
-        self.world.push_undo(before);
+        if let Some(b) = before {
+            self.world.push_undo(b);
+        }
 
         if self.end_requested.is_some() {
             self.world.state.choice = None;

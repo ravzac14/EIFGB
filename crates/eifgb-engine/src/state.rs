@@ -60,6 +60,13 @@ pub struct GameState {
     /// through UNDO and RESTART: they're the player's, not the story's.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+    /// BRIEF: rooms the player has been to are described in full only the
+    /// first time. The player's choice, kept like the notes.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub brief: bool,
+    /// The last few commands that took a turn, as typed, for RECAP.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -119,6 +126,8 @@ impl GameState {
             weather: None,
             weather_due: None,
             notes: Vec::new(),
+            brief: false,
+            recent: Vec::new(),
         }
     }
 }

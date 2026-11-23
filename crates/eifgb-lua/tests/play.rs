@@ -3929,7 +3929,7 @@ fn words_that_used_to_go_wrong() {
     // EXITS isn't EXIT (go out), SING isn't S, BRIEF isn't BRIBE.
     assert_eq!(say(&mut g, "exits"), "Known exits: northwest, east and south.");
     assert_says(&mut g, "sing", "You hum a little tune.");
-    assert_says(&mut g, "brief", "I don't know the verb \"brief\"");
+    assert_says(&mut g, "brief", "[Brief:");
     let turns = g.world().state.turn;
     assert_eq!(g.input("exits").status.turns, turns, "EXITS takes no turn");
 }
@@ -4658,4 +4658,211 @@ fn players_keep_notes_of_their_own() {
     say(&mut h, "s");
     say(&mut h, "w");
     assert_says(&mut h, "note", "sticky note");
+}
+
+// ------------------------------------------------- helping the player along
+
+#[test]
+fn where_is_says_where_things_were_last_seen() {
+    let mut g = game(lighthouse());
+    say(&mut g, "search pool");
+    say(&mut g, "n");
+    assert_eq!(say(&mut g, "where is the keeper"), "The old keeper is right here.");
+    say(&mut g, "s");
+    assert_eq!(say(&mut g, "where's the key"), "You're carrying the brass key.");
+    assert_eq!(
+        say(&mut g, "where is the old man"),
+        "You last saw the old keeper in the Base of the Lighthouse. GO TO OLD MAN takes you there."
+    );
+    assert_says(&mut g, "find the oil can", "You last saw the oil can in the Base of the Lighthouse.");
+    assert_eq!(say(&mut g, "where is the radio"), "You haven't seen anything like that.");
+    assert_says(&mut g, "where is the lighthouse", "GO TO LIGHTHOUSE takes you there.");
+    // It takes no turn.
+    assert_eq!(g.world().state.turn, 3);
+    // GO TO THE KEEPER walks to where he was seen.
+    assert_says(&mut g, "go to the keeper", "(to the Base of the Lighthouse, where you last saw the old keeper)");
+    assert_eq!(g.world().def(g.world().here()).key, "lighthouse_base");
+    assert_eq!(say(&mut g, "go to the can"), "The oil can is right here.");
+    // Something taken away while the player wasn't looking.
+    say(&mut g, "take can");
+    say(&mut g, "drop can");
+    say(&mut g, "s");
+    g.input("look"); // the can is still where it was dropped
+    assert_says(&mut g, "where is the can", "in the Base of the Lighthouse");
+}
+
+/// WHERE IS reminds; it doesn't hint. It knows only what the player saw.
+#[test]
+fn where_is_only_knows_what_the_player_saw() {
+    let src = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { north: yard, down: cellar } }
+  yard: { name: Yard, exits: { south: hall }, on: { enter: 'world.guard.dead = true; world.cake:move_to(nil)' } }
+  cellar: { name: Cellar, dark: true, exits: { up: hall } }
+objects:
+  cake: { name: cake, in: hall, traits: [portable, edible] }
+  apple: { name: apple, in: yard, traits: [portable, edible] }
+  coin: { name: coin, in: cellar, traits: [portable] }
+  gem: { name: gem, in: cellar, traits: [portable] }
+characters:
+  guard: { name: guard, in: hall }
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    // Feeling for the coin in the dark finds the coin, not the gem too.
+    say(&mut g, "d");
+    assert_says(&mut g, "feel for the coin", "Taken");
+    say(&mut g, "u");
+    assert_eq!(say(&mut g, "where is the gem"), "You haven't seen anything like that.");
+    // What happened in the hall while the player was in the yard, they
+    // don't know: the guard and the cake are where they left them.
+    say(&mut g, "n");
+    assert_says(&mut g, "where is the guard", "You last saw the guard in the Hall.");
+    assert_eq!(say(&mut g, "where is the body"), "You haven't seen anything like that.");
+    assert_says(&mut g, "where is the cake", "You last saw the cake in the Hall.");
+    // Eaten in front of them, it's nowhere.
+    say(&mut g, "take apple");
+    say(&mut g, "eat apple");
+    assert_eq!(say(&mut g, "where is the apple"), "You haven't seen anything like that.");
+    // Back in the hall, they see for themselves.
+    say(&mut g, "s");
+    assert_says(&mut g, "where is the cake", "was here when you last looked, but isn't now");
+    assert_says(&mut g, "where is the body", "right here");
+}
+
+#[test]
+fn undo_takes_back_several_moves() {
+    let mut g = game(lighthouse());
+    for c in ["search pool", "n", "s", "n"] {
+        say(&mut g, c);
+    }
+    assert_says(&mut g, "undo 2", "[Took back 2 moves.]");
+    assert_eq!(g.world().def(g.world().here()).key, "lighthouse_base");
+    assert_eq!(g.world().state.turn, 2);
+    // More than there are: as far as it goes.
+    assert_says(&mut g, "undo three moves", "[Took back 2 moves. That's as far back as UNDO goes.]");
+    assert_eq!(g.world().state.turn, 0);
+    assert_eq!(say(&mut g, "undo"), "There's nothing to undo.");
+}
+
+#[test]
+fn oops_fixes_the_word_and_near_misses_ask() {
+    let mut g = game(lighthouse());
+    say(&mut g, "search pool");
+    say(&mut g, "n");
+    // OOPS: the word that wasn't understood, swapped.
+    assert_eq!(say(&mut g, "take the qqq"), "I don't know the word \"qqq\".");
+    assert_eq!(say(&mut g, "oops can"), "Taken.");
+    assert_eq!(say(&mut g, "oops can"), "There's no misspelled word to fix.");
+    say(&mut g, "drop can");
+    // Too close to two words to fix silently: ask.
+    // Only guesses that make sense: TALK CAN doesn't.
+    assert_eq!(say(&mut g, "tak can"), "I don't know the word \"tak\". Did you mean TAKE?");
+    assert_eq!(say(&mut g, "yes"), "Taken.");
+    say(&mut g, "drop can");
+    assert_says(&mut g, "tak can", "Did you mean TAKE?");
+    assert_eq!(say(&mut g, "no"), "Then try putting it another way.");
+    assert_says(&mut g, "tak can", "Did you mean TAKE?");
+    assert_eq!(say(&mut g, "oops take"), "Taken.");
+    // Two that both make sense: YES asks which.
+    assert_eq!(say(&mut g, "lok at can"), "I don't know the word \"lok\". Did you mean LOOK?");
+    assert_eq!(say(&mut g, "y"), "A dented can of lamp oil.");
+    assert_eq!(say(&mut g, "wak keeper"), "I don't know the word \"wak\". Did you mean WAKE or WALK?");
+    assert_eq!(say(&mut g, "yes"), "Which: WAKE or WALK?");
+    assert_says(&mut g, "wake", "isn't asleep");
+    // A short word on its own isn't guessed at.
+    assert_says(&mut g, "nod", "I don't know the verb \"nod\".");
+    // OOPS fixes the lone word too.
+    assert_eq!(say(&mut g, "oops look"), say(&mut g, "look"));
+    say(&mut g, "drop can");
+    // Something else entirely carries on as usual.
+    assert_says(&mut g, "tak can", "Did you mean");
+    assert_says(&mut g, "look", "Base of the Lighthouse");
+    // A word too far from anything just isn't known.
+    assert_eq!(say(&mut g, "x qqqqqq"), "I don't know the word \"qqqqqq\".");
+}
+
+#[test]
+fn brief_names_places_already_seen() {
+    let mut g = game(lighthouse());
+    assert_says(&mut g, "brief", "[Brief:");
+    // The first visit is in full; going back, just the name and what's there.
+    assert_says(&mut g, "n", "A cramped round room");
+    let back = say(&mut g, "s");
+    assert!(back.contains("Rocky Shore") && !back.contains("Waves break"), "{back}");
+    assert_says(&mut g, "look", "Waves break");
+    let base = say(&mut g, "n");
+    assert!(!base.contains("cramped") && base.contains("You can see an iron gate"), "{base}");
+    // The player's choice: UNDO, RESTART and saves keep it.
+    say(&mut g, "undo");
+    say(&mut g, "restart");
+    say(&mut g, "n");
+    assert!(!say(&mut g, "s").contains("Waves break"));
+    assert!(g.world().state.brief);
+    assert_says(&mut g, "verbose", "[Verbose:");
+    assert_says(&mut g, "n", "A cramped round room");
+}
+
+#[test]
+fn recap_sums_up_where_things_stand() {
+    let mut g = game(lighthouse());
+    for c in ["search pool", "n", "take can", "note the keeper knows things"] {
+        say(&mut g, c);
+    }
+    assert_eq!(
+        say(&mut g, "recap"),
+        "The story so far: 3 moves, and 2 places visited.\nYou're in the Base of the Lighthouse.\nYou're carrying a brass key and an oil can.\nYour score is 5 out of 30.\nYour last few moves: search pool, n, take can.\nYou've written 1 note: NOTES shows them."
+    );
+    // UNDO takes moves back out of it; a save keeps it, and says RECAP is there.
+    say(&mut g, "undo");
+    assert_says(&mut g, "summary", "Your last few moves: search pool, n.");
+    let saved = g.world().save();
+    let mut h = game(lighthouse());
+    assert_says(&mut h, "recap", "The story so far: 0 moves.");
+    assert_eq!(h.restore(&saved).text().lines().next(), Some("[Restored. RECAP sums up where things stand.]"));
+    assert_says(&mut h, "recap", "Your last few moves: search pool, n.");
+}
+
+#[test]
+fn ask_about_goes_straight_to_the_topic() {
+    let mut g = game(lighthouse());
+    say(&mut g, "n");
+    let out = say(&mut g, "ask the keeper about the gate");
+    assert_eq!(
+        out,
+        "\"Another storm,\" the old man murmurs. \"Another ship.\"\n\"Dropped the key in the tide pool. Clumsy old hands.\"\n\"Another storm,\" the old man murmurs. \"Another ship.\"\n1. Ask about the gate\n2. Say goodbye"
+    );
+    assert_eq!(g.world().state.vars["keeper_trust"], eifgb_engine::ir::Value::Int(1));
+    say(&mut g, "2");
+    // A topic no option mentions (or one not offered yet) opens the conversation as usual.
+    assert_says(&mut g, "ask keeper about the lamp", "1. Ask about the gate");
+    say(&mut g, "2");
+    // One UNDO takes back the question and its answer together.
+    say(&mut g, "ask about the gate");
+    say(&mut g, "2");
+    say(&mut g, "undo");
+    say(&mut g, "undo");
+    assert_eq!(g.world().state.vars["keeper_trust"], eifgb_engine::ir::Value::Int(1));
+}
+
+#[test]
+fn again_with_something_else() {
+    let mut g = small(
+        "objects:\n  box: { name: wooden box, in: hall, traits: [container] }\n  table: { name: table, in: hall, traits: [supporter] }\n  coin: { name: coin, in: hall, traits: [portable] }\n  ring: { name: ring, in: hall, traits: [portable] }\n",
+    );
+    assert_eq!(say(&mut g, "take coin"), "Taken.");
+    assert_eq!(say(&mut g, "again, the ring"), "Taken.");
+    assert_eq!(say(&mut g, "put coin in box"), "You put the coin in the wooden box.");
+    assert_eq!(say(&mut g, "again with the ring"), "You put the ring in the wooden box.");
+    say(&mut g, "take all from box");
+    // A different way of putting it: ON, not IN.
+    assert_says(&mut g, "put ring in table", "table");
+    assert_eq!(say(&mut g, "again on the table"), "You put the ring on the table.");
+    assert_eq!(g.world().state.turn, 7);
+    say(&mut g, "take ring");
+    // AGAIN still remembers the new command.
+    say(&mut g, "take ring");
+    assert_eq!(say(&mut g, "put ring in box"), "You put the ring in the wooden box.");
+    assert_eq!(say(&mut g, "again, the coin"), "You put the coin in the wooden box.");
 }

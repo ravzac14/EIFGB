@@ -125,10 +125,16 @@ impl<H: ScriptHost> Game<H> {
             (A::Unlock, Some(t)) => self.lock_or_unlock(t, cmd.tool, false),
             (A::Lock, Some(t)) => self.lock_or_unlock(t, cmd.tool, true),
             (A::Search, Some(t)) => self.search(t, ctx),
-            (A::Talk, Some(t)) => self.talk(t, ctx),
+            (A::Talk, Some(t)) => {
+                self.topic = cmd.text.clone();
+                self.talk(t, ctx)
+            }
             // ASK ABOUT THE GATE: whoever here there is to talk to.
             (A::Talk, None) => match self.people_to_talk_to()[..] {
-                [t] => self.talk(t, &ctx.clone().entity("target", t)),
+                [t] => {
+                    self.topic = cmd.text.clone();
+                    self.talk(t, &ctx.clone().entity("target", t))
+                }
                 [] => {
                     self.msg("talk.nobody", ctx);
                     false
@@ -257,7 +263,9 @@ impl<H: ScriptHost> Game<H> {
         if self.passing {
             return;
         }
-        self.show_picture(here);
+        if !self.briefly {
+            self.show_picture(here);
+        }
         // Shut inside something: that's all there is to see.
         let ceiling = self.world.ceiling();
         if ceiling != here {
@@ -270,11 +278,13 @@ impl<H: ScriptHost> Game<H> {
             return;
         }
         let before = self.out.lines.len();
-        if let Some(d) = &description {
-            self.render_line(LineKind::Text, d, &Ctx::new().this(here));
+        if !self.briefly {
+            if let Some(d) = &description {
+                self.render_line(LineKind::Text, d, &Ctx::new().this(here));
+            }
+            // Outdoors: the weather.
+            self.describe_weather();
         }
-        // Outdoors: the weather.
-        self.describe_weather();
         let described = self.out.lines.len() > before;
         // Things that won't be listed (scenery) still get their state
         // mentioned, unless the room description already covers it.
@@ -654,6 +664,8 @@ impl<H: ScriptHost> Game<H> {
             self.world.set(door, "open", Value::Bool(true));
         }
         self.room_event(here, "leave");
+        // BRIEF: somewhere the player has been is only named, not described again.
+        let been = self.world.state.visited.contains(&to);
         if self.world.move_to(PLAYER, Some(to)).is_err() {
             return false;
         }
@@ -671,7 +683,9 @@ impl<H: ScriptHost> Game<H> {
         if let Some(door) = exit.through {
             self.world.unset(door, "hidden");
         }
+        self.briefly = been && self.world.state.brief;
         self.look();
+        self.briefly = false;
         self.world.spring_traps(PLAYER, to);
         self.report_traps();
         // Walking in normally wakes anyone asleep there (after they're seen
@@ -1377,15 +1391,13 @@ impl<H: ScriptHost> Game<H> {
 
     fn talk(&mut self, t: EntityId, ctx: &Ctx) -> bool {
         if self.world.def(t).kind != EntityKind::Character {
+            self.topic = None;
             self.msg("talk.not_person", ctx);
             return false;
         }
-        if self.world.is_dead(t) {
-            self.msg("talk.dead", ctx);
-            return false;
-        }
-        if self.world.is_asleep(t) {
-            self.msg("talk.asleep", ctx);
+        if self.world.is_dead(t) || self.world.is_asleep(t) {
+            self.topic = None;
+            self.msg(if self.world.is_dead(t) { "talk.dead" } else { "talk.asleep" }, ctx);
             return false;
         }
         match self.world.def(t).talk {
@@ -1395,6 +1407,7 @@ impl<H: ScriptHost> Game<H> {
                 true
             }
             None => {
+                self.topic = None;
                 self.msg("talk.no_response", ctx);
                 false
             }

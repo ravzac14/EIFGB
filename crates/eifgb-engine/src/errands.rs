@@ -118,6 +118,10 @@ impl<H: ScriptHost> Game<H> {
         let extra = room_words.clone();
         let named = self.world.places_named(words, &extra);
         if named.is_empty() {
+            // GO TO THE KEEPER: where the player last saw them.
+            if let Some(went) = self.go_to_thing(words) {
+                return went;
+            }
             self.msg("go.unknown_place", &ctx);
             return false;
         }
@@ -135,7 +139,7 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// Walks to a room by the shortest known way, a turn a step.
-    fn walk_to(&mut self, to: EntityId) -> bool {
+    pub(crate) fn walk_to(&mut self, to: EntityId) -> bool {
         let here = self.world.here();
         if to == here {
             self.msg("go.already_there", &Ctx::new());
@@ -173,7 +177,7 @@ impl<H: ScriptHost> Game<H> {
 
     /// The nearest of `targets` by exits the player knows (to rooms they've
     /// been to), and the steps to it: each a direction and the room it leads to.
-    fn route(&self, from: EntityId, targets: &[EntityId]) -> Option<(EntityId, Vec<(Direction, EntityId)>)> {
+    pub(crate) fn route(&self, from: EntityId, targets: &[EntityId]) -> Option<(EntityId, Vec<(Direction, EntityId)>)> {
         let w = &self.world;
         let mut came: HashMap<EntityId, (EntityId, Direction)> = HashMap::new();
         let mut queue = VecDeque::from([from]);
@@ -464,15 +468,20 @@ impl<H: ScriptHost> Game<H> {
     /// FEEL FOR THE KEY: feel around, then take it if it's there.
     pub(crate) fn feel_for(&mut self, cmd: &Command, ctx: &Ctx) -> bool {
         let here = self.world.here();
-        for t in self.world.touchable_things() {
-            self.world.state.located.insert(t, here);
-        }
         let words: Vec<String> = cmd.text.as_deref().unwrap_or("").split_whitespace().map(str::to_string).collect();
-        let found = self.grammar.name_matches(&self.world, &words);
+        let mut among = self.world.scope();
+        for t in self.world.touchable_things() {
+            if !among.contains(&t) {
+                among.push(t);
+            }
+        }
+        let found = self.grammar.name_matches_in(&self.world, &words, &among);
         let Some(&t) = found.iter().find(|&&t| !self.world.is_within(t, PLAYER)) else {
             self.msg("feel.not_found", ctx);
             return false;
         };
+        // Only what they found: the rest is still unknown to them.
+        self.world.state.located.insert(t, here);
         if !self.world.has(t, Trait::Portable) {
             self.msg("feel.found_one", &ctx.clone().entity("target", t));
             return true;

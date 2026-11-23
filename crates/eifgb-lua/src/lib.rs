@@ -268,7 +268,7 @@ fn kind_name(k: EntityKind) -> &'static str {
 }
 
 /// Fields every entity has. Scripts can read them but not assign them.
-const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper"];
+const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen"];
 
 impl ScriptHost for LuaHost {
     fn load(&mut self, story: &Story) -> Result<(), ScriptError> {
@@ -333,6 +333,8 @@ impl ScriptHost for LuaHost {
                             "key" => (s(&def.key)?, false),
                             "name" => (s(&w.display_name(id))?, false),
                             "proper" => (mlua::Value::Boolean(w.is_proper(id)), false),
+                            // The player has seen it, or held it: they know of it (WHERE IS does).
+                            "seen" => (mlua::Value::Boolean(w.state.located.contains_key(&id) || w.is_within(id, eifgb_engine::ir::PLAYER)), false),
                             "kind" => (s(kind_name(def.kind))?, false),
                             "capacity" => match w.capacity(id) {
                                 Some(n) => (mlua::Value::Integer(i64::from(n)), false),

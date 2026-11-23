@@ -4739,6 +4739,23 @@ characters:
     assert_says(&mut g, "where is the body", "right here");
 }
 
+/// `seen`: the player has seen it or held it, and stays knowing of it.
+#[test]
+fn hints_stop_once_the_thing_is_found() {
+    let mut g = small(
+        "objects:\n  rug: { name: rug, in: hall }\n  coin: { name: coin, in: hall, traits: [portable], state: { hidden: true }, revealed_by: search rug }\nhints:\n  find_coin:\n    when: not world.coin.seen\n    steps: [Something's under the rug., SEARCH RUG.]\n",
+    );
+    assert_says(&mut g, "hint", "Something's under the rug.");
+    say(&mut g, "search rug");
+    assert_says(&mut g, "hint", "You don't need a hint right now.");
+    // Taken away and dropped somewhere else: still found.
+    say(&mut g, "take coin");
+    say(&mut g, "n");
+    say(&mut g, "drop coin");
+    say(&mut g, "s");
+    assert_says(&mut g, "hint", "You don't need a hint right now.");
+}
+
 #[test]
 fn undo_takes_back_several_moves() {
     let mut g = game(lighthouse());

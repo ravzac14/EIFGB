@@ -678,6 +678,149 @@ assert.ok($("#panel-puzzles").textContent.includes("Endings"), $("#panel-puzzles
 document.querySelector("#panel-puzzles .chain .step").click();
 assert.equal($("#inspector .kind").textContent, "Room", "a step selects what it's about");
 
+// History: each change says what it was, and going back several at once works.
+$("#history").click();
+const hist = $("#history-dialog");
+assert.ok(hist.open);
+const steps = [...hist.querySelectorAll(".history li:not(.now):not(.undone)")];
+assert.ok(steps.length >= 5, hist.textContent);
+assert.match(steps[0].querySelector(".what").textContent, /Renamed the room New room to Changed room/, "the newest first, by name");
+assert.ok(steps.some((li) => /Added the room/.test(li.textContent)), hist.textContent);
+const beforeBack = yaml();
+[...steps[1].querySelectorAll("button")].find((b) => /Undo back to here \(2 changes\)/.test(b.textContent)).click();
+assert.equal(hist.open, false);
+assert.notEqual(yaml(), beforeBack);
+$("#history").click();
+assert.equal(hist.querySelectorAll(".history li.undone").length, 2, "both can be redone");
+[...hist.querySelectorAll(".history li.undone button")][0].click();
+assert.equal(yaml(), beforeBack, "redone, both");
+assert.match($("#undo").title, /^Undo: Renamed the room New room to Changed room/);
+
+// Find in game: a word anywhere, and going to it.
+$("#tab-find").click();
+assert.equal($("#panel-find").hidden, false);
+const findText = $("#find-text");
+findText.value = "changed room";
+findText.dispatchEvent(new Event("input"));
+await tick(250);
+const results = [...document.querySelectorAll("#find-results li")];
+assert.ok(results.length >= 1, $("#panel-find").textContent);
+assert.match(results[0].textContent, /^Room Changed room/);
+assert.equal(results[0].querySelector("mark").textContent.toLowerCase(), "changed room");
+results[0].click();
+assert.equal($("#inspector .kind").textContent, "Room");
+assert.equal($("#panel-find").hidden, false, "the results stay open");
+findText.value = "no such words anywhere";
+findText.dispatchEvent(new Event("input"));
+await tick(250);
+assert.match($("#find-count").textContent, /Not found/);
+
+// Tidy up: one change, which undo takes back.
+$("#tidy").click();
+assert.match($("#undo").title, /^Undo: Tidied up the map/);
+$("#undo").click();
+
+// A game with timers, a key to find and a walkthrough: the Timers tab, hint
+// drafts, and test play from a step of the walkthrough.
+const snack = readFileSync(`${web}../spec/examples/midnight_snack/game.yaml`, "utf8");
+$("#tab-yaml").click();
+$("#file").value = "game.yaml";
+$("#file").dispatchEvent(new Event("change"));
+$("#yaml").value = snack;
+$("#yaml").dispatchEvent(new Event("input"));
+await tick(700);
+assert.equal($("#tab-timers").hidden, false);
+$("#tab-timers").click();
+const tl = $("#panel-timers");
+assert.match(tl.textContent, /pie_cools/);
+assert.match(tl.textContent, /once, after 6 actions/);
+assert.equal(tl.querySelectorAll(".tl-mark").length, 1);
+tl.querySelector(".tl-label button").click();
+assert.match($("#inspector").textContent, /pie_cools/, "a timer's name selects it");
+await tick(500);
+$("#tab-puzzles").click();
+// For each ending, only the steps it needs, each after what it waits on.
+const heads = [...document.querySelectorAll("#panel-puzzles h4")].map((h) => h.textContent);
+assert.ok(heads.includes("The fed ending (a win): 2 steps"), heads.join(" | "));
+const fed = document.querySelectorAll("#panel-puzzles .chain")[0];
+const fedSteps = [...fed.querySelectorAll(".step .what")].map((x) => x.textContent);
+assert.deepEqual(fedSteps.slice(0, 3), ["Start in Kitchen.", "Search the worn mat: a small key.", "Unlock the pantry door with the small key: Pantry opens up."]);
+assert.equal(fed.querySelectorAll(".step")[2].querySelector(".after").textContent, " after 2");
+const draft = [...document.querySelectorAll("#panel-puzzles .draft-hints button")][0];
+assert.match(draft.textContent, /Draft 2 hints from these steps/);
+draft.click();
+assert.match(yaml(), /hints:\n\s+find_small_key:\n\s+when: not world\.small_key\.seen\n\s+steps:\n\s+- A small key might be useful/);
+assert.match($("#undo").title, /^Undo: Drafted 2 hints from the puzzle chain/);
+await tick(500);
+assert.equal(document.querySelectorAll("#panel-puzzles .draft-hints button").length, 0, "not drafted twice");
+// Record the first three moves as the walkthrough, then start at step 2.
+$("#tab-play").click();
+await tick(50);
+[...tp.querySelectorAll(".tp-bar button")].find((b) => b.textContent === "Start over").click();
+await tick(50);
+for (const c of ["n", "x mat", "look under the mat"]) tpSay(c);
+[...tp.querySelectorAll(".tp-bar button")].find((b) => b.textContent === "Save as walkthrough").click();
+await tick(500);
+const jump = tp.querySelector(".tp-jump");
+assert.equal(jump.hidden, false);
+assert.equal(jump.options.length, 4);
+jump.value = "2";
+jump.dispatchEvent(new Event("change"));
+await tick(50);
+assert.match(tp.querySelector(".tp-log").textContent, /Played the walkthrough up to step 2 \(x mat\)/);
+assert.doesNotMatch(tp.querySelector(".tp-log").textContent, /> n\b/, "the moves before aren't shown");
+// After an edit: the moves again, on the new version.
+typeName([...document.querySelectorAll("#inspector input[type=text]")][0], "Renamed again");
+const replay = [...tp.querySelectorAll(".tp-stale button")].find((b) => /new version up to here/.test(b.textContent));
+replay.click();
+await tick(50);
+assert.match(tp.querySelector(".tp-log").textContent, /Played your 2 moves again on the new version/);
+
+// Either-or choices, and what the chain takes on trust, in the Puzzles tab.
+$("#tab-yaml").click();
+$("#file").value = "game.yaml";
+$("#file").dispatchEvent(new Event("change"));
+$("#yaml").value = `format: eifgb/0.1
+game: { id: t, title: T, version: "1", start: forge }
+vars: { armed: false }
+rooms:
+  forge: { name: Forge, exits: { north: lair, east: { to: yard, when: clock.night } } }
+  lair: { name: Lair, exits: { south: forge, north: { to: hoard, through: hoard_door } } }
+  hoard: { name: Hoard, on: { enter: 'end_game("rich")' } }
+  yard: { name: Yard }
+clock: { start: "8:00" }
+objects:
+  hoard_door: { name: hoard door, in: lair, traits: [door, openable, lockable], state: { locked: true }, unlocks_with: sword }
+  sword: { name: sword, traits: [portable] }
+  shield: { name: shield, traits: [portable] }
+characters:
+  smith: { name: smith, in: forge, talk: armoury }
+choices:
+  armoury:
+    start: pick
+    nodes:
+      pick:
+        text: Take one.
+        options:
+          - { text: Take the sword, when: not vars.armed, do: 'vars.armed = true; world.sword:move_to(player)', end: true }
+          - { text: Take the shield, when: not vars.armed, do: 'vars.armed = true; world.shield:move_to(player)', end: true }
+endings:
+  rich: { kind: win, text: Rich. }
+`;
+$("#yaml").dispatchEvent(new Event("input"));
+await tick(1200);
+$("#tab-puzzles").click();
+const pz = $("#panel-puzzles");
+assert.match(pz.textContent, /Where a player could get stuck/);
+assert.match(pz.textContent, /If the player chooses “Take the shield”, they can't win: it rules out “Take the sword”\./);
+assert.match(pz.querySelector(".only-if").textContent, /^Only if the player chooses “Take the sword”\.$/);
+const chooseStep = pz.querySelector(".chain .step.choose");
+assert.match(chooseStep.querySelector(".either").textContent, /Only one of these: it rules out Choose “Take the shield” in the conversation armoury\./);
+chooseStep.click();
+assert.match($("#inspector").textContent, /armoury/, "a choice selects its conversation");
+assert.match(pz.querySelector(".assumes-box summary").textContent, /What the chain takes on trust/);
+assert.ok(!/clock\.night/.test(pz.querySelector(".assumes-box").textContent), "the yard isn't on the way to an ending");
+
 assert.deepEqual(errors, []);
 console.log("ok   editor page");
 await GlobalRegistrator.unregister();

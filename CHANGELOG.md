@@ -6,6 +6,44 @@ behave will be called out here.
 
 ## Unreleased
 
+- New in the editor:
+  - Find (Ctrl+Shift+F) searches every room, thing, character, message and
+    script for a word, a name or an ID.
+  - History lists your recent changes, each saying what it was, to step
+    back several at once.
+  - Tidy up lays the map out again by its directions, and ways that are
+    hard to read on the map (lines that cross, run through a room, or go
+    the opposite way to their direction) are marked and listed.
+  - A picture already in the game can be used again elsewhere, and the
+    editor says how much space pictures take in the browser.
+  - Test play can start at any step of the walkthrough, and after an edit
+    can play your moves again on the new version.
+  - The puzzle chain is a graph: each step says what it needs first, each
+    ending lists only the steps it takes, side puzzles are kept apart, and
+    a step with more than one way to do it says so. A way that waits on a
+    variable says what sets it, or that nothing does.
+  - The Puzzles tab says where a player could get stuck: something needed
+    to win that can be eaten, burnt, smashed or done away with by a
+    script, a key that wears out before the last lock it's for, or a
+    choice that rules out the only way to win.
+  - Either-or choices: options or handlers that each check a variable
+    isn't set and then set it are read as "only one of these". Each says
+    what it rules out, endings say which choice they need ("only if the
+    player chooses “Take the sword”"), and an ending needing two of them
+    can't happen. A way waiting on a value (`vars.side == "rebels"`) needs
+    what sets that value.
+  - Steps solved in scripts are marked, with a link to the script, and the
+    Puzzles tab lists what the chain takes on trust: scripts it can't see
+    inside, conditions it can't read, things got from characters. Verb
+    handlers are read as the action ("Give the loaf of bread to the hungry
+    child", from `args.tool == world.child`), and a merchant's goods are
+    bought.
+  - The Puzzles tab drafts hints from the puzzle chain: a nudge, a clue and
+    the answer for each thing to find and door to unlock, until it's done.
+  - The Timers tab shows when each timer can go off, in actions and (with
+    a clock) the time of day, and what it does.
+- Scripts can ask whether the player has found something yet:
+  `world.key.seen` (seen it or held it), for hints that stop once it's found.
 - Typos are never fixed behind the player's back any more. SERCH POOL used
   to run SEARCH POOL silently, and a real word the game didn't know could
   be taken for one it did: THINK became THANK. Now the game asks "Did you

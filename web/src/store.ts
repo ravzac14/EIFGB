@@ -116,6 +116,23 @@ export const localGames = {
   },
 };
 
+/**
+ * How much of this browser's storage the site uses, and about how much it
+ * may: browsers keep about 5 million characters for a site, two bytes each.
+ */
+export function storageUse(): { used: number; limit: number } {
+  let chars = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? "";
+      chars += k.length + (localStorage.getItem(k)?.length ?? 0);
+    }
+  } catch {
+    /* storage turned off: nothing used */
+  }
+  return { used: chars * 2, limit: 10_000_000 };
+}
+
 /** A short, stable key for a set of files. */
 export function hashFiles(files: Files): string {
   let h = 2166136261;

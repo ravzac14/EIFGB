@@ -35,6 +35,10 @@ export interface InspectorContext {
   addPicture(file: File, base: string): Promise<string | null>;
   /** Where to show a picture from: the project's copy, or its web address. */
   pictureUrl(file: string): string | null;
+  /** The game's own pictures: each file, its size, and what shows it ("Room Attic"). */
+  pictures(): { file: string; bytes: number; usedBy: { owner: string[]; name: string }[] }[];
+  /** How much of the browser's storage is used, and about how much there is, in bytes. */
+  storage(): { used: number; limit: number };
   /** Deletes a picture file nothing uses any more. */
   dropPicture(file: string): void;
   /** A room's colour on the map (kept in map.yaml), or undefined. */

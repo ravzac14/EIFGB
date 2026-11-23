@@ -38,21 +38,25 @@ a thing, UNDO 3, OOPS and "Did you mean…?", BRIEF and VERBOSE, RECAP, ASK
 ABOUT going to the topic, and AGAIN WITH (see the command reference in the
 README).
 
-## The editor
+So are the editor ideas: a picture library, Find in game, map tidy-up,
+undo history, test play from a step of the walkthrough, hints drafted from
+the puzzle chain, and the timer timeline (see "Step 7" in the README).
 
-- **A picture library:** reuse a picture across rooms and things, and see
-  how much space a game's pictures take in the browser.
-- **Find in game:** search every room, thing and script for a word.
-- **Map tidy-up:** lay out rooms neatly by their directions, and spot
-  exits that cross or overlap.
-- **Undo history:** a list of recent changes to step back to, not only one
-  at a time.
-- **Playtest from a save:** start test play from any point a recording
-  reached, without replaying from the start.
-- **Hints from the puzzle chain:** draft HINT steps from the Puzzles tab
-  ("Search the worn mat…").
-- **Timer timeline:** when each timer can go off, and what it does, in
-  turns and (with a clock) hours.
+## The puzzle chain
+
+Steps solved inside Lua are marked, and what the chain takes on trust is
+listed, but it can't see what those scripts need. Two ways to close the
+gap:
+
+- **Authors describe a scripted step:** an optional `step:` on a handler,
+  e.g. `step: { text: Give the bread to the child, needs: [bread] }`, that
+  the chain uses as written. Precise, but something more to keep in step
+  with the script.
+- **Learn from the walkthrough:** the editor already replays it after
+  every change. It could note what each command made possible ("command
+  7, GIVE BREAD TO CHILD: the coin appeared, the gate opened") and use
+  that wherever reading the game falls short. True to how the game plays,
+  but only for what the walkthrough does.
 
 ## The player
 

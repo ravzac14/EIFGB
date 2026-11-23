@@ -427,6 +427,11 @@ Problems that says where it stopped working. The walkthrough is
 always uses the same random numbers as the check, so what you recorded
 plays the same way again.
 
+Test play can also start part-way. **Start at a step…** plays the
+walkthrough up to the step you pick without showing it, then lets you
+carry on from there. After a change, it offers to play your moves again on
+the new version, so you can try a fix without typing your way back.
+
 Test play also keeps a list of what the game **didn't understand**, under
 **Not understood**: a word that isn't a name for anything ("x lantern"),
 a verb the game doesn't know ("yoink the gem"), or a word that's only in
@@ -435,15 +440,89 @@ another name for something in that room, make the verb mean one the game
 knows (an [alias](#your-own-words-aliases)), or add it as an object.
 Players will try the same things.
 
-The **Puzzles** tab reads the game and shows one way through it, in
-order: what has to be found (SEARCH THE MAT: A SMALL KEY), unlocked (THE
-PANTRY DOOR WITH THE SMALL KEY: PANTRY OPENS UP) and reached, and what
-ends the game. Above that, it lists what can never happen: a room nobody
-can get to, a key that opens nothing, something locked with no key, a
-hidden thing nothing reveals, an ending nothing leads to. It follows
-exits, doors, keys, containers, `revealed_by`, conversations, timers and
-the Lua that names things (`world.cellar`, `end_game("won")`), and assumes
-`when` conditions come true sooner or later. Click a line to go to it.
+The **Puzzles** tab reads the game and shows how each ending comes about:
+what has to be found (SEARCH THE MAT: A SMALL KEY), unlocked (THE PANTRY
+DOOR WITH THE SMALL KEY: PANTRY OPENS UP) and reached, each after the
+steps it needs ("after 2"). It's worked out as a graph, so puzzles that
+don't depend on each other stay apart: each ending lists only the steps
+it takes, and **side puzzles** are the ones no ending needs. A step that
+can be done more than one way says so ("or: unlock the desk with the code
+4512"). A way that waits on a variable (`when: vars.bridge_down`) says
+what sets it ("once PUSH THE WINCH sets vars.bridge_down"), and one that
+waits on a value (`when: vars.side == "rebels"`) needs what sets that
+value.
+
+**Either-or choices.** When only one of several things can happen, the
+chain treats them as a choice: options or handlers that each check a
+variable isn't set yet and then set it. For example, "Take the sword" and
+"Take the shield", each with `when: not vars.armed` and `do: 'vars.armed =
+true; …'`. Each shows as a step saying what it rules out. An ending that
+depends on one says "Only if the player chooses “Take the sword”". An
+ending that needs two of them can't happen, and a choice that leaves no
+way to win is listed under getting stuck.
+
+Above that, it lists what can never happen: a room nobody can get to, a
+key that opens nothing, something locked with no key, a hidden thing
+nothing reveals, an ending nothing leads to, a way waiting on a variable
+nothing sets. And **where a player could get stuck**: something they need
+to win that can be eaten, burnt or smashed, that a script can do away
+with (`move_to(nil)`), a key that wears out (`uses`) before the last lock
+it's needed for, or a choice that rules out the only way to win. It
+follows exits, doors, keys, codes, containers, `revealed_by`,
+conversations, timers and the Lua that names things (`world.cellar`,
+`end_game("won")`). Click a line to go to it.
+
+**Steps solved in scripts.** The chain reads your game; it doesn't play
+it, and it can't see inside Lua. It says so rather than guess:
+
+- A step that leans on a script says **solved in a script**, with a link
+  to it. Check that the script does what the step says.
+- **What the chain takes on trust** lists every assumption on the way to
+  an ending: scripts it can't see inside, conditions it can't read
+  (`when: clock.night` is assumed to come true), and things it assumes
+  the player can get from someone ("by asking, buying, stealing or
+  fighting").
+- Some scripts it can read. A handler for a verb is read as that action.
+  If it checks what it was done with (`args.tool == world.child`), the step
+  needs that too. So `after_give` on the bread, with that check, is "Give
+  the loaf of bread to the hungry child". A merchant's priced goods are
+  bought. Writing handlers this way keeps the chain accurate.
+
+The walkthrough in Test play is the check for the rest: it plays the game
+for real after every change.
+
+**Draft hints from these steps** turns the chain into [hints](#hints) for
+HINT: for each thing to find and door to unlock, a nudge, a clue and the
+answer, shown until the player has done it (`when: not
+world.small_key.seen`, or `when: world.pantry_door.locked`). The steps on
+the way to an ending come first, so HINT helps with the earliest one still
+to do. They're drafts: reword them in your own voice.
+
+The **Timers** tab shows when each [timer](#timed-events) can go off: a
+mark after so many actions, a shaded span for a random wait (`after:
+5-10`), every time a repeating one goes off, and, with a
+[clock](#time-of-day), the time of day that would be. It says what each
+one does and what can stop it. A dashed line means the timer counts from
+when something starts it, not from the start of the game.
+
+A few more tools in the editor:
+
+- **Find** (Ctrl+Shift+F) searches every room, thing, character,
+  conversation, message and script for a word, a name or an ID. Click a
+  result to go to it.
+- **History**, beside Undo and Redo, lists your recent changes, newest
+  first, each saying what it was ("Added the room Attic"). Click one to go
+  back to before it; going back can be redone, until you change something
+  else.
+- **Tidy up**, on the map, lays your rooms out again by their directions
+  from the start room. Ways that are hard to read on the map are drawn
+  dashed in red, and listed: two lines that cross, a line running through
+  another room, and an exit drawn going the opposite way to its direction.
+  Only the map changes, never the game.
+- **Pictures** can be shared: a room, thing or character can use a
+  picture that's already in the game, which is kept once. Under each
+  picture, the editor says how much space the game's pictures take, and
+  how full the browser's storage is.
 
 That's a complete game. Compare yours with
 [`spec/examples/midnight_snack/game.yaml`](spec/examples/midnight_snack/game.yaml).
@@ -2123,7 +2202,8 @@ chooses text. `the(x)`, `The(x)`, `a(x)` and `A(x)` add articles.
 `complete_goal(id)`, `clock.time`, `clock.hour`, `clock.night`,
 `clock.day`, `pass_time(minutes)`, `set_clock(time)`; on objects,
 `:move_to(place)`, `:is_in(holder)`, `:contents()`, `:has(trait)`,
-`:can_hold(thing)`, and `.capacity`, which can be changed.
+`:can_hold(thing)`, `.capacity`, which can be changed, and `.seen`,
+whether the player has found it yet (seen it, or held it), for hints.
 
 **Custom verbs:**
 

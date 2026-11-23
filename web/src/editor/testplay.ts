@@ -3,6 +3,10 @@
 // started over), from the start room or from the room selected on the map,
 // and shows on the map which room the player is in.
 //
+// It can also start part-way: at any step of the walkthrough, or, after an
+// edit, where the game in progress had got to, by playing the moves again
+// on the new version without showing them.
+//
 // What's typed in a game played from the start can be saved as the
 // game's walkthrough.txt; the editor's check replays it after every edit
 // and says here (and under Problems) when it no longer wins.
@@ -37,6 +41,11 @@ export interface TestPlayHost {
   addAlias(word: string, means: string): void;
   addVerb(word: string): void;
   addScenery(room: string, word: string): void;
+}
+
+/** The commands in a walkthrough, one a line, without comments and blank lines. */
+export function walkthroughCommands(text: string | undefined): string[] {
+  return (text ?? "").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
 }
 
 /** A command test play didn't understand, kept until it's fixed or dismissed. */
@@ -74,6 +83,7 @@ export class TestPlay {
   private fromStart = false;
   private won = false;
   private record: HTMLButtonElement;
+  private jump: HTMLSelectElement;
   private walk: HTMLElement;
   /** What wasn't understood, this session. */
   private misses: Miss[] = [];
@@ -92,12 +102,24 @@ export class TestPlay {
     });
     this.record = el("button", { type: "button", textContent: "Save as walkthrough" });
     this.record.addEventListener("click", () => this.saveWalkthrough());
+    this.jump = el("select", { className: "tp-jump", hidden: true });
+    this.jump.setAttribute("aria-label", "Start at a step of the walkthrough");
+    this.jump.addEventListener("change", () => {
+      const n = Number(this.jump.value);
+      this.jump.value = "";
+      if (n) void this.replay(walkthroughCommands(this.host.files()[WALKTHROUGH]).slice(0, n), "walkthrough");
+    });
     this.walk = el("p", { className: "tp-walk dim" });
     this.status = el("span", { className: "dim tp-status", role: "status" });
     this.stale = el("p", { className: "tp-stale", hidden: true });
     const again = el("button", { type: "button", className: "link", textContent: "Start over" });
     again.addEventListener("click", () => void this.start());
-    this.stale.append("You've changed the game since this started. ", again, " to play the new version.");
+    const replay = el("button", { type: "button", className: "link", textContent: "play the new version up to here" });
+    replay.addEventListener("click", () => {
+      if (this.fromStart) void this.replay([...this.played], "moves");
+      else void this.start();
+    });
+    this.stale.append("You've changed the game since this started. ", again, " to play the new version, or ", replay, " (your moves, played again for you).");
     this.log = el("div", { className: "tp-log", ariaLive: "polite" });
     this.line = el("input", { type: "text", autocomplete: "off", spellcheck: false, ariaLabel: "Command" });
     this.line.setAttribute("autocapitalize", "off");
@@ -123,7 +145,7 @@ export class TestPlay {
     });
     this.log.append(el("p", { className: "dim", textContent: "Play your game here while you work on it. Press Start over to begin." }));
     this.missBox = el("details", { className: "tp-misses", hidden: true });
-    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.record, this.status), this.walk, this.missBox, this.stale, this.log, this.form);
+    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.jump, this.record, this.status), this.walk, this.missBox, this.stale, this.log, this.form);
     this.walkthrough("none");
     this.update();
   }
@@ -148,8 +170,18 @@ export class TestPlay {
       : `Save the ${this.played.length} commands you've typed as ${WALKTHROUGH}, to check after every change that the game can still be won`;
   }
 
+  /** The steps of the walkthrough to start at. */
+  private fillJump(text: string | undefined) {
+    const cmds = walkthroughCommands(text);
+    this.jump.hidden = !cmds.length;
+    this.jump.replaceChildren(el("option", { value: "", textContent: "Start at a step…" }));
+    cmds.forEach((c, i) => this.jump.append(el("option", { value: String(i + 1), textContent: `After ${i + 1}. ${c}` })));
+    this.jump.title = "Play the walkthrough up to a step without showing it, then carry on from there";
+  }
+
   /** How the saved walkthrough plays now: "none" when there isn't one, "unchecked" when the game can't be played. */
-  walkthrough(w: Walkthrough | "none" | "unchecked") {
+  walkthrough(w: Walkthrough | "none" | "unchecked", text?: string) {
+    this.fillJump(text);
     this.walk.replaceChildren();
     this.walk.className = "tp-walk dim";
     if (w === "none") {
@@ -180,7 +212,7 @@ export class TestPlay {
     this.stale.hidden = game(now) === game(this.startedWith);
   }
 
-  async start(from?: string) {
+  async start(from?: string, quiet = false) {
     this.engine ??= await this.host.engine();
     let files = this.host.files();
     this.startedWith = files;
@@ -215,8 +247,35 @@ export class TestPlay {
     this.running = true;
     this.form.hidden = false;
     if (from) this.say(`Started in ${this.host.selectedRoom()?.name ?? from}, as if the game began there.`, "notice");
-    this.show(loaded.output);
+    if (!quiet) this.show(loaded.output);
     this.line.focus({ preventScroll: true });
+  }
+
+  /**
+   * Starts over and plays `commands` without showing them, then shows where
+   * that got to: a step of the walkthrough, or the moves of the game in
+   * progress on the new version. Stops early at an ending.
+   */
+  async replay(commands: string[], what: "walkthrough" | "moves") {
+    await this.start(undefined, true);
+    if (!this.running || !this.engine) return;
+    let last: Output | null = null;
+    let n = 0;
+    for (const c of commands) {
+      last = this.engine.input(c);
+      this.played.push(c);
+      n++;
+      if (last.ended) break;
+    }
+    this.log.replaceChildren();
+    const said = what === "walkthrough" ? `Played the walkthrough up to step ${n} (${commands[n - 1] ?? ""})` : `Played your ${n} move${n === 1 ? "" : "s"} again on the new version`;
+    this.say(
+      n < commands.length ? `${said}, but the game ended there, ${commands.length - n} short.` : `${said}. Carry on from here; Save as walkthrough keeps those moves too.`,
+      "notice",
+    );
+    if (last) this.show(last);
+    else this.say("(Nothing to play.)", "notice");
+    this.update();
   }
 
   private send(text: string) {

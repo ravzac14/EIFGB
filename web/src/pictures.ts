@@ -105,3 +105,16 @@ export function figure(src: string | null, alt: string): HTMLElement {
   }
   return f;
 }
+
+/** About how many bytes a project file takes: a picture's own size, not its text's. */
+export function fileBytes(text: string): number {
+  const m = /^data:[^;,]+;base64,/.exec(text);
+  return m ? Math.floor(((text.length - m[0].length) * 3) / 4) : text.length;
+}
+
+/** "12 KB", "1.4 MB". */
+export function sizeText(bytes: number): string {
+  if (bytes < 1000) return `${bytes} bytes`;
+  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
+  return `${(bytes / 1_000_000).toFixed(1)} MB`;
+}

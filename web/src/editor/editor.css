@@ -267,3 +267,67 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .endings-list { list-style: none; margin: 0; padding: 0; }
 .endings-list li { padding: 0.25rem 0.2rem; cursor: pointer; }
 .endings-list li.bad strong { color: var(--err); }
+
+/* History: recent changes, to step back to. */
+.history-dialog { width: min(34rem, calc(100vw - 32px)); font-family: var(--sans); }
+.history-dialog h2 { margin-top: 0; }
+.history { list-style: none; margin: 0.6rem 0 0; padding: 0; max-height: 60vh; overflow: auto; }
+.history li { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; padding: 0.35rem 0; border-bottom: 1px solid var(--line); font-size: 0.9em; }
+.history li .what { flex: 1 1 12rem; }
+.history li.undone .what { color: var(--dim); text-decoration: line-through; }
+.history li.now { color: var(--accent); }
+
+/* Find in game. */
+.find-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.find-row input { flex: 1 1 16rem; max-width: 28rem; padding: 0.35em 0.5em; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+.found { list-style: none; margin: 0; padding: 0; }
+.found li { padding: 0.3rem 0; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 0.85em; }
+.found li:hover, .found li:focus { color: var(--accent); outline: none; }
+.found .found-text { display: block; color: var(--dim); font-family: var(--mono); font-size: 0.95em; overflow-wrap: anywhere; }
+.found mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--fg); border-radius: 2px; }
+
+/* Ways that are hard to read on the map. */
+#map .link.flagged line:not(.hit) { stroke: var(--bad); stroke-dasharray: 3 3; }
+.map-check { position: absolute; top: 3rem; left: 0.6rem; max-width: min(26rem, calc(100% - 1.2rem)); background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--bad); border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85em; }
+.map-check summary { cursor: pointer; }
+.map-check ul { margin: 0.3rem 0; padding-left: 1.1rem; }
+.map-check p { margin: 0.3rem 0; }
+.map-check .link { padding: 0; }
+
+/* Pictures already in the game. */
+.pic-preview.small { max-height: 90px; }
+
+/* Hints drafted from the puzzle chain. */
+.draft-hints { margin: 0.8rem 0; }
+.draft-hints p { margin: 0.3rem 0 0; font-size: 0.85em; }
+
+/* The timer timeline. */
+.tl { --label: 0; margin-top: 0.4rem; }
+.tl-scale { position: relative; height: 2.2rem; margin: 0 0.5rem; border-bottom: 1px solid var(--line); }
+.tl-tick { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.75em; color: var(--dim); }
+.tl-tick.tl-time { top: 1rem; color: var(--accent); }
+.tl-rows { list-style: none; margin: 0; padding: 0; }
+.tl-row { padding: 0.4rem 0; border-bottom: 1px solid var(--line); font-size: 0.85em; }
+.tl-label .link { padding: 0; font-weight: 600; }
+.tl-track { position: relative; height: 0.9rem; margin: 0.3rem 0.5rem; border-bottom: 2px solid var(--line); }
+.tl-track.later { border-bottom-style: dashed; }
+.tl-mark { position: absolute; bottom: -0.35rem; width: 0.7rem; height: 0.7rem; margin-left: -0.35rem; border-radius: 50%; background: var(--accent); }
+.tl-span { position: absolute; bottom: -0.3rem; height: 0.6rem; border-radius: 0.3rem; background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.tl-does { margin: 0.2rem 0 0; color: var(--dim); }
+
+/* Test play: starting at a step of the walkthrough. */
+.tp-jump { max-width: 16rem; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.2rem 0.3rem; }
+
+/* The puzzle chain as a graph: for each ending, and side puzzles. */
+#panel-puzzles h4 { margin: 0.8rem 0 0.4rem; font-size: 0.9em; }
+.chain .step .after { font-size: 0.85em; }
+.chain .step .or { display: block; font-size: 0.85em; }
+.chain.side .step { padding-left: 0.6rem; }
+.chain.side .step::before, .chain.side .step::after { content: none; }
+.chain .step.choose { border-left: 3px solid #8a5cc7; }
+.chain .step .either { display: block; font-size: 0.85em; color: #8a5cc7; }
+.chain .step .script { display: block; font-size: 0.85em; }
+.only-if { margin: 0 0 0.4rem; font-size: 0.85em; color: #8a5cc7; }
+.assumes-box { margin: 0.8rem 0; }
+.assumes-box summary { cursor: pointer; font-weight: 600; }
+.assumes li { cursor: pointer; }

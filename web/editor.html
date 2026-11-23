@@ -23,6 +23,7 @@
   <span class="tools" id="tools" hidden>
     <button id="undo" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
     <button id="redo" type="button" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+    <button id="history" type="button" aria-haspopup="dialog" title="Recent changes, to step back to" disabled>History</button>
     <button id="download" type="button" aria-haspopup="dialog" title="Download the game's files, or the game as a web page to share">Download</button>
     <button id="play" class="primary" type="button" title="Play the game from the start, in a new tab">Play</button>
   </span>
@@ -67,6 +68,7 @@
       <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
       <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
       <button id="fit" type="button">Fit</button>
+      <button id="tidy" type="button" title="Lay the rooms out again by their directions, from the start room. Undo puts them back.">Tidy up</button>
       <label class="map-theme">Editor theme
         <select id="map-theme" title="How the map looks while you work on it">
           <option value="site">Same as the site</option>
@@ -75,17 +77,26 @@
       </label>
     </div>
     <p id="map-hint" class="map-hint ui"></p>
+    <div id="map-check" class="map-check ui" role="status" hidden></div>
   </section>
   <aside id="inspector" class="inspector ui" aria-label="Details"></aside>
   <section class="drawer ui">
     <div class="tabs" role="tablist">
       <button id="tab-problems" role="tab" type="button" aria-selected="true">Problems</button>
       <button id="tab-puzzles" role="tab" type="button" aria-selected="false">Puzzles</button>
+      <button id="tab-timers" role="tab" type="button" aria-selected="false" hidden>Timers</button>
+      <button id="tab-find" role="tab" type="button" aria-selected="false" title="Find a word anywhere in the game (Ctrl+Shift+F)">Find</button>
       <button id="tab-yaml" role="tab" type="button" aria-selected="false">Files</button>
       <button id="tab-play" role="tab" type="button" aria-selected="false">Test play</button>
     </div>
     <div id="panel-problems" class="panel" role="tabpanel"></div>
     <div id="panel-puzzles" class="panel" role="tabpanel" hidden></div>
+    <div id="panel-timers" class="panel" role="tabpanel" hidden></div>
+    <div id="panel-find" class="panel" role="tabpanel" hidden>
+      <div class="find-row"><input id="find-text" type="search" placeholder="A word, a name or an ID" aria-label="Find in the game" autocomplete="off" spellcheck="false"><span id="find-count" class="dim" role="status"></span></div>
+      <p class="dim">Every room, thing, character, conversation and script that mentions it. Click one to go to it.</p>
+      <ul id="find-results" class="found"></ul>
+    </div>
     <div id="panel-yaml" class="panel" role="tabpanel" hidden>
       <div class="file-row"><select id="file" aria-label="File"><option value="game.yaml">game.yaml</option></select><span id="file-help" class="dim">This is your game's file. Changes on the map show up here, and changes here show up on the map.</span></div>
       <textarea id="yaml" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="game.yaml"></textarea>
@@ -95,6 +106,7 @@
   </section>
 </div>
 <dialog id="settings"></dialog>
+<dialog id="history-dialog" class="history-dialog" aria-labelledby="history-title"></dialog>
 <dialog id="download-dialog" class="download-dialog" aria-labelledby="download-title"></dialog>
 <dialog id="add-dialog" class="add-dialog" aria-label="Add a component"></dialog>
 <script type="module" src="./src/editor/main.ts"></script>

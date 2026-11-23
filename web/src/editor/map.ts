@@ -253,7 +253,11 @@ export class MapView {
 
   // ----------------------------------------------------------- drawing
 
-  render(model: Model, positions: Positions, selection: Selection, bad: Set<string>) {
+  /** Ways (keyed "a|b") that are hard to read where they're drawn: crossing, say. */
+  private flagged = new Set<string>();
+
+  render(model: Model, positions: Positions, selection: Selection, bad: Set<string>, flagged = new Set<string>()) {
+    this.flagged = flagged;
     this.model = model;
     this.positions = positions;
     this.selection = selection;
@@ -301,7 +305,8 @@ export class MapView {
     if (!pa || !pb) return;
     const selected = this.isSelectedExit(l.a, l.ab) || this.isSelectedExit(l.b, l.ba);
     const advanced = l.ab?.kind === "advanced" || l.ba?.kind === "advanced";
-    const g = svg("g", { class: `link${selected ? " selected" : ""}${advanced ? " advanced" : ""}` }, layer);
+    const flagged = this.flagged.has([l.a, l.b].sort().join("|"));
+    const g = svg("g", { class: `link${selected ? " selected" : ""}${advanced ? " advanced" : ""}${flagged ? " flagged" : ""}` }, layer);
     let dx = pb.x - pa.x;
     let dy = pb.y - pa.y;
     if (l.a === l.b) {

@@ -73,9 +73,25 @@ export interface Presentation {
 export type Files = Record<string, string>;
 /** The puzzle chain, from the editor's check: see crates/eifgb-compiler/src/puzzles.rs. */
 export interface Puzzles {
-  steps: { kind: "start" | "find" | "unlock" | "reach" | "ending"; id: string; text: string }[];
-  endings: { key: string; kind: "win" | "loss" | "neutral"; reachable: boolean; from: string[] }[];
-  problems: { id: string; what: "room" | "thing" | "character" | "ending"; message: string }[];
+  /**
+   * What the player does, each after what it `needs` (indexes into `steps`).
+   * `or`: other ways to do it; `either`: for a choice, the others it rules
+   * out; `script`: the script it leans on, whose inside the chain can't see.
+   */
+  steps: { kind: "start" | "find" | "unlock" | "reach" | "choose" | "ending"; id: string; text: string; needs?: number[]; or?: string[]; either?: string[]; script?: string }[];
+  /** `needs`: every step the ending takes, in order; `only_if`: the either-or choices it depends on. */
+  endings: { key: string; kind: "win" | "loss" | "neutral"; reachable: boolean; from: string[]; needs?: number[]; only_if?: string[] }[];
+  problems: PuzzleNote[];
+  /** Where a player could get stuck on the way to a win. */
+  stuck?: PuzzleNote[];
+  /** What the chain takes on trust: scripts it can't see inside, conditions it assumes come true. */
+  assumes?: PuzzleNote[];
+}
+/** Something the puzzle chain says about a room, thing, character, conversation or ending. */
+export interface PuzzleNote {
+  id: string;
+  what: "room" | "thing" | "character" | "choice" | "ending";
+  message: string;
 }
 /** How walkthrough.txt played, when the editor's check finds one: see the bridge's `walkthrough`. */
 export interface Walkthrough {

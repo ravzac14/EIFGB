@@ -2,11 +2,11 @@
 // the drawer (problems, and the game file). Projects are kept in the
 // browser with the games you've loaded, so they're on the home page too.
 
-import { dataBytes, isPicture, pictureSrc, shrink } from "../pictures.ts";
+import { dataBytes, fileBytes, isPicture, pictureSrc, shrink } from "../pictures.ts";
 import { zipSync, strToU8 } from "fflate";
 import { loadEngine, type Diagnostic, type Engine, type Files, type Puzzles } from "../engine.ts";
 import { fromFileList } from "../files.ts";
-import { localGames, mapTheme, type LocalGame, type MapTheme } from "../store.ts";
+import { localGames, mapTheme, storageUse, type LocalGame, type MapTheme } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
 import { feedbackButton, feedbackContext } from "../feedback.ts";
 import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
@@ -15,6 +15,11 @@ import { MapView, type Selection } from "./map.ts";
 import { renderInspector, type InspectorContext } from "./inspector.ts";
 import { openAddComponent } from "./add-component.ts";
 import { TestPlay, WALKTHROUGH } from "./testplay.ts";
+import { describeChange, when } from "./history.ts";
+import { findInGame, MAX_FOUND } from "./find.ts";
+import { mapProblems, tidy, wayKey, type MapProblem, type Way } from "./tidy.ts";
+import { draftHints } from "./hint-drafts.ts";
+import { timeline, timeText } from "./timeline.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
@@ -93,9 +98,15 @@ const testPlay = new TestPlay($("panel-play"), {
   },
 });
 
-/** Every file of the project at one moment: what undo goes back to. */
+/**
+ * Every file of the project at one moment: what undo goes back to. On the
+ * undo and redo lists, `label` says what the change from (or to) it was,
+ * and `at` when it was made.
+ */
 interface Snapshot {
   files: Files;
+  label?: string;
+  at?: number;
 }
 const undo: Snapshot[] = [];
 const redo: Snapshot[] = [];
@@ -104,6 +115,11 @@ let lastCoalesce: { key: string; at: number } | null = null;
 const snapshot = (): Snapshot => ({
   files: { ...project.files, "game.yaml": model ? model.toString() : project.files["game.yaml"], ...(model ? { [MAP_FILE]: mapText() } : {}) },
 });
+/** Puts `before` on the undo list, labelled with the change since (or as given). */
+function pushUndo(before: Snapshot, after: Snapshot, label?: string) {
+  undo.push({ files: before.files, label: label ?? describeChange(before.files, after.files), at: Date.now() });
+  redo.length = 0;
+}
 const sameFiles = (a: Files, b: Files) => {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   return [...keys].every((k) => a[k] === b[k]);
@@ -164,7 +180,7 @@ function save() {
 }
 
 /** Every edit comes through here: one undo step, a save, a redraw and a check. */
-function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: boolean } = {}) {
+function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: boolean; label?: string } = {}) {
   if (!model) return;
   const before = snapshot();
   model.lastRename = null;
@@ -184,10 +200,15 @@ function change(fn: (m: Model) => void, opts: { coalesce?: string; redraw?: bool
   const after = snapshot();
   if (!sameFiles(before.files, after.files)) {
     const now = Date.now();
-    const merge = opts.coalesce && lastCoalesce?.key === opts.coalesce && now - lastCoalesce.at < 2000;
-    if (!merge) undo.push(before);
+    const merge = opts.coalesce && lastCoalesce?.key === opts.coalesce && now - lastCoalesce.at < 2000 && undo.length;
+    if (merge) {
+      // Still typing in the same field: the same step, now saying all of it.
+      const top = undo[undo.length - 1];
+      top.label = describeChange(top.files, after.files);
+      top.at = now;
+      redo.length = 0;
+    } else pushUndo(before, after, opts.label);
     lastCoalesce = opts.coalesce ? { key: opts.coalesce, at: now } : null;
-    redo.length = 0;
     // New rooms need places on the map.
     positions = layout(model, positions);
     save();
@@ -208,14 +229,60 @@ function restore(s: Snapshot) {
 function doUndo() {
   const s = undo.pop();
   if (!s) return;
-  redo.push(snapshot());
+  redo.push({ ...snapshot(), label: s.label, at: s.at });
   restore(s);
 }
 function doRedo() {
   const s = redo.pop();
   if (!s) return;
-  undo.push(snapshot());
+  undo.push({ ...snapshot(), label: s.label, at: s.at });
   restore(s);
+}
+
+/** Goes back (or forward) `n` changes at once, from the history list. */
+function stepMany(n: number, from: Snapshot[], to: Snapshot[]) {
+  let now = snapshot();
+  for (let i = 0; i < n && from.length; i++) {
+    const s = from.pop()!;
+    to.push({ files: now.files, label: s.label, at: s.at });
+    now = s;
+  }
+  restore(now);
+}
+const undoMany = (n: number) => stepMany(n, undo, redo);
+const redoMany = (n: number) => stepMany(n, redo, undo);
+
+/** How many changes the history list shows. */
+const HISTORY = 30;
+
+/** The history list: recent changes, newest first, to step back to. */
+function showHistory() {
+  const dialog = $<HTMLDialogElement>("history-dialog");
+  const list = el("ol", { className: "history" });
+  // Changes undone, which can be redone: newest-undone last, so they read in order.
+  const undone = redo.slice(-HISTORY);
+  for (let i = 0; i < undone.length; i++) {
+    const s = undone[i];
+    const steps = undone.length - i;
+    const li = el("li", { className: "undone" }, el("span", { className: "what", textContent: s.label ?? "A change" }), el("span", { className: "dim", textContent: " undone" }));
+    li.append(button("Redo to here", () => (redoMany(steps), dialog.close())));
+    list.append(li);
+  }
+  list.append(el("li", { className: "now" }, el("strong", { textContent: "Now" })));
+  const done = undo.slice(-HISTORY).reverse();
+  done.forEach((s, i) => {
+    const li = el("li", {}, el("span", { className: "what", textContent: s.label ?? "A change" }), el("span", { className: "dim", textContent: ` ${s.at ? when(s.at) : ""}` }));
+    li.append(button(i === 0 ? "Undo this" : `Undo back to here (${i + 1} changes)`, () => (undoMany(i + 1), dialog.close())));
+    list.append(li);
+  });
+  dialog.replaceChildren(
+    button("Close", () => dialog.close(), "close"),
+    el("h2", { id: "history-title", textContent: "History" }),
+    el("p", { className: "dim", textContent: undo.length || redo.length ? "Your changes since you opened the game, newest first. Going back can be redone, until you change something else." : "No changes yet since you opened the game." }),
+    list,
+    undo.length > HISTORY ? el("p", { className: "dim", textContent: `And ${undo.length - HISTORY} earlier changes: Undo reaches those too.` }) : "",
+  );
+  dialog.showModal();
 }
 
 // ----------------------------------------------------------- drawing
@@ -231,9 +298,15 @@ function badRooms(): Set<string> {
 }
 
 function drawMap() {
-  if (model) mapView.render(model, positions, selection, badRooms());
+  const hard = model ? mapProblems(model, positions) : [];
+  const flagged = new Set(hard.flatMap((p) => (p.kind === "cross" ? [wayKey(p.a), wayKey(p.b)] : [wayKey(p.a)])));
+  if (model) mapView.render(model, positions, selection, badRooms(), flagged);
+  showMapCheck(hard);
   $<HTMLButtonElement>("undo").disabled = !undo.length;
   $<HTMLButtonElement>("redo").disabled = !redo.length;
+  $<HTMLButtonElement>("history").disabled = !undo.length && !redo.length;
+  $("undo").title = undo.length ? `Undo: ${undo[undo.length - 1].label ?? "the last change"} (Ctrl+Z)` : "Undo (Ctrl+Z)";
+  $("redo").title = redo.length ? `Redo: ${redo[redo.length - 1].label ?? "the change"} (Ctrl+Shift+Z)` : "Redo (Ctrl+Shift+Z)";
   $("title").textContent = model?.title() ?? project.title;
   document.title = `${model?.title() ?? project.title} · Editor`;
   $("map-hint").textContent =
@@ -244,9 +317,91 @@ function drawMap() {
         : "";
 }
 
+/** Under the map's tools: ways that are hard to read where they're drawn. */
+function showMapCheck(hard: MapProblem[]) {
+  const box = $("map-check");
+  box.hidden = !hard.length;
+  if (!hard.length) return box.replaceChildren();
+  const name = (id: string) => model?.room(id)?.name ?? id;
+  const way = (w: Way) => {
+    const b = button(`${name(w.room)}–${name(w.to)}`, () => select({ kind: "exit", room: w.room, dir: w.dir }), "link");
+    b.title = "Select it";
+    return b;
+  };
+  const items = hard.slice(0, 5).map((p) =>
+    el(
+      "li",
+      {},
+      ...(p.kind === "cross"
+        ? [way(p.a), " crosses ", way(p.b)]
+        : p.kind === "through"
+          ? [way(p.a), ` runs through ${name(p.room)}`]
+          : [way(p.a), ` goes ${p.a.dir}, but is drawn the other way`]),
+    ),
+  );
+  const details = el("details", {}, el("summary", { textContent: `${hard.length} way${hard.length === 1 ? " is" : "s are"} hard to read on the map` }), el("ul", {}, ...items));
+  if (hard.length > 5) details.append(el("p", { className: "dim", textContent: `And ${hard.length - 5} more.` }));
+  details.append(el("p", { className: "dim", textContent: "Drag rooms to untangle them, or Tidy up to lay the map out again by its directions. Only the map changes, never the game." }));
+  box.replaceChildren(details);
+}
+
+/** The Timers tab: when each timer can go off, and what it does. */
+function showTimers() {
+  const tab = $("tab-timers");
+  const panel = $("panel-timers");
+  const ids = model?.ids("timers") ?? [];
+  tab.hidden = !ids.length;
+  if (!ids.length) {
+    if (!panel.hidden) showTab("problems");
+    return panel.replaceChildren();
+  }
+  const t = timeline(model!);
+  const pct = (n: number) => `${Math.min(100, (n / t.span) * 100)}%`;
+  // The scale: actions, and with a clock the time they'd reach.
+  const step = t.span <= 40 ? 5 : t.span <= 100 ? 10 : t.span <= 400 ? 50 : 100;
+  const scale = el("div", { className: "tl-scale" });
+  for (let n = 0; n <= t.span; n += step) {
+    const tick = el("span", { className: "tl-tick", textContent: String(n) });
+    tick.style.left = pct(n);
+    if (t.clock) tick.title = timeText(t.clock.start + n * t.clock.perTurn);
+    scale.append(tick);
+    if (t.clock && n % (step * 2) === 0) {
+      const clock = el("span", { className: "tl-tick tl-time", textContent: timeText(t.clock.start + n * t.clock.perTurn) });
+      clock.style.left = pct(n);
+      scale.append(clock);
+    }
+  }
+  const rows = t.timers.map((p) => {
+    const track = el("div", { className: `tl-track${p.fromStart ? "" : " later"}` });
+    for (const m of p.marks) {
+      if (m.from > t.span) continue;
+      const mark = el("span", { className: m.to > m.from ? "tl-span" : "tl-mark" });
+      mark.style.left = pct(m.from);
+      if (m.to > m.from) mark.style.width = `calc(${pct(m.to)} - ${pct(m.from)})`;
+      const at = t.clock && p.fromStart ? `, about ${timeText(t.clock.start + m.from * t.clock.perTurn)}` : "";
+      mark.title = m.to > m.from ? `Between actions ${m.from} and ${m.to}${at}` : `After action ${m.from}${at}`;
+      track.append(mark);
+    }
+    const name = button(p.id, () => select({ kind: "timer", id: p.id }), "link");
+    name.title = "Select it";
+    return el(
+      "li",
+      { className: "tl-row" },
+      el("div", { className: "tl-label" }, name, el("span", { className: "dim", textContent: ` ${p.schedule}, ${p.fromStart ? "from the start" : "counting from " + p.starts.replace(/^when /, "when ")}` })),
+      track,
+      el("p", { className: "tl-does" }, `It ${p.does.join(", ")}.`, p.unless.length ? ` ${p.unless.map((u) => u.charAt(0).toUpperCase() + u.slice(1)).join(". ")}.` : "", p.stops ? ` Stopped by: ${p.stops}.` : ""),
+    );
+  });
+  panel.replaceChildren(
+    el("p", { className: "dim", textContent: `When each timer can go off, counted in actions (commands that take a turn)${t.clock ? `, and the time of day that would be (the clock starts at ${timeText(t.clock.start)}, ${t.clock.perTurn} minute${t.clock.perTurn === 1 ? "" : "s"} an action)` : ""}. A shaded span is a random wait; a dashed track counts from when something starts the timer, not from the start.` }),
+    el("div", { className: "tl" }, scale, el("ol", { className: "tl-rows" }, ...rows)),
+  );
+}
+
 function redraw() {
   drawMap();
   testPlay.update();
+  showTimers();
   if (!model) {
     $("inspector").replaceChildren(el("p", { className: "dim", textContent: "Fix the mistake in the game file to see the map." }));
     return;
@@ -281,6 +436,23 @@ function inspectorContext(model: Model): InspectorContext {
     addScriptFile,
     addPicture,
     pictureUrl: (file) => pictureSrc(file, project.files),
+    pictures: () => {
+      const users = new Map<string, { owner: string[]; name: string }[]>();
+      const kinds = [["rooms", "Room"], ["objects", "Thing"], ["characters", "Character"]] as const;
+      for (const [section, kind] of kinds) {
+        for (const id of model.ids(section)) {
+          const file = model.picture([section, id])?.file;
+          if (!file) continue;
+          const name = (section === "rooms" ? model.room(id)?.name : section === "objects" ? model.thing(id)?.name : model.character(id)?.name) ?? id;
+          users.set(file, [...(users.get(file) ?? []), { owner: [section, id], name: `${kind} ${name}` }]);
+        }
+      }
+      return Object.keys(project.files)
+        .filter((f) => isPicture(f, project.files[f]))
+        .sort()
+        .map((file) => ({ file, bytes: fileBytes(project.files[file]), usedBy: users.get(file) ?? [] }));
+    },
+    storage: storageUse,
     dropPicture: (file) => {
       if (project.files[file] === undefined || model?.toString().includes(file)) return;
       const { [file]: _gone, ...rest } = project.files;
@@ -413,7 +585,7 @@ function scheduleCheck() {
       const checked = (await engine).check(files);
       problems = checked.diagnostics;
       puzzles = checked.puzzles ?? null;
-      testPlay.walkthrough(files[WALKTHROUGH] === undefined ? "none" : (checked.walkthrough ?? "unchecked"));
+      testPlay.walkthrough(files[WALKTHROUGH] === undefined ? "none" : (checked.walkthrough ?? "unchecked"), files[WALKTHROUGH]);
     } catch (e) {
       problems = [{ severity: "error", path: "", message: `The checker couldn't run: ${e}` }];
     }
@@ -425,17 +597,23 @@ function scheduleCheck() {
 
 let puzzles: Puzzles | null = null;
 
-/** The Puzzles tab: what can't happen, then what the player does, in order. */
+/**
+ * The Puzzles tab: what can't happen, where a player could get stuck, then
+ * what the player does for each ending (only the steps it needs), and side
+ * puzzles nothing needs.
+ */
 function showPuzzles() {
   const panel = $("panel-puzzles");
   const bad = puzzles?.problems ?? [];
-  $("tab-puzzles").textContent = bad.length ? `Puzzles (${bad.length})` : "Puzzles";
+  const worries = bad.length + (puzzles?.stuck?.length ?? 0);
+  $("tab-puzzles").textContent = worries ? `Puzzles (${worries})` : "Puzzles";
   if (!puzzles) {
     panel.replaceChildren(el("p", { className: "dim", textContent: "The puzzle chain shows once the game's errors are fixed." }));
     return;
   }
   const go = (what: string, id: string) => {
     if (what === "ending") return goTo(`endings.${id}`);
+    if (what === "choice" && model?.ids("choices").includes(id)) return select({ kind: "choice", id });
     if (model?.room(id)) return select({ kind: "room", id });
     if (model?.character(id)) return select({ kind: "character", id });
     goTo(`objects.${id}`);
@@ -452,17 +630,119 @@ function showPuzzles() {
     }
     out.push(ul);
   }
+  // Where a player could get stuck on the way to a win.
+  const stuck = puzzles.stuck ?? [];
+  if (stuck.length) {
+    out.push(el("h3", { textContent: "Where a player could get stuck" }));
+    const ul = el("ul", { className: "problems" });
+    for (const p of stuck) {
+      const li = el("li", { className: "warning", title: "Show it" });
+      li.append(el("span", { className: "sev", textContent: "Stuck" }), p.message);
+      li.addEventListener("click", () => go(p.what, p.id));
+      ul.append(li);
+    }
+    out.push(ul);
+  }
+  const steps = puzzles.steps;
+  // One step as a line: what to do, what it waits on, and other ways to do it.
+  const stepLine = (i: number, numbered: Map<number, number>) => {
+    const s = steps[i];
+    const li = el("li", { className: `step ${s.kind}`, title: "Show it" }, el("span", { className: "what", textContent: s.text }));
+    const after = (s.needs ?? []).filter((n) => numbered.has(n)).map((n) => numbered.get(n)!);
+    if (after.length) li.append(el("span", { className: "after dim", textContent: ` after ${after.join(" and ")}` }));
+    for (const o of s.or ?? []) li.append(el("span", { className: "or dim", textContent: `or: ${o}` }));
+    if (s.either?.length) li.append(el("span", { className: "either", textContent: `Only one of these: it rules out ${s.either.map((x) => x.replace(/\.$/, "")).join(" and ")}.` }));
+    if (s.script && s.kind !== "choose") {
+      const open = button(`solved in a script (${s.script})`, () => openScript(s.script!), "link");
+      open.title = "The chain can't see inside scripts: check this one does what the step says";
+      open.addEventListener("click", (e) => e.stopPropagation());
+      li.append(el("span", { className: "script" }, open));
+    }
+    li.addEventListener("click", () => go(s.kind === "ending" ? "ending" : s.kind === "choose" ? "choice" : "", s.id));
+    return li;
+  };
+  // A chain of steps, from the start, each numbered for "after 2".
+  const chain = (ids: number[]) => {
+    const ol = el("ol", { className: "chain" });
+    const numbered = new Map<number, number>();
+    for (const i of [0, ...ids.filter((i) => i !== 0)]) {
+      numbered.set(i, numbered.size + 1);
+      ol.append(stepLine(i, numbered));
+    }
+    return ol;
+  };
+  const endings = puzzles.endings.filter((e) => e.reachable && e.needs);
   out.push(
     el("h3", { textContent: "What the player does" }),
-    el("p", { className: "dim", textContent: "One way through, from the start: what has to be found, unlocked and reached, and what ends the game. Conditions are assumed to come true." }),
+    el("p", { className: "dim", textContent: "For each ending, what has to be found, unlocked and reached, each after what it needs. Steps that can be done more than one way say so. Conditions are assumed to come true." }),
   );
-  const ol = el("ol", { className: "chain" });
-  for (const s of puzzles.steps) {
-    const li = el("li", { className: `step ${s.kind}`, title: "Show it", textContent: s.text });
-    li.addEventListener("click", () => go(s.kind === "ending" ? "ending" : "", s.id));
-    ol.append(li);
+  if (endings.length) {
+    for (const e of endings) {
+      const at = steps.findIndex((s) => s.kind === "ending" && s.id === e.key);
+      out.push(el("h4", { textContent: `The ${e.key} ending (${e.kind === "win" ? "a win" : e.kind === "loss" ? "a loss" : "neither"})${e.needs!.length ? `: ${e.needs!.length} step${e.needs!.length === 1 ? "" : "s"}` : ""}` }));
+      if (e.only_if?.length) out.push(el("p", { className: "only-if", textContent: `${e.only_if.join(", and ")}.`.replace(/^o/, "O") }));
+      out.push(chain([...e.needs!, ...(at >= 0 ? [at] : [])]));
+    }
+    const used = new Set(endings.flatMap((e) => e.needs!));
+    const side = steps.map((s, i) => i).filter((i) => i > 0 && steps[i].kind !== "ending" && !used.has(i));
+    if (side.length) {
+      out.push(el("h4", { textContent: "Side puzzles" }), el("p", { className: "dim", textContent: "Things the player can do that no ending needs." }));
+      const ul = el("ul", { className: "chain side" });
+      for (const i of side) ul.append(stepLine(i, new Map()));
+      out.push(ul);
+    }
+  } else {
+    out.push(chain(steps.map((_, i) => i)));
   }
-  out.push(ol);
+  // What it takes on trust: said plainly, so the author can check those parts.
+  const assumes = puzzles.assumes ?? [];
+  if (assumes.length) {
+    const ul = el("ul", { className: "problems assumes" });
+    for (const a of assumes) {
+      const li = el("li", { title: "Show it" }, a.message);
+      li.addEventListener("click", () => go(a.what, a.id));
+      ul.append(li);
+    }
+    out.push(
+      el(
+        "details",
+        { className: "assumes-box" },
+        el("summary", { textContent: `What the chain takes on trust (${assumes.length})` }),
+        el("p", { className: "dim", textContent: "The chain reads the game; it doesn't play it. It can't see inside scripts, and it assumes conditions it can't read come true. These are the steps that rest on that: worth checking, or covering with the walkthrough in Test play." }),
+        ul,
+      ),
+    );
+  }
+  // Hints for HINT, drafted from the steps: only the ones not drafted already.
+  const have = new Set((model?.ids("hints") ?? []).map((h) => String(model!.get(["hints", h, "when"]) ?? "")));
+  const drafts = model ? draftHints(model, puzzles.steps, puzzles.endings).filter((d) => !have.has(d.when)) : [];
+  if (drafts.length) {
+    const draft = button(`Draft ${drafts.length === 1 ? "a hint" : `${drafts.length} hints`} from these steps`, () => {
+      let first = "";
+      change(
+        (m) => {
+          for (const d of drafts) {
+            const id = m.addHint(d.name);
+            first ||= id;
+            // `when` first, as the templates write it: when, then what to say.
+            m.set(["hints", id, "steps"], undefined);
+            m.set(["hints", id, "when"], d.when);
+            m.setHintSteps(id, d.steps);
+          }
+        },
+        { label: `Drafted ${drafts.length === 1 ? "a hint" : `${drafts.length} hints`} from the puzzle chain` },
+      );
+      if (first) select({ kind: "hint", id: first });
+    });
+    out.push(
+      el(
+        "div",
+        { className: "draft-hints" },
+        draft,
+        el("p", { className: "dim", textContent: "For HINT: a nudge first and the answer last, for each step the game can tell is done (something found, a door unlocked). They're drafts: reword them in your own voice." }),
+      ),
+    );
+  }
   if (puzzles.endings.length) {
     out.push(el("h3", { textContent: "Endings" }));
     const ul = el("ul", { className: "endings-list" });
@@ -554,8 +834,10 @@ function goTo(path: string) {
   showInFile(parts[1] ? `${parts[1]}:` : parts[0] ?? "");
 }
 
-function showTab(which: "problems" | "puzzles" | "yaml" | "play") {
-  for (const t of ["problems", "puzzles", "yaml", "play"] as const) {
+type Tab = "problems" | "puzzles" | "timers" | "find" | "yaml" | "play";
+const TABS: Tab[] = ["problems", "puzzles", "timers", "find", "yaml", "play"];
+function showTab(which: Tab) {
+  for (const t of TABS) {
     $(`tab-${t}`).setAttribute("aria-selected", String(which === t));
     $(`panel-${t}`).hidden = which !== t;
   }
@@ -563,6 +845,65 @@ function showTab(which: "problems" | "puzzles" | "yaml" | "play") {
 }
 
 
+
+// ------------------------------------------------------------- find
+
+/** Searches the whole game: the Find tab. */
+function runFind() {
+  const q = $<HTMLInputElement>("find-text").value;
+  const out = $("find-results");
+  const found = q.trim() ? findInGame(snapshot().files, q) : [];
+  $("find-count").textContent = !q.trim() ? "" : found.length ? `${found.length >= MAX_FOUND ? `The first ${MAX_FOUND}` : found.length} place${found.length === 1 ? "" : "s"}` : "Not found anywhere in the game.";
+  out.replaceChildren(
+    ...found.map((f) => {
+      const text = el("span", { className: "found-text" }, f.text.slice(0, f.at), el("mark", { textContent: f.text.slice(f.at, f.at + f.length) }), f.text.slice(f.at + f.length));
+      const li = el("li", { title: "Go to it" }, el("strong", { textContent: f.where }), f.field ? el("span", { className: "dim", textContent: ` ${f.field}` }) : "", text);
+      li.tabIndex = 0;
+      const go = () => {
+        if (f.line !== undefined) {
+          openFile(f.path);
+          selectLine(f.line);
+        } else {
+          goTo(f.path);
+          // Showing it on the map or in the panel: stay on the results.
+          if ($("panel-yaml").hidden) showTab("find");
+        }
+      };
+      li.addEventListener("click", go);
+      li.addEventListener("keydown", (e) => e.key === "Enter" && go());
+      return li;
+    }),
+  );
+}
+let findTimer = 0;
+$("find-text").addEventListener("input", () => {
+  clearTimeout(findTimer);
+  findTimer = window.setTimeout(runFind, 200);
+});
+function openFind() {
+  showTab("find");
+  const input = $<HTMLInputElement>("find-text");
+  input.focus();
+  input.select();
+  runFind();
+}
+$("tab-find").addEventListener("click", openFind);
+
+/** Opens where a script is: a file under scripts/, or the handler or conversation it belongs to. */
+function openScript(origin: string) {
+  if (project.files[origin] !== undefined) return openFile(origin);
+  goTo(origin);
+}
+
+/** Selects a line of the file open in the Files tab. */
+function selectLine(line: number) {
+  const ta = $<HTMLTextAreaElement>("yaml");
+  const lines = ta.value.split("\n");
+  const at = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+  ta.focus();
+  ta.setSelectionRange(at, at + (lines[line - 1]?.length ?? 0));
+  ta.scrollTop = Math.max(0, (line - 3) * parseFloat(getComputedStyle(ta).lineHeight || "18"));
+}
 
 function showInFile(find: string) {
   if (currentFile !== "game.yaml") openFile("game.yaml");
@@ -592,9 +933,9 @@ $("yaml").addEventListener("input", () => {
       // A script file: kept as typed; the checker says if it's broken.
       const before = snapshot();
       project = { ...project, files: { ...project.files, [currentFile]: text } };
-      if (!sameFiles(before.files, snapshot().files)) {
-        undo.push(before);
-        redo.length = 0;
+      const after = snapshot();
+      if (!sameFiles(before.files, after.files)) {
+        pushUndo(before, after);
         save();
         scheduleCheck();
       }
@@ -604,8 +945,7 @@ $("yaml").addEventListener("input", () => {
     try {
       const next = new Model(text);
       const before = snapshot();
-      undo.push(before);
-      redo.length = 0;
+      pushUndo(before, { files: { ...before.files, "game.yaml": text } });
       model = next;
       positions = layout(model, positions);
       project = { ...project, files: { ...project.files, "game.yaml": text } };
@@ -622,6 +962,7 @@ $("yaml").addEventListener("input", () => {
 $("tab-problems").addEventListener("click", () => showTab("problems"));
 $("tab-puzzles").addEventListener("click", () => showTab("puzzles"));
 $("tab-play").addEventListener("click", () => showTab("play"));
+$("tab-timers").addEventListener("click", () => showTab("timers"));
 $("tab-yaml").addEventListener("click", () => openFile(currentFile));
 $("file").addEventListener("change", () => openFile($<HTMLSelectElement>("file").value));
 
@@ -629,6 +970,7 @@ $("file").addEventListener("change", () => openFile($<HTMLSelectElement>("file")
 
 $("undo").addEventListener("click", doUndo);
 $("redo").addEventListener("click", doRedo);
+$("history").addEventListener("click", showHistory);
 $("play").addEventListener("click", () => {
   save();
   window.open(`./play.html?local=${encodeURIComponent(project.key)}&fresh=1`, "_blank", "noopener");
@@ -715,10 +1057,18 @@ $("add-component").addEventListener("click", () => {
 $("zoom-in").addEventListener("click", () => mapView.zoom(1.25));
 $("zoom-out").addEventListener("click", () => mapView.zoom(0.8));
 $("fit").addEventListener("click", () => mapView.fit());
+$("tidy").addEventListener("click", () => {
+  if (!model) return;
+  change((m) => (positions = tidy(m, positions)), { label: "Tidied up the map" });
+  mapView.fit();
+});
 
 document.addEventListener("keydown", (e) => {
   const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !typing) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "f" && model) {
+    e.preventDefault();
+    openFind();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !typing) {
     e.preventDefault();
     if (e.shiftKey) doRedo();
     else doUndo();

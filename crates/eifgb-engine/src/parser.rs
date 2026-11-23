@@ -43,7 +43,8 @@ pub enum Parsed {
     /// Something is missing: the object ("take"), or the second object
     /// ("fill lamp"), in which case `target` and `word` are set. The
     /// player's next input is appended to `prefix` to complete it.
-    NeedNoun { prefix: Vec<String>, verb: String, target: Option<EntityId>, word: Option<String> },
+    /// `way`: what's missing is a direction (GO on its own).
+    NeedNoun { prefix: Vec<String>, verb: String, target: Option<EntityId>, word: Option<String>, way: bool },
     Fail(Failure),
 }
 
@@ -641,7 +642,7 @@ impl Grammar {
     /// words they typed before what's missing (SHAKE, not WAKE), or else,
     /// for nothing or a short form (X, L AT), the verb's own.
     fn asked_verb(verb: &eifgb_ir::Verb, typed: &[String]) -> String {
-        if typed.is_empty() || typed.iter().any(|w| w.chars().count() < 3) {
+        if typed.first().is_none_or(|w| w.chars().count() < 3) {
             Self::verb_name(verb)
         } else {
             typed.join(" ")
@@ -667,7 +668,8 @@ impl Grammar {
                     && lead.iter().zip(toks).all(|(a, b)| *a == b)
                     && matches!(p.0.get(lead.len()), Some(PatternToken::Slot(_)))
                 {
-                    return Parsed::NeedNoun { prefix: toks.to_vec(), verb: Self::asked_verb(verb, toks), target: None, word: None };
+                    let way = matches!(p.0.get(lead.len()), Some(PatternToken::Slot(Slot::Direction)));
+                    return Parsed::NeedNoun { prefix: toks.to_vec(), verb: Self::asked_verb(verb, toks), target: None, word: None, way };
                 }
             }
         }
@@ -694,6 +696,7 @@ impl Grammar {
                             verb: Self::verb_name(verb),
                             target: Some(target),
                             word: Some(link.clone()),
+                            way: false,
                         };
                     }
                 }
@@ -739,6 +742,7 @@ impl Grammar {
                     verb: Self::asked_verb(verb, &toks[..span.0]),
                     target: None,
                     word: None,
+                    way: false,
                 },
                 NounFail::NoPronoun => Parsed::Fail(Failure::NoPronoun),
                 NounFail::NotFound { unknown_word: Some(w) } => Parsed::Fail(Failure::UnknownWord { word: w }),

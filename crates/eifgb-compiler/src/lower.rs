@@ -561,6 +561,9 @@ impl<'a> Lowerer<'a> {
 
     fn lower_room(&mut self, key: &str, r: &src::Room) -> Entity {
         let path = format!("rooms.{key}");
+        if r.name.trim().is_empty() {
+            self.d.error(format!("{path}.name"), "a room needs a name: it's shown as the heading when the player is there");
+        }
         let mut exits = Vec::new();
         for (dir, exit) in &r.exits {
             let epath = format!("{path}.exits.{dir}");
@@ -705,6 +708,9 @@ impl<'a> Lowerer<'a> {
 
     fn lower_thing(&mut self, section: &str, key: &str, t: &src::Thing, kind: EntityKind) -> Entity {
         let path = format!("{section}.{key}");
+        if t.name.trim().is_empty() {
+            self.d.error(format!("{path}.name"), "needs a name: it's what the game calls it (\"You can see a lamp here\"), and what players type");
+        }
         let mut state: BTreeMap<String, Value> = t.state.clone().into_iter().collect();
 
         let mut traits = Vec::new();

@@ -94,6 +94,17 @@ fn check_scripts(story: &eifgb_engine::ir::Story) -> bool {
 }
 
 fn main() -> ExitCode {
+    // `eifgb play game.yaml | head`: when what reads the output goes away,
+    // stop quietly rather than with a panic about a broken pipe.
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let p = info.payload();
+        let msg = p.downcast_ref::<String>().map(String::as_str).or_else(|| p.downcast_ref::<&str>().copied()).unwrap_or("");
+        if msg.contains("Broken pipe") {
+            std::process::exit(0);
+        }
+        default(info);
+    }));
     let cli = Cli::parse();
     let result = match cli.command {
         Command::Check { game } => run_compile(&game).map(|out| out.story.as_ref().is_some_and(check_scripts)),

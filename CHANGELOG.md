@@ -9,6 +9,17 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+## Unreleased
+
+- Fixed: after UNDO, the game could still remember seeing something the
+  undone move had found, so WHERE IS knew where it was.
+- GO on its own asks "Which way do you want to go?", WHERE DID I GET on
+  its own asks "Where did I get what?", and a command typed in answer to
+  such a question (LOOK) is carried out rather than taken as the answer.
+- A room or thing with an empty name is now an error: it showed as a gap
+  ("You can see a here.").
+- `eifgb play … | head` no longer ends with a crash about a broken pipe.
+
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - New in the editor:

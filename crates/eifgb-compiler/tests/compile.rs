@@ -656,3 +656,12 @@ fn world_fields_are_checked() {
     let w = with("weather: { start: clear, changes: 10-20, kinds: { clear: { describe: Clear. }, rain: {} } }\n").story.unwrap().weather.unwrap();
     assert_eq!((w.start.as_str(), w.every, w.spread, w.kinds.len()), ("clear", Some(10), 10, 2));
 }
+
+#[test]
+fn rooms_and_things_need_names() {
+    let out = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: '  ' }\nobjects:\n  k: { name: '', in: hall }\ncharacters:\n  c: { name: '', in: hall }\n");
+    let errs = errors(&out);
+    assert!(errs.iter().any(|e| e.contains("rooms.hall.name: a room needs a name")), "{errs:#?}");
+    assert!(errs.iter().any(|e| e.contains("objects.k.name: needs a name")), "{errs:#?}");
+    assert!(errs.iter().any(|e| e.contains("characters.c.name: needs a name")), "{errs:#?}");
+}

@@ -125,14 +125,14 @@ pub struct Game<H: ScriptHost> {
     /// Waiting several turns: WAIT says nothing each turn.
     pub(crate) quiet_wait: bool,
     /// What the player was holding when this input began.
-    held_before: Vec<EntityId>,
+    pub(crate) held_before: Vec<EntityId>,
     /// Every conversation option chosen in this game, as (choice, node,
     /// option): what a walkthrough reached. Not part of the saved state.
     chosen: std::collections::BTreeSet<(u32, u32, usize)>,
     /// Where the player was, and what they could see, when this input
     /// began: if it's gone by the end (eaten, burnt) and they're still
     /// there, they saw it go, and WHERE IS knows.
-    seen_before: (Option<EntityId>, Vec<EntityId>),
+    pub(crate) seen_before: (Option<EntityId>, Vec<EntityId>),
     /// A meta command's free text (ERASE NOTE 2).
     pub(crate) last_text: Option<String>,
     /// The last command that wasn't understood, and the word that wasn't,
@@ -257,8 +257,16 @@ impl<H: ScriptHost> Game<H> {
     }
 
     /// Loads a save the host fetched after `restore_requested`.
+    /// What this input began with (held, seen) isn't this game's any more:
+    /// UNDO, RESTART or RESTORE put another in its place.
+    pub(crate) fn forget_this_turn(&mut self) {
+        self.held_before.clear();
+        self.seen_before = (None, Vec::new());
+    }
+
     pub fn restore(&mut self, json: &str) -> Output {
         self.out = Output::default();
+        self.forget_this_turn();
         let (notes, brief) = (self.world.state.notes.clone(), self.world.state.brief);
         match self.world.restore(json) {
             Ok(()) => {
@@ -475,6 +483,12 @@ impl<H: ScriptHost> Game<H> {
                 let mut merged = prefix;
                 merged.extend(toks.iter().cloned());
                 match self.grammar.parse(&self.world, &merged) {
+                    // "Where did I get what?" "Look.": free text takes any
+                    // words, but a reply that's a command of its own is one.
+                    Parsed::Command(c) if c.text.is_some() && toks.first().is_some_and(|w| self.grammar.is_verb_word(w)) => match self.grammar.parse(&self.world, &toks) {
+                        alone @ Parsed::Command(_) => alone,
+                        _ => Parsed::Command(c),
+                    },
                     p @ Parsed::Command(_) => p,
                     _ => self.grammar.parse(&self.world, &toks),
                 }
@@ -491,12 +505,16 @@ impl<H: ScriptHost> Game<H> {
                 self.pending = Some(Pending::Which { before, after, options });
                 false
             }
-            Parsed::NeedNoun { prefix, verb, target, word } => {
+            Parsed::NeedNoun { prefix, verb, target, word, way } => {
                 match (target, word) {
                     (Some(t), Some(w)) => self.msg(
                         "parser.need_tool",
                         &Ctx::new().text("verb", verb).entity("target", t).text("word", w),
                     ),
+                    // GO: which way?
+                    _ if way => self.msg("parser.need_way", &Ctx::new().text("verb", verb)),
+                    // WHERE DID I GET: "Where did I get what?"
+                    _ if is_question(&verb) => self.msg("parser.need_what", &Ctx::new().text("verb", as_asked(&verb))),
                     _ => self.msg("parser.need_target", &Ctx::new().text("verb", verb)),
                 }
                 self.pending = Some(Pending::Noun { prefix });
@@ -594,6 +612,7 @@ impl<H: ScriptHost> Game<H> {
                 let suggestions = (self.grammar.lang().list_or)(&self.grammar.suggestions(&self.world));
                 self.msg("parser.unknown_verb", &ctx.text("word", word).text("suggestions", suggestions));
             }
+            Failure::Partial { verb } if is_question(&verb) => self.msg("parser.partial_question", &ctx),
             Failure::Partial { verb } => self.msg("parser.partial", &ctx.text("verb", verb)),
             Failure::UnknownWord { word } => self.msg("parser.unknown_word", &ctx.text("word", word)),
             Failure::NotHere if self.world.in_darkness() => self.msg("parser.dark", &ctx),
@@ -1314,6 +1333,19 @@ impl<H: ScriptHost> Game<H> {
             .collect();
         (self.grammar.lang().list_and)(&names)
     }
+}
+
+/// Whether words begin a question: WHERE DID I GET, WHAT DID.
+fn is_question(verb: &str) -> bool {
+    matches!(verb.split_whitespace().next(), Some("what" | "where" | "who" | "which" | "how" | "why" | "when"))
+}
+
+/// Typed words as the start of a question back: "where did i get" → "Where did I get".
+fn as_asked(verb: &str) -> String {
+    let words: Vec<String> = verb.split_whitespace().map(|w| if w == "i" { "I".to_string() } else { w.to_string() }).collect();
+    let s = words.join(" ");
+    let mut c = s.chars();
+    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
 /// How many actions until a timer goes off: its `after` or `every`, plus,

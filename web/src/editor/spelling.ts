@@ -45,8 +45,18 @@ function prose(v: unknown, path: (string | number)[], out: [string, string][]) {
   else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) prose(x, [...path, k], out);
 }
 
+/** The last answer, for the same text: it's asked after every edit. */
+let last: { yaml: string; limit: number; out: Typo[] } | null = null;
+
 /** Possible typos in game.yaml's prose, most likely first (at most `limit`). */
 export function typos(yaml: string, limit = 30): Typo[] {
+  if (last?.yaml === yaml && last.limit === limit) return last.out;
+  const out = findTypos(yaml, limit);
+  last = { yaml, limit, out };
+  return out;
+}
+
+function findTypos(yaml: string, limit: number): Typo[] {
   let doc: unknown;
   try {
     doc = parse(yaml);

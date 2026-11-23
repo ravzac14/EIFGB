@@ -30,6 +30,7 @@ impl<H: ScriptHost> Game<H> {
         let notes = std::mem::take(&mut self.world.state.notes);
         let brief = self.world.state.brief;
         let r = f(self);
+        self.forget_this_turn();
         self.world.state.notes = notes;
         self.world.state.brief = brief;
         r

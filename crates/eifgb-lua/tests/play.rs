@@ -126,6 +126,38 @@ fn the_wanderer_finds_errors_and_endings() {
     assert_eq!(again, w);
 }
 
+/// At every step of every example's walkthrough: a save restores to the
+/// same game, and UNDO puts back exactly what was there before.
+#[test]
+fn saves_and_undo_put_back_exactly_what_was_there() {
+    for folder in ["examples", "templates"] {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec").join(folder);
+        for e in std::fs::read_dir(&root).unwrap() {
+            let dir = e.unwrap().path();
+            let story = compile(&DirFiles { root: dir.clone() }, "game.yaml").story.unwrap();
+            let walk = std::fs::read_to_string(dir.join("walkthrough.txt")).unwrap();
+            let mut g = game(story.clone());
+            for step in eifgb_engine::testing::walkthrough_steps(&walk) {
+                let before = g.world().save();
+                if g.input(&step.command).ended.is_some() {
+                    break;
+                }
+                let after = g.world().save();
+                let mut h = game(story.clone());
+                h.restore(&after);
+                assert_eq!(h.world().save(), after, "{}: restoring after {}", dir.display(), step.command);
+                if after != before && g.world().state.turn > 0 {
+                    let mut u = game(story.clone());
+                    u.restore(&before);
+                    u.input(&step.command);
+                    u.input("undo");
+                    assert_eq!(u.world().save(), before, "{}: UNDO after {}", dir.display(), step.command);
+                }
+            }
+        }
+    }
+}
+
 #[test]
 fn every_example_walkthrough_wins() {
     assert!(walkthroughs_win("examples") >= 4, "expected the lighthouse, midnight_snack, campfire and blackfang walkthroughs");
@@ -4888,6 +4920,20 @@ fn where_things_came_from() {
     say(&mut g, "drop coin");
     say(&mut g, "take coin");
     assert!(say(&mut g, "where is the coin").ends_with("You found it in the Yard."));
+}
+
+/// Questions for what's missing read as questions: GO, WHERE DID I GET.
+#[test]
+fn missing_words_are_asked_for_in_plain_words() {
+    let mut g = game(lighthouse());
+    assert_eq!(say(&mut g, "go"), "Which way do you want to go?");
+    assert_says(&mut g, "north", "Base of the Lighthouse");
+    assert_eq!(say(&mut g, "where did i get"), "Where did I get what?");
+    // A reply that's a command of its own is one.
+    assert_says(&mut g, "look", "A cramped round room");
+    assert_eq!(say(&mut g, "what did say"), "I didn't follow that question.");
+    assert_eq!(say(&mut g, "find"), "What do you want to find?");
+    assert_eq!(say(&mut g, "the keeper"), "The old keeper is right here.");
 }
 
 #[test]

@@ -9,7 +9,7 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
-## Unreleased
+## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - Fixed: after UNDO, the game could still remember seeing something the
   undone move had found, so WHERE IS knew where it was.
@@ -19,8 +19,6 @@ if you like ("## 2026-11-24: editor tools"). -->
 - A room or thing with an empty name is now an error: it showed as a gap
   ("You can see a here.").
 - `eifgb play … | head` no longer ends with a crash about a broken pipe.
-
-## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - New in the editor:
   - Conversations as a graph: select one and its parts are drawn on the

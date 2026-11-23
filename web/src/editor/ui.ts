@@ -12,7 +12,7 @@ export interface InspectorContext {
    * Makes an edit. `coalesce` merges typing in one field into one undo step;
    * `redraw: false` leaves the panel alone (so a field being typed in keeps focus).
    */
-  change(fn: (m: Model) => void, opts?: { coalesce?: string; redraw?: boolean }): void;
+  change(fn: (m: Model) => void, opts?: { coalesce?: string; redraw?: boolean; label?: string }): void;
   select(sel: Selection): void;
   /** Adds a room `dir` of `from`, connected both ways; returns its ID. */
   addRoomBeside(from: string, dir: Direction): string;
@@ -71,7 +71,7 @@ export function field(
 ) {
   const id = `f${++fieldCount}`;
   const input = opts.multiline
-    ? el("textarea", { id, value, placeholder: opts.placeholder ?? "" })
+    ? el("textarea", { id, value, placeholder: opts.placeholder ?? "", spellcheck: true })
     : el("input", { id, type: "text", value, placeholder: opts.placeholder ?? "" });
   input.addEventListener("input", () => oninput((input as HTMLInputElement).value));
   if (opts.onchange) input.addEventListener("change", () => opts.onchange!((input as HTMLInputElement).value));

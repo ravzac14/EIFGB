@@ -821,6 +821,54 @@ assert.match($("#inspector").textContent, /armoury/, "a choice selects its conve
 assert.match(pz.querySelector(".assumes-box summary").textContent, /What the chain takes on trust/);
 assert.ok(!/clock\.night/.test(pz.querySelector(".assumes-box").textContent), "the yard isn't on the way to an ending");
 
+// A conversation as a graph: on the canvas while it's selected.
+assert.equal($("#talk").hasAttribute("hidden"), false, "the conversation's graph");
+assert.equal($("#map").hasAttribute("hidden"), true);
+assert.equal(document.querySelectorAll("#talk .talk-node").length, 1);
+assert.equal(document.querySelectorAll("#talk .talk-port").length, 2, "a dot for each reply");
+assert.ok(document.querySelector("#talk .talk-end"), "replies that end it lead to End");
+// Drag a reply's dot into empty space: a new part, and the reply leads there.
+const port = document.querySelector("#talk .talk-port");
+port.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: 270, clientY: 70, pointerId: 1 }));
+window.dispatchEvent(new PointerEvent("pointermove", { clientX: 600, clientY: 300, pointerId: 1 }));
+window.dispatchEvent(new PointerEvent("pointerup", { clientX: 600, clientY: 300, pointerId: 1 }));
+assert.equal(document.querySelectorAll("#talk .talk-node").length, 2);
+assert.match(yaml(), /- \{ ?text: Take the sword, when: not vars\.armed, do: 'vars\.armed = true; world\.sword:move_to\(player\)', goto: node ?\}|goto: node/);
+assert.match($("#undo").title, /Added a part to the conversation/);
+const mapFile = () => JSON.parse(localStorage.getItem(`eifgb:local:${new URLSearchParams(location.search).get("project")}`)).files["map.yaml"];
+assert.match(mapFile(), /talk:\n {2}armoury:\n {4}pick: \[0, 0\]\n {4}node: \[560, 260\]/, "where the parts are, in map.yaml");
+// Clicking a part shows it in the details panel.
+document.querySelectorAll("#talk .talk-node")[1].dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: 600, clientY: 300, pointerId: 1 }));
+window.dispatchEvent(new PointerEvent("pointerup", { clientX: 600, clientY: 300, pointerId: 1 }));
+assert.ok(document.querySelector("#talk .talk-node.picked"));
+$("#talk-back").click();
+assert.equal($("#talk").hasAttribute("hidden"), true);
+assert.equal($("#map").hasAttribute("hidden"), false);
+
+// Words in a description: what players can use, and what isn't anything yet.
+press($('#map [data-room="forge"]'));
+const desc = [...document.querySelectorAll("#inspector textarea")].find((t) => t.placeholder === "What the player sees here.");
+desc.value = "Sparks fly from the anvil. The smith hums. A hammer, a hammer, and a hamer hang on the wall.";
+desc.dispatchEvent(new Event("input"));
+await tick(400);
+const words = document.querySelector("#inspector .desc-words");
+assert.deepEqual([...words.querySelectorAll(".kw")].map((k) => k.textContent), ["smith"], "a word for the smith");
+const adds = [...words.querySelectorAll(".desc-new button")].map((b) => b.textContent);
+assert.ok(adds.includes("+ anvil") && adds.includes("+ wall"), adds.join(" "));
+[...words.querySelectorAll(".desc-new button")].find((b) => b.textContent === "+ anvil").click();
+assert.match(yaml(), /\n  anvil:\n\s+name: anvil\n\s+in: forge\n\s+traits: \[scenery\]/);
+// The typo, under Problems.
+await tick(500);
+assert.match($("#panel-problems .typos-box").textContent, /“hamer”, perhaps “hammer”/);
+
+// The wanderer, in test play.
+$("#tab-play").click();
+await tick(50);
+[...tp.querySelectorAll(".tp-bar button")].find((b) => b.textContent === "Wander").click();
+await tick(100);
+assert.match(tp.querySelector(".tp-wander").textContent, /2000 random moves over \d+ games?, apart from yours/);
+assert.match(tp.querySelector(".tp-wander summary").textContent, /no script errors/);
+
 assert.deepEqual(errors, []);
 console.log("ok   editor page");
 await GlobalRegistrator.unregister();

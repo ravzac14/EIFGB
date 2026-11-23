@@ -10,15 +10,20 @@ import { localGames, mapTheme, storageUse, type LocalGame, type MapTheme } from 
 import { settingsDialog } from "../settings-ui.ts";
 import { feedbackButton, feedbackContext } from "../feedback.ts";
 import { Model, NEW_GAME, slug, type Direction } from "./model.ts";
-import { MAP_FILE, besideRoom, layout, readMap, writeMap, type Point, type Positions } from "./layout.ts";
+import { MAP_FILE, besideRoom, layout, readMap, readTalk, writeMap, type Point, type Positions } from "./layout.ts";
+import { TalkView, talkLayout, type TalkPositions } from "./talk-graph.ts";
 import { MapView, type Selection } from "./map.ts";
 import { renderInspector, type InspectorContext } from "./inspector.ts";
 import { openAddComponent } from "./add-component.ts";
 import { TestPlay, WALKTHROUGH } from "./testplay.ts";
+
+/** walkthrough.txt, or one for an ending: walkthrough-feast.txt. */
+const isWalkthrough = (f: string) => f === WALKTHROUGH || /^walkthrough-[^/]+\.txt$/.test(f);
 import { describeChange, when } from "./history.ts";
 import { findInGame, MAX_FOUND } from "./find.ts";
 import { mapProblems, tidy, wayKey, type MapProblem, type Way } from "./tidy.ts";
 import { draftHints } from "./hint-drafts.ts";
+import { typos } from "./spelling.ts";
 import { timeline, timeText } from "./timeline.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -49,6 +54,10 @@ const button = (text: string, onClick: () => void, cls = "") => {
 let project: LocalGame;
 let model: Model | null = null;
 let positions: Positions = new Map();
+/** Where each conversation's parts sit in its graph (only those placed by hand). */
+let talkPos: TalkPositions = new Map();
+/** The conversation part last clicked in the graph. */
+let talkPicked: string | null = null;
 let selection: Selection = null;
 let problems: Diagnostic[] = [];
 let mapView: MapView;
@@ -66,10 +75,17 @@ const testPlay = new TestPlay($("panel-play"), {
   },
   markHere: (room) => mapView?.setHere(room),
   showProblems: () => showTab("problems"),
-  saveWalkthrough: (text) =>
+  saveWalkthrough: (text, file = WALKTHROUGH) =>
     change(() => {
-      project = { ...project, files: { ...project.files, [WALKTHROUGH]: text } };
+      project = { ...project, files: { ...project.files, [file]: text } };
     }),
+  nameOf: (id) => model?.room(id)?.name ?? model?.thing(id)?.name ?? model?.character(id)?.name ?? id.replace(/_/g, " "),
+  show: (what) => {
+    if ("choice" in what) return select({ kind: "choice", id: what.choice });
+    if (model?.room(what.id)) return select({ kind: "room", id: what.id });
+    if (model?.character(what.id)) return select({ kind: "character", id: what.id });
+    goTo(`objects.${what.id}`);
+  },
   thingsIn: (room) =>
     model
       ? [
@@ -128,7 +144,10 @@ const sameFiles = (a: Files, b: Files) => {
 let verbs: { id: string; example: string }[] = [];
 /** The file open in the Files tab. */
 let currentFile = "game.yaml";
-const mapText = () => (model ? writeMap(positions, model.roomIds()) : (project.files[MAP_FILE] ?? ""));
+const mapText = () =>
+  model
+    ? writeMap(positions, model.roomIds(), talkPos, Object.fromEntries(model.choiceIds().map((c) => [c, model!.choice(c)?.nodes.map((n) => n.id) ?? []])))
+    : (project.files[MAP_FILE] ?? "");
 
 function newKey() {
   return `e${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
@@ -151,6 +170,7 @@ function load(yaml: string, map?: string) {
   try {
     model = new Model(yaml);
     positions = layout(model, readMap(map));
+    talkPos = readTalk(map);
     $("yaml-msg").textContent = "";
   } catch (e) {
     model = null;
@@ -297,8 +317,22 @@ function badRooms(): Set<string> {
   return out;
 }
 
+/** A conversation, when one is selected: its graph instead of the map. */
+function drawTalk(): boolean {
+  const c = selection?.kind === "choice" && model ? model.choice(selection.id) : null;
+  $("map").toggleAttribute("hidden", !!c);
+  $("talk").toggleAttribute("hidden", !c);
+  $("talk-bar").hidden = !c;
+  if (!c) return false;
+  if (talkPicked && !c.nodes.some((n) => n.id === talkPicked)) talkPicked = null;
+  talkView.render(c, talkLayout(c, talkPos.get(c.id)), talkPicked);
+  $("talk-title").textContent = `The conversation “${c.id.replace(/_/g, " ")}”`;
+  return true;
+}
+
 function drawMap() {
-  const hard = model ? mapProblems(model, positions) : [];
+  const talking = drawTalk();
+  const hard = model && !talking ? mapProblems(model, positions) : [];
   const flagged = new Set(hard.flatMap((p) => (p.kind === "cross" ? [wayKey(p.a), wayKey(p.b)] : [wayKey(p.a)])));
   if (model) mapView.render(model, positions, selection, badRooms(), flagged);
   showMapCheck(hard);
@@ -309,8 +343,9 @@ function drawMap() {
   $("redo").title = redo.length ? `Redo: ${redo[redo.length - 1].label ?? "the change"} (Ctrl+Shift+Z)` : "Redo (Ctrl+Shift+Z)";
   $("title").textContent = model?.title() ?? project.title;
   document.title = `${model?.title() ?? project.title} · Editor`;
-  $("map-hint").textContent =
-    selection?.kind === "room"
+  $("map-hint").textContent = talking
+    ? "Drag a part to move it. Drag from a reply's dot onto a part to make it lead there, or into empty space for a new part. Esc goes back to the map."
+    : selection?.kind === "room"
       ? "Click a + to add a room that way, or drag it onto another room to connect them."
       : model && model.roomIds().length < 2
         ? "Click a room, then one of the + around it to add a room next door."
@@ -510,7 +545,7 @@ function openFile(path: string) {
   const pick = $<HTMLSelectElement>("file");
   pick.replaceChildren(
     ...Object.keys(project.files)
-      .filter((f) => f === "game.yaml" || f === WALKTHROUGH || f.endsWith(".lua"))
+      .filter((f) => f === "game.yaml" || isWalkthrough(f) || f.endsWith(".lua"))
       .sort((a, b) => (a === "game.yaml" ? -1 : b === "game.yaml" ? 1 : a.localeCompare(b)))
       .map((f) => Object.assign(document.createElement("option"), { value: f, textContent: f, selected: f === currentFile })),
   );
@@ -520,8 +555,8 @@ function openFile(path: string) {
   $("file-help").textContent =
     currentFile === "game.yaml"
       ? "This is your game's file. Changes on the map show up here, and changes here show up on the map."
-      : currentFile === WALKTHROUGH
-        ? "Commands that win the game, one a line (# starts a comment). After every change, the editor plays them and says under Problems if they no longer win. Test play can record a new one."
+      : isWalkthrough(currentFile)
+        ? `Commands that ${currentFile === WALKTHROUGH ? "win the game" : `reach the ${currentFile.slice(12, -4)} ending`}, one a line (# starts a comment). A line can say what the game should answer: take key => Taken. After every change, the editor plays them and says under Problems if they no longer do. Test play can record a new one.`
         : "A Lua file for your scripts' shared functions. Problems in it show in the Problems tab.";
   showTab("yaml");
 }
@@ -586,6 +621,7 @@ function scheduleCheck() {
       problems = checked.diagnostics;
       puzzles = checked.puzzles ?? null;
       testPlay.walkthrough(files[WALKTHROUGH] === undefined ? "none" : (checked.walkthrough ?? "unchecked"), files[WALKTHROUGH]);
+      testPlay.walkthroughs(checked.walkthroughs ?? []);
     } catch (e) {
       problems = [{ severity: "error", path: "", message: `The checker couldn't run: ${e}` }];
     }
@@ -778,12 +814,31 @@ $("inspector").addEventListener("focusout", (e) => {
   }, 0);
 });
 
+/** Possible typos, under the problems: not counted as problems, only worth a look. */
+function typoList(): HTMLElement | "" {
+  const found = typos(model?.toString() ?? project.files["game.yaml"] ?? "");
+  if (!found.length) return "";
+  const ul = el("ul", { className: "problems typos" });
+  for (const t of found) {
+    const li = el("li", { title: "Show it" }, el("span", { className: "sev", textContent: "Typo?" }), `“${t.word}”, perhaps “${t.like}”`, el("code", { textContent: ` ${t.path}` }));
+    li.addEventListener("click", () => goTo(t.path));
+    ul.append(li);
+  }
+  return el(
+    "details",
+    { className: "typos-box" },
+    el("summary", { textContent: `Possible typos (${found.length})` }),
+    el("p", { className: "dim", textContent: "Words used once that are one letter off a word the game uses elsewhere, or one of its names. Only a guess: the game's own words are always allowed. Text boxes are spell checked by the browser too." }),
+    ul,
+  );
+}
+
 function showProblems() {
   const panel = $("panel-problems");
   const errors = problems.filter((p) => p.severity === "error").length;
   $("tab-problems").textContent = problems.length ? `Problems (${problems.length})` : "Problems";
   if (!problems.length) {
-    panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }));
+    panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }), typoList());
     return;
   }
   const ul = el("ul", { className: "problems" });
@@ -798,13 +853,14 @@ function showProblems() {
   panel.replaceChildren(
     el("p", { className: "dim", textContent: errors ? "The game can't be played until the errors are fixed. Click one to go to it." : "Warnings don't stop the game, but are worth a look." }),
     ul,
+    typoList(),
   );
 }
 
 /** Selects what a problem's path is about, or shows it in the file. */
 function goTo(path: string) {
   // The walkthrough: test play, where it can be played again and re-recorded.
-  if (path === WALKTHROUGH) return showTab("play");
+  if (isWalkthrough(path)) return showTab("play");
   const parts = path.split(/[.[\]]+/).filter(Boolean);
   if (parts[0] === "rooms" && parts[1] && model?.room(parts[1])) {
     if (parts[2] === "exits" && parts[3] && model.exit(parts[1], parts[3] as Direction)) select({ kind: "exit", room: parts[1], dir: parts[3] as Direction });
@@ -1128,6 +1184,56 @@ document.addEventListener("keydown", (e) => {
     select(null);
   }
 });
+
+const talkView = new TalkView(document.getElementById("talk") as unknown as SVGSVGElement, {
+  pick: (node) => {
+    talkPicked = node;
+    drawTalk();
+    // The part, in the details panel.
+    const card = $("inspector").querySelector<HTMLElement>(`[data-node="${CSS.escape(node)}"]`);
+    card?.scrollIntoView({ block: "start", behavior: "smooth" });
+    card?.classList.remove("flash");
+    void card?.offsetWidth;
+    card?.classList.add("flash");
+  },
+  move: (node, to) => {
+    if (selection?.kind !== "choice") return;
+    const id = selection.id;
+    change(
+      () => {
+        const m = talkPos.get(id) ?? new Map<string, Point>();
+        // Keep the other parts where they're drawn now, so they don't jump.
+        const c = model?.choice(id);
+        if (c) for (const [n, p] of talkLayout(c, m)) if (!m.has(n)) m.set(n, p);
+        m.set(node, to);
+        talkPos.set(id, m);
+      },
+      { coalesce: `talk:${id}:${node}`, label: "Moved a part of the conversation", redraw: false },
+    );
+  },
+  link: (node, option, to) => {
+    if (selection?.kind !== "choice") return;
+    const id = selection.id;
+    if ("node" in to) {
+      change((m) => m.setOptionNext(id, node, option, { goto: to.node }), { label: `Made a reply lead to the part “${to.node}”` });
+      return;
+    }
+    change(
+      (m) => {
+        const fresh = m.addNode(id);
+        const pos = talkPos.get(id) ?? new Map<string, Point>();
+        const c = m.choice(id);
+        if (c) for (const [n, p] of talkLayout(c, pos)) if (!pos.has(n)) pos.set(n, p);
+        pos.set(fresh, to.at);
+        talkPos.set(id, pos);
+        m.setOptionNext(id, node, option, { goto: fresh });
+        talkPicked = fresh;
+      },
+      { label: "Added a part to the conversation" },
+    );
+  },
+});
+$("talk-back").addEventListener("click", () => select(null));
 
 mapView = new MapView(document.getElementById("map") as unknown as SVGSVGElement, {
   select,

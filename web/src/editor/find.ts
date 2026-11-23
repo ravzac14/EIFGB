@@ -88,7 +88,7 @@ export function findInGame(files: Files, query: string): Found[] {
     lines(files["game.yaml"] ?? "", "game.yaml", add);
   }
   for (const f of Object.keys(files).sort()) {
-    if (f.endsWith(".lua") || f === "walkthrough.txt") lines(files[f], f, add);
+    if (f.endsWith(".lua") || /^walkthrough(-[^/]+)?\.txt$/.test(f)) lines(files[f], f, add);
   }
   return out;
 }

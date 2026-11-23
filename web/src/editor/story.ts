@@ -728,6 +728,7 @@ export function choicePanel(panel: HTMLElement, ctx: InspectorContext, id: strin
   for (const n of c.nodes) {
     const p = ["choices", id, "nodes", n.id];
     const card = el("section", { class: `node${n.id === c.start ? " start" : ""}` });
+    card.dataset.node = n.id;
     const nameInput = el("input", { type: "text", value: n.id, class: "node-name", ariaLabel: "Part's name" }) as HTMLInputElement;
     nameInput.addEventListener("change", () => {
       let next: string | null = null;

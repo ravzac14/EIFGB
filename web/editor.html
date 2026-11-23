@@ -63,6 +63,8 @@
 <div id="workspace" class="workspace" hidden>
   <section class="canvas" aria-label="Map">
     <svg id="map" role="application" aria-label="The map of rooms. Click a room to select it."></svg>
+    <svg id="talk" class="talk" role="application" aria-label="The conversation as a graph. Click a part to edit it." hidden></svg>
+    <div id="talk-bar" class="talk-bar ui" hidden><button id="talk-back" type="button">← Back to the map</button><strong id="talk-title"></strong></div>
     <div class="map-tools ui">
       <button id="add-component" type="button" class="primary" aria-haspopup="dialog">Add component</button>
       <button id="zoom-in" type="button" aria-label="Zoom in">+</button>

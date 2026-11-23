@@ -126,6 +126,9 @@ pub struct Game<H: ScriptHost> {
     pub(crate) quiet_wait: bool,
     /// What the player was holding when this input began.
     held_before: Vec<EntityId>,
+    /// Every conversation option chosen in this game, as (choice, node,
+    /// option): what a walkthrough reached. Not part of the saved state.
+    chosen: std::collections::BTreeSet<(u32, u32, usize)>,
     /// Where the player was, and what they could see, when this input
     /// began: if it's gone by the end (eaten, burnt) and they're still
     /// there, they saw it go, and WHERE IS knows.
@@ -175,6 +178,7 @@ impl<H: ScriptHost> Game<H> {
             passing: false,
             quiet_wait: false,
             held_before: Vec::new(),
+            chosen: std::collections::BTreeSet::new(),
             seen_before: (None, Vec::new()),
             last_text: None,
             oops: None,
@@ -208,6 +212,11 @@ impl<H: ScriptHost> Game<H> {
 
     pub fn world(&self) -> &World {
         &self.world
+    }
+
+    /// Every conversation option chosen in this game: (choice, node, option).
+    pub fn chosen(&self) -> &std::collections::BTreeSet<(u32, u32, usize)> {
+        &self.chosen
     }
 
     /// The opening: title, intro, `start` handlers and the first room.
@@ -1246,6 +1255,7 @@ impl<H: ScriptHost> Game<H> {
         let cur = self.world.state.choice.expect("a choice is open");
         let opt = self.world.story().choice(cur.choice).nodes[cur.node as usize].options[index].clone();
         let key = self.world.story().choice(cur.choice).key.clone();
+        self.chosen.insert((cur.choice.0, cur.node, index));
         let said = self.render_str(&opt.text, &Ctx::new());
         let you = self.msg_str("talk.recall_you", &Ctx::new().text("text", said));
         self.world.state.talks.entry(key.clone()).or_default().push(you);

@@ -23,7 +23,7 @@ function project(dir) {
     for (const name of readdirSync(d)) {
       const p = join(d, name);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ya?ml|lua)$/.test(name) || name === "walkthrough.txt") files[relative(dir, p).split("\\").join("/")] = readFileSync(p, "utf8");
+      else if (/\.(ya?ml|lua)$/.test(name) || /^walkthrough(-[^/]+)?\.txt$/.test(name)) files[relative(dir, p).split("\\").join("/")] = readFileSync(p, "utf8");
       // Pictures, as data: URLs, as the site keeps them.
       else if (/\.(png|jpe?g|gif|webp|svg)$/i.test(name)) {
         const ext = name.split(".").pop().toLowerCase();

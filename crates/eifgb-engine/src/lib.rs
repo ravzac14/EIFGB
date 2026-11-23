@@ -35,6 +35,7 @@ pub mod parser;
 pub mod rng;
 pub mod script;
 pub mod state;
+pub mod testing;
 pub mod text;
 pub mod world;
 

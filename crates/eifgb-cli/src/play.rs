@@ -59,12 +59,10 @@ pub fn play(story: Story, commands: Option<&Path>, seed: Option<u64>, save_file:
 
     let scripted: Option<Vec<String>> = match commands {
         Some(p) => Some(
-            std::fs::read_to_string(p)
-                .map_err(|e| format!("{}: {e}", p.display()))?
-                .lines()
-                .map(str::trim)
-                .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                .map(String::from)
+            // A walkthrough: `take key => Taken.` plays TAKE KEY.
+            eifgb_engine::testing::walkthrough_steps(&std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?)
+                .into_iter()
+                .map(|s| s.command)
                 .collect(),
         ),
         None => None,

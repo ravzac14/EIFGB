@@ -5,7 +5,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import type { Files } from "./engine.ts";
 import { IMAGE, dataUrl } from "./pictures.ts";
 
-const TEXT = /\.(ya?ml|lua)$/i;
+const TEXT = /\.(ya?ml|lua)$|(^|\/)walkthrough(-[^/]+)?\.txt$/i;
 const SKIP = /(^|\/)(\.|__MACOSX\/)/;
 
 /** Puts `game.yaml` (or the only .yaml file) at the root, keeping paths relative to it. */

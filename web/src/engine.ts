@@ -93,12 +93,32 @@ export interface PuzzleNote {
   what: "room" | "thing" | "character" | "choice" | "ending";
   message: string;
 }
-/** How walkthrough.txt played, when the editor's check finds one: see the bridge's `walkthrough`. */
+/**
+ * How a walkthrough played, in the editor's check: see
+ * crates/eifgb-engine/src/testing.rs. `goal`: the ending it's for (null:
+ * any win); `never`: what it never reached.
+ */
 export interface Walkthrough {
-  result: "win" | "loss" | "neutral" | "unfinished" | "error";
+  result: "win" | "loss" | "neutral" | "unfinished" | "error" | "reply";
   steps: number;
   line?: number;
   problem?: string | null;
+  ending?: string | null;
+  goal?: string | null;
+  file?: string;
+  never?: { rooms: string[]; things: string[]; options: { choice: string; node: string; option: number; text: string }[] };
+}
+/** What the wanderer found: see crates/eifgb-engine/src/testing.rs. */
+export interface Wandered {
+  error?: string;
+  moves: number;
+  games: number;
+  errors: { at: number; command: string; text: string; commands: string[] }[];
+  endings: Record<string, number>;
+  rooms: [number, number];
+  things: [number, number];
+  quiet: { from: number; moves: number; room: string } | null;
+  never: string[];
 }
 export interface Loaded {
   diagnostics: Diagnostic[];
@@ -109,7 +129,9 @@ export interface Engine {
   /** Compile `files` and start the game. */
   load(files: Files, entry?: string, seed?: number): Loaded;
   /** Compile only. */
-  check(files: Files, entry?: string): { diagnostics: Diagnostic[]; walkthrough?: Walkthrough; puzzles?: Puzzles };
+  check(files: Files, entry?: string): { diagnostics: Diagnostic[]; walkthrough?: Walkthrough; walkthroughs?: Walkthrough[]; puzzles?: Puzzles };
+  /** The wanderer: random moves on new games of `files`, apart from the game being played. */
+  wander(files: Files, seed: number, moves: number, entry?: string): Wandered;
   /** One line of input. */
   input(line: string): Output;
   /** The whole game state, as a string. */
@@ -143,5 +165,6 @@ export async function loadEngine(base: string | URL): Promise<Engine> {
     save: () => call("eifgb_save", [], []),
     restore: (save) => call("eifgb_restore", ["string"], [save]),
     map: () => call("eifgb_map", [], []),
+    wander: (files, seed, moves, entry = "game.yaml") => call("eifgb_wander", ["string", "string", "number", "number"], [JSON.stringify(files), entry, seed, moves]),
   };
 }

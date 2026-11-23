@@ -11,6 +11,23 @@ if you like ("## 2026-11-24: editor tools"). -->
 
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
+- New in the editor:
+  - Conversations as a graph: select one and its parts are drawn on the
+    canvas, with a line from each reply to where it leads. Drag to arrange
+    them, and to connect a reply to a part or make a new one.
+  - Under a description, the words players can already use are
+    highlighted, and things it mentions that aren't anything yet are a
+    click from being scenery.
+  - Possible typos, under Problems: words used once that are a letter off
+    another word the game uses, or one of its names.
+  - Walkthroughs: a line can say what the game should answer (`take key =>
+    Taken.`); `walkthrough-<ending>.txt` checks another ending; and Test
+    play lists what the walkthroughs never reach.
+  - Wander: a test player that tries 2000 random moves and reports script
+    errors (and the moves that led to them), endings, and where nothing
+    new happened for a long time.
+- Opening a game folder or zip now keeps its walkthroughs.
+
 - WHAT DID SHE SAY? (or WHAT DID THE KEEPER SAY?) shows the last
   conversation again, what you chose too, even in the middle of it.
 - MAP describes the places you've been and the ways out of each in words,

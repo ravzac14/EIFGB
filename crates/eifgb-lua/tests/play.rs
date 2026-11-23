@@ -42,31 +42,88 @@ fn assert_says(g: &mut Game<LuaHost>, input: &str, needle: &str) {
 // --------------------------------------------------------- the lighthouse
 
 /// Every example game and starter template with a walkthrough.txt must play
-/// through to a win without warnings or script errors. This keeps the README
-/// tutorial honest, and the editor's starters working.
+/// through to a win without warnings or script errors, as the editor
+/// checks it, expected replies and all; and any walkthrough-<ending>.txt to
+/// its ending. This keeps the README tutorial honest, and the editor's
+/// starters working.
 fn walkthroughs_win(folder: &str) -> usize {
+    use eifgb_engine::testing::{play_walkthrough, Goal};
     let examples = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec").join(folder);
     let mut played = 0;
     for entry in std::fs::read_dir(&examples).unwrap() {
         let dir = entry.unwrap().path();
-        let Ok(walkthrough) = std::fs::read_to_string(dir.join("walkthrough.txt")) else { continue };
+        if std::fs::metadata(dir.join("walkthrough.txt")).is_err() {
+            continue;
+        }
         let out = compile(&DirFiles { root: dir.clone() }, "game.yaml");
         assert!(out.diagnostics.is_empty(), "{}: {:#?}", dir.display(), out.diagnostics);
-        let mut g = game(out.story.unwrap());
-        let mut last = Output::default();
-        for line in walkthrough.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
-            last = g.input(line);
-            assert!(
-                !last.lines.iter().any(|l| l.kind == LineKind::Error),
-                "{}\n> {line}\n{}",
-                dir.display(),
-                last.text()
-            );
+        for f in std::fs::read_dir(&dir).unwrap() {
+            let file = f.unwrap().file_name().to_string_lossy().to_string();
+            if !(file == "walkthrough.txt" || (file.starts_with("walkthrough-") && file.ends_with(".txt"))) {
+                continue;
+            }
+            let text = std::fs::read_to_string(dir.join(&file)).unwrap();
+            let mut g = game(out.story.clone().unwrap());
+            let p = play_walkthrough(&mut g, &text, &Goal::of(&file, &text), &file);
+            assert_eq!(p.problem, None, "{}: {file}", dir.display());
         }
-        assert_eq!(last.ended, Some(EndingKind::Win), "{}\n{}", dir.display(), last.text());
         played += 1;
     }
     played
+}
+
+/// Walkthroughs: expected replies, one for an ending, and what they never reach.
+#[test]
+fn walkthroughs_check_replies_endings_and_coverage() {
+    use eifgb_engine::testing::{play_walkthrough, Goal};
+    let story = compile(&DirFiles { root: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/examples/midnight_snack") }, "game.yaml").story.unwrap();
+    let base = "n\nx mat\nlook under the mat\ntake key\nunlock door\nn\n";
+    // An expected reply that's there (case and spacing don't matter), and one that isn't.
+    let mut g = game(story.clone());
+    let p = play_walkthrough(&mut g, &format!("{base}take the fruit => TAKEN.\neat it\n"), &Goal::Win, "the walkthrough");
+    assert_eq!((p.result, p.problem.as_deref()), ("win", None));
+    let mut g = game(story.clone());
+    let p = play_walkthrough(&mut g, "n\nx mat => A golden key.\n", &Goal::Win, "the walkthrough");
+    assert_eq!((p.result, p.line), ("reply", Some(2)));
+    assert!(p.problem.as_deref().unwrap().starts_with("the walkthrough expected “A golden key.” at line 2 (x mat), but the game said: "), "{:?}", p.problem);
+    // For an ending: by its name, or a `# ending:` line.
+    assert_eq!(Goal::of("walkthrough-feast.txt", ""), Goal::Ending("feast".into()));
+    assert_eq!(Goal::of("walkthrough.txt", "# ending: feast\nn"), Goal::Ending("feast".into()));
+    assert_eq!(Goal::of("walkthrough.txt", "n"), Goal::Win);
+    let mut g = game(story.clone());
+    let p = play_walkthrough(&mut g, &format!("{base}take the fruit\neat it\n"), &Goal::Ending("feast".into()), "walkthrough-feast.txt");
+    assert_eq!(p.ending.as_deref(), Some("fed"));
+    assert!(p.problem.as_deref().unwrap().starts_with("walkthrough-feast.txt no longer reaches the feast ending: at line 8 (eat it) the game ends with the fed ending"), "{:?}", p.problem);
+    // What it never reached.
+    let mut g = game(story.clone());
+    let p = play_walkthrough(&mut g, "x mat\n", &Goal::Win, "the walkthrough");
+    assert_eq!(p.result, "unfinished");
+    assert!(p.never.rooms.contains(&"pantry".to_string()), "{:?}", p.never);
+    assert!(p.never.things.contains(&"apple".to_string()), "{:?}", p.never);
+    let lighthouse = lighthouse();
+    let mut g = game(lighthouse.clone());
+    let p = play_walkthrough(&mut g, "search pool\nn\ntalk to keeper\n1\n", &Goal::Win, "the walkthrough");
+    assert!(p.never.options.iter().any(|o| o.choice == "keeper_talk" && o.text == "Say goodbye"), "{:?}", p.never.options);
+    assert!(!p.never.options.iter().any(|o| o.text == "Ask about the gate"), "{:?}", p.never.options);
+}
+
+/// The wanderer: random moves, and what it finds.
+#[test]
+fn the_wanderer_finds_errors_and_endings() {
+    use eifgb_engine::testing::wander;
+    let story = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall, exits: { north: yard } }\n  yard: { name: Yard, exits: { south: hall }, on: { enter: 'end_game(\"out\")' } }\nobjects:\n  bell: { name: bell, in: hall, on: { push: 'local x = nil; return x.y' } }\nendings:\n  out: { kind: win, text: Out. }\n").story.unwrap();
+    let make = || Some(game(story.clone()));
+    let w = wander(make, 7, 400);
+    assert_eq!(w.moves, 400);
+    assert!(w.endings.contains_key("out"), "{w:?}");
+    assert!(w.games > 1, "a new game after each ending");
+    assert_eq!(w.errors.len(), 1, "the same error once: {w:?}");
+    assert_eq!(w.errors[0].command, "push bell");
+    assert_eq!(w.errors[0].commands.last().map(String::as_str), Some("push bell"));
+    assert_eq!(w.rooms, (2, 2));
+    // The same seed plays the same way.
+    let again = wander(|| Some(game(story.clone())), 7, 400);
+    assert_eq!(again, w);
 }
 
 #[test]

@@ -55,7 +55,26 @@ export function readMap(text: string | undefined): Positions {
   return out;
 }
 
-export function writeMap(positions: Positions, ids: string[]): string {
+/** Where the parts of each conversation sit in its graph: `talk: { keeper_talk: { start: [0, 0] } }`. */
+export function readTalk(text: string | undefined): Map<string, Map<string, Point>> {
+  const out = new Map<string, Map<string, Point>>();
+  if (!text) return out;
+  try {
+    const talk = parse(text)?.talk ?? {};
+    for (const [choice, nodes] of Object.entries(talk)) {
+      const m = new Map<string, Point>();
+      for (const [node, p] of Object.entries(nodes as Record<string, unknown>)) {
+        if (Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number")) m.set(node, { x: p[0], y: p[1] });
+      }
+      if (m.size) out.set(choice, m);
+    }
+  } catch {
+    /* automatic places */
+  }
+  return out;
+}
+
+export function writeMap(positions: Positions, ids: string[], talk?: Map<string, Map<string, Point>>, choices?: Record<string, string[]>): string {
   const rooms: Record<string, number[]> = {};
   for (const id of ids) {
     const p = positions.get(id);
@@ -69,7 +88,15 @@ export function writeMap(positions: Positions, ids: string[]): string {
     (_, k: string, list: string) => `${k}: [${[...list.matchAll(/-?\d+/g)].map((m) => m[0]).join(", ")}]\n`,
   );
   const colours = ids.filter((id) => positions.get(id)?.colour).map((id) => `  ${id}: ${positions.get(id)!.colour}`);
-  return `# Where the editor draws each room on its map, the size of any room made\n# bigger or smaller, and room colours. The game never reads this file.\n${body.replace(/\n+$/, "\n")}${colours.length ? `colours:\n${colours.join("\n")}\n` : ""}`;
+  // Conversations: only parts that still exist, of conversations that do.
+  const talks: string[] = [];
+  for (const [choice, nodes] of talk ?? []) {
+    const live = choices?.[choice];
+    if (!live) continue;
+    const rows = [...nodes].filter(([n]) => live.includes(n)).map(([n, p]) => `    ${n}: [${Math.round(p.x)}, ${Math.round(p.y)}]`);
+    if (rows.length) talks.push(`  ${choice}:`, ...rows);
+  }
+  return `# Where the editor draws each room on its map, the size of any room made\n# bigger or smaller, room colours, and where the parts of each conversation\n# sit in its graph. The game never reads this file.\n${body.replace(/\n+$/, "\n")}${colours.length ? `colours:\n${colours.join("\n")}\n` : ""}${talks.length ? `talk:\n${talks.join("\n")}\n` : ""}`;
 }
 
 const key = (x: number, y: number) => `${x},${y}`;

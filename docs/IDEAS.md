@@ -43,7 +43,10 @@ tidy-up, undo history, test play from a step of the walkthrough, hints
 drafted from the puzzle chain, and the timer timeline (see "Step 7" in the
 README); and so are bookmarks in the web player.
 
-So are WHAT DID SHE SAY?, MAP in words, and where things came from
+The second editor list is built too: conversations as a graph, words in
+descriptions (highlighted, or a click from scenery), possible typos,
+walkthrough coverage, a walkthrough for each ending, the wanderer, and
+expected replies. So are WHAT DID SHE SAY?, MAP in words, and where things came from
 (WHERE IS on something carried, INVENTORY BY PLACE); counting (TAKE TWO
 COINS, TAKE ALL BUT THE KEY) was already there.
 
@@ -66,20 +69,9 @@ COINS, TAKE ALL BUT THE KEY) was already there.
 
 ## The editor
 
-- **Conversations as a graph:** a choice's nodes and options drawn like
-  the map, to drag and connect.
-- **Words in descriptions:** nouns a description mentions that aren't a
-  thing or scenery yet, each one click from being one.
-- **Spelling:** a spell check of the game's own text, with its names
-  allowed.
-- **Walkthrough coverage:** rooms, things and conversation options the
-  walkthrough never reaches.
-- **A walkthrough for each ending,** all checked after every change.
-- **A wanderer test:** a test player that tries things at random for a
-  few thousand moves, and reports errors, dead ends and places it got
-  stuck.
-- **Expected replies:** a walkthrough line can say what the game should
-  answer (`take key => Taken.`), so a change of wording is caught too.
+- **A dictionary for spelling:** the typo check compares the game with
+  itself; a bundled English word list would catch typos it uses more than
+  once, too.
 
 ## The player
 

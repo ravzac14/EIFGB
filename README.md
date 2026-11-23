@@ -412,6 +412,17 @@ take the fruit
 eat it
 ```
 
+A line can also say what the game should answer, after `=>`. The reply
+has to contain it (capitals and spacing don't matter), so a change of
+wording is caught too:
+
+```
+look under the mat => small key
+```
+
+A walkthrough for another ending goes in `walkthrough-<ending>.txt`, like
+`walkthrough-feast.txt`, and has to reach that ending.
+
 Replay it at any time, to check that your changes haven't broken the game:
 
 ```
@@ -426,6 +437,20 @@ Problems that says where it stopped working. The walkthrough is
 `walkthrough.txt`, in the Files tab with the rest of your game. Test play
 always uses the same random numbers as the check, so what you recorded
 plays the same way again.
+
+Test play also says what the walkthroughs never reach: rooms never
+entered, things never seen, and conversation replies never chosen. A
+change there isn't checked, so it's worth a playthrough or another
+walkthrough. Reach an ending other than the win in Test play, and **Save
+for the … ending** saves it as that ending's walkthrough, checked after
+every change too.
+
+**Wander** sends a test player through your game: 2000 random moves on
+games of its own, without touching yours. It reports script errors, with
+the moves that led to each (**Play it here** plays them in Test play),
+the endings it reached, how much of the game it got to, and its longest
+stretch where nothing new happened, which can be a place players get
+stuck.
 
 Test play can also start part-way. **Start at a step…** plays the
 walkthrough up to the step you pick without showing it, then lets you
@@ -519,6 +544,20 @@ A few more tools in the editor:
   dashed in red, and listed: two lines that cross, a line running through
   another room, and an exit drawn going the opposite way to its direction.
   Only the map changes, never the game.
+- **Conversations as a graph:** select a conversation and the map shows
+  its parts instead, each with its replies, and a line from each reply to
+  where it leads. Drag a part to move it; drag from a reply's dot onto a
+  part to make it lead there, or into empty space for a new part. Click a
+  part to edit it.
+- **Words in descriptions:** under a description, the words players can
+  already use for something here are highlighted, and things it mentions
+  that aren't anything yet are underlined, each a click from being
+  scenery ("A narrow path climbs north" means someone will type EXAMINE
+  PATH).
+- **Possible typos**, under Problems: words used once that are a letter
+  off a word the game uses elsewhere, or one of its names ("lantren"). The
+  game's own words are always allowed, and the browser spell checks text
+  boxes too.
 - **Pictures** can be shared: a room, thing or character can use a
   picture that's already in the game, which is kept once. Under each
   picture, the editor says how much space the game's pictures take, and

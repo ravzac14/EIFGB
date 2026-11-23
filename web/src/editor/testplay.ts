@@ -11,7 +11,7 @@
 // game's walkthrough.txt; the editor's check replays it after every edit
 // and says here (and under Problems) when it no longer wins.
 
-import type { Engine, Files, Missed, Output, Walkthrough } from "../engine.ts";
+import type { Engine, Files, Missed, Output, Walkthrough, Wandered } from "../engine.ts";
 import { Model } from "./model.ts";
 import { figure, pictureSrc } from "../pictures.ts";
 
@@ -30,8 +30,12 @@ export interface TestPlayHost {
   markHere(room: string | null): void;
   /** Opens the Problems tab. */
   showProblems(): void;
-  /** Writes walkthrough.txt. */
-  saveWalkthrough(text: string): void;
+  /** Writes walkthrough.txt, or another walkthrough file. */
+  saveWalkthrough(text: string, file?: string): void;
+  /** A room's, thing's or character's name, by its ID. */
+  nameOf(id: string): string;
+  /** Selects what an ID is (a room, thing, character), or a conversation's option. */
+  show(what: { id: string } | { choice: string }): void;
   /** What's in a room, to add a word to. */
   thingsIn(room: string): { id: string; name: string; section: "objects" | "characters" }[];
   /** Words a new word could mean: verbs the game knows. */
@@ -43,10 +47,21 @@ export interface TestPlayHost {
   addScenery(room: string, word: string): void;
 }
 
-/** The commands in a walkthrough, one a line, without comments and blank lines. */
+/** The commands in a walkthrough, one a line, without comments, blank lines, or what a line expects (`take key => Taken.`). */
 export function walkthroughCommands(text: string | undefined): string[] {
-  return (text ?? "").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+  return (text ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => l.split("=>")[0].trim())
+    .filter(Boolean);
 }
+
+/** A walkthrough for an ending: `walkthrough-feast.txt`. */
+export const endingWalkthrough = (ending: string) => `walkthrough-${ending}.txt`;
+
+/** How many moves the wanderer makes each time. */
+const WANDER_MOVES = 2000;
 
 /** A command test play didn't understand, kept until it's fixed or dismissed. */
 interface Miss {
@@ -83,7 +98,14 @@ export class TestPlay {
   private fromStart = false;
   private won = false;
   private record: HTMLButtonElement;
+  private recordEnding: HTMLButtonElement;
+  /** The ending the game in progress reached, if it has. */
+  private ending: string | null = null;
   private jump: HTMLSelectElement;
+  /** The other walkthroughs, and what none of them reach. */
+  private walks: HTMLElement;
+  private wanderBox: HTMLDetailsElement;
+  private wanderRuns = 0;
   private walk: HTMLElement;
   /** What wasn't understood, this session. */
   private misses: Miss[] = [];
@@ -102,6 +124,13 @@ export class TestPlay {
     });
     this.record = el("button", { type: "button", textContent: "Save as walkthrough" });
     this.record.addEventListener("click", () => this.saveWalkthrough());
+    this.recordEnding = el("button", { type: "button", hidden: true });
+    this.recordEnding.addEventListener("click", () => this.ending && this.saveWalkthrough(endingWalkthrough(this.ending)));
+    const wanderButton = el("button", { type: "button", textContent: "Wander" });
+    wanderButton.title = `A test player tries ${WANDER_MOVES} random moves, apart from your game, and reports script errors, endings, and places it got stuck`;
+    wanderButton.addEventListener("click", () => void this.wander());
+    this.walks = el("div", { className: "tp-walks" });
+    this.wanderBox = el("details", { className: "tp-wander", hidden: true });
     this.jump = el("select", { className: "tp-jump", hidden: true });
     this.jump.setAttribute("aria-label", "Start at a step of the walkthrough");
     this.jump.addEventListener("change", () => {
@@ -145,7 +174,7 @@ export class TestPlay {
     });
     this.log.append(el("p", { className: "dim", textContent: "Play your game here while you work on it. Press Start over to begin." }));
     this.missBox = el("details", { className: "tp-misses", hidden: true });
-    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.jump, this.record, this.status), this.walk, this.missBox, this.stale, this.log, this.form);
+    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.jump, this.record, this.recordEnding, wanderButton, this.status), this.walk, this.walks, this.wanderBox, this.missBox, this.stale, this.log, this.form);
     this.walkthrough("none");
     this.update();
   }
@@ -165,6 +194,11 @@ export class TestPlay {
     this.fromRoom.disabled = !r;
     this.fromRoom.title = r ? `Play from ${r.name}, as if the game started there` : "Select a room on the map to start there";
     this.record.disabled = !this.fromStart || !this.played.length;
+    this.recordEnding.hidden = !this.fromStart || !this.ending;
+    if (this.ending) {
+      this.recordEnding.textContent = `Save for the ${this.ending} ending`;
+      this.recordEnding.title = `Save these ${this.played.length} commands as ${endingWalkthrough(this.ending)}, checked after every change to still reach the ${this.ending} ending`;
+    }
     this.record.title = !this.fromStart
       ? "Only a game played from the start can be a walkthrough"
       : `Save the ${this.played.length} commands you've typed as ${WALKTHROUGH}, to check after every change that the game can still be won`;
@@ -197,18 +231,94 @@ export class TestPlay {
     }
   }
 
-  private saveWalkthrough() {
+  private saveWalkthrough(file = WALKTHROUGH) {
     if (!this.fromStart || !this.played.length) return;
-    if (!this.won && !confirm("This game hasn't been won yet. Save what you've typed as the walkthrough anyway?")) return;
+    if (file === WALKTHROUGH && !this.won && !confirm("This game hasn't been won yet. Save what you've typed as the walkthrough anyway?")) return;
     const when = new Date().toISOString().slice(0, 10);
-    this.host.saveWalkthrough(`# Recorded in test play, ${when}. One command a line; lines starting with # are skipped.\n${this.played.join("\n")}\n`);
-    this.say(`Saved your ${this.played.length} commands as ${WALKTHROUGH}.`, "notice");
+    const goal = file === WALKTHROUGH ? "" : ` It should reach the ${this.ending} ending.`;
+    this.host.saveWalkthrough(
+      `# Recorded in test play, ${when}.${goal} One command a line; lines starting with # are skipped.\n# A line can say what the game should answer: take key => Taken.\n${this.played.join("\n")}\n`,
+      file,
+    );
+    this.say(`Saved your ${this.played.length} commands as ${file}.`, "notice");
+  }
+
+  /** Every walkthrough's result, and what none of them reach. */
+  walkthroughs(list: Walkthrough[]) {
+    const others = list.filter((w) => w.file && w.file !== WALKTHROUGH);
+    this.walks.replaceChildren();
+    for (const w of others) {
+      const ok = !w.problem;
+      this.walks.append(
+        el("p", { className: `tp-walk ${ok ? "ok" : "bad"}`, textContent: ok ? `✓ ${w.file} still reaches the ${w.goal} ending, in ${w.steps} command${w.steps === 1 ? "" : "s"}.` : `✗ ${w.problem}` }),
+      );
+    }
+    // What no walkthrough reaches: in all of their "never" lists.
+    const nevers = list.map((w) => w.never).filter((n): n is NonNullable<Walkthrough["never"]> => !!n);
+    if (!nevers.length) return;
+    const all = <T>(get: (n: NonNullable<Walkthrough["never"]>) => T[], key: (x: T) => string) => get(nevers[0]).filter((x) => nevers.every((n) => get(n).some((y) => key(y) === key(x))));
+    const rooms = all((n) => n.rooms, (x) => x);
+    const things = all((n) => n.things, (x) => x);
+    const options = all((n) => n.options, (o) => `${o.choice}.${o.node}.${o.option}`);
+    if (!rooms.length && !things.length && !options.length) {
+      this.walks.append(el("p", { className: "tp-walk ok", textContent: "✓ Between them, the walkthroughs go everywhere, see everything and try every reply." }));
+      return;
+    }
+    const box = el("details", { className: "tp-never" });
+    const total = rooms.length + things.length + options.length;
+    box.append(el("summary", { textContent: `What the walkthrough${list.length === 1 ? "" : "s"} never reach${list.length === 1 ? "es" : ""} (${total})` }));
+    box.append(el("p", { className: "dim", textContent: "Places never entered, things never seen, and replies never chosen. A change there isn't checked: worth a playthrough, or another walkthrough." }));
+    const line = (label: string, items: HTMLElement[]) => {
+      if (!items.length) return;
+      const p = el("p", {}, el("strong", { textContent: `${label}: ` }));
+      items.forEach((b, i) => p.append(...(i ? [", ", b] : [b])));
+      box.append(p);
+    };
+    const link = (text: string, go: () => void) => {
+      const b = el("button", { type: "button", className: "link", textContent: text });
+      b.addEventListener("click", go);
+      return b;
+    };
+    line("Rooms", rooms.map((r) => link(this.host.nameOf(r), () => this.host.show({ id: r }))));
+    line("Things", things.map((t) => link(this.host.nameOf(t), () => this.host.show({ id: t }))));
+    line("Replies", options.map((o) => link(`“${o.text || "…"}” (${o.choice.replace(/_/g, " ")})`, () => this.host.show({ choice: o.choice }))));
+    this.walks.append(box);
+  }
+
+  /** The wanderer: random moves on games of their own, then what it found. */
+  private async wander() {
+    this.engine ??= await this.host.engine();
+    const box = this.wanderBox;
+    box.hidden = false;
+    box.open = true;
+    box.replaceChildren(el("summary", { textContent: "The wanderer" }), el("p", { className: "dim", textContent: "Wandering…" }));
+    await new Promise((r) => setTimeout(r, 0));
+    const w: Wandered = this.engine.wander(this.host.files(), ++this.wanderRuns, WANDER_MOVES);
+    const out: (HTMLElement | string)[] = [el("summary", { textContent: w.error ? "The wanderer" : `The wanderer: ${w.errors.length ? `${w.errors.length} script error${w.errors.length === 1 ? "" : "s"}` : "no script errors"}, ${Object.keys(w.endings).length} ending${Object.keys(w.endings).length === 1 ? "" : "s"}` })];
+    if (w.error) {
+      box.replaceChildren(...out, el("p", { textContent: `It can't play yet: ${w.error}.` }));
+      return;
+    }
+    out.push(el("p", { className: "dim", textContent: `${w.moves} random moves over ${w.games} game${w.games === 1 ? "" : "s"}, apart from yours. Wander again for different moves.` }));
+    for (const e of w.errors) {
+      const again = el("button", { type: "button", textContent: "Play it here" });
+      again.title = "Play the moves that led to it in test play, to see it happen";
+      again.addEventListener("click", () => void this.replay(e.commands, "moves"));
+      out.push(el("p", { className: "tp-walk bad" }, `✗ A script error at move ${e.at} (${e.command}): ${e.text} `, again));
+    }
+    const ends = Object.entries(w.endings);
+    out.push(el("p", {}, ends.length ? `Endings it reached: ${ends.map(([k, m]) => `${k} (first at move ${m})`).join(", ")}.` : "It didn't reach an ending."));
+    out.push(el("p", {}, `It got to ${w.rooms[0]} of ${w.rooms[1]} rooms and saw ${w.things[0]} of ${w.things[1]} things${w.never.length ? `; never to ${w.never.map((r) => this.host.nameOf(r)).join(", ")}` : ""}.`));
+    if (w.quiet && w.quiet.moves >= 200) {
+      out.push(el("p", { className: "tp-walk" }, `Its longest stretch with nothing new: ${w.quiet.moves} moves from move ${w.quiet.from}, in ${this.host.nameOf(w.quiet.room)}. A player could get stuck there, or it's just hard to find the way on by chance.`));
+    }
+    box.replaceChildren(...out);
   }
 
   /** The game was edited: a game in progress may be out of date (moving rooms on the map doesn't count). */
   changed(now: Files) {
     if (!this.running || !this.startedWith) return;
-    const game = (f: Files) => JSON.stringify(Object.entries(f).filter(([k]) => k !== "map.yaml" && k !== WALKTHROUGH).sort());
+    const game = (f: Files) => JSON.stringify(Object.entries(f).filter(([k]) => k !== "map.yaml" && !/^walkthrough(-[^/]+)?\.txt$/.test(k)).sort());
     this.stale.hidden = game(now) === game(this.startedWith);
   }
 
@@ -231,6 +341,7 @@ export class TestPlay {
     this.played = [];
     this.fromStart = !from;
     this.won = false;
+    this.ending = null;
     this.update();
     const loaded = this.engine.load(files, "game.yaml", SEED);
     if (!loaded.output) {
@@ -396,6 +507,10 @@ export class TestPlay {
       else this.say(l.text, l.kind === "text" ? "" : l.kind);
     }
     if (o.ended === "win") this.won = true;
+    if (o.ended && o.ending) {
+      this.ending = o.ending;
+      this.update();
+    }
     if (o.ended) this.say(`That's an ending${o.ending ? ` (${o.ending})` : ""}. UNDO goes back a move; Start over plays again.`, "notice");
     const s = o.status;
     this.status.textContent = [s.room, s.max_score !== null ? `score ${s.score}/${s.max_score}` : "", s.time ?? "", `turn ${s.turns}`].filter(Boolean).join(" · ");

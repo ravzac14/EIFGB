@@ -331,3 +331,30 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .assumes-box { margin: 0.8rem 0; }
 .assumes-box summary { cursor: pointer; font-weight: 600; }
 .assumes li { cursor: pointer; }
+
+/* A conversation as a graph, on the canvas. */
+#talk { width: 100%; height: 100%; display: block; touch-action: none; }
+#talk[hidden], #map[hidden] { display: none; }
+.talk-bar { position: absolute; top: 3rem; left: 0.6rem; display: flex; gap: 0.6rem; align-items: center; background: var(--bg); padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid var(--line); }
+#talk .talk-node rect { fill: var(--room); stroke: var(--room-line); stroke-width: 1.5; cursor: grab; }
+#talk .talk-node.start rect { stroke: var(--accent); stroke-width: 2.5; }
+#talk .talk-node.picked rect { stroke: var(--sel); stroke-width: 3; }
+#talk .talk-name { fill: var(--fg); font: 600 13px var(--sans); pointer-events: none; }
+#talk .talk-said { fill: var(--dim); font: italic 11px var(--serif); pointer-events: none; }
+#talk .talk-option { fill: var(--fg); font: 11.5px var(--sans); pointer-events: none; }
+#talk .talk-option.dim { fill: var(--dim); }
+#talk .talk-port { fill: var(--sel); stroke: var(--bg); stroke-width: 2; cursor: crosshair; }
+#talk .talk-lines path { fill: none; stroke: var(--link); stroke-width: 2; }
+#talk .talk-lines path.to-end { stroke-dasharray: 4 3; }
+#talk marker path { fill: var(--link); }
+#talk .talk-rubber { fill: none; stroke: var(--sel); stroke-width: 2.5; stroke-dasharray: 6 4; pointer-events: none; }
+#talk .talk-end rect { fill: var(--panel); stroke: var(--link); }
+#talk .talk-end text { fill: var(--dim); font: 600 12px var(--sans); text-anchor: middle; }
+.inspector section.node.flash { animation: node-flash 1.4s ease-out; }
+@keyframes node-flash { from { background: color-mix(in srgb, var(--sel) 22%, transparent); } to { background: transparent; } }
+
+/* Words in descriptions: what players can use, and what isn't anything yet. */
+.desc-words .desc-preview { margin: 0.3rem 0; padding: 0.4rem 0.6rem; background: var(--panel); border-radius: 6px; font-family: var(--serif); font-size: 0.9em; line-height: 1.5; }
+.desc-words .kw { background: color-mix(in srgb, #3a9a5b 22%, transparent); border-radius: 3px; padding: 0 1px; }
+.desc-words .nw { text-decoration: underline dashed var(--warn, #c08a1e); text-underline-offset: 3px; }
+.desc-words .desc-new { display: flex; gap: 0.3rem; flex-wrap: wrap; align-items: center; margin: 0.3rem 0; }

@@ -12,6 +12,10 @@ import { draftHints } from "../src/editor/hint-drafts.ts";
 import { parseTime, timeline, timeText } from "../src/editor/timeline.ts";
 import { walkthroughCommands } from "../src/editor/testplay.ts";
 import { fileBytes, sizeText } from "../src/pictures.ts";
+import { readDescription, wordsHere } from "../src/editor/describe-words.ts";
+import { typos } from "../src/editor/spelling.ts";
+import { talkLayout } from "../src/editor/talk-graph.ts";
+import { readTalk, writeMap } from "../src/editor/layout.ts";
 import { loadEngine } from "../src/engine.ts";
 
 const spec = (p) => readFileSync(new URL(`../../spec/${p}`, import.meta.url), "utf8");
@@ -208,5 +212,55 @@ assert.equal(fileBytes("hello"), 5);
 assert.equal(sizeText(512), "512 bytes");
 assert.equal(sizeText(42_000), "42 KB");
 assert.equal(sizeText(1_400_000), "1.4 MB");
+
+// ------------------------------------------------- words in descriptions
+
+{
+  const m = new Model(spec("examples/lighthouse/game.yaml"));
+  const { known } = wordsHere(m, { room: "shore" });
+  assert.equal(known.get("pool"), "tide pool", "a word for something here");
+  const { parts, nouns } = readDescription("Waves break against black rocks. A tide pool shivers in a hollow nearby. A narrow path climbs north to the lighthouse, its lamp dark.", known, new Set(["rocky", "shore"]));
+  assert.deepEqual(parts.filter((p) => p.kind === "known").map((p) => p.text), ["tide", "pool"]);
+  assert.deepEqual(nouns, ["hollow", "path", "lighthouse", "lamp"]);
+  // Plurals name the same thing; `${…}` is left alone; vague words aren't things.
+  const k = new Map([["key", "brass key"]]);
+  assert.deepEqual(readDescription("Two keys hang by the door.", k).parts.filter((p) => p.kind === "known").map((p) => p.text), ["keys"]);
+  // The words shown inside ${if} count; the Lua in ${…} doesn't.
+  assert.deepEqual(readDescription("${if the vars.x}The candle${end} burns at the end of the table.", new Map()).nouns, ["candle", "table"]);
+}
+
+// ------------------------------------------------------------ spelling
+
+{
+  const game = `format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, description: "A lantern hangs here. The lantern is lit. Beside the lantren, a door." }
+objects:
+  lamp: { name: brass lamp, in: hall, description: "A brass lamp. Its brass is dull." }
+  door: { name: door, in: hall, description: "The doors are shut, the door is red." }
+`;
+  assert.deepEqual(typos(game).map((t) => [t.word, t.like, t.path]), [["lantren", "lantern", "rooms.hall.description"]]);
+  // The game's own names are always allowed, and code isn't prose.
+  assert.deepEqual(typos(game.replace("lantren", "lanterns")), []);
+  assert.deepEqual(typos(`${game.replace("lantren", "lantern")}  wick: { name: lantrn, in: hall, on: { take: 'say("lantren")' } }\n`), []);
+}
+
+// ------------------------------------------------- conversations as a graph
+
+{
+  const m = new Model(spec("examples/lighthouse/game.yaml"));
+  const c = m.choice("keeper_talk");
+  const places = talkLayout(c, undefined);
+  assert.equal(places.size, c.nodes.length);
+  assert.deepEqual(places.get(c.start), { x: 0, y: 0 }, "the first part first");
+  for (const n of c.nodes.filter((n) => n.id !== c.start)) assert.ok(places.get(n.id).x > 0, `${n.id} after the start`);
+  // Placed by hand: kept in map.yaml, beside the rooms, for parts that still exist.
+  const talk = new Map([["keeper_talk", new Map([[c.start, { x: 40, y: 50 }], ["gone", { x: 1, y: 1 }]])]]);
+  const text = writeMap(new Map(), [], talk, { keeper_talk: c.nodes.map((n) => n.id) });
+  assert.match(text, /talk:\n {2}keeper_talk:\n {4}\w+: \[40, 50\]\n$/);
+  assert.deepEqual(readTalk(text).get("keeper_talk").get(c.start), { x: 40, y: 50 });
+  assert.equal(talkLayout(c, readTalk(text).get("keeper_talk")).get(c.start).x, 40);
+}
 
 console.log("ok   editor tools");

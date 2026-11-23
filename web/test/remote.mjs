@@ -50,8 +50,9 @@ try {
   assert.deepEqual(Object.keys(files).sort(), ["game.yaml", "scripts/camp.lua"]);
   assert.equal(engine.check(files).diagnostics.filter((d) => d.severity === "error").length, 0);
   // A zip.
+  // A zip: its walkthrough comes too.
   const zipped = await fetchGame(`${base}/campfire.zip`);
-  assert.deepEqual(Object.keys(zipped).sort(), ["game.yaml", "scripts/camp.lua"]);
+  assert.deepEqual(Object.keys(zipped).sort(), ["game.yaml", "scripts/camp.lua", "walkthrough.txt"]);
   assert.equal(engine.load(zipped).meta.title, "Campfire");
   // Nothing there.
   await assert.rejects(fetchGame(`${base}/nowhere/`), /Nothing was found/);

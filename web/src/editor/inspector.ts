@@ -7,6 +7,13 @@ import {
 } from "./model.ts";
 import { THING_DRAG, factionHue } from "./map.ts";
 import { pictureSection } from "./picture-ui.ts";
+import { describeWords } from "./describe-words.ts";
+
+/** A description field, with the words in it players can use (and nouns that aren't anything yet) underneath. */
+function withWords(ctx: InspectorContext, owner: { room: string } | { thing: string } | { character: string }, parts: HTMLElement[]): HTMLElement[] {
+  const input = parts.find((p) => p instanceof HTMLTextAreaElement) as HTMLTextAreaElement | undefined;
+  return input ? [...parts, describeWords(ctx, owner, input)] : parts;
+}
 import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
@@ -192,11 +199,11 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
         if (next) ctx.select({ kind: "room", id: next });
       },
     }),
-    ...field("Description", r.description, (v) => ctx.change((x) => x.set(["rooms", id, "description"], v || undefined), { coalesce: `desc:${id}`, redraw: false }), {
+    ...withWords(ctx, { room: id }, field("Description", r.description, (v) => ctx.change((x) => x.set(["rooms", id, "description"], v || undefined), { coalesce: `desc:${id}`, redraw: false }), {
       multiline: true,
       placeholder: "What the player sees here.",
       help: "Exits, doors and things in the room are listed after this automatically.",
-    }),
+    })),
     check("The story starts here", m.start() === id, (v) => {
       if (v) ctx.change((x) => x.set(["game", "start"], id));
       else ctx.change(() => {}); // a game needs a start: keep it, and redraw
@@ -414,10 +421,10 @@ function doorForm(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ...field("Name", d.name, (v) => ctx.change((x) => x.set(["objects", id, "name"], v || "door"), { coalesce: `dname:${id}`, redraw: false }), {
       help: "What players call it: OPEN THE OAK DOOR.",
     }),
-    ...field("Description", d.description, (v) => ctx.change((x) => x.set(["objects", id, "description"], v || undefined), { coalesce: `ddesc:${id}`, redraw: false }), {
+    ...withWords(ctx, { thing: id }, field("Description", d.description, (v) => ctx.change((x) => x.set(["objects", id, "description"], v || undefined), { coalesce: `ddesc:${id}`, redraw: false }), {
       multiline: true,
       placeholder: "What the player sees when they examine it.",
-    }),
+    })),
     el("label", { textContent: "At the start it's" }),
     el("div", { class: "radio" }, radio("closed", "Closed"), radio("open", "Open"), radio("locked", "Locked")),
   );
@@ -627,10 +634,10 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ...(forSale
       ? numField(ctx, ["objects", id, "price"], `Price (${holder.name} sells it)`, m.get(["objects", id, "price"]), "In the player's money. Empty: not for sale.")
       : []),
-    ...field("Description", t.description, (v) => ctx.change((x) => x.set(["objects", id, "description"], v || undefined), { coalesce: `tdesc:${id}`, redraw: false }), {
+    ...withWords(ctx, { thing: id }, field("Description", t.description, (v) => ctx.change((x) => x.set(["objects", id, "description"], v || undefined), { coalesce: `tdesc:${id}`, redraw: false }), {
       multiline: true,
       placeholder: "What the player sees when they examine it.",
-    }),
+    })),
     ...pictureSection(ctx, ["objects", id], "thing"),
     ...field("Other words for it", t.synonyms.join(", "), (v) => ctx.change((x) => x.setList(["objects", id, "synonyms"], v.split(",")), { coalesce: `tsyn:${id}`, redraw: false }), {
       placeholder: "money, treasure",
@@ -879,10 +886,10 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
         if (next) ctx.select({ kind: "character", id: next });
       },
     }),
-    ...field("Description", c.description, (v) => ctx.change((x) => x.set([...p, "description"], v || undefined), { coalesce: `cdesc:${id}`, redraw: false }), {
+    ...withWords(ctx, { character: id }, field("Description", c.description, (v) => ctx.change((x) => x.set([...p, "description"], v || undefined), { coalesce: `cdesc:${id}`, redraw: false }), {
       multiline: true,
       placeholder: "What the player sees when they look at them.",
-    }),
+    })),
     ...pictureSection(ctx, p, "character"),
     ...field("Other words for them", c.synonyms.join(", "), (v) => ctx.change((x) => x.setList([...p, "synonyms"], v.split(",")), { coalesce: `csyn:${id}`, redraw: false }), {
       placeholder: "woman, crone",

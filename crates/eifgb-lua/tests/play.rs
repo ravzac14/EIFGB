@@ -121,9 +121,17 @@ fn opening_output_and_status() {
 #[test]
 fn typos_synonyms_and_inflections() {
     let mut g = game(lighthouse());
-    assert_says(&mut g, "serch the pool", "pull out a small brass key");
-    assert_says(&mut g, "examin brass kye", "green with age");
-    assert_says(&mut g, "nrth", "Base of the Lighthouse");
+    // A slip is never swapped in unasked: the game asks, and YES fixes it.
+    assert_says(&mut g, "serch the pool", "Did you mean SEARCH?");
+    assert_says(&mut g, "yes", "pull out a small brass key");
+    assert_says(&mut g, "examin brass kye", "Did you mean EXAMINE?");
+    assert_says(&mut g, "yes", "Did you mean KEY?");
+    assert_says(&mut g, "yes", "green with age");
+    assert_says(&mut g, "nrth", "Did you mean NORTH?");
+    assert_says(&mut g, "y", "Base of the Lighthouse");
+    // A real word the game doesn't have isn't taken for one it does.
+    assert_says(&mut g, "think", "nothing new comes to mind");
+    assert_eq!(say(&mut g, "shake"), "What do you want to shake?");
     assert_says(&mut g, "grabbed the can", "Taken.");
     assert_says(&mut g, "peer at keys", "green with age");
     assert_says(&mut g, "please drop the can", "Dropped.");
@@ -4771,8 +4779,8 @@ fn oops_fixes_the_word_and_near_misses_ask() {
     assert_eq!(say(&mut g, "wak keeper"), "I don't know the word \"wak\". Did you mean WAKE or WALK?");
     assert_eq!(say(&mut g, "yes"), "Which: WAKE or WALK?");
     assert_says(&mut g, "wake", "isn't asleep");
-    // A short word on its own isn't guessed at.
-    assert_says(&mut g, "nod", "I don't know the verb \"nod\".");
+    // A short word on its own isn't guessed at when it could be several.
+    assert_says(&mut g, "wak", "I don't know the verb \"wak\".");
     // OOPS fixes the lone word too.
     assert_eq!(say(&mut g, "oops look"), say(&mut g, "look"));
     say(&mut g, "drop can");

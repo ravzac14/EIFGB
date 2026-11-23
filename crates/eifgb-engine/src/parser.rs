@@ -196,44 +196,15 @@ fn distance(a: &str, b: &str) -> usize {
     d[n][m]
 }
 
-/// The candidate closest to `word`, if it's unambiguous and close enough to be a typo.
-fn closest<'a>(word: &str, candidates: impl IntoIterator<Item = &'a String>) -> Option<&'a String> {
-    if word.chars().count() < 3 || word.starts_with(ENTITY_TOKEN) {
-        return None;
-    }
-    // Two letters wrong only in a long word: "brief" isn't "bribe".
-    let limit = if word.chars().count() <= 6 { 1 } else { 2 };
-    let mut best: Option<(usize, &String)> = None;
-    let mut tie = false;
-    for c in candidates {
-        let d = distance(word, c);
-        if d == 0 || d > limit {
-            continue;
-        }
-        match best {
-            Some((bd, _)) if d > bd => {}
-            Some((bd, _)) if d == bd => tie = true,
-            _ => {
-                best = Some((d, c));
-                tie = false;
-            }
-        }
-    }
-    if tie { None } else { best.map(|(_, c)| c) }
-}
-
-/// Words a typo might have meant, when [`closest`] can't be sure: the
-/// nearest few (ties included), allowing one more slip in longer words.
+/// Words a typo might have meant, for "Did you mean…?": the nearest few
+/// (ties included). Never swapped in unasked: THINK isn't THANK.
 fn near_misses(word: &str, candidates: &[String]) -> Vec<String> {
     let n = word.chars().count();
     if n < 3 || word.starts_with(ENTITY_TOKEN) || word.chars().all(|c| c.is_ascii_digit()) {
         return Vec::new();
     }
-    let limit = match n {
-        ..=4 => 1,
-        5..=7 => 2,
-        _ => 3,
-    };
+    // Two letters wrong only in a long word: PONDER isn't ORDER.
+    let limit = if n <= 6 { 1 } else { 2 };
     let mut near: Vec<(usize, &String)> = candidates
         .iter()
         .filter(|c| c.chars().count() > 1)
@@ -623,30 +594,8 @@ impl Grammar {
             return Parsed::Fail(Failure::Empty);
         }
         let story = world.story();
-        let mut toks = toks.to_vec();
+        let toks = toks.to_vec();
         let mut cands = self.candidates(story, &toks);
-
-        // Step 5: correct a misspelled verb or direction (but HALL is a place, not CALL).
-        let place: Vec<String> = toks.iter().filter(|w| !self.articles.contains(*w)).cloned().collect();
-        if cands.is_empty() && !self.is_known_start(&toks[0]) && world.places_named(&place, &[]).is_empty() {
-            let starts: Vec<String> = self
-                .verb_words
-                .iter()
-                .chain(self.directions.keys())
-                .chain(self.phrases.iter().map(|(k, _)| &k[0]))
-                .cloned()
-                .collect();
-            if let Some(fixed) = closest(&toks[0], &starts) {
-                let mut fixed_toks = toks.clone();
-                fixed_toks[0] = fixed.clone();
-                let fixed_toks = self.normalize(fixed_toks);
-                let fixed_cands = self.candidates(story, &fixed_toks);
-                if !fixed_cands.is_empty() || fixed_toks.len() == 1 {
-                    toks = fixed_toks;
-                    cands = fixed_cands;
-                }
-            }
-        }
 
         if cands.is_empty() {
             return self.no_pattern(world, &toks);
@@ -673,9 +622,9 @@ impl Grammar {
 /// The verb's name for questions: the leading words of its first pattern
     /// ("x" → "examine").
     fn verb_name(verb: &eifgb_ir::Verb) -> String {
-        let lead: Vec<&str> = verb
-            .patterns
-            .first()
+        // The first pattern that takes something: THANK {target}, not THANKS.
+        let pattern = verb.patterns.iter().find(|p| p.0.iter().any(|t| !matches!(t, PatternToken::Word(_)))).or(verb.patterns.first());
+        let lead: Vec<&str> = pattern
             .map(|p| {
                 p.0.iter()
                     .map_while(|t| match t {
@@ -686,6 +635,17 @@ impl Grammar {
             })
             .unwrap_or_default();
         lead.join(" ")
+    }
+
+    /// The verb as the player put it, for "What do you want to …?": the
+    /// words they typed before what's missing (SHAKE, not WAKE), or else,
+    /// for nothing or a short form (X, L AT), the verb's own.
+    fn asked_verb(verb: &eifgb_ir::Verb, typed: &[String]) -> String {
+        if typed.is_empty() || typed.iter().any(|w| w.chars().count() < 3) {
+            Self::verb_name(verb)
+        } else {
+            typed.join(" ")
+        }
     }
 
     /// No pattern fits. The input might be a verb waiting for its
@@ -707,7 +667,7 @@ impl Grammar {
                     && lead.iter().zip(toks).all(|(a, b)| *a == b)
                     && matches!(p.0.get(lead.len()), Some(PatternToken::Slot(_)))
                 {
-                    return Parsed::NeedNoun { prefix: toks.to_vec(), verb: Self::verb_name(verb), target: None, word: None };
+                    return Parsed::NeedNoun { prefix: toks.to_vec(), verb: Self::asked_verb(verb, toks), target: None, word: None };
                 }
             }
         }
@@ -776,7 +736,7 @@ impl Grammar {
             match nf {
                 NounFail::Missing => Parsed::NeedNoun {
                     prefix: toks[..span.0].to_vec(),
-                    verb: Self::verb_name(verb),
+                    verb: Self::asked_verb(verb, &toks[..span.0]),
                     target: None,
                     word: None,
                 },
@@ -784,7 +744,7 @@ impl Grammar {
                 NounFail::NotFound { unknown_word: Some(w) } => Parsed::Fail(Failure::UnknownWord { word: w }),
                 NounFail::NotFound { unknown_word: None } => Parsed::Fail(Failure::NotHere),
                 NounFail::Scenery => Parsed::Fail(Failure::Scenery),
-                NounFail::Structural => Parsed::Fail(Failure::Partial { verb: Self::verb_name(verb) }),
+                NounFail::Structural => Parsed::Fail(Failure::Partial { verb: Self::asked_verb(verb, &toks[..span.0]) }),
                 NounFail::Ambiguous(options) => Parsed::Ambiguous {
                     before: toks[..span.0].to_vec(),
                     after: toks[span.1..].to_vec(),
@@ -927,31 +887,6 @@ impl Grammar {
                 return Err(NounFail::Scenery);
             }
         }
-        if matches.is_empty() {
-            // Step 5: fix misspelled nouns, using only words of things in scope.
-            let scope_vocab: Vec<String> = scope
-                .iter()
-                .flat_map(|e| {
-                    let v = &world.def(*e).vocab;
-                    v.nouns.iter().chain(&v.adjectives).cloned().collect::<Vec<_>>()
-                })
-                .collect();
-            let fixed: Option<Vec<String>> = words
-                .iter()
-                .map(|w| {
-                    if scope_vocab.contains(w) || self.stem_in(w, &scope_vocab) {
-                        Some((*w).clone())
-                    } else {
-                        closest(w, &scope_vocab).cloned()
-                    }
-                })
-                .collect();
-            if let Some(fixed) = fixed {
-                let refs: Vec<&String> = fixed.iter().collect();
-                matches = self.match_scope(world, &scope, &refs, true);
-            }
-        }
-
         match matches.len() {
             0 if words.iter().any(|w| self.pattern_words.contains(*w) && !self.vocab_words.contains(*w)) => {
                 Err(NounFail::Structural)
@@ -1052,10 +987,6 @@ impl Grammar {
             1 => Ok(found),
             _ => self.one_of(world, &found, action),
         })
-    }
-
-    fn stem_in(&self, w: &str, vocab: &[String]) -> bool {
-        (self.lang.stems)(w).iter().any(|s| vocab.contains(s))
     }
 
     fn stem_known(&self, w: &str) -> bool {
@@ -1317,10 +1248,11 @@ mod tests {
     }
 
     #[test]
-    fn closest_refuses_ties_and_short_words() {
-        let words: Vec<String> = ["take", "talk", "search"].iter().map(|s| s.to_string()).collect();
-        assert_eq!(closest("serch", &words).map(String::as_str), Some("search"));
-        assert_eq!(closest("tak", &words), None, "take and talk tie");
-        assert_eq!(closest("xx", &words), None);
+    fn near_misses_allow_two_slips_only_in_long_words() {
+        let words: Vec<String> = ["order", "shove", "examine"].iter().map(|s| s.to_string()).collect();
+        assert!(near_misses("ponder", &words).is_empty());
+        assert!(near_misses("shiver", &words).is_empty());
+        assert_eq!(near_misses("exmaine", &words), vec!["examine".to_string()]);
+        assert_eq!(near_misses("exzmnie", &words), vec!["examine".to_string()]);
     }
 }

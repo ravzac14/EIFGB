@@ -345,6 +345,22 @@ verbs:
   laugh:
     patterns: ["laugh", "giggle", "chuckle", "smile", "grin"]
     default: "You laugh to yourself."
+  think:
+    patterns: ["think", "ponder", "contemplate", "wonder", "think hard", "think about {text}", "ponder {text}", "contemplate {text}", "wonder about {text}", "consider {text}"]
+    default: "You think it over, but nothing new comes to mind."
+  nod:
+    patterns: ["nod", "nod at {target}", "nod to {target}", "shake head", "shake my head", "shrug"]
+    default: "Nobody seems to notice."
+    reach: false
+  hug:
+    patterns: ["hug {target}", "embrace {target}", "cuddle {target}", "hug", "hug myself"]
+    default: "A hug won't help here."
+  clap:
+    patterns: ["clap", "applaud", "clap hands", "clap my hands", "clap your hands", "cheer"]
+    default: "You clap. The sound dies away."
+  shiver:
+    patterns: ["shiver", "tremble", "shudder", "sigh", "yawn", "frown", "sneeze", "cough"]
+    default: "Nothing comes of it."
   yes:
     patterns: ["yes", "y", "yeah", "yep", "sure", "ok", "okay"]
     default: "That was a rhetorical question."

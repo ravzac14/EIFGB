@@ -1865,8 +1865,8 @@ follows:
 - **The room and the floor:** X ROOM, SEARCH HERE, TAKE THE KEY FROM THE
   FLOOR, PUT IT ON THE GROUND (drops it).
 - **Small talk and the odd thing:** HELLO, JUMP, SIT, LIE DOWN, SLEEP,
-  SING, DANCE, PRAY, CRY, LAUGH, YES, NO, THANKS, SORRY, XYZZY and the
-  like get a short reply. Each is a verb you can hook (`on: { jump: ... }`)
+  SING, DANCE, PRAY, CRY, LAUGH, THINK, NOD, SHRUG, HUG, CLAP, SHIVER,
+  SIGH, YES, NO, THANKS, SORRY, XYZZY and the like get a short reply. Each is a verb you can hook (`on: { jump: ... }`)
   or reword with its `default`. HELLO KEEPER talks to the keeper.
 
 #### Looking and moving

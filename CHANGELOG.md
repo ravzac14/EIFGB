@@ -6,6 +6,17 @@ behave will be called out here.
 
 ## Unreleased
 
+- Typos are never fixed behind the player's back any more. SERCH POOL used
+  to run SEARCH POOL silently, and a real word the game didn't know could
+  be taken for one it did: THINK became THANK. Now the game asks "Did you
+  mean SEARCH?", and YES runs it. **This changes how games behave:**
+  walkthroughs and recordings with typos in them need the typos fixed.
+- New everyday words: THINK (PONDER, THINK ABOUT …), NOD, SHRUG, HUG, CLAP,
+  SHIVER, SIGH and YAWN, with stock replies.
+- "What do you want to …?" uses the player's own words: SHAKE asks "What do
+  you want to shake?", not "…to wake?", and THANK no longer asks "…to
+  thanks?".
+- "Did you mean…?" is pickier: PONDER no longer suggests ORDER.
 - Help for players, in every game:
   - WHERE IS THE KEY (or FIND THE KEEPER) says where you last saw it, and
     GO TO THE KEEPER walks you there. It's a reminder, not a hint: it only

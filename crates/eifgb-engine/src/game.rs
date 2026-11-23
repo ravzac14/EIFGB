@@ -527,21 +527,30 @@ impl<H: ScriptHost> Game<H> {
         }
         let verb = toks.first().filter(|w| self.grammar.is_verb_word(w)).cloned();
         let scenery_word = toks.iter().skip(1).find(|w| self.grammar.describes_here(&self.world, w)).cloned();
-        // For OOPS, and "Did you mean…?" when a fix is too uncertain to make.
+        // For OOPS, and "Did you mean…?": a near miss is never swapped in unasked.
         match &f {
             Failure::UnknownVerb { word } | Failure::UnknownWord { word } => {
                 self.oops = Some((toks.to_vec(), word.clone()));
                 let mut guesses = match f {
-                    // A short word on its own is too little to go on: NOD isn't NO or NOW.
-                    Failure::UnknownVerb { .. } if toks.len() == 1 && word.chars().count() <= 4 => Vec::new(),
                     Failure::UnknownVerb { .. } if toks.first() == Some(word) => self.grammar.verb_guesses(word),
                     _ => self.grammar.noun_guesses(&self.world, word),
                 };
-                // Only guesses that make a command: TAK CAN is TAKE CAN, not TALK CAN.
+                // Only guesses that make a command: TAK CAN is TAKE CAN, not
+                // TALK CAN. (Or that leave another slip to ask about next:
+                // EXAMIN BRASS KYE.)
                 guesses.retain(|g| {
                     let fixed: Vec<String> = toks.iter().map(|t| if t == word { g.clone() } else { t.clone() }).collect();
-                    !matches!(self.grammar.parse(&self.world, &fixed), Parsed::Fail(_))
+                    match self.grammar.parse(&self.world, &fixed) {
+                        Parsed::Fail(Failure::UnknownWord { word: next }) => next != *g,
+                        Parsed::Fail(_) => false,
+                        _ => true,
+                    }
                 });
+                // A short word on its own is too little to choose between: NOD
+                // isn't NO or NOW. (TKAE is TAKE, though.)
+                if toks.len() == 1 && word.chars().count() <= 4 && guesses.len() > 1 {
+                    guesses.clear();
+                }
                 if !guesses.is_empty() {
                     self.out.missed = Some(Missed { kind: if matches!(f, Failure::UnknownVerb { .. }) { "unknown_verb" } else { "unknown_word" }, word: Some(word.clone()), verb: None });
                     let shown: Vec<String> = guesses.iter().map(|g| g.to_uppercase()).collect();

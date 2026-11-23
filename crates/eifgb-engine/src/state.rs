@@ -47,6 +47,16 @@ pub struct GameState {
     /// reach what they know is here.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub located: BTreeMap<EntityId, EntityId>,
+    /// Where the player first came to have each thing: the room (None: they
+    /// had it from the start). For WHERE IS and INVENTORY BY PLACE.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub got: BTreeMap<EntityId, Option<EntityId>>,
+    /// What was said in each conversation, the last time it was open (by
+    /// choice key), and which was the last: WHAT DID SHE SAY?
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub talks: BTreeMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_talk: Option<String>,
     /// Timers that have gone off at least once (for `say_again`).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fired: BTreeSet<String>,
@@ -128,6 +138,9 @@ impl GameState {
             notes: Vec::new(),
             brief: false,
             recent: Vec::new(),
+            got: BTreeMap::new(),
+            talks: BTreeMap::new(),
+            last_talk: None,
         }
     }
 }

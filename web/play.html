@@ -22,6 +22,7 @@
   <span id="status" class="status" aria-live="off"></span>
   <span class="tools">
     <button id="map-open" type="button" aria-pressed="false" aria-controls="map" disabled>Map</button>
+    <button id="bookmarks-open" type="button" disabled title="Mark this moment in the story, to read it again later">Bookmarks</button>
     <button id="saves-open" type="button" disabled>Saves</button>
     <button id="restart" type="button" disabled>Restart</button>
     <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
@@ -42,6 +43,7 @@
   <div id="map-body" class="map-body"></div>
 </aside>
 <dialog id="saves"></dialog>
+<dialog id="bookmarks" class="bookmarks-dialog" aria-labelledby="bookmarks-title"></dialog>
 <dialog id="settings"></dialog>
 <script type="module" src="./src/play.ts"></script>
 </body>

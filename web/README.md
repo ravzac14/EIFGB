@@ -158,6 +158,12 @@ Everything is kept in the browser's local storage (`src/store.ts`):
   opens the Saves dialog.
 - **Files:** any slot can be downloaded as a `.eifgb-save.json` file, and
   loaded back on another device (*Load a save file…*).
+- **Bookmarks:** *Bookmarks → Bookmark this moment* keeps the last command
+  and the game's reply, with where and when, and the game as it was then.
+  *Read* shows the passage again (and *Show it in the story* scrolls to it,
+  if it's still on the page); *Go back to this moment* restores it, like a
+  save. They're kept per game (`bookmarks:<game>`), and aren't game
+  actions: nothing in the story is clicked.
 
 ## The engine API (`src/engine.ts`)
 

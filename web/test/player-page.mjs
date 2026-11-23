@@ -31,6 +31,41 @@ const type = (text) => {
   $("#line").value = text;
   $("#prompt").requestSubmit();
 };
+// Bookmarks: mark a moment, read it again, show it, and go back to it.
+window.confirm = () => true;
+Element.prototype.scrollIntoView ??= () => {};
+const clickIn = (box, text) => {
+  const b = [...box.querySelectorAll("button")].find((x) => x.textContent === text);
+  assert.ok(b, `a "${text}" button in ${box.textContent}`);
+  b.click();
+};
+type("look");
+$("#bookmarks-open").click();
+const bm = $("#bookmarks");
+assert.ok(bm.open);
+assert.match(bm.textContent, /No bookmarks yet/);
+bm.querySelector("input[type=text]").value = "The kitchen at midnight";
+clickIn(bm, "Bookmark this moment");
+assert.equal(bm.querySelectorAll(".bookmarks li strong").length, 1);
+assert.match(bm.querySelector(".bookmarks li").textContent, /The kitchen at midnight.*Kitchen, turn/);
+assert.ok(document.querySelectorAll("#log .bookmarked").length >= 2, "the command and its reply are marked");
+const kept = JSON.parse(localStorage.getItem("eifgb:bookmarks:example:midnight_snack"));
+assert.equal(kept[0].text[0], "> look");
+assert.ok(kept[0].text.length > 1 && kept[0].save, "the reply, and the game then");
+clickIn(bm, "Read");
+assert.match(bm.querySelector(".passage").textContent, /> look/);
+clickIn(bm, "Show it in the story");
+assert.equal(bm.open, false);
+assert.ok($("#log .flash"), "shown, and flashed");
+// Somewhere else, then back to the bookmark.
+const then = $("#status").textContent;
+type("x mat");
+type("look under the mat");
+assert.notEqual($("#status").textContent, then);
+$("#bookmarks-open").click();
+clickIn(bm, "Go back to this moment");
+assert.equal($("#status").textContent, then, "back where it was bookmarked");
+
 const steps = readFileSync(`${web}../spec/examples/midnight_snack/walkthrough.txt`, "utf8")
   .split("\n")
   .map((l) => l.trim())

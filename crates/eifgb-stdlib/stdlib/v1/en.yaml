@@ -265,8 +265,29 @@ verbs:
       - "where did i leave {text}"
       - "where did i put {text}"
       - "where did i last see {text}"
+      - "where did i get {text}"
+      - "where did i find {text}"
+      - "where did {text} come from"
       - "find {text}"
       - "locate {text}"
+  last_talk:
+    action: last_talk
+    patterns:
+      - "what did {text} say"
+      - "what did she say"
+      - "what did he say"
+      - "what did they say"
+      - "what was said"
+      - "what was that"
+      - "remind me what {text} said"
+      - "conversation"
+      - "last conversation"
+  map:
+    action: map
+    patterns: ["map", "show map", "show the map", "text map", "where have i been", "places", "places i've been"]
+  inventory_by_place:
+    action: inventory_by_place
+    patterns: ["inventory by place", "inventory by room", "i by place", "inv by place", "where did i get everything", "where did i get all this"]
   oops:
     action: oops
     patterns: ["oops {text}", "oops"]
@@ -926,7 +947,7 @@ messages:
   again.cannot: "There's nothing in your last command to swap for that."
   where.what: "Where is what?"
   where.unknown: "You haven't seen anything like that."
-  where.carried: "You're carrying ${the(args.target)}."
+  where.carried: "You're carrying ${the(args.target)}.${if args.found} You found it in the ${args.found}.${end}${if args.start} You've had it from the start.${end}"
   where.here: "${The(args.target)} is right here."
   where.gone: "${The(args.target)} was here when you last looked, but isn't now."
   where.seen: "You last saw ${the(args.target)} in the ${args.place}.${if args.go} GO TO ${args.typed} takes you there.${end}"
@@ -944,6 +965,19 @@ messages:
   recap.to_do: "Still to do: ${args.list}."
   recap.recent: "Your last few moves: ${args.list}."
   recap.notes: "You've written ${args.n} ${if args.n == 1}note${else}notes${end}: NOTES shows them."
+  talk.recall_head: "[${if args.who}The last time you talked to ${args.who}${else}The last conversation${end}:]"
+  talk.recall_you: "(You: ${args.text})"
+  talk.recall_none: "You haven't talked to anyone yet."
+  talk.recall_not_them: "You haven't talked to ${the(args.target)} yet."
+  map.head: "[You've been to ${args.n} ${if args.n == 1}place${else}places${end}.]"
+  map.room: "${args.room}${if args.here} (you're here)${end}: ${args.ways}."
+  map.no_ways: "no ways out that you know of"
+  map.way_to: "${args.dir} to the ${args.room}"
+  map.way_new: "${args.dir}, somewhere you haven't been"
+  map.through: "${args.way}, through ${the(args.door)}${if args.closed} (closed)${end}"
+  inventory.from_start: "From the start: ${args.list}."
+  inventory.from_place: "From the ${args.place}: ${args.list}."
+  inventory.from_somewhere: "From somewhere: ${args.list}."
   parser.not_here: "You can't see any such thing."
   parser.scenery: "That's just part of the scenery."
   parser.dark: "It's too dark to see."

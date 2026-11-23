@@ -569,6 +569,11 @@ impl World {
         self.contents(PLAYER)
     }
 
+    /// Everything the player carries, and what's inside it.
+    pub fn inventory_all(&self) -> Vec<EntityId> {
+        self.ids().filter(|&t| t != PLAYER && self.is_within(t, PLAYER)).collect()
+    }
+
     // --------------------------------------------------------------- exits
 
     pub fn exit(&self, room: EntityId, dir: Direction) -> Option<&Exit> {

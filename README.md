@@ -1994,6 +1994,7 @@ follows:
 | SAY … | SAY … TO …, WHISPER … | Says something aloud, for your `on: { say: ... }` handlers (the words are `args.text`). |
 | CUT, TIE … TO …, DIG, KNOCK ON …, WAVE AT …, POINT AT … | CHOP, SLICE, ATTACH …, RAP ON … | Tries it out; the game decides if anything happens. |
 | INVENTORY | I | Lists what you carry. |
+| INVENTORY BY PLACE | WHERE DID I GET EVERYTHING | What you carry, by where you found it: "From the start: a pocket watch. From the Yard: a coin and a pebble." |
 | USE … | USE … ON …, USE … WITH … | Does what the thing is for: lights a lamp, wears a hat, eats food, opens a door (or goes through it once it's open). USE KEY ON DOOR unlocks it, and USE SWORD ON GOBLIN attacks. |
 | LIGHT … | TURN ON … | Lights a lamp, torch or candle. |
 | EXTINGUISH … | PUT OUT …, BLOW OUT …, TURN OFF … | Puts a light or a fire out. |
@@ -2048,8 +2049,10 @@ follows:
 | RESTART | | Starts the game again. |
 | SCORE | | Shows your score, if the game keeps one. |
 | HELP | | A short guide to playing. |
+| MAP | WHERE HAVE I BEEN, PLACES | The places you've been, in words, here first, and the ways out of each: where they lead, or that you haven't been that way yet, and the doors on them. For the terminal and screen readers. With a map in the game in view, MAP looks at that instead. |
+| WHAT DID SHE SAY? | WHAT DID THE KEEPER SAY?, WHAT WAS SAID, CONVERSATION | Shows the last conversation again (or the one with someone named), what you chose too, without opening it. Works in the middle of one. |
 | RECAP | SUMMARY, REMIND ME, WHERE WAS I | Where things stand: where you are, what you carry, your score and goals, and your last few moves. For coming back to a game after a while. |
-| WHERE IS … | FIND …, WHERE DID I LEAVE … | Where you last saw something or someone: "You last saw the old keeper in the Base of the Lighthouse." GO TO THE KEEPER walks you there. A reminder, not a hint: it only knows what you've seen, so it never tells you where something has gone since, or what's become of it. |
+| WHERE IS … | FIND …, WHERE DID I LEAVE …, WHERE DID I GET … | Where you last saw something or someone: "You last saw the old keeper in the Base of the Lighthouse." For something you carry, where you found it. GO TO THE KEEPER walks you there. A reminder, not a hint: it only knows what you've seen, so it never tells you where something has gone since, or what's become of it. |
 | BRIEF / VERBOSE | | BRIEF names places you've been before without describing them again (LOOK still does); VERBOSE, the default, always describes them. Kept with saves, and through UNDO and RESTART. |
 | HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
 | JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them, and your notes. |

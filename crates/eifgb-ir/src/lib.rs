@@ -1334,6 +1334,12 @@ pub enum BuiltinAction {
     Brief,
     /// What's happened so far, and where things stand.
     Recap,
+    /// WHAT DID SHE SAY?: the last conversation again.
+    LastTalk,
+    /// MAP: the places the player has been, and the ways between them, in words.
+    Map,
+    /// INVENTORY BY PLACE: what's carried, by where it was found.
+    InventoryByPlace,
 }
 
 impl BuiltinAction {
@@ -1361,6 +1367,9 @@ impl BuiltinAction {
                 | BuiltinAction::Verbose
                 | BuiltinAction::Brief
                 | BuiltinAction::Recap
+                | BuiltinAction::LastTalk
+                | BuiltinAction::Map
+                | BuiltinAction::InventoryByPlace
                 | BuiltinAction::Again
                 | BuiltinAction::Quit
         )

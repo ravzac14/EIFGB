@@ -4677,7 +4677,7 @@ fn where_is_says_where_things_were_last_seen() {
     say(&mut g, "n");
     assert_eq!(say(&mut g, "where is the keeper"), "The old keeper is right here.");
     say(&mut g, "s");
-    assert_eq!(say(&mut g, "where's the key"), "You're carrying the brass key.");
+    assert_eq!(say(&mut g, "where's the key"), "You're carrying the brass key. You found it in the Rocky Shore.");
     assert_eq!(
         say(&mut g, "where is the old man"),
         "You last saw the old keeper in the Base of the Lighthouse. GO TO OLD MAN takes you there."
@@ -4754,6 +4754,83 @@ fn hints_stop_once_the_thing_is_found() {
     say(&mut g, "drop coin");
     say(&mut g, "s");
     assert_says(&mut g, "hint", "You don't need a hint right now.");
+}
+
+/// WHAT DID HE SAY?: the last conversation, or someone's, again.
+#[test]
+fn what_was_said_in_the_last_conversation() {
+    let mut g = game(lighthouse());
+    assert_eq!(say(&mut g, "what did he say"), "You haven't talked to anyone yet.");
+    say(&mut g, "search pool");
+    say(&mut g, "n");
+    say(&mut g, "talk to keeper");
+    say(&mut g, "1");
+    // Inside the conversation too, and then its options again.
+    let mid = say(&mut g, "what did he say");
+    assert!(mid.starts_with("[The last time you talked to the old keeper:]"), "{mid}");
+    assert!(mid.contains("(You: Ask about the gate)\n\"Dropped the key in the tide pool."), "{mid}");
+    assert!(mid.ends_with("2. Say goodbye"), "{mid}");
+    say(&mut g, "2");
+    let after = say(&mut g, "what did the keeper say");
+    assert!(after.ends_with("(You: Say goodbye)"), "{after}");
+    assert_eq!(say(&mut g, "what was said"), after);
+    // It takes no turn, and isn't a word the game didn't know.
+    let turn = g.world().state.turn;
+    say(&mut g, "conversation");
+    assert_eq!(g.world().state.turn, turn);
+    // Whatever the pronoun.
+    assert!(say(&mut g, "what did she say").contains("Say goodbye"));
+}
+
+/// MAP, in words: the places you've been, and the ways out of them.
+#[test]
+fn map_in_words() {
+    let mut g = game(lighthouse());
+    assert_eq!(say(&mut g, "map"), "[You've been to 1 place.]\nRocky Shore (you're here): north, somewhere you haven't been.");
+    say(&mut g, "search pool");
+    say(&mut g, "n");
+    assert_eq!(
+        say(&mut g, "where have i been"),
+        "[You've been to 2 places.]\nBase of the Lighthouse (you're here): south to the Rocky Shore; up, somewhere you haven't been, through the iron gate (closed).\nRocky Shore: north to the Base of the Lighthouse."
+    );
+    // A secret door: no way through it until it's found; then there is.
+    let src = "\
+format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, exits: { east: { to: vault, through: panel } } }
+  vault: { name: Vault, exits: { west: { to: hall, through: panel } } }
+objects:
+  shelf: { name: bookshelf, in: hall }
+  panel: { name: sliding panel, in: hall, traits: [door, openable, scenery], state: { hidden: true }, revealed_by: search shelf }
+";
+    let mut g = game(compile_str(src).story.unwrap());
+    assert_eq!(say(&mut g, "map"), "[You've been to 1 place.]\nHall (you're here): no ways out that you know of.");
+    say(&mut g, "search bookshelf");
+    assert_eq!(say(&mut g, "map"), "[You've been to 1 place.]\nHall (you're here): east, somewhere you haven't been, through the sliding panel (closed).");
+    say(&mut g, "open panel");
+    say(&mut g, "e");
+    assert!(say(&mut g, "map").contains("Vault (you're here): west to the Hall, through the sliding panel"));
+    // A map in the game is looked at, though.
+    let mut g = small("objects:\n  chart: { name: old map, synonyms: [map], in: hall, description: Lines and a cross. }\n");
+    assert_eq!(say(&mut g, "map"), "Lines and a cross.");
+}
+
+/// Where things came from: WHERE IS, and INVENTORY BY PLACE.
+#[test]
+fn where_things_came_from() {
+    let mut g = small("player: { }\nobjects:\n  watch: { name: pocket watch, in: player, traits: [portable] }\n  coin: { name: coin, in: yard, traits: [portable] }\n  pebble: { name: pebble, in: yard, traits: [portable] }\n");
+    say(&mut g, "n");
+    say(&mut g, "take coin");
+    say(&mut g, "take pebble");
+    assert_eq!(say(&mut g, "where did i get the coin"), "You're carrying the coin. You found it in the Yard.");
+    assert_eq!(say(&mut g, "where is the watch"), "You're carrying the pocket watch. You've had it from the start.");
+    assert_eq!(say(&mut g, "inventory by place"), "From the start: a pocket watch.\nFrom the Yard: a coin and a pebble.");
+    // Dropped elsewhere and picked up again: still found where it was first.
+    say(&mut g, "s");
+    say(&mut g, "drop coin");
+    say(&mut g, "take coin");
+    assert!(say(&mut g, "where is the coin").ends_with("You found it in the Yard."));
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! Commands that help the player keep track, and recover from slips:
 //! WHERE IS THE KEY, RECAP, UNDO 3, OOPS and "Did you mean…?", AGAIN WITH
-//! THE IRON KEY, and ASK ABOUT THE GATE going straight to the gate.
+//! THE IRON KEY, ASK ABOUT THE GATE going straight to the gate, WHAT DID
+//! SHE SAY?, MAP in words, and INVENTORY BY PLACE.
 //!
 //! What they use is what the game already keeps: where things were last
 //! seen (`located`), the last command, and the moves taken.
@@ -179,6 +180,12 @@ impl<H: ScriptHost> Game<H> {
         let here = self.world.here();
         let ctx = Ctx::new().entity("target", t);
         if self.world.is_within(t, PLAYER) {
+            // Where they got it, if they remember.
+            let ctx = match self.world.state.got.get(&t) {
+                Some(Some(r)) => ctx.text("found", self.world.def(*r).name.clone()),
+                Some(None) => ctx.value("start", Value::Bool(true)),
+                None => ctx,
+            };
             return self.msg("where.carried", &ctx);
         }
         if self.world.in_scope(t) {
@@ -262,6 +269,140 @@ impl<H: ScriptHost> Game<H> {
         let notes = self.world.state.notes.len() as i64;
         if notes > 0 {
             self.msg("recap.notes", &ctx.clone().value("n", Value::Int(notes)));
+        }
+    }
+
+    // ----------------------------------------------------- what was said
+
+    /// Keeps what a conversation said, from line `from` on: its text, not
+    /// the numbered options.
+    pub(crate) fn keep_talk(&mut self, key: &str, from: usize) {
+        const KEPT: usize = 40;
+        let said: Vec<String> = self.out.lines[from.min(self.out.lines.len())..].iter().filter(|l| l.kind == LineKind::Text).map(|l| l.text.clone()).collect();
+        let talk = self.world.state.talks.entry(key.to_string()).or_default();
+        talk.extend(said);
+        if talk.len() > KEPT {
+            talk.drain(..talk.len() - KEPT);
+        }
+    }
+
+    /// Who a conversation is with: whoever has it as their `talk`.
+    fn talker(&self, key: &str) -> Option<EntityId> {
+        let story = self.world.story();
+        let c = story.choices.iter().position(|c| c.key == key)?;
+        self.world.ids().find(|&i| self.world.def(i).talk.is_some_and(|t| t.0 as usize == c))
+    }
+
+    /// WHAT DID SHE SAY?: the last conversation again, or the one with
+    /// someone named (WHAT DID THE KEEPER SAY?).
+    pub(crate) fn last_talk(&mut self, who: &str) {
+        let words = self.phrase_words(who);
+        let pronoun = words.len() == 1 && self.world.story().lexicon.pronouns.iter().any(|p| p == &words[0]);
+        let key = if words.is_empty() || pronoun {
+            self.world.state.last_talk.clone()
+        } else {
+            let named = self.known_called(&words);
+            let Some(&t) = named.first() else { return self.msg("where.unknown", &Ctx::new()) };
+            let key = self.world.def(t).talk.map(|c| self.world.story().choices[c.0 as usize].key.clone());
+            match key.filter(|k| self.world.state.talks.contains_key(k)) {
+                Some(k) => Some(k),
+                None => return self.msg("talk.recall_not_them", &Ctx::new().entity("target", t)),
+            }
+        };
+        let Some(key) = key.filter(|k| self.world.state.talks.get(k).is_some_and(|l| !l.is_empty())) else {
+            return self.msg("talk.recall_none", &Ctx::new());
+        };
+        let who = self.talker(&key).map(|t| self.the(t));
+        let ctx = match who {
+            Some(w) => Ctx::new().text("who", w),
+            None => Ctx::new(),
+        };
+        self.msg_kind(LineKind::Notice, "talk.recall_head", &ctx);
+        for line in self.world.state.talks[&key].clone() {
+            self.push(LineKind::Text, line);
+        }
+    }
+
+    // --------------------------------------------------------------- map
+
+    /// MAP: the places the player has been and their ways out, in words:
+    /// what the website's map shows, here first, then outward.
+    pub(crate) fn text_map(&mut self) {
+        // A map in the game, in view: MAP looks at it.
+        let map_here = self.known_called(&["map".to_string()]).into_iter().find(|&t| self.world.in_scope(t));
+        if map_here.is_some() {
+            // As OOPS does: the command, run as if typed.
+            self.command(vec!["examine".into(), "map".into()]);
+            return;
+        }
+        let w = &self.world;
+        let here = w.here();
+        let visited = &w.state.visited;
+        // Here first, then the places next to those already listed.
+        let mut order = vec![here];
+        let mut i = 0;
+        while i < order.len() {
+            for e in w.def(order[i]).exits.iter().filter(|e| w.exit_visible(e)) {
+                if let Some(to) = e.to.filter(|t| visited.contains(t) && !order.contains(t)) {
+                    order.push(to);
+                }
+            }
+            i += 1;
+        }
+        let rest: Vec<EntityId> = visited.iter().copied().filter(|r| !order.contains(r)).collect();
+        order.extend(rest);
+        order.retain(|r| visited.contains(r) || *r == here);
+        let n = order.len() as i64;
+        self.msg_kind(LineKind::Notice, "map.head", &Ctx::new().value("n", Value::Int(n)));
+        for r in order {
+            // Ways that lead somewhere, as LOOK lists them ("The sea. Not tonight." isn't one).
+            let exits: Vec<eifgb_ir::Exit> = self.world.def(r).exits.iter().filter(|e| e.to.is_some() && self.world.exit_visible(e)).cloned().collect();
+            let mut ways = Vec::new();
+            for e in exits {
+                let dir = self.grammar.direction_word(e.direction);
+                let known = e.to.filter(|t| self.world.state.visited.contains(t));
+                let way = match known {
+                    Some(to) => self.msg_str("map.way_to", &Ctx::new().text("dir", dir).text("room", self.world.def(to).name.clone())),
+                    None => self.msg_str("map.way_new", &Ctx::new().text("dir", dir)),
+                };
+                let way = match e.through {
+                    Some(d) => self.msg_str("map.through", &Ctx::new().text("way", way).entity("door", d).value("closed", Value::Bool(!self.world.flag(d, "open")))),
+                    None => way,
+                };
+                ways.push(way);
+            }
+            let ways = if ways.is_empty() { self.msg_str("map.no_ways", &Ctx::new()) } else { ways.join("; ") };
+            let ctx = Ctx::new().text("room", self.world.def(r).name.clone()).value("here", Value::Bool(r == here)).text("ways", ways);
+            self.msg("map.room", &ctx);
+        }
+    }
+
+    // ---------------------------------------------------- inventory by place
+
+    /// INVENTORY BY PLACE: what's carried, grouped by where it was found.
+    pub(crate) fn inventory_by_place(&mut self) {
+        let held = self.world.inventory();
+        if held.is_empty() {
+            return self.msg("inventory.empty", &Ctx::new());
+        }
+        // In the order the places first come up.
+        let mut groups: Vec<(Option<Option<EntityId>>, Vec<EntityId>)> = Vec::new();
+        for t in held {
+            let from = self.world.state.got.get(&t).copied();
+            match groups.iter_mut().find(|(f, _)| *f == from) {
+                Some((_, list)) => list.push(t),
+                None => groups.push((from, vec![t])),
+            }
+        }
+        // From the start first.
+        groups.sort_by_key(|(f, _)| !matches!(f, Some(None)));
+        for (from, list) in groups {
+            let ctx = Ctx::new().text("list", self.list_a(&list));
+            match from {
+                Some(None) => self.msg("inventory.from_start", &ctx),
+                Some(Some(r)) => self.msg("inventory.from_place", &ctx.text("place", self.world.def(r).name.clone())),
+                None => self.msg("inventory.from_somewhere", &ctx),
+            }
         }
     }
 

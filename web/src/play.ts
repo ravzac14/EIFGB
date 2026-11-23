@@ -2,7 +2,7 @@
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
 import { figure, pictureSrc } from "./pictures.ts";
-import { endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type SaveFile, type Slot } from "./store.ts";
+import { bookmarksFor, endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type Bookmark, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
 import { speak, stopSpeaking } from "./speech.ts";
@@ -15,6 +15,7 @@ const after = $("after");
 const form = $<HTMLFormElement>("prompt");
 const line = $<HTMLInputElement>("line");
 const savesDialog = $<HTMLDialogElement>("saves");
+const bookmarksDialog = $<HTMLDialogElement>("bookmarks");
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
 feedbackButton($("feedback-open"));
 feedbackContext({
@@ -100,6 +101,11 @@ let engine: Engine;
 let files: Files;
 let meta: Meta;
 let saves: ReturnType<typeof savesFor>;
+let bookmarks: ReturnType<typeof bookmarksFor>;
+/** The latest moment in the story: the last command and its reply, as on the page. */
+let moment: HTMLElement[] = [];
+/** Bookmarks made this visit, and where they are on the page. */
+const marked = new Map<number, HTMLElement>();
 /** The game's key in this browser's storage (its saves and endings). */
 let gameKey = "";
 /** The sharing guide's safety section. */
@@ -322,6 +328,13 @@ function handle(o: Output) {
   saves.setAuto(engine.save());
 }
 
+/** The page from `first` to the end: a moment, to bookmark. */
+function momentFrom(first: Element | null) {
+  const out: HTMLElement[] = [];
+  for (let e = first; e; e = e.nextElementSibling) if (!e.classList.contains("diagnostics")) out.push(e as HTMLElement);
+  moment = out;
+}
+
 function send(text: string, echo = text) {
   skipTyping();
   say(echo, "cmd");
@@ -329,6 +342,7 @@ function send(text: string, echo = text) {
   const o = engine.input(text);
   show(o);
   handle(o);
+  momentFrom(start);
   scrollTo(start);
 }
 
@@ -355,7 +369,7 @@ function begin(): boolean {
     p.append(el("a", { href: SAFETY, target: "_blank", rel: "noopener", textContent: "Is that safe?" }));
   }
   showDiagnostics(loaded.diagnostics, "The game has some warnings for its author:");
-  show(loaded.output);
+  momentFrom(show(loaded.output));
   return true;
 }
 
@@ -378,6 +392,7 @@ function defaultName() {
 
 function restoreFrom(save: string) {
   savesDialog.close();
+  bookmarksDialog.close();
   over = false;
   form.hidden = false;
   after.replaceChildren();
@@ -385,9 +400,96 @@ function restoreFrom(save: string) {
   const o = engine.restore(save);
   start.remove();
   const first = show(o);
+  momentFrom(first);
   saves.setAuto(engine.save());
   scrollTo(first);
   line.focus();
+}
+
+// ------------------------------------------------------------ bookmarks
+
+/** A moment as text: "> look", then the reply, a line each. */
+function momentText(els: HTMLElement[]): string[] {
+  return els
+    .map((e) => {
+      if (e.classList.contains("cmd")) return `> ${e.textContent ?? ""}`;
+      if (e.tagName === "FIGURE") return `[Picture: ${e.querySelector("img")?.alt || e.textContent || ""}]`;
+      return e.textContent ?? "";
+    })
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/** Shows a bookmarked moment on the page, if it's still there. */
+function showMarked(b: Bookmark): boolean {
+  const at = marked.get(b.at);
+  if (!at || !log.contains(at)) return false;
+  bookmarksDialog.close();
+  at.scrollIntoView({ block: "start" });
+  at.classList.remove("flash");
+  void at.offsetWidth;
+  at.classList.add("flash");
+  return true;
+}
+
+function openBookmarks() {
+  const render = (open?: number) => {
+    bookmarksDialog.replaceChildren(
+      button("Done", () => bookmarksDialog.close(), "close"),
+      el("h2", { id: "bookmarks-title", textContent: "Bookmarks" }),
+      el("p", { className: "dim", textContent: "Mark a moment to read it again later: your last command and what the game said. Bookmarks are kept in this browser, for this game." }),
+    );
+    const name = document.createElement("input");
+    name.type = "text";
+    name.value = defaultName();
+    name.setAttribute("aria-label", "Bookmark name");
+    const msg = el("p", { className: "dim", role: "status" });
+    const mark = button(
+      "Bookmark this moment",
+      () => {
+        const text = momentText(moment);
+        if (!text.length) return void (msg.textContent = "There's nothing on the page to bookmark yet.");
+        const b: Bookmark = { name: name.value.trim() || defaultName(), at: Date.now(), room: last?.status.room ?? "", turn: last?.status.turns ?? 0, text, save: engine.save() };
+        if (!bookmarks.add(b)) return void (msg.textContent = "There's no room left in this browser.");
+        marked.set(b.at, moment[0]);
+        for (const e of moment) e.classList.add("bookmarked");
+        render();
+      },
+      "primary",
+    );
+    bookmarksDialog.append(el("div", { className: "row" }, name, mark), msg);
+    const list = bookmarks.list();
+    const ul = el("ul", { className: "slots bookmarks" });
+    if (!list.length) ul.append(el("li", { className: "dim", textContent: "No bookmarks yet." }));
+    for (const b of list) {
+      const li = el("li");
+      li.append(el("strong", { textContent: b.name }), el("span", { className: "when", textContent: `${[b.room, `turn ${b.turn}`].filter(Boolean).join(", ")} · ${new Date(b.at).toLocaleString()}` }));
+      const row = el("div", { className: "row" });
+      row.append(
+        button(open === b.at ? "Hide" : "Read", () => render(open === b.at ? undefined : b.at)),
+        button("Go back to this moment", () => {
+          if (confirm(`Go back to “${b.name}”? Where you are now is replaced (your saves are kept).`)) restoreFrom(b.save);
+        }),
+        button("Delete", () => {
+          if (confirm(`Delete the bookmark “${b.name}”?`)) {
+            bookmarks.remove(b.at);
+            render(open);
+          }
+        }),
+      );
+      li.append(row);
+      if (open === b.at) {
+        const passage = el("blockquote", { className: "passage" });
+        for (const t of b.text) passage.append(el("p", { textContent: t, className: t.startsWith("> ") ? "cmd" : "" }));
+        li.append(passage);
+        if (marked.has(b.at) && log.contains(marked.get(b.at)!)) li.append(el("div", { className: "row" }, button("Show it in the story", () => showMarked(b))));
+      }
+      ul.append(li);
+    }
+    bookmarksDialog.append(ul);
+  };
+  render();
+  if (!bookmarksDialog.open) bookmarksDialog.showModal();
 }
 
 function download(slot: Slot) {
@@ -493,6 +595,7 @@ log.addEventListener("click", () => {
   if (!getSelection()?.toString() && !form.hidden) line.focus({ preventScroll: true });
 });
 $("saves-open").addEventListener("click", openSaves);
+$("bookmarks-open").addEventListener("click", openBookmarks);
 mapButton.addEventListener("click", () => showMap(mapBox.hidden));
 $("map-close").addEventListener("click", () => {
   showMap(false);
@@ -517,6 +620,7 @@ async function main() {
     return;
   }
   saves = savesFor(src.key);
+  bookmarks = bookmarksFor(src.key);
   gameKey = src.key;
   // The editor's Play button: always from the beginning.
   if (new URLSearchParams(location.search).has("fresh")) {
@@ -528,7 +632,7 @@ async function main() {
   if (!begin()) return;
   document.title = meta.title;
   $("title").textContent = meta.title;
-  for (const b of ["map-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
+  for (const b of ["map-open", "bookmarks-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
   form.hidden = false;
 
   const auto = saves.auto();
@@ -537,7 +641,7 @@ async function main() {
     if (o.lines.some((l) => l.kind === "notice")) {
       log.replaceChildren();
       say("Welcome back. Here's where you were.", "notice");
-      show(o);
+      momentFrom(show(o));
       say("(Restart, at the top, begins again.)", "notice");
       scrollTo(log.lastElementChild as HTMLElement);
     } else {

@@ -9,6 +9,20 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+## Unreleased
+
+- WHAT DID SHE SAY? (or WHAT DID THE KEEPER SAY?) shows the last
+  conversation again, what you chose too, even in the middle of it.
+- MAP describes the places you've been and the ways out of each in words,
+  for the terminal and screen readers.
+- WHERE IS THE KEY says where you found something you carry (or that
+  you've had it from the start), and INVENTORY BY PLACE groups what you
+  carry by where you found it.
+- Bookmarks, while playing on the website: *Bookmarks → Bookmark this
+  moment* marks your last command and what the game said. Read it again
+  later, even on another visit, jump to it in the story, or go back to that
+  moment in the game.
+
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - New in the editor:

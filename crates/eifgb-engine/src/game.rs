@@ -274,6 +274,10 @@ impl<H: ScriptHost> Game<H> {
     }
 
     fn intro(&mut self) {
+        // What the player starts with, they've had from the start.
+        for t in self.world.inventory_all() {
+            self.world.state.got.insert(t, None);
+        }
         let title = self.world.story().meta.title.clone();
         self.push(LineKind::Banner, title);
         if let Some(intro) = self.world.story().intro.clone() {
@@ -307,6 +311,10 @@ impl<H: ScriptHost> Game<H> {
             if !self.world.is_within(t, PLAYER) && self.world.touchable_here(t) {
                 self.world.state.located.insert(t, here);
             }
+        }
+        // Where the player first came to have each thing they carry.
+        for t in self.world.inventory_all() {
+            self.world.state.got.entry(t).or_insert(Some(here));
         }
         let mut out = std::mem::take(&mut self.out);
         out.status = Status {
@@ -711,6 +719,12 @@ impl<H: ScriptHost> Game<H> {
                 self.msg_kind(LineKind::Notice, if self.world.state.brief { "brief.on" } else { "verbose.on" }, &ctx);
             }
             BuiltinAction::Recap => self.recap(),
+            BuiltinAction::LastTalk => {
+                let who = self.last_text.take().unwrap_or_default();
+                self.last_talk(&who);
+            }
+            BuiltinAction::Map => self.text_map(),
+            BuiltinAction::InventoryByPlace => self.inventory_by_place(),
             BuiltinAction::Quit => self.out.quit_requested = true,
             other => unreachable!("{other:?} is not a meta action"),
         }
@@ -1102,7 +1116,11 @@ impl<H: ScriptHost> Game<H> {
         self.world.state.choice = Some(ChoiceCursor { choice: ChoiceId(idx as u32), node: start });
         let topic = self.topic.take();
         let shown = self.out.lines.len();
+        // A new conversation with them: what's said is kept, for WHAT DID SHE SAY?
+        self.world.state.talks.insert(key.to_string(), Vec::new());
+        self.world.state.last_talk = Some(key.to_string());
         self.enter_node();
+        self.keep_talk(key, shown);
         // ASK ABOUT THE GATE: straight to what was asked about, without
         // listing the options first.
         if let Some(i) = topic.and_then(|t| self.topic_option(&t)) {
@@ -1181,17 +1199,22 @@ impl<H: ScriptHost> Game<H> {
     }
 
     fn choice_input(&mut self, line: &str) {
-        // UNDO, SAVE, RESTORE, RESTART and QUIT still work inside a choice.
+        // UNDO, SAVE, RESTORE, RESTART and QUIT still work inside a choice,
+        // and WHAT DID SHE SAY?
         let toks: Vec<String> = self.grammar.split_commands(line).concat();
         if let Parsed::Command(cmd) = self.grammar.parse(&self.world, &self.grammar.normalize(toks.clone()))
             && let VerbAction::Builtin(a) = self.world.story().verbs[cmd.verb].action
             && matches!(
                 a,
-                BuiltinAction::Undo | BuiltinAction::Save | BuiltinAction::Restore | BuiltinAction::Restart | BuiltinAction::Quit
+                BuiltinAction::Undo | BuiltinAction::Save | BuiltinAction::Restore | BuiltinAction::Restart | BuiltinAction::Quit | BuiltinAction::LastTalk
             )
         {
             self.last_text = cmd.text.clone();
             self.meta(a);
+            // Still choosing: the options again.
+            if a == BuiltinAction::LastTalk && self.world.state.choice.is_some() {
+                self.show_options();
+            }
             return;
         }
 
@@ -1222,6 +1245,11 @@ impl<H: ScriptHost> Game<H> {
     pub(crate) fn take_option(&mut self, index: usize, before: Option<crate::state::GameState>) {
         let cur = self.world.state.choice.expect("a choice is open");
         let opt = self.world.story().choice(cur.choice).nodes[cur.node as usize].options[index].clone();
+        let key = self.world.story().choice(cur.choice).key.clone();
+        let said = self.render_str(&opt.text, &Ctx::new());
+        let you = self.msg_str("talk.recall_you", &Ctx::new().text("text", said));
+        self.world.state.talks.entry(key.clone()).or_default().push(you);
+        let shown = self.out.lines.len();
         if let Some(s) = &opt.say {
             self.render_line(LineKind::Text, s, &Ctx::new());
         }
@@ -1233,6 +1261,7 @@ impl<H: ScriptHost> Game<H> {
         }
 
         if self.end_requested.is_some() {
+            self.keep_talk(&key, shown);
             self.world.state.choice = None;
             self.settle();
             return;
@@ -1248,6 +1277,7 @@ impl<H: ScriptHost> Game<H> {
                 Next::Stay => self.show_options(),
             }
         }
+        self.keep_talk(&key, shown);
         self.settle();
     }
 

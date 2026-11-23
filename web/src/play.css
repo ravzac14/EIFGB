@@ -97,3 +97,13 @@ figure.picture p { margin: 0; }
 .pmap .room.here rect { stroke: var(--accent); stroke-width: 3; }
 .pmap .room.here text { font-weight: bold; }
 #map-open[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+/* Bookmarks: a mark beside a bookmarked moment, a flash when it's shown,
+   and the moment as it was, in the list. */
+.log .bookmarked { border-left: 3px solid var(--accent); padding-left: 0.6rem; margin-left: -0.9rem; }
+.log .flash { animation: flash 1.6s ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, var(--accent) 25%, transparent); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .log .flash { animation: none; outline: 2px solid var(--accent); } }
+.bookmarks-dialog .passage { margin: 0.5rem 0 0; padding: 0.4rem 0.8rem; border-left: 3px solid var(--line); font-family: var(--serif); max-height: 40vh; overflow: auto; }
+.bookmarks-dialog .passage p { margin: 0.3rem 0; }
+.bookmarks-dialog .passage .cmd { font-style: italic; color: var(--dim); }

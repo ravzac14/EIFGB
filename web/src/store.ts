@@ -179,6 +179,31 @@ export function savesFor(game: string) {
   };
 }
 
+// ------------------------------------------------------------ bookmarks
+
+/** A moment in the story the player marked, to read again (or go back to). */
+export interface Bookmark {
+  name: string;
+  at: number;
+  room: string;
+  turn: number;
+  /** What was on the page: the command ("> look") and the reply, a line each. */
+  text: string[];
+  /** The game as it was then, to go back to. */
+  save: string;
+}
+
+/** Bookmarks for one game, newest first. */
+export function bookmarksFor(game: string) {
+  return {
+    list: () => read<Bookmark[]>(`bookmarks:${game}`, []).sort((a, b) => b.at - a.at),
+    /** False if there's no room. */
+    add: (b: Bookmark) => write(`bookmarks:${game}`, [b, ...read<Bookmark[]>(`bookmarks:${game}`, [])]),
+    remove: (at: number) => write(`bookmarks:${game}`, read<Bookmark[]>(`bookmarks:${game}`, []).filter((b) => b.at !== at)),
+    rename: (at: number, name: string) => write(`bookmarks:${game}`, read<Bookmark[]>(`bookmarks:${game}`, []).map((b) => (b.at === at ? { ...b, name } : b))),
+  };
+}
+
 // ------------------------------------------------------------- the map
 
 /** Whether the player's map panel is open; `null` until they've chosen. */

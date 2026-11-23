@@ -8,6 +8,8 @@ import {
 import { THING_DRAG, factionHue } from "./map.ts";
 import { pictureSection } from "./picture-ui.ts";
 import { describeWords } from "./describe-words.ts";
+import { foldSections } from "./fold.ts";
+import { gettingStartedHidden } from "../store.ts";
 
 /** A description field, with the words in it players can use (and nouns that aren't anything yet) underneath. */
 function withWords(ctx: InspectorContext, owner: { room: string } | { thing: string } | { character: string }, parts: HTMLElement[]): HTMLElement[] {
@@ -15,26 +17,31 @@ function withWords(ctx: InspectorContext, owner: { room: string } | { thing: str
   // string to type over: it's edited in the file, so nothing is lost here.
   const [section, id] = "room" in owner ? ["rooms", owner.room] : "thing" in owner ? ["objects", owner.thing] : ["characters", owner.character];
   const raw = ctx.model.get([section, id, "description"]);
+  const vary = button("Say something different each time…", () => ctx.change((x) => x.set([section, id, "description"], [input?.value ?? "", ""])), "link small-link");
+  vary.title = "Each in turn, the first time and then another, round and round, or at random";
   if (raw !== undefined && raw !== null && typeof raw !== "string") {
-    return [
-      el("label", { textContent: "Description" }),
-      el("p", { class: "note", textContent: "This description varies each time it's shown (a list, first and later, cycle or random), so it's edited in the game file." }),
-      el("div", { class: "actions" }, button("Show it in the file", () => ctx.showInFile(`${id}:`))),
-    ];
+    // Varied: how, and a box for each line.
+    return proseField(ctx, [section, id, "description"], "Description", "", () => {}, { multiline: true });
   }
   const input = parts.find((p) => p instanceof HTMLTextAreaElement) as HTMLTextAreaElement | undefined;
-  return input ? [...parts, describeWords(ctx, owner, input)] : parts;
+  return input ? [...parts, el("div", { class: "vary-link" }, vary), describeWords(ctx, owner, input)] : parts;
 }
 import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
-import { boolField, button, cap, check, el, field, help, idFollows, numField, roomName, select, type InspectorContext } from "./ui.ts";
+import { boolField, button, cap, check, el, field, help, idFollows, numField, proseField, roomName, select, type InspectorContext } from "./ui.ts";
 
 export type { InspectorContext } from "./ui.ts";
 
 
 export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   panel.replaceChildren();
+  drawPanel(panel, ctx);
+  // The essentials first; everything else folded, saying what's set in it.
+  foldSections(panel, ctx.selection?.kind ?? "game");
+}
+
+function drawPanel(panel: HTMLElement, ctx: InspectorContext) {
   const s = ctx.selection;
   if (s?.kind === "room" && ctx.model.room(s.id)) return roomPanel(panel, ctx, s.id);
   if (s?.kind === "exit" && ctx.model.exit(s.room, s.dir)) return exitPanel(panel, ctx, s.room, s.dir);
@@ -48,6 +55,35 @@ export function renderInspector(panel: HTMLElement, ctx: InspectorContext) {
   if (s?.kind === "choice" && ctx.model.choice(s.id)) return choicePanel(panel, ctx, s.id);
   if (s?.kind === "verb" && ctx.model.ids("verbs").includes(s.id)) return verbPanel(panel, ctx, s.id);
   gamePanel(panel, ctx);
+}
+
+/**
+ * For a new game: the few steps to a game that can be played and won,
+ * each ticked off as it's done. Gone once they all are.
+ */
+function gettingStarted(ctx: InspectorContext): HTMLElement[] {
+  const m = ctx.model;
+  const text = m.toString();
+  const steps: [boolean, string, string][] = [
+    [m.title() !== "My Game", "Give it a title", "Below, in Title."],
+    [m.roomIds().length >= 2, "Add a second room", "Click the room on the map, then a + beside it."],
+    [m.things().some((t) => !t.traits.includes("door")), "Put something in a room", "Select a room, and add a thing under In this room."],
+    [m.ids("endings").length > 0 && (/end_game\(|\bend: /.test(text)), "Add an ending, and something that leads to it", "Add component → Ending, then end_game(\"…\") in a script (when the player eats the apple, say)."],
+    [ctx.hasWalkthrough(), "Win it in Test play, and save the walkthrough", "Test play, at the bottom: play to the end, then Save as walkthrough. After that, every change is checked."],
+  ];
+  if (steps.every(([done]) => done) || gettingStartedHidden.get()) return [];
+  const ol = el("ol", { class: "started" });
+  for (const [done, what, how] of steps) ol.append(el("li", { class: done ? "done" : "" }, el("span", { class: "tick", textContent: done ? "✓" : "" }), el("strong", { textContent: what }), done ? "" : el("span", { class: "help", textContent: ` ${how}` })));
+  const hide = button(
+    "Don't show this again",
+    () => {
+      // For every game in this browser; "Drawing the map", below, brings it back.
+      gettingStartedHidden.set(true);
+      ctx.select(null);
+    },
+    "link small-link",
+  );
+  return [el("h3", { textContent: "Getting started" }), ol, el("div", { class: "actions" }, hide)];
 }
 
 /** A row of swatches: the room's colour on the map, to group rooms into regions. */
@@ -118,6 +154,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
   panel.append(
     el("p", { class: "kind", textContent: "Your game" }),
     el("h2", { textContent: m.title() }),
+    ...gettingStarted(ctx),
     ...field("Title", str(["game", "title"]), (v) => ctx.change((x) => x.set(["game", "title"], v), { coalesce: "title", redraw: false })),
     ...field("Author", str(["game", "author"]), (v) => ctx.change((x) => x.set(["game", "author"], v || undefined), { coalesce: "author", redraw: false }), {
       placeholder: "Your name (optional)",
@@ -158,6 +195,9 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
   scriptsSection(panel, ctx, [], "game");
   panel.append(
     el("h3", { textContent: "Drawing the map" }),
+    ...(gettingStartedHidden.get()
+      ? [el("div", { class: "actions" }, button("Show the Getting started checklist again", () => (gettingStartedHidden.set(false), ctx.select(null)), "link small-link"))]
+      : []),
     el(
       "ul",
       { class: "tips" },
@@ -219,13 +259,6 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       if (v) ctx.change((x) => x.set(["game", "start"], id));
       else ctx.change(() => {}); // a game needs a start: keep it, and redraw
     }),
-    check("It's dark: the player needs a light to see", r.dark, (v) => ctx.change((x) => x.set(["rooms", id, "dark"], v || undefined))),
-    check("Lists its exits after the description", m.bool(["rooms", id, "list_exits"], m.bool(["settings", "list_exits"], true)), (v) =>
-      ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
-    ),
-    colourPicker(ctx, id),
-    ...roomBehaviour(ctx, id),
-    ...pictureSection(ctx, ["rooms", id], "room"),
     el("h3", { textContent: "Ways out" }),
   );
   if (exits.length) panel.append(el("ul", { class: "exits" }, ...exits.map((e) => exitLine(ctx, id, e))));
@@ -264,6 +297,15 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     el("h3", { textContent: "People and creatures" }),
     peopleList(ctx, m.peopleIn(id), "Nobody here yet."),
     addPersonRow(ctx, id),
+    // Less often needed: folded, each saying what's set.
+    el("h3", { textContent: "Light, sound and the map" }),
+    check("It's dark: the player needs a light to see", r.dark, (v) => ctx.change((x) => x.set(["rooms", id, "dark"], v || undefined))),
+    check("Lists its exits after the description", m.bool(["rooms", id, "list_exits"], m.bool(["settings", "list_exits"], true)), (v) =>
+      ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
+    ),
+    colourPicker(ctx, id),
+    ...roomBehaviour(ctx, id),
+    ...pictureSection(ctx, ["rooms", id], "room"),
   );
   scriptsSection(panel, ctx, ["rooms", id], "room");
 
@@ -649,7 +691,6 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       multiline: true,
       placeholder: "What the player sees when they examine it.",
     })),
-    ...pictureSection(ctx, ["objects", id], "thing"),
     ...field("Other words for it", t.synonyms.join(", "), (v) => ctx.change((x) => x.setList(["objects", id, "synonyms"], v.split(",")), { coalesce: `tsyn:${id}`, redraw: false }), {
       placeholder: "money, treasure",
       help: "Words in its name already work. Separate others with commas.",
@@ -702,6 +743,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
 
   // Hidden until found.
+  panel.append(...pictureSection(ctx, ["objects", id], "thing"));
   panel.append(el("h3", { textContent: "Hidden" }), state("Hidden until the player finds it", "hidden", t.hidden));
   if (t.hidden) {
     const simple = t.revealedBy.length <= 1 && (t.revealedBy[0] ?? "").trim().split(/\s+(?![^(]*\))/).length <= 2;
@@ -865,6 +907,33 @@ function addPersonRow(ctx: InspectorContext, room: string | null): HTMLElement {
 
 
 
+/** A daily routine: where they should be, by the clock. */
+function routineRows(ctx: InspectorContext, id: string): HTMLElement[] {
+  const m = ctx.model;
+  const path = ["characters", id, "routine"];
+  const rows = m.pairs(path);
+  const out: HTMLElement[] = [el("label", { textContent: "A daily routine" })];
+  if (m.get(["clock"]) === undefined) {
+    out.push(help("Where they go at what time of day: the baker in the bakery from 6:00, the square from 13:00. It needs the time of day."), el("div", { class: "actions" }, button("Keep the time of day", () => ctx.change((x) => x.addClock()))));
+    return out;
+  }
+  const write = (next: [string, string][]) => ctx.change((x) => x.setPairs(path, next));
+  const rooms = m.rooms().map((r): [string, string] => [r.id, r.name]);
+  const list = el("ul", { class: "routine" });
+  rows.forEach(([time, room], i) => {
+    const t = el("input", { type: "text", value: time, ariaLabel: "From (a time)", placeholder: "6:00", class: "time" }) as HTMLInputElement;
+    t.addEventListener("change", () => write(rows.map((r, j) => (j === i ? [t.value, r[1]] : r))));
+    const where = select(rooms, room, (v) => write(rows.map((r, j) => (j === i ? [r[0], v] : r))), "Goes to");
+    list.append(el("li", {}, "From ", t, " in ", where, button("✕", () => write(rows.filter((_, j) => j !== i)), "small")));
+  });
+  out.push(
+    list,
+    el("div", { class: "actions" }, button("+ Add a time", () => write([...rows, [rows.length ? "18:00" : "8:00", m.character(id)?.in ?? rooms[0]?.[0] ?? ""]]))),
+    help(rows.length ? "Each turn they head for the latest place whose time has come, and stay there. Fights, fear and orders come first." : "Where they go at what time of day, a room at a time: the baker in the bakery from 6:00, the square from 13:00."),
+  );
+  return out;
+}
+
 function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   const m = ctx.model;
   const c = m.character(id)!;
@@ -901,15 +970,6 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       multiline: true,
       placeholder: "What the player sees when they look at them.",
     })),
-    ...pictureSection(ctx, p, "character"),
-    el("label", { textContent: "How they feel about the player" }),
-    select(
-      [["", "Neutral (the usual)"], ["hostile", "Hostile: won't talk or trade; may fight"], ["wary", "Wary: dearer to buy from"], ["friendly", "Friendly: cheaper"], ["devoted", "Devoted: cheapest of all"]],
-      typeof get("disposition") === "string" ? String(get("disposition")) : typeof get("disposition") === "number" ? ({ [-5]: "hostile", [-2]: "wary", 2: "friendly", 5: "devoted" } as Record<number, string>)[get("disposition") as number] ?? "" : "",
-      (v) => ctx.change((x) => x.set([...p, "disposition"], v || undefined)),
-      "How they feel about the player",
-    ),
-    help("At the start. Gifts they like, apologies and kind words warm them; attacks, insults and theft cool them. Scripts read self.disposition (-10 to 10) and self.feeling."),
     ...field("Other words for them", c.synonyms.join(", "), (v) => ctx.change((x) => x.setList([...p, "synonyms"], v.split(",")), { coalesce: `csyn:${id}`, redraw: false }), {
       placeholder: "woman, crone",
     }),
@@ -918,6 +978,7 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     el("h3", { textContent: "What they do" }),
     behaviors,
     help(BEHAVIOR_TEXT[behavior][1]),
+    ...routineRows(ctx, id),
   );
 
   // What their behaviour needs.
@@ -952,6 +1013,14 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   // Talking.
   const choices = m.choiceIds();
   panel.append(
+    el("h3", { textContent: "How they feel about the player" }),
+    select(
+      [["", "Neutral (the usual)"], ["hostile", "Hostile: won't talk or trade; may fight"], ["wary", "Wary: dearer to buy from"], ["friendly", "Friendly: cheaper"], ["devoted", "Devoted: cheapest of all"]],
+      typeof get("disposition") === "string" ? String(get("disposition")) : typeof get("disposition") === "number" ? ({ [-5]: "hostile", [-2]: "wary", 2: "friendly", 5: "devoted" } as Record<number, string>)[get("disposition") as number] ?? "" : "",
+      (v) => ctx.change((x) => x.set([...p, "disposition"], v || undefined)),
+      "How they feel about the player",
+    ),
+    help("At the start. Gifts they like, apologies and kind words warm them; attacks, insults and theft cool them. Scripts read self.disposition (-10 to 10) and self.feeling."),
     el("h3", { textContent: "Talking" }),
     el("label", { textContent: "TALK TO them starts" }),
     select(
@@ -1007,6 +1076,7 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // What they carry.
   panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
+  panel.append(...pictureSection(ctx, p, "character"));
 
   scriptsSection(panel, ctx, p, "character");
 

@@ -488,6 +488,7 @@ function inspectorContext(model: Model): InspectorContext {
         .map((file) => ({ file, bytes: fileBytes(project.files[file]), usedBy: users.get(file) ?? [] }));
     },
     storage: storageUse,
+    hasWalkthrough: () => project.files[WALKTHROUGH] !== undefined,
     dropPicture: (file) => {
       if (project.files[file] === undefined || model?.toString().includes(file)) return;
       const { [file]: _gone, ...rest } = project.files;

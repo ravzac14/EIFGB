@@ -37,6 +37,8 @@ export interface InspectorContext {
   pictureUrl(file: string): string | null;
   /** The game's own pictures: each file, its size, and what shows it ("Room Attic"). */
   pictures(): { file: string; bytes: number; usedBy: { owner: string[]; name: string }[] }[];
+  /** Whether the game has a walkthrough yet (walkthrough.txt). */
+  hasWalkthrough(): boolean;
   /** How much of the browser's storage is used, and about how much there is, in bytes. */
   storage(): { used: number; limit: number };
   /** Deletes a picture file nothing uses any more. */
@@ -80,19 +82,74 @@ export function field(
   return out;
 }
 
+type Vary = "stop" | "first" | "cycle" | "random";
+const VARY: [Vary, string][] = [
+  ["stop", "Each in turn, then the last from then on"],
+  ["first", "The first time, then another"],
+  ["cycle", "Round and round"],
+  ["random", "At random (never twice in a row)"],
+];
+
+/** Varied text as written: how it varies, and its lines. Null for plain text. */
+export function readVaried(raw: unknown): { how: Vary; lines: string[] } | null {
+  const v = raw && typeof raw === "object" && "toJSON" in raw ? (raw as { toJSON(): unknown }).toJSON() : raw;
+  if (Array.isArray(v)) return { how: "stop", lines: v.map(String) };
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    if (Array.isArray(o.cycle)) return { how: "cycle", lines: o.cycle.map(String) };
+    if (Array.isArray(o.random)) return { how: "random", lines: o.random.map(String) };
+    if (typeof o.first === "string") return { how: "first", lines: [o.first, ...(typeof o.later === "string" ? [o.later] : [])] };
+  }
+  return null;
+}
+
+/** Varied text as it's written in the file. */
+function writeVaried(how: Vary, lines: string[]): unknown {
+  if (how === "first") return lines[1] !== undefined ? { first: lines[0] ?? "", later: lines[1] } : { first: lines[0] ?? "" };
+  if (how === "cycle") return { cycle: lines };
+  if (how === "random") return { random: lines };
+  return lines;
+}
+
 /**
- * A text field, unless the text at `path` varies (a list, first and later,
- * cycle, random): then a note, and a way to it in the file, so typing here
- * can't flatten it.
+ * Text that can vary each time it's shown: one box, with a way to make it
+ * vary; or, when it does, how it varies and a box for each line.
  */
 export function proseField(ctx: InspectorContext, path: (string | number)[], ...args: Parameters<typeof field>): HTMLElement[] {
-  const raw = ctx.model.get(path);
-  if (raw === undefined || raw === null || typeof raw === "string") return field(...args);
-  return [
-    el("label", { textContent: args[0] }),
-    el("p", { class: "note", textContent: "This text varies each time it's shown (a list, first and later, cycle or random), so it's edited in the game file." }),
-    el("div", { class: "actions" }, button("Show it in the file", () => ctx.showInFile(`${String(path[1])}:`))),
-  ];
+  const [label, value, , opts = {}] = args;
+  const varied = readVaried(ctx.model.get(path));
+  if (!varied) {
+    const out = field(...args);
+    const vary = button("Say something different each time…", () => ctx.change((x) => x.set(path, [value || "", ""])), "link small-link");
+    vary.title = "Each in turn, the first time and then another, round and round, or at random";
+    // After the field's help, if any.
+    out.push(el("div", { class: "vary-link" }, vary));
+    return out;
+  }
+  const { how, lines } = varied;
+  const write = (h: Vary, l: string[]) => ctx.change((x) => x.set(path, writeVaried(h, l)), { coalesce: `vary:${path.join(".")}`, redraw: false });
+  const out: HTMLElement[] = [el("label", { textContent: `${label}, varying` })];
+  const kind = select(VARY.map(([v, t]) => [v, t]), how, (v) => ctx.change((x) => x.set(path, writeVaried(v as Vary, v === "first" ? lines.slice(0, 2) : lines))), "How it varies");
+  out.push(kind);
+  const list = el("ol", { class: "vary-lines" });
+  lines.forEach((line, i) => {
+    const ta = el("textarea", { value: line, rows: 2, spellcheck: true, ariaLabel: `${label}, line ${i + 1}`, placeholder: i === 0 ? (opts.placeholder ?? "") : how === "first" ? "Said from then on" : "" }) as HTMLTextAreaElement;
+    ta.addEventListener("input", () => write(how, lines.map((l, j) => (j === i ? ta.value : l))));
+    const remove = button("✕", () => ctx.change((x) => x.set(path, lines.length > 2 ? writeVaried(how, lines.filter((_, j) => j !== i)) : lines.filter((_, j) => j !== i)[0] ?? "")), "small");
+    remove.title = "Take this line out";
+    list.append(el("li", {}, ta, remove));
+  });
+  out.push(list);
+  out.push(
+    el(
+      "div",
+      { class: "actions" },
+      ...(how === "first" && lines.length >= 2 ? [] : [button("+ Add a line", () => ctx.change((x) => x.set(path, writeVaried(how, [...lines, ""]))))]),
+      button("Make it plain again", () => ctx.change((x) => x.set(path, lines[0] || undefined))),
+    ),
+  );
+  if (opts.help) out.push(help(opts.help));
+  return out;
 }
 
 export function check(label: string, checked: boolean, onchange: (v: boolean) => void) {

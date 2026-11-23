@@ -250,3 +250,9 @@ export const mapTheme = {
   get: (): MapTheme => (read<string>("map-theme", "site") === "blueprint" ? "blueprint" : "site"),
   set: (t: MapTheme) => void write("map-theme", t),
 };
+
+/** Whether the editor's Getting started checklist is hidden, for every game in this browser. */
+export const gettingStartedHidden = {
+  get: (): boolean => read<boolean>("getting-started-hidden", false),
+  set: (hidden: boolean) => void write("getting-started-hidden", hidden),
+};

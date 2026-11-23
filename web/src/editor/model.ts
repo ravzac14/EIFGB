@@ -899,6 +899,11 @@ export class Model {
     this.doc.setIn(["hints", id, "steps"], seq);
   }
 
+  /** A scene: a named stretch of the story, from a condition to another. */
+  addScene(title = "A new scene"): string {
+    return this.addEntry("scenes", title, { title, when: "false", done: "false" }, ["goals", "hints", "timers", "endings", "choices", "characters", "objects", "rooms"]);
+  }
+
   /** A goal for the journal, named from its first few words. */
   addGoal(text = "Something to do."): string {
     const name = text.replace(/[^\p{L}\p{N}\s]/gu, " ").trim().split(/\s+/).slice(0, 3).join(" ") || "goal";
@@ -1261,6 +1266,22 @@ export class Model {
   setPicture(owner: string[], file: string | null, alt: string) {
     if (!file) return this.set([...owner, "picture"], undefined);
     this.set([...owner, "picture"], alt.trim() ? { file, alt } : file);
+  }
+
+  /** A small map's entries, as text: a routine's `"6:00": bakery`. */
+  pairs(path: (string | number)[]): [string, string][] {
+    const m = this.map(path);
+    if (!m) return [];
+    return m.items.map((p) => [String(isScalar(p.key) ? p.key.value : p.key), String(isScalar(p.value) ? p.value.value : (p.value ?? ""))]);
+  }
+
+  /** Sets a small map from entries (empty: removes it), in flow style: `{ "6:00": bakery }`. */
+  setPairs(path: (string | number)[], pairs: [string, string][]) {
+    const kept = pairs.filter(([k, v]) => k.trim() && v.trim());
+    if (!kept.length) return this.set(path, undefined);
+    const node = this.doc.createNode(Object.fromEntries(kept.map(([k, v]) => [k.trim(), v.trim()]))) as YAMLMap;
+    node.flow = true;
+    this.doc.setIn(path, node);
   }
 
   /** The game's aliases: its own words for words the game knows. */

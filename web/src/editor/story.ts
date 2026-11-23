@@ -222,6 +222,33 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
     })),
   );
 
+  // Scenes: stretches of the story, each edited where it's listed.
+  const scenes = m.ids("scenes");
+  const sceneCards = scenes.map((sid) => {
+    const sp = ["scenes", sid];
+    const val = (k: string) => String(m.get([...sp, k]) ?? "");
+    return el(
+      "details",
+      { class: "scene" },
+      el("summary", { textContent: val("title") || sid.replace(/_/g, " ") }),
+      ...field("Called", val("title"), (v) => ctx.change((x) => x.set([...sp, "title"], v || undefined), { coalesce: `${sid}.title`, redraw: false }), { help: "For RECAP: “Now: The storm.”" }),
+      el("label", { textContent: "Begins when (Lua)" }),
+      codeBox(val("when"), (v) => ctx.change((x) => x.set([...sp, "when"], v.trim() || undefined), { coalesce: `${sid}.when`, redraw: false }), "Begins when", 1),
+      ...field("Said when it begins", val("begins"), (v) => ctx.change((x) => x.set([...sp, "begins"], v || undefined), { coalesce: `${sid}.begins`, redraw: false }), { placeholder: "The first drops of rain hit the cobbles." }),
+      el("label", { textContent: "Ends when (Lua)" }),
+      codeBox(val("done"), (v) => ctx.change((x) => x.set([...sp, "done"], v.trim() || undefined), { coalesce: `${sid}.done`, redraw: false }), "Ends when", 1),
+      ...field("Said when it ends", val("ends"), (v) => ctx.change((x) => x.set([...sp, "ends"], v || undefined), { coalesce: `${sid}.ends`, redraw: false }), { placeholder: "The storm blows itself out." }),
+      help(`Scripts: scenes.${sid} is nil, "running" or "done"; start_scene("${sid}"), end_scene("${sid}").`),
+      el("div", { class: "actions" }, button("Delete this scene", () => confirm(`Delete the scene “${val("title") || sid}”?`) && ctx.change((x) => x.deleteEntry("scenes", sid)), "danger")),
+    );
+  });
+  group(
+    "Scenes",
+    el("ul", { class: "things" }, ...sceneCards.map((c) => el("li", {}, c))),
+    ...(scenes.length ? [] : [help("Named stretches of the story, from a condition to another: the morning rush, the storm, the chase. RECAP says which is going on.")]),
+    el("div", { class: "actions" }, button("Add a scene", () => ctx.change((x) => x.addScene()))),
+  );
+
   // The time of day.
   const clock = m.get(["clock"]) !== undefined;
   const time = (k: string, label: string, byDefault: string, helpText: string) =>

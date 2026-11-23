@@ -22,12 +22,15 @@ const DETERMINERS = new Set(["a", "an", "the", "some", "its", "his", "her", "the
 const STOP = new Set([
   "and", "or", "but", "of", "with", "in", "on", "at", "to", "from", "by", "for", "into", "onto", "over", "under", "behind", "through", "across", "beside", "near",
   "is", "are", "was", "were", "be", "been", "has", "have", "had", "it", "that", "which", "who", "where", "when", "as", "than", "then", "so", "if", "not",
-  "nearby", "here", "there", "away", "above", "below", "ahead", "again", "too", "still", "now", "very",
+  "nearby", "here", "there", "away", "above", "below", "ahead", "again", "too", "still", "now", "very", "off", "back", "around", "apart", "together",
+  "would", "could", "should", "can", "will", "may", "might", "must", "shall", "does", "did", "do",
 ]);
+/** Words that often follow a verb as an adverb: "starts here", "hangs open". */
+const AFTER_VERB_ADVERB = new Set(["here", "there", "away", "nearby", "above", "below", "ahead", "again", "still", "off", "back", "around", "apart", "together", "open", "shut", "slowly", "quietly"]);
 /** Words that often follow a verb: "climbs north", "shivers in", "hang by". */
 const AFTER_VERB = new Set(["in", "on", "at", "to", "into", "onto", "over", "under", "through", "across", "beside", "near", "by", "from", "toward", "towards", "around", "along", "past", "against", "about", "off", "out", "up", "down"]);
 /** Nouns too vague to be things. */
-const VAGUE = new Set(["way", "ways", "side", "sides", "top", "bottom", "edge", "end", "rest", "moment", "time", "place", "thing", "things", "bit", "kind", "sort", "lot", "air", "distance", "while", "middle", "direction", "smell", "sound", "light", "dark", "darkness", "silence", "corner"]);
+const VAGUE = new Set(["mile", "miles", "inch", "inches", "hour", "hours", "minute", "minutes", "day", "days", "year", "years", "way", "ways", "side", "sides", "top", "bottom", "edge", "end", "rest", "moment", "time", "place", "thing", "things", "bit", "kind", "sort", "lot", "air", "distance", "while", "middle", "direction", "smell", "sound", "light", "dark", "darkness", "silence", "corner"]);
 const DIRECTIONS = new Set(["north", "south", "east", "west", "northeast", "northwest", "southeast", "southwest", "up", "down", "in", "out", "inside", "outside"]);
 
 const singular = (w: string) => (w.endsWith("ies") ? `${w.slice(0, -3)}y` : w.endsWith("es") && /(s|x|ch|sh)es$/.test(w) ? w.slice(0, -2) : w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
@@ -69,7 +72,7 @@ export function readDescription(text: string, known: Map<string, string>, skip: 
     // The word after it, if the phrase ran to its length.
     if (!next) for (let j = phrase[phrase.length - 1] + 1; j < words.length && !next; j++) if (isWord(j)) next = lower[j];
     // "A narrow path climbs north": an -s word before a direction or "in" is a verb.
-    if (phrase.length >= 2 && (AFTER_VERB.has(next) || DIRECTIONS.has(next)) && /[^s]s$/.test(lower[phrase[phrase.length - 1]])) phrase.pop();
+    if (phrase.length >= 2 && (AFTER_VERB.has(next) || DIRECTIONS.has(next) || AFTER_VERB_ADVERB.has(next)) && /[^s]s$/.test(lower[phrase[phrase.length - 1]])) phrase.pop();
     // "its lamp dark": the vague word isn't the noun.
     while (phrase.length > 1 && VAGUE.has(lower[phrase[phrase.length - 1]])) phrase.pop();
     heads.add(phrase[phrase.length - 1]);

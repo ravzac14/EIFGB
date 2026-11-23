@@ -47,6 +47,16 @@ $("#new-game").click();
 await tick();
 assert.equal($("#workspace").hidden, false);
 assert.equal(document.querySelectorAll("#map .room").length, 1);
+// The steps to a first game, none done yet.
+const firstSteps = [...document.querySelectorAll("#inspector .started li")];
+assert.deepEqual(firstSteps.map((li) => li.querySelector("strong").textContent), ["Give it a title", "Add a second room", "Put something in a room", "Add an ending, and something that leads to it", "Win it in Test play, and save the walkthrough"]);
+assert.equal(document.querySelectorAll("#inspector .started li.done").length, 0);
+// Not wanted: hidden, for every game in this browser, until brought back.
+[...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Don't show this again").click();
+assert.equal($("#inspector .started"), null);
+assert.equal(localStorage.getItem("eifgb:getting-started-hidden"), "true");
+[...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Show the Getting started checklist again").click();
+assert.equal(document.querySelectorAll("#inspector .started li").length, 5);
 
 // Select the room; its + handles appear. Click the north one: a new room, joined both ways.
 press($('#map [data-room="first_room"]'));
@@ -376,7 +386,9 @@ assert.equal($("#inspector .kind").textContent, "Character");
 // A shopkeeper, with something for sale.
 press($('#map [data-room="first_room"]'));
 typeName(addPerson("merchant"), "Old Meg");
-const sale = [...document.querySelectorAll("#inspector .add.two")].at(-1);
+// The add row under "For sale".
+let sale = [...document.querySelectorAll("#inspector h3")].find((h) => h.textContent === "For sale");
+while (sale && !sale.matches(".add.two")) sale = sale.nextElementSibling;
 sale.querySelector("button").click();
 typeName(document.activeElement, "lantern oil");
 const price = [...document.querySelectorAll("#inspector label")].find((l) => l.textContent.startsWith("Price")).nextElementSibling;
@@ -868,6 +880,52 @@ await tick(50);
 await tick(100);
 assert.match(tp.querySelector(".tp-wander").textContent, /2000 random moves over \d+ games?, apart from yours/);
 assert.match(tp.querySelector(".tp-wander summary").textContent, /no script errors/);
+
+// Panels: the essentials first, the rest folded, saying what's set.
+press($('#map [data-room="forge"]'));
+[...document.querySelectorAll("#inspector .thing")].find((r) => r.textContent.includes("smith")).click();
+assert.equal($("#inspector .kind").textContent, "Character", $("#inspector").textContent.slice(0, 200));
+const sections = [...document.querySelectorAll("#inspector details.section > summary")].map((x) => x.textContent);
+assert.ok(sections.some((x) => /^What they do · Stays put, to talk to/.test(x)), sections.join(" | "));
+assert.ok(sections.includes("Talking · armoury"), sections.join(" | "));
+// A daily routine: it needs the time of day first.
+const doing = [...document.querySelectorAll("#inspector details.section")].find((d) => d.querySelector("summary").textContent.startsWith("What they do"));
+doing.open = true;
+doing.dispatchEvent(new Event("toggle"));
+// (This game keeps the time already; one that didn't would offer "Keep the time of day".)
+assert.ok(![...doing.querySelectorAll("button")].some((b) => b.textContent === "Keep the time of day"));
+const doing2 = () => [...document.querySelectorAll("#inspector details.section")].find((d) => d.querySelector("summary").textContent.startsWith("What they do"));
+[...doing2().querySelectorAll("button")].find((b) => b.textContent === "+ Add a time").click();
+assert.equal(doing2().open, true, "an opened section stays open after a change");
+assert.match(yaml(), /routine: \{ ?"?8:00"?: forge ?\}/);
+const time = doing2().querySelector(".routine input.time");
+time.value = "13:00";
+time.dispatchEvent(new Event("change"));
+assert.match(yaml(), /routine: \{ ?"?13:00"?: forge ?\}/);
+
+// Text that varies, in the panel: say something different each time.
+press($('#map [data-room="forge"]'));
+[...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Say something different each time…").click();
+assert.match(yaml(), /description: ?(\[|\n\s+- )"?Sparks fly/);
+assert.equal(document.querySelectorAll("#inspector .vary-lines textarea").length, 2);
+const varies = [...document.querySelectorAll("#inspector select")].find((x) => x.getAttribute("aria-label") === "How it varies");
+varies.value = "random";
+varies.dispatchEvent(new Event("change"));
+assert.match(yaml(), /description: ?\{ ?random: ?\[ ?"?Sparks fly|description:\n\s+random:\n\s+- "?Sparks fly/);
+[...document.querySelectorAll("#inspector button")].find((b) => b.textContent === "Make it plain again").click();
+assert.match(yaml(), /description: "?Sparks fly/);
+
+// The game's panel: scenes beside goals, and the steps to a first game.
+$("#map").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+assert.equal($("#inspector .kind").textContent, "Your game");
+assert.equal($("#inspector .started"), null, "every step done: no checklist");
+const scenesGroup = [...document.querySelectorAll("#inspector details.group")].find((d) => d.querySelector("summary").textContent.startsWith("Scenes"));
+assert.equal(scenesGroup.open, false, "folded until opened");
+[...scenesGroup.querySelectorAll("button")].find((b) => b.textContent === "Add a scene").click();
+assert.match(yaml(), /scenes:\n\s+a_new_scene:\n\s+title: A new scene\n\s+when: "?false"?\n\s+done: "?false"?/);
+const scenesGroup2 = [...document.querySelectorAll("#inspector details.group")].find((d) => d.querySelector("summary").textContent.startsWith("Scenes"));
+assert.match(scenesGroup2.querySelector("summary").textContent, /Scenes · 1/);
 
 assert.deepEqual(errors, []);
 console.log("ok   editor page");

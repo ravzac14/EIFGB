@@ -56,8 +56,6 @@ COINS, TAKE ALL BUT THE KEY) was already there.
 
 - **Games in more than one language:** a game's own text in a second
   language, chosen by the player.
-- **Routines and scenes in the editor:** they're written in the file for
-  now; a timetable on a character, and scenes beside goals.
 
 ## The editor
 

@@ -19,16 +19,41 @@ You unlock the pantry door with the small key.
 > scripts, timers, endings and conversations.
 > The file format may still change before 1.0.
 
+- [Two ways to make a game](#two-ways-to-make-a-game)
 - [Quick start](#quick-start)
 - [Tutorial: Midnight Snack](#tutorial-midnight-snack)
 - [States and descriptions](#states-and-descriptions)
 - [Containers and supporters](#containers-and-supporters)
+- [How things behave](#how-things-behave)
+- [Pictures](#pictures)
+- [Your own words: aliases](#your-own-words-aliases)
 - [Timed events](#timed-events)
+- [Goals: a journal](#goals-a-journal)
+- [Scenes](#scenes)
+- [Time of day](#time-of-day)
+- [Hints](#hints)
 - [Characters: NPCs and enemies](#characters-npcs-and-enemies)
 - [Command reference](#command-reference)
 - [Cheat sheet](#cheat-sheet)
 - [Where to go next](#where-to-go-next)
 - [For contributors](#for-contributors)
+
+## Two ways to make a game
+
+**In your browser, with nothing to install:** open
+[the editor](https://ravzac14.github.io/EIFGB/editor.html), and start from
+a blank game, a starter template, or a copy of an example. Draw rooms on
+the map, and fill in what you need in the details panel beside it: each
+panel starts with the essentials (a name, a description, where it is),
+and everything else is folded underneath, saying what's set. A short
+checklist on a new game walks you through to a game that can be won, and
+Test play, at the bottom, plays it as you go. Everything in this guide can
+be done there; the YAML shown is what the editor writes for you, in the
+Files tab.
+
+**As files, with the command line:** write `game.yaml` in any editor, and
+check and play it with the `eifgb` tool. The quick start below sets it up,
+and the tutorial builds a whole game this way.
 
 ## Quick start
 
@@ -531,6 +556,21 @@ one does and what can stop it. A dashed line means the timer counts from
 when something starts it, not from the start of the game.
 
 A few more tools in the editor:
+
+- **The details panel** starts with what most things need (a name, a
+  description, where it is), and folds everything else under headings
+  that say what's set in them ("What they do · Hunts the player"). Open
+  one to change it; it stays open while you work. On a new game, a
+  **Getting started** checklist ticks off the steps to a game that can be
+  won. *Don't show this again* hides it for every game in this browser;
+  *Show the Getting started checklist again*, under Drawing the map,
+  brings it back.
+- **Text that varies:** under a description, *Say something different
+  each time…* gives it a box for each line, and a choice of each in turn,
+  the first time and then another, round and round, or at random.
+- **Routines and scenes:** a character's *What they do* has a daily
+  routine (a time and a place for each row), and the game's panel lists
+  scenes beside goals, each with when it begins and ends.
 
 - **Find** (Ctrl+Shift+F) searches every room, thing, character,
   conversation, message and script for a word, a name or an ID. Click a

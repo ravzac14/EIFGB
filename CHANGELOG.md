@@ -9,6 +9,22 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+## Unreleased
+
+- The editor is simpler to find your way around: each panel starts with
+  the essentials, and folds the rest under headings that say what's set;
+  the game's sections are folded too, with how many each has; and a new
+  game has a Getting started checklist, to a game that can be won (with
+  "Don't show this again", for every game, and a way back under Drawing
+  the map).
+- Everything new can be set in the editor: text that varies (a box for
+  each line, and how it varies), daily routines, scenes, how characters
+  feel, and conversation options shown greyed with why.
+- The guide starts with the two ways to make a game: in the browser, or
+  as files with the command line.
+- Fixed: the editor's description helper suggested words like "would" and
+  "starts" as things to add.
+
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - Text that varies: a description, message or reply can be a list (each

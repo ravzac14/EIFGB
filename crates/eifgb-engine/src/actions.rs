@@ -18,7 +18,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// [`World::door_blocked`]: crate::World::door_blocked
 const BUILTIN_STATE: &[&str] = &[
     "open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with", "asleep",
-    "sees_in_dark", "fuel", "uses", "liquid", "dark",
+    "sees_in_dark", "fuel", "uses", "liquid", "dark", "disposition",
 ];
 
 /// One thing the automatic state descriptions can say.
@@ -44,6 +44,7 @@ fn visit_text_code(text: &Text, f: &mut dyn FnMut(&str)) {
                 visit_text_code(then, f);
                 visit_text_code(otherwise, f);
             }
+            Segment::Vary { options, .. } => options.iter().for_each(|o| visit_text_code(o, f)),
         }
     }
 }
@@ -422,6 +423,14 @@ impl<H: ScriptHost> Game<H> {
         }
         let described = self.out.lines.len() > before;
         self.describe_state(t, description.as_ref(), described);
+        // How someone seems to feel about the player, unless it's neither way.
+        if self.world.def(t).kind == EntityKind::Character && self.world.is_active(t) {
+            let feeling = eifgb_ir::feeling(self.world.disposition(t));
+            if feeling != "neutral" {
+                let s = self.msg_str(&format!("disposition.{feeling}"), &Ctx::new().entity("target", t));
+                self.push_sentence(s, true);
+            }
+        }
         self.describe_contents(t);
         true
     }
@@ -1398,6 +1407,12 @@ impl<H: ScriptHost> Game<H> {
         if self.world.is_dead(t) || self.world.is_asleep(t) {
             self.topic = None;
             self.msg(if self.world.is_dead(t) { "talk.dead" } else { "talk.asleep" }, ctx);
+            return false;
+        }
+        // Hostile: no talking.
+        if self.world.disposition(t) <= crate::npc::HOSTILE {
+            self.topic = None;
+            self.msg("talk.hostile", &ctx.clone().entity("target", t));
             return false;
         }
         match self.world.def(t).talk {

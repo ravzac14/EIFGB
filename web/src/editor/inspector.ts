@@ -11,6 +11,17 @@ import { describeWords } from "./describe-words.ts";
 
 /** A description field, with the words in it players can use (and nouns that aren't anything yet) underneath. */
 function withWords(ctx: InspectorContext, owner: { room: string } | { thing: string } | { character: string }, parts: HTMLElement[]): HTMLElement[] {
+  // Text that varies (a list, first and later, cycle, random) isn't one
+  // string to type over: it's edited in the file, so nothing is lost here.
+  const [section, id] = "room" in owner ? ["rooms", owner.room] : "thing" in owner ? ["objects", owner.thing] : ["characters", owner.character];
+  const raw = ctx.model.get([section, id, "description"]);
+  if (raw !== undefined && raw !== null && typeof raw !== "string") {
+    return [
+      el("label", { textContent: "Description" }),
+      el("p", { class: "note", textContent: "This description varies each time it's shown (a list, first and later, cycle or random), so it's edited in the game file." }),
+      el("div", { class: "actions" }, button("Show it in the file", () => ctx.showInFile(`${id}:`))),
+    ];
+  }
   const input = parts.find((p) => p instanceof HTMLTextAreaElement) as HTMLTextAreaElement | undefined;
   return input ? [...parts, describeWords(ctx, owner, input)] : parts;
 }
@@ -891,6 +902,14 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       placeholder: "What the player sees when they look at them.",
     })),
     ...pictureSection(ctx, p, "character"),
+    el("label", { textContent: "How they feel about the player" }),
+    select(
+      [["", "Neutral (the usual)"], ["hostile", "Hostile: won't talk or trade; may fight"], ["wary", "Wary: dearer to buy from"], ["friendly", "Friendly: cheaper"], ["devoted", "Devoted: cheapest of all"]],
+      typeof get("disposition") === "string" ? String(get("disposition")) : typeof get("disposition") === "number" ? ({ [-5]: "hostile", [-2]: "wary", 2: "friendly", 5: "devoted" } as Record<number, string>)[get("disposition") as number] ?? "" : "",
+      (v) => ctx.change((x) => x.set([...p, "disposition"], v || undefined)),
+      "How they feel about the player",
+    ),
+    help("At the start. Gifts they like, apologies and kind words warm them; attacks, insults and theft cool them. Scripts read self.disposition (-10 to 10) and self.feeling."),
     ...field("Other words for them", c.synonyms.join(", "), (v) => ctx.change((x) => x.setList([...p, "synonyms"], v.split(",")), { coalesce: `csyn:${id}`, redraw: false }), {
       placeholder: "woman, crone",
     }),

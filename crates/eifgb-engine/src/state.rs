@@ -57,6 +57,16 @@ pub struct GameState {
     pub talks: BTreeMap<String, Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_talk: Option<String>,
+    /// How often each varied text has been shown, by its place in the
+    /// source (for a random one, its last pick + 1).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub vary: BTreeMap<String, u32>,
+    /// How many times the player has entered each room.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub visits: BTreeMap<EntityId, u32>,
+    /// Scenes begun: false while going on, true once over.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scenes: BTreeMap<String, bool>,
     /// Timers that have gone off at least once (for `say_again`).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fired: BTreeSet<String>,
@@ -141,6 +151,9 @@ impl GameState {
             got: BTreeMap::new(),
             talks: BTreeMap::new(),
             last_talk: None,
+            vary: BTreeMap::new(),
+            visits: BTreeMap::from([(story.meta.start, 1)]),
+            scenes: BTreeMap::new(),
         }
     }
 }

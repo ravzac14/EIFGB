@@ -50,12 +50,14 @@ pub struct Source {
     #[serde(default)]
     pub goals: IndexMap<String, Goal>,
     #[serde(default)]
+    pub scenes: IndexMap<String, Scene>,
+    #[serde(default)]
     pub clock: Option<Clock>,
     #[serde(default)]
     pub weather: Option<Weather>,
     /// Overrides for standard library messages, by key.
     #[serde(default)]
-    pub messages: IndexMap<String, String>,
+    pub messages: IndexMap<String, Prose>,
     /// The game's own words for words the game knows: `using: with`.
     #[serde(default)]
     pub aliases: IndexMap<String, String>,
@@ -215,7 +217,7 @@ pub struct Room {
     #[serde(default)]
     pub list_exits: Option<bool>,
     #[serde(default)]
-    pub description: Option<String>,
+    pub description: Option<Prose>,
     #[serde(default)]
     pub exits: IndexMap<String, Exit>,
     #[serde(default)]
@@ -338,7 +340,7 @@ pub struct Thing {
     #[serde(default)]
     pub state: IndexMap<String, Value>,
     #[serde(default)]
-    pub description: Option<String>,
+    pub description: Option<Prose>,
     #[serde(default)]
     pub unlocks_with: Option<String>,
     #[serde(default)]
@@ -368,6 +370,13 @@ pub struct Thing {
     /// Rooms the character keeps to.
     #[serde(default)]
     pub area: Vec<String>,
+    /// Where it should be by the clock: `{ "6:00": bakery, "13:00": market }`.
+    #[serde(default)]
+    pub routine: IndexMap<String, String>,
+    /// How it feels about the player at the start: a number, or a word
+    /// (hostile, wary, neutral, friendly, devoted).
+    #[serde(default)]
+    pub disposition: Option<Value>,
     /// How many rooms away a hunter or follower notices the player.
     #[serde(default)]
     pub range: Option<u32>,
@@ -525,7 +534,7 @@ impl OneOrMany {
 pub struct Verb {
     pub patterns: Vec<String>,
     #[serde(default)]
-    pub default: Option<String>,
+    pub default: Option<Prose>,
     /// Whether the player must be able to touch the thing. On by default;
     /// set it to false for verbs like READ that work through glass.
     #[serde(default)]
@@ -543,7 +552,7 @@ pub struct Choice {
 #[serde(deny_unknown_fields)]
 pub struct Node {
     #[serde(default)]
-    pub text: Option<String>,
+    pub text: Option<Prose>,
     #[serde(default, rename = "do")]
     pub run: Option<String>,
     #[serde(default)]
@@ -560,8 +569,14 @@ pub struct ChoiceOption {
     pub text: String,
     #[serde(default)]
     pub when: Option<String>,
+    /// While `when` is false, shown greyed with this reason.
     #[serde(default)]
-    pub say: Option<String>,
+    pub why_not: Option<String>,
+    #[serde(default)]
+    pub say: Option<Prose>,
+    /// How choosing it changes how the one talked to feels: +1, -2.
+    #[serde(default)]
+    pub disposition: Option<i64>,
     #[serde(default, rename = "do")]
     pub run: Option<String>,
     #[serde(default)]
@@ -646,6 +661,53 @@ pub struct Goal {
     pub points: Option<i64>,
 }
 
+/// A named stretch of the story: begins once `when` (Lua) is true, ends once
+/// `done` is. `begins`/`ends` are said then.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Scene {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub when: Option<String>,
+    #[serde(default)]
+    pub done: Option<String>,
+    #[serde(default)]
+    pub begins: Option<String>,
+    #[serde(default)]
+    pub ends: Option<String>,
+}
+
+/// Text that can vary: a string, a list (each in turn, then the last), or
+/// `{ first, later }`, `{ cycle: [...] }`, `{ random: [...] }`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum Prose {
+    One(String),
+    List(Vec<String>),
+    Ways(ProseWays),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProseWays {
+    #[serde(default)]
+    pub first: Option<String>,
+    #[serde(default)]
+    pub later: Option<String>,
+    #[serde(default)]
+    pub cycle: Option<Vec<String>>,
+    #[serde(default)]
+    pub random: Option<Vec<String>>,
+}
+
+impl Prose {
+    /// The plain string, when it is one.
+    pub fn as_one(&self) -> Option<&str> {
+        if let Prose::One(s) = self { Some(s) } else { None }
+    }
+}
+
 /// The time of day. Times are written like "7:30", "19:00", "7:30 pm",
 /// "noon" or "midnight".
 #[derive(Debug, Deserialize)]
@@ -698,7 +760,7 @@ pub struct Timer {
     #[serde(default)]
     pub when: Option<String>,
     #[serde(default)]
-    pub say: Option<String>,
+    pub say: Option<Prose>,
     /// Said instead of `say` from the second time it goes off.
     #[serde(default)]
     pub say_again: Option<String>,

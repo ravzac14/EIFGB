@@ -46,26 +46,18 @@ README); and so are bookmarks in the web player.
 The second editor list is built too: conversations as a graph, words in
 descriptions (highlighted, or a click from scenery), possible typos,
 walkthrough coverage, a walkthrough for each ending, the wanderer, and
-expected replies. So are WHAT DID SHE SAY?, MAP in words, and where things came from
+expected replies. And the writing ideas: text that varies (and visits), daily routines,
+disposition (tied in with patience, faction attitude, gifts and apologies),
+scenes, and locked conversation options. So are WHAT DID SHE SAY?, MAP in words, and where things came from
 (WHERE IS on something carried, INVENTORY BY PLACE); counting (TAKE TWO
 COINS, TAKE ALL BUT THE KEY) was already there.
 
 ## Writing games
 
-- **Text that changes with visits:** `first:` and `later:` descriptions,
-  or `${visits}`, without counting by hand in a `_visits` field.
-- **Variety:** a description or reply as a list, `cycle:` or `random:`, so
-  WAIT and a ticking clock don't say the same thing every time.
-- **Daily routines:** characters who keep to a clock (`routine: { "6:00":
-  bakery, "13:00": market }`), and are found where they should be.
-- **How people feel about you:** a `regard` that gifts, answers and
-  insults move, which conversation options and prices can check.
-- **Scenes:** named stretches of the story, with a start and an end
-  (`when:`), shown in RECAP and the journal, and usable in conditions.
-- **Locked options shown:** a conversation option that's not yet
-  available shown greyed, with why ("You'd need something to trade").
 - **Games in more than one language:** a game's own text in a second
   language, chosen by the player.
+- **Routines and scenes in the editor:** they're written in the file for
+  now; a timetable on a character, and scenes beside goals.
 
 ## The editor
 

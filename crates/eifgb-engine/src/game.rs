@@ -32,6 +32,8 @@ pub enum LineKind {
     Notice,
     /// A numbered option while a choice is open.
     Choice,
+    /// An option not open yet, with why: shown greyed, not to be picked.
+    Locked,
     Ending,
     /// A script error. Shown so authors can fix it; play carries on.
     Error,
@@ -449,6 +451,8 @@ impl<H: ScriptHost> Game<H> {
                 }
                 Effect::StartGoal(k) => self.start_goal(&k),
                 Effect::CompleteGoal(k) => self.complete_goal(&k),
+                Effect::StartScene(k) => self.begin_scene(&k),
+                Effect::EndScene(k) => self.end_scene(&k),
                 Effect::Weather(k) => self.set_weather(&k),
                 Effect::Npc(event) => self.narrate(&event),
             }
@@ -1113,6 +1117,7 @@ impl<H: ScriptHost> Game<H> {
     /// Carries out an ending or an opened choice that a script asked for.
     fn settle(&mut self) {
         self.update_goals();
+        self.update_scenes();
         if let Some(key) = self.end_requested.take() {
             self.choice_requested = None;
             self.finish_game(&key);
@@ -1162,6 +1167,16 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
+    /// For a conversation's scripts and text: `self` is the one being
+    /// talked to (whoever has it as their `talk` and is here).
+    fn talk_ctx(&self) -> Ctx {
+        let who = self.world.state.choice.and_then(|c| self.talker_now(&self.world.story().choice(c.choice).key));
+        match who {
+            Some(t) => Ctx::new().this(t),
+            None => Ctx::new(),
+        }
+    }
+
     fn enter_node(&mut self) {
         // Nodes without options move on by themselves. The limit stops a
         // loop of such nodes from hanging the game.
@@ -1169,10 +1184,10 @@ impl<H: ScriptHost> Game<H> {
             let Some(cur) = self.world.state.choice else { return };
             let node = self.world.story().choice(cur.choice).nodes[cur.node as usize].clone();
             if let Some(t) = &node.text {
-                self.render_line(LineKind::Text, t, &Ctx::new());
+                self.render_line(LineKind::Text, t, &self.talk_ctx());
             }
             if let Some(r) = &node.run {
-                self.run(r, &Ctx::new());
+                self.run(r, &self.talk_ctx());
             }
             if self.end_requested.is_some() {
                 self.world.state.choice = None;
@@ -1203,11 +1218,11 @@ impl<H: ScriptHost> Game<H> {
         let mut out = Vec::new();
         for (i, o) in node.options.iter().enumerate() {
             if let Some(w) = &o.when
-                && !self.run(w, &Ctx::new()).truthy()
+                && !self.run(w, &self.talk_ctx()).truthy()
             {
                 continue;
             }
-            let text = self.render_str(&o.text, &Ctx::new());
+            let text = self.render_str(&o.text, &self.talk_ctx());
             out.push((i, text));
         }
         out
@@ -1222,6 +1237,20 @@ impl<H: ScriptHost> Game<H> {
         }
         for (n, (_, text)) in vis.iter().enumerate() {
             self.push(LineKind::Choice, format!("{}. {text}", n + 1));
+        }
+        // Not yet: shown greyed, with why, and no number to pick.
+        if let Some(cur) = self.world.state.choice {
+            let node = self.world.story().choice(cur.choice).nodes[cur.node as usize].clone();
+            for (i, o) in node.options.iter().enumerate() {
+                let (Some(why), Some(_)) = (&o.why_not, &o.when) else { continue };
+                if vis.iter().any(|(j, _)| *j == i) {
+                    continue;
+                }
+                let ctx = self.talk_ctx();
+                let (text, why) = (self.render_str(&o.text, &ctx), self.render_str(why, &ctx));
+                let line = self.msg_str("choice.locked", &Ctx::new().text("text", text).text("why", why));
+                self.push(LineKind::Locked, line);
+            }
         }
         self.out.options = vis.into_iter().map(|(_, t)| t).collect();
     }
@@ -1259,7 +1288,7 @@ impl<H: ScriptHost> Game<H> {
             (hits.len() == 1).then(|| hits[0])
         };
         let Some(pick) = by_number.or_else(by_text) else {
-            self.msg("choice.invalid", &Ctx::new());
+            self.msg("choice.invalid", &self.talk_ctx());
             self.show_options();
             return;
         };
@@ -1275,15 +1304,23 @@ impl<H: ScriptHost> Game<H> {
         let opt = self.world.story().choice(cur.choice).nodes[cur.node as usize].options[index].clone();
         let key = self.world.story().choice(cur.choice).key.clone();
         self.chosen.insert((cur.choice.0, cur.node, index));
-        let said = self.render_str(&opt.text, &Ctx::new());
-        let you = self.msg_str("talk.recall_you", &Ctx::new().text("text", said));
+        let said = self.render_str(&opt.text, &self.talk_ctx());
+        let you = self.msg_str("talk.recall_you", &self.talk_ctx().text("text", said));
         self.world.state.talks.entry(key.clone()).or_default().push(you);
         let shown = self.out.lines.len();
         if let Some(s) = &opt.say {
-            self.render_line(LineKind::Text, s, &Ctx::new());
+            self.render_line(LineKind::Text, s, &self.talk_ctx());
         }
         if let Some(r) = &opt.run {
-            self.run(r, &Ctx::new());
+            self.run(r, &self.talk_ctx());
+        }
+        // How the one talked to feels about that.
+        if opt.disposition != 0
+            && let Some(who) = self.talker_now(&key)
+            && let Some((_, now)) = self.world.shift_disposition(who, opt.disposition)
+        {
+            let warmer = opt.disposition > 0;
+            self.msg_kind(LineKind::Notice, if warmer { "disposition.warmer" } else { "disposition.cooler" }, &self.talk_ctx().entity("target", who).text("feeling", now));
         }
         if let Some(b) = before {
             self.world.push_undo(b);

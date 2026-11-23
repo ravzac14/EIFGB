@@ -1037,7 +1037,8 @@ impl<H: ScriptHost> Game<H> {
         if self.refuses_trade(seller, ctx) {
             return None;
         }
-        Some((seller, i64::from(price)))
+        // A friend pays less; someone wary of the player, more.
+        Some((seller, self.world.asking_price(seller, i64::from(price))))
     }
 
     /// A merchant pushed too far won't trade with the player at all.
@@ -1126,6 +1127,7 @@ impl<H: ScriptHost> Game<H> {
         // Like being attacked: it puts up with `patience` lowball offers.
         if patience <= 0 {
             self.world.set(seller, "_refuses", Value::Bool(true));
+            self.world.shift_disposition(seller, -1);
             self.msg("offer.insulted", &ctx);
             return false;
         }
@@ -1154,7 +1156,7 @@ impl<H: ScriptHost> Game<H> {
         }
         let Some((seller, price)) = self.seller_of(wanted, None, &ctx.clone().entity("target", wanted)) else { return false };
         let ctx = ctx.clone().entity("merchant", seller);
-        let (buys_at, haggle) = self.world.def(seller).npc.as_ref().map_or((0, 0), |n| (n.buys_at, n.haggle));
+        let (buys_at, haggle) = self.world.def(seller).npc.as_ref().map_or((0, 0), |n| (self.world.buying_at(seller, n.buys_at), n.haggle));
         let worth = self.world.def(t).price.map_or(0, i64::from) * i64::from(buys_at) / 100;
         if worth <= 0 {
             self.msg("sell.worthless", &ctx);
@@ -1178,6 +1180,7 @@ impl<H: ScriptHost> Game<H> {
         };
         if patience <= 0 && haggle > 0 {
             self.world.set(seller, "_refuses", Value::Bool(true));
+            self.world.shift_disposition(seller, -1);
             self.msg("offer.insulted", &ctx);
             return false;
         }
@@ -1207,7 +1210,7 @@ impl<H: ScriptHost> Game<H> {
             return false;
         }
         let n = self.world.def(buyer).npc.clone();
-        let (buys_at, haggle) = n.as_ref().map_or((0, 0), |n| (n.buys_at, n.haggle));
+        let (buys_at, haggle) = n.as_ref().map_or((0, 0), |n| (self.world.buying_at(buyer, n.buys_at), n.haggle));
         let price = self.world.def(t).price.map_or(0, i64::from);
         let offer = price * i64::from(buys_at) / 100;
         if offer <= 0 {
@@ -1259,6 +1262,7 @@ impl<H: ScriptHost> Game<H> {
         };
         if patience <= 0 {
             self.world.set(buyer, "_refuses", Value::Bool(true));
+            self.world.shift_disposition(buyer, -1);
             self.world.unset(buyer, "_deal");
             self.msg("offer.insulted", &ctx);
             return false;
@@ -1369,7 +1373,7 @@ impl<H: ScriptHost> Game<H> {
             let items: Vec<String> = goods
                 .iter()
                 .map(|&i| {
-                    let price = self.money_text(i64::from(self.world.def(i).price.unwrap_or(0)));
+                    let price = self.money_text(self.world.asking_price(m, i64::from(self.world.def(i).price.unwrap_or(0))));
                     self.msg_str("wares.item", &Ctx::new().text("item", self.a(i)).text("price", price))
                 })
                 .collect();

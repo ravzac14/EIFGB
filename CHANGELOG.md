@@ -11,6 +11,22 @@ if you like ("## 2026-11-24: editor tools"). -->
 
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
+- Text that varies: a description, message or reply can be a list (each
+  in turn), `first:` and `later:`, `cycle:` or `random:`, so WAIT and a
+  ticking clock needn't say the same thing every time. `here.visits`
+  counts a room's visits.
+- Characters keep to daily routines with a clock: `routine: { "6:00":
+  bakery, "13:00": square }`.
+- Scenes: named stretches of the story that begin and end with
+  conditions, shown in RECAP, and readable in scripts (`scenes.storm`).
+- Disposition: how each character feels about you, from hostile to
+  devoted. Gifts, apologies and kind words warm them; attacks, theft and
+  insults cool them, and their side's attitude moves them too. It shows
+  when you examine them, in merchants' prices, and in what they'll talk
+  about; a hostile character won't talk or trade.
+- Conversation options can be shown greyed with why (`why_not:`), can be
+  for friends only (`self` is the one you're talking to), and can change
+  how they feel (`disposition: 2`).
 - Fixed: after UNDO, the game could still remember seeing something the
   undone move had found, so WHERE IS knew where it was.
 - GO on its own asks "Which way do you want to go?", WHERE DID I GET on

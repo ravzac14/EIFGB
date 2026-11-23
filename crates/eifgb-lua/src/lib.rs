@@ -268,7 +268,7 @@ fn kind_name(k: EntityKind) -> &'static str {
 }
 
 /// Fields every entity has. Scripts can read them but not assign them.
-const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen"];
+const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling"];
 
 impl ScriptHost for LuaHost {
     fn load(&mut self, story: &Story) -> Result<(), ScriptError> {
@@ -335,6 +335,13 @@ impl ScriptHost for LuaHost {
                             "proper" => (mlua::Value::Boolean(w.is_proper(id)), false),
                             // The player has seen it, or held it: they know of it (WHERE IS does).
                             "seen" => (mlua::Value::Boolean(w.state.located.contains_key(&id) || w.is_within(id, eifgb_engine::ir::PLAYER)), false),
+                            // A room: how many times the player has come in (0: never).
+                            "visits" => (mlua::Value::Integer(i64::from(w.state.visits.get(&id).copied().unwrap_or(0))), false),
+                            // A character: how it feels about the player, as a word.
+                            "feeling" => match w.get(id, "disposition") {
+                                Some(eifgb_engine::ir::Value::Int(d)) => (s(eifgb_engine::ir::feeling(*d))?, false),
+                                _ => (mlua::Value::Nil, false),
+                            },
                             "kind" => (s(kind_name(def.kind))?, false),
                             "capacity" => match w.capacity(id) {
                                 Some(n) => (mlua::Value::Integer(i64::from(n)), false),
@@ -707,6 +714,31 @@ impl ScriptHost for LuaHost {
                         Ok(())
                     })?,
                 )?;
+                h.set(
+                    "scene_get",
+                    scope.create_function(move |lua, key: String| {
+                        let w = world.borrow();
+                        if !w.story().scenes.iter().any(|s| s.key == key) {
+                            return Err(rt(format!("scenes.{key}: there is no scene called '{key}'")));
+                        }
+                        Ok(match w.state.scenes.get(&key) {
+                            None => mlua::Value::Nil,
+                            Some(done) => mlua::Value::String(lua.create_string(if *done { "done" } else { "running" })?),
+                        })
+                    })?,
+                )?;
+                for (name, end) in [("start_scene", false), ("end_scene", true)] {
+                    h.set(
+                        name,
+                        scope.create_function(move |_, key: String| {
+                            if !world.borrow().story().scenes.iter().any(|s| s.key == key) {
+                                return Err(rt(format!("{name}: there is no scene called '{key}'")));
+                            }
+                            effects.borrow_mut().push(if end { Effect::EndScene(key) } else { Effect::StartScene(key) });
+                            Ok(())
+                        })?,
+                    )?;
+                }
                 for (name, done) in [("start_goal", false), ("complete_goal", true)] {
                     h.set(
                         name,

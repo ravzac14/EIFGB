@@ -184,6 +184,7 @@ mod tests {
             Segment::Expr(c) => &c.src,
             Segment::If { cond, .. } => &cond.src,
             Segment::Lit(s) => s,
+            Segment::Vary { key, .. } => key,
         }
     }
 

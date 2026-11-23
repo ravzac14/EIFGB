@@ -25,7 +25,10 @@
 .log .ending { font-weight: bold; text-align: center; font-size: 1.2em; margin: 1.5em 0; }
 .log .error { color: var(--err); font-family: var(--mono); font-size: 0.85em; }
 .log .choice { margin: 0 0 0.3em; padding-left: 1em; }
-.log .choice + :not(.choice) { margin-top: 0.7em; }
+.log .choice + :not(.choice):not(.locked) { margin-top: 0.7em; }
+.log .locked { margin: 0 0 0.3em; padding-left: 1em; color: var(--dim); font-style: italic; }
+.log .locked::before { content: "– "; }
+.log .locked + :not(.choice):not(.locked) { margin-top: 0.7em; }
 .log .cmd { color: var(--accent); margin-top: 1.3em; }
 figure.picture { margin: 0.4em 0 0.9em; }
 figure.picture img { display: block; max-width: 100%; max-height: 60vh; height: auto; border-radius: 6px; border: 1px solid var(--line, rgba(127,127,127,.3)); }

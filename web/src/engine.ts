@@ -8,7 +8,8 @@ export interface Diagnostic {
   path: string;
   message: string;
 }
-export type LineKind = "banner" | "title" | "text" | "notice" | "choice" | "ending" | "error" | "picture";
+/** `locked`: a conversation option not open yet, with why; shown greyed, and not numbered. */
+export type LineKind = "banner" | "title" | "text" | "notice" | "choice" | "locked" | "ending" | "error" | "picture";
 export interface Line {
   kind: LineKind;
   text: string;

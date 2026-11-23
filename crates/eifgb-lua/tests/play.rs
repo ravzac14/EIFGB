@@ -4936,6 +4936,175 @@ fn missing_words_are_asked_for_in_plain_words() {
     assert_eq!(say(&mut g, "the keeper"), "The old keeper is right here.");
 }
 
+/// A town for the "writing games" tests: varied text, a routine, a scene,
+/// a merchant with feelings, and a conversation with an option for friends.
+const MARKET_TOWN: &str = "\
+format: eifgb/0.1
+game: { id: town, title: Town, version: '1', start: square }
+clock: { start: '8:00', minutes_per_turn: 5 }
+player: { money: 20 }
+rooms:
+  square:
+    name: Square
+    description: { first: You step into the square for the first time., later: 'The square again${if here.visits > 2}, as familiar as your hand${end}.' }
+    exits: { east: bakery, west: home }
+  bakery: { name: Bakery, description: [Warm and floury., Still warm., Warm.], exits: { west: square } }
+  home: { name: Cottage, exits: { east: square } }
+objects:
+  bread: { name: loaf of bread, synonyms: [loaf, bread], in: baker, price: 10, traits: [portable] }
+  flower: { name: flower, in: square, traits: [portable] }
+characters:
+  baker:
+    name: baker
+    in: bakery
+    behavior: merchant
+    likes: [flower]
+    talk: baker_talk
+    routine: { '6:00': bakery, '9:00': square }
+scenes:
+  morning: { title: The morning rush, when: 'clock.hour < 9', done: 'clock.hour >= 9', begins: The town is waking up., ends: The morning rush is over. }
+choices:
+  baker_talk:
+    start: hi
+    nodes:
+      hi:
+        text: '\"Morning!\" says the baker.'
+        options:
+          - { text: Compliment the bread, say: '\"Why, thank you!\"', disposition: 2, goto: hi }
+          - { text: Insult the bread, say: '\"Well!\"', disposition: -9, end: true }
+          - { text: Ask for the secret recipe, when: 'self.disposition >= 4', why_not: The baker doesn't trust you enough yet., say: '\"Butter.\"', end: true }
+          - { text: Goodbye, end: true }
+messages:
+  wait.done: { cycle: [Time passes., A cart rumbles by.] }
+";
+
+fn market_town() -> Game<LuaHost> {
+    let out = compile_str(MARKET_TOWN);
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+/// Text that varies: first and later, a list that stops, a cycle, and visits.
+#[test]
+fn text_varies_with_visits_and_in_turn() {
+    let mut g = market_town();
+    assert_says(&mut g, "look", "The square again.");
+    assert_eq!(say(&mut g, "wait"), "Time passes.");
+    assert_eq!(say(&mut g, "wait"), "A cart rumbles by.");
+    assert_eq!(say(&mut g, "wait"), "Time passes.", "round again");
+    // A list: each in turn, then the last for ever.
+    assert_says(&mut g, "e", "Warm and floury.");
+    assert_says(&mut g, "look", "Still warm.");
+    assert_says(&mut g, "look", "Warm.");
+    assert_says(&mut g, "look", "Warm.");
+    // visits: the square a second and third time.
+    assert_says(&mut g, "w", "The square again.");
+    say(&mut g, "e");
+    assert_says(&mut g, "w", "The square again, as familiar as your hand.");
+    // UNDO takes the count back too.
+    say(&mut g, "undo");
+    say(&mut g, "undo");
+    assert_eq!(say(&mut g, "wait"), "A cart rumbles by.");
+    // Random: never the same twice in a row.
+    let mut r = small("messages:\n  wait.done: { random: [One., Two., Three.] }\n");
+    let mut last = String::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for _ in 0..30 {
+        let now = say(&mut r, "wait");
+        assert_ne!(now, last);
+        seen.insert(now.clone());
+        last = now;
+    }
+    assert_eq!(seen.len(), 3);
+    // Mistakes.
+    let bad = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall, description: { later: Again. } }\n");
+    assert!(bad.diagnostics.iter().any(|d| d.message.contains("'later' needs a 'first'")), "{:#?}", bad.diagnostics);
+}
+
+/// Routines: characters go where the clock says.
+#[test]
+fn characters_keep_to_their_routines() {
+    let mut g = market_town();
+    say(&mut g, "e");
+    assert_says(&mut g, "look", "baker");
+    for _ in 0..12 {
+        say(&mut g, "wait");
+    }
+    // 9:00: off to the square.
+    assert!(!say(&mut g, "look").contains("baker"));
+    assert_says(&mut g, "w", "You can see a flower and a baker here.");
+    let bad = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\ncharacters:\n  c: { name: c, in: hall, routine: { '6:00': hall } }\n");
+    assert!(bad.diagnostics.iter().any(|d| d.message.contains("a routine goes by the time of day")), "{:#?}", bad.diagnostics);
+}
+
+/// Scenes: begun and ended by their conditions, shown in RECAP, readable in Lua.
+#[test]
+fn scenes_begin_and_end() {
+    let mut g = Game::new(compile_str(MARKET_TOWN).story.unwrap(), LuaHost::new().unwrap(), 1).unwrap();
+    let opening = g.start().text();
+    assert!(opening.contains("The town is waking up."), "{opening}");
+    assert_says(&mut g, "recap", "Now: The morning rush.");
+    let mut ended = String::new();
+    for _ in 0..13 {
+        ended.push_str(&say(&mut g, "wait"));
+    }
+    assert!(ended.contains("The morning rush is over."), "{ended}");
+    assert!(!say(&mut g, "recap").contains("Now:"));
+    // From scripts, and checked by the compiler.
+    // (Like start_goal, start_scene takes effect when the script returns.)
+    let mut s = small("scenes:\n  storm: { when: 'false', begins: Thunder., ends: Calm. }\nobjects:\n  bell: { name: bell, in: hall, on: { push: 'start_scene(\"storm\")', pull: 'say(scenes.storm); end_scene(\"storm\")' } }\n");
+    assert_eq!(say(&mut s, "push bell"), "Thunder.");
+    assert_eq!(say(&mut s, "pull bell"), "running\nCalm.");
+    let bad = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall, on: { enter: 'end_scene(\"nope\")' } }\n");
+    assert!(bad.diagnostics.iter().any(|d| d.message.contains("end_scene(\"nope\"): no such scene")), "{:#?}", bad.diagnostics);
+}
+
+/// Disposition: how someone feels, moved by talk, gifts and insults; it
+/// shows when examined, in prices, and in what they'll say.
+#[test]
+fn disposition_moves_and_matters() {
+    let mut g = market_town();
+    say(&mut g, "take flower");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "x baker"), "You see nothing special about the baker.", "neutral: nothing said");
+    assert_says(&mut g, "wares", "a loaf of bread (10 coins)");
+    // Locked, with why; numbered past it.
+    let menu = g.input("talk to baker");
+    assert!(menu.text().contains("3. Goodbye\nAsk for the secret recipe (The baker doesn't trust you enough yet.)"), "{}", menu.text());
+    assert_eq!(menu.lines.last().map(|l| l.kind), Some(LineKind::Locked), "shown greyed");
+    assert_eq!(menu.options.len(), 3, "and not one to pick");
+    assert_eq!(say(&mut g, "1"), "\"Why, thank you!\"\n[The baker warms to you: friendly now.]\n\"Morning!\" says the baker.\n1. Compliment the bread\n2. Insult the bread\n3. Goodbye\nAsk for the secret recipe (The baker doesn't trust you enough yet.)");
+    say(&mut g, "3");
+    assert_eq!(say(&mut g, "x baker"), "You see nothing special about the baker. The baker seems glad to see you.");
+    assert_says(&mut g, "wares", "a loaf of bread (9 coins)");
+    // A liked gift: warmer still, and the recipe opens up.
+    say(&mut g, "give flower to baker");
+    assert_eq!(g.world().disposition(g.world().story().entity_by_key("baker").unwrap()), 4);
+    assert_says(&mut g, "talk to baker", "3. Ask for the secret recipe");
+    // An insult: hostile, and that's the end of talking and trading.
+    say(&mut g, "2");
+    assert_eq!(say(&mut g, "talk to baker"), "The baker won't talk to you.");
+    assert_says(&mut g, "x baker", "The baker glares at you.");
+    assert_says(&mut g, "buy bread", "won't");
+}
+
+/// The trust system and disposition together: attacks, apologies, factions.
+#[test]
+fn disposition_follows_the_trust_system() {
+    let src = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nplayer: { health: 20 }\nrooms:\n  hall: { name: Hall }\nfactions:\n  guards: { patience: 3 }\ncharacters:\n  ann: { name: Ann, in: hall, faction: guards, health: 30, patience: 3, disposition: friendly }\n  bob: { name: Bob, in: hall, faction: guards, health: 30, patience: 3 }\n";
+    let mut g = game(compile_str(src).story.unwrap());
+    let w = |g: &Game<LuaHost>, k: &str| g.world().disposition(g.world().story().entity_by_key(k).unwrap());
+    assert_eq!((w(&g, "ann"), w(&g, "bob")), (2, 0), "a word for where it starts");
+    say(&mut g, "hit ann");
+    assert_eq!(w(&g, "ann"), 0, "an attack cools");
+    say(&mut g, "apologize to ann");
+    assert_eq!(w(&g, "ann"), 1, "an apology warms");
+    // Lua: a number to read and set, and the word.
+    let mut s = small("characters:\n  cat: { name: cat, in: hall, disposition: 7, on: { examine: 'say(self.feeling); self.disposition = -6; say(self.feeling)' } }\n");
+    assert_eq!(say(&mut s, "x cat"), "devoted\nhostile");
+    let bad = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\ncharacters:\n  c: { name: c, in: hall, disposition: grumpy }\n");
+    assert!(bad.diagnostics.iter().any(|d| d.message.contains("'grumpy' isn't a disposition")), "{:#?}", bad.diagnostics);
+}
+
 #[test]
 fn undo_takes_back_several_moves() {
     let mut g = game(lighthouse());

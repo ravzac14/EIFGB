@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise", "proper", "rename"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "disposition", "visits", "seen", "feeling", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise", "proper", "rename"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -243,6 +243,7 @@ impl<'a> Lowerer<'a> {
         let scripts = self.load_scripts(&s.scripts);
         let hints = self.lower_hints(&s.hints);
         let goals = self.lower_goals(&s.goals);
+        let scenes = self.lower_scenes(&s.scenes);
 
         let presentation = s.presentation.as_ref().map(|p| self.presentation(p));
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
@@ -281,6 +282,7 @@ impl<'a> Lowerer<'a> {
             factions,
             hints,
             goals,
+            scenes,
             clock,
             weather,
         };
@@ -382,6 +384,38 @@ impl<'a> Lowerer<'a> {
         s.map(|s| self.text(s, path))
     }
 
+    /// Text that may vary: a string, a list (each in turn, then the last),
+    /// `{ first, later }`, `{ cycle: [...] }` or `{ random: [...] }`.
+    fn prose(&mut self, p: &src::Prose, path: &str) -> Text {
+        let (mode, texts): (VaryMode, Vec<&str>) = match p {
+            src::Prose::One(s) => return self.text(s, path),
+            src::Prose::List(l) => (VaryMode::Stop, l.iter().map(String::as_str).collect()),
+            src::Prose::Ways(w) => match (&w.first, &w.later, &w.cycle, &w.random) {
+                (Some(f), later, None, None) => (VaryMode::Stop, [Some(f.as_str()), later.as_deref()].into_iter().flatten().collect()),
+                (None, None, Some(c), None) => (VaryMode::Cycle, c.iter().map(String::as_str).collect()),
+                (None, None, None, Some(r)) => (VaryMode::Random, r.iter().map(String::as_str).collect()),
+                (None, Some(_), None, None) => {
+                    self.d.error(path, "'later' needs a 'first': what's said the first time");
+                    return Text::default();
+                }
+                _ => {
+                    self.d.error(path, "varied text is one of: a list, 'first' (and 'later'), 'cycle' or 'random'");
+                    return Text::default();
+                }
+            },
+        };
+        if texts.is_empty() {
+            self.d.error(path, "varied text needs at least one line");
+            return Text::default();
+        }
+        let options = texts.iter().enumerate().map(|(i, t)| self.text(t, &format!("{path}[{i}]"))).collect();
+        Text(vec![Segment::Vary { key: path.to_string(), mode, options }])
+    }
+
+    fn prose_opt(&mut self, p: Option<&src::Prose>, path: &str) -> Option<Text> {
+        p.map(|p| self.prose(p, path))
+    }
+
     fn code(&mut self, s: &str, path: &str) -> Code {
         let src = s.trim().to_string();
         if src.is_empty() {
@@ -431,7 +465,7 @@ impl<'a> Lowerer<'a> {
                 None => VerbAction::Script,
             };
             let mut patterns = self.patterns(&v.patterns, &format!("{path}.patterns"));
-            let mut default = self.text_opt(v.default.as_deref(), &format!("{path}.default"));
+            let mut default = self.prose_opt(v.default.as_ref(), &format!("{path}.default"));
             if let Some(std) = std
                 && std.action.is_none()
             {
@@ -498,7 +532,7 @@ impl<'a> Lowerer<'a> {
 
     fn lower_messages(
         &mut self,
-        author: &indexmap::IndexMap<String, String>,
+        author: &indexmap::IndexMap<String, src::Prose>,
         stdlib: &Stdlib,
     ) -> BTreeMap<String, Text> {
         let mut out = BTreeMap::new();
@@ -511,7 +545,7 @@ impl<'a> Lowerer<'a> {
                 let hint = did_you_mean(key, stdlib.messages.keys().map(String::as_str));
                 self.d.warn(&path, format!("'{key}' is not a standard message, so nothing will use it{hint}"));
             }
-            out.insert(key.clone(), self.text(m, &path));
+            out.insert(key.clone(), self.prose(m, &path));
         }
         out
     }
@@ -594,7 +628,7 @@ impl<'a> Lowerer<'a> {
             kind: EntityKind::Room,
             name: r.name.clone(),
             vocab: Vocab::default(),
-            description: self.text_opt(r.description.as_deref(), &format!("{path}.description")),
+            description: self.prose_opt(r.description.as_ref(), &format!("{path}.description")),
             traits: vec![],
             state: BTreeMap::new(),
             location: None,
@@ -875,6 +909,27 @@ impl<'a> Lowerer<'a> {
         {
             state.insert("patience".into(), Value::Int(i64::from(n.patience)));
         }
+        // How it feels about the player: a number, or a word for one.
+        if npc.is_some() {
+            let d = match &t.disposition {
+                None => 0,
+                Some(Value::Int(n)) => (*n).clamp(-10, 10),
+                Some(Value::Str(w)) => match eifgb_ir::disposition_of(w) {
+                    Some(n) => n,
+                    None => {
+                        self.d.error(format!("{path}.disposition"), format!("'{w}' isn't a disposition: one of hostile, wary, neutral, friendly or devoted, or a number from -10 to 10"));
+                        0
+                    }
+                },
+                Some(_) => {
+                    self.d.error(format!("{path}.disposition"), "a disposition is a number from -10 to 10, or a word: hostile, wary, neutral, friendly or devoted");
+                    0
+                }
+            };
+            state.insert("disposition".into(), Value::Int(d));
+        } else if t.disposition.is_some() {
+            self.d.warn(format!("{path}.disposition"), "only characters have a disposition");
+        }
         let hostile = npc.as_ref().is_some_and(|n| n.behavior.hostile());
         let damage = t.damage.or(if hostile { Some(1) } else { None });
         // Light, fuel, liquids, wear, codes.
@@ -921,7 +976,7 @@ impl<'a> Lowerer<'a> {
             kind,
             name: t.name.clone(),
             vocab: vocab(&t.name, &t.synonyms, &t.adjectives),
-            description: self.text_opt(t.description.as_deref(), &format!("{path}.description")),
+            description: self.prose_opt(t.description.as_ref(), &format!("{path}.description")),
             traits,
             state,
             location,
@@ -1058,8 +1113,25 @@ impl<'a> Lowerer<'a> {
                 .filter_map(|(i, k)| this.entity_ref(k, &format!("{path}.{field}[{i}]")))
                 .collect()
         };
+        // Where it should be by the clock, in time order.
+        let mut routine: Vec<(u32, EntityId)> = Vec::new();
+        for (time, room) in &t.routine {
+            let rpath = format!("{path}.routine.{time}");
+            let at = match eifgb_ir::parse_time(time) {
+                Ok(m) => m,
+                Err(e) => {
+                    self.d.error(&rpath, e);
+                    continue;
+                }
+            };
+            if let Some(r) = self.room_ref(room, &rpath) {
+                routine.push((at, r));
+            }
+        }
+        routine.sort_by_key(|(t, _)| *t);
         Some(Npc {
             behavior,
+            routine,
             wander: t.wander.unwrap_or(behavior.default_wander()),
             area,
             range: t.range,
@@ -1350,6 +1422,30 @@ impl<'a> Lowerer<'a> {
 
     // --------------------------------------------------------------- goals
 
+    fn lower_scenes(&mut self, raw: &indexmap::IndexMap<String, src::Scene>) -> Vec<Scene> {
+        let mut out = Vec::new();
+        for (key, sc) in raw {
+            let path = format!("scenes.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&path, e);
+            }
+            let title = sc.title.clone().unwrap_or_else(|| {
+                let t = key.replace('_', " ");
+                let mut c = t.chars();
+                c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            });
+            out.push(Scene {
+                key: key.clone(),
+                title: self.text(&title, &format!("{path}.title")),
+                when: sc.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
+                done: sc.done.as_deref().map(|d| self.code(d, &format!("{path}.done"))),
+                begins: self.text_opt(sc.begins.as_deref(), &format!("{path}.begins")),
+                ends: self.text_opt(sc.ends.as_deref(), &format!("{path}.ends")),
+            });
+        }
+        out
+    }
+
     fn lower_goals(&mut self, raw: &indexmap::IndexMap<String, src::Goal>) -> Vec<Goal> {
         let mut out = Vec::new();
         for (key, g) in raw {
@@ -1494,7 +1590,7 @@ impl<'a> Lowerer<'a> {
                 started_by,
                 stopped_by,
                 when: t.when.as_deref().map(|w| self.code(w, &format!("{path}.when"))),
-                say: self.text_opt(t.say.as_deref(), &format!("{path}.say")),
+                say: self.prose_opt(t.say.as_ref(), &format!("{path}.say")),
                 say_again: self.text_opt(t.say_again.as_deref(), &format!("{path}.say_again")),
                 chance: t.chance.as_ref().and_then(|c| {
                     let n = match c {
@@ -1553,7 +1649,7 @@ impl<'a> Lowerer<'a> {
             let mut nodes = Vec::new();
             for (nkey, n) in &c.nodes {
                 let npath = format!("{path}.nodes.{nkey}");
-                let text = self.text_opt(n.text.as_deref(), &format!("{npath}.text"));
+                let text = self.prose_opt(n.text.as_ref(), &format!("{npath}.text"));
                 let run = n.run.as_deref().map(|r| self.code(r, &format!("{npath}.do")));
                 let mut options = Vec::new();
                 for (i, o) in n.options.iter().enumerate() {
@@ -1570,7 +1666,9 @@ impl<'a> Lowerer<'a> {
                     options.push(ChoiceOption {
                         text: self.text(&o.text, &format!("{opath}.text")),
                         when: o.when.as_deref().map(|w| self.code(w, &format!("{opath}.when"))),
-                        say: self.text_opt(o.say.as_deref(), &format!("{opath}.say")),
+                        say: self.prose_opt(o.say.as_ref(), &format!("{opath}.say")),
+                        why_not: self.text_opt(o.why_not.as_deref(), &format!("{opath}.why_not")),
+                        disposition: o.disposition.unwrap_or(0),
                         run: o.run.as_deref().map(|r| self.code(r, &format!("{opath}.do"))),
                         next,
                     });
@@ -1771,6 +1869,14 @@ impl<'a> Lowerer<'a> {
     /// Checks `end_game("x")` and `open_choice("x")` calls whose
     /// argument is a string literal.
     fn check_script_references(&mut self, story: &Story) {
+        // A routine keeps to the clock: there has to be one.
+        if story.clock.is_none() {
+            for e in &story.entities {
+                if e.npc.as_ref().is_some_and(|n| !n.routine.is_empty()) {
+                    self.d.error(format!("characters.{}.routine", e.key), "a routine goes by the time of day; add a 'clock:' section with the time it starts");
+                }
+            }
+        }
         let endings: Vec<&str> = story.endings.iter().map(|e| e.key.as_str()).collect();
         let choices: Vec<&str> = story.choices.iter().map(|c| c.key.as_str()).collect();
         let mut sources: Vec<(String, String)> = Vec::new();
@@ -1790,6 +1896,14 @@ impl<'a> Lowerer<'a> {
                     if !story.timers.iter().any(|t| t.key == name) {
                         let hint = did_you_mean(name, story.timers.iter().map(|t| t.key.as_str()));
                         self.d.error(origin, format!("{call}(\"{name}\"): no such timer{hint}"));
+                    }
+                }
+            }
+            for call in ["start_scene", "end_scene"] {
+                for name in literal_calls(src, call) {
+                    if !story.scenes.iter().any(|s| s.key == name) {
+                        let hint = did_you_mean(name, story.scenes.iter().map(|s| s.key.as_str()));
+                        self.d.error(origin, format!("{call}(\"{name}\"): no such scene{hint}"));
                     }
                 }
             }
@@ -1966,6 +2080,7 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
                     text(then, f);
                     text(otherwise, f);
                 }
+                Segment::Vary { options, .. } => options.iter().for_each(|o| text(o, f)),
             }
         }
     }

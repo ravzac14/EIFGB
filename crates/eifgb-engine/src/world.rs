@@ -115,11 +115,16 @@ impl World {
         {
             return Err(MoveError::WouldContainItself);
         }
+        let was = if id == PLAYER { self.room_of(PLAYER) } else { None };
         self.state.entities[id.index()].location = dest;
         if id == PLAYER
             && let Some(room) = self.room_of(PLAYER)
         {
             self.state.visited.insert(room);
+            // Another visit, unless it's the same room (into a box and out).
+            if was != Some(room) {
+                *self.state.visits.entry(room).or_insert(0) += 1;
+            }
         }
         Ok(())
     }

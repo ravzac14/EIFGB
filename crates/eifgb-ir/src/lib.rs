@@ -88,6 +88,9 @@ pub struct Story {
     /// Goals for the JOURNAL, in the order they're listed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub goals: Vec<Goal>,
+    /// Named stretches of the story, in the order they're listed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scenes: Vec<Scene>,
     /// The time of day, if the game keeps one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clock: Option<Clock>,
@@ -134,6 +137,25 @@ pub struct Goal {
     /// Points scored when it's done.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub points: i64,
+}
+
+/// A named stretch of the story: it begins once `when` is true (no
+/// `when`: from the start) or a script calls `start_scene`, and ends once
+/// `done` is true or a script calls `end_scene`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Scene {
+    pub key: String,
+    /// What it's called, for RECAP: "The storm".
+    pub title: Text,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done: Option<Code>,
+    /// Said when it begins, and when it ends.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub begins: Option<Text>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends: Option<Text>,
 }
 
 fn is_zero(n: &i64) -> bool {
@@ -624,6 +646,10 @@ pub struct TrapSpec {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Npc {
     pub behavior: Behavior,
+    /// Where it should be by the clock: (minutes after midnight, room), in
+    /// time order. Each day it heads for the latest place whose time has come.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub routine: Vec<(u32, EntityId)>,
     /// Percent chance of moving to a neighbouring room on a turn with
     /// nothing better to do.
     #[serde(default)]
@@ -1075,6 +1101,46 @@ pub enum Segment {
         #[serde(default, skip_serializing_if = "is_empty_text")]
         otherwise: Text,
     },
+    /// Text that varies each time it's shown: one of `options`, chosen by
+    /// `mode` and how many times it's been shown (kept by `key`, its place
+    /// in the source).
+    Vary { key: String, mode: VaryMode, options: Vec<Text> },
+}
+
+/// The word for how a character feels about the player, by its
+/// disposition (-10 to 10): -6 is hostile, 3 friendly.
+pub fn feeling(d: i64) -> &'static str {
+    match d {
+        ..=-5 => "hostile",
+        -4..=-2 => "wary",
+        -1..=1 => "neutral",
+        2..=4 => "friendly",
+        _ => "devoted",
+    }
+}
+
+/// The disposition a word starts at: "friendly" is 2.
+pub fn disposition_of(word: &str) -> Option<i64> {
+    match word.trim().to_lowercase().as_str() {
+        "hostile" => Some(-5),
+        "wary" | "unfriendly" | "suspicious" => Some(-2),
+        "neutral" => Some(0),
+        "friendly" => Some(2),
+        "devoted" | "loyal" => Some(5),
+        _ => None,
+    }
+}
+
+/// How varied text chooses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VaryMode {
+    /// Each in turn, then the last for ever: a list, or `first:` and `later:`.
+    Stop,
+    /// Each in turn, round and round.
+    Cycle,
+    /// One at random, never the same twice in a row.
+    Random,
 }
 
 fn is_empty_text(t: &Text) -> bool {
@@ -1558,6 +1624,13 @@ pub struct ChoiceOption {
     pub text: Text,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<Code>,
+    /// While `when` is false: shown anyway, greyed, with this reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why_not: Option<Text>,
+    /// How choosing it changes how the one being talked to feels about the
+    /// player: their disposition, up or down.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub disposition: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub say: Option<Text>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

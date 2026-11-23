@@ -122,6 +122,9 @@ pub enum Effect {
     StartGoal(String),
     /// `complete_goal`: a goal is done.
     CompleteGoal(String),
+    /// `start_scene`, `end_scene`.
+    StartScene(String),
+    EndScene(String),
     /// A character moved or attacked; the engine describes it if the player can see.
     Npc(crate::npc::NpcEvent),
     /// Change the weather to this kind.

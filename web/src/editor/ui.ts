@@ -80,6 +80,21 @@ export function field(
   return out;
 }
 
+/**
+ * A text field, unless the text at `path` varies (a list, first and later,
+ * cycle, random): then a note, and a way to it in the file, so typing here
+ * can't flatten it.
+ */
+export function proseField(ctx: InspectorContext, path: (string | number)[], ...args: Parameters<typeof field>): HTMLElement[] {
+  const raw = ctx.model.get(path);
+  if (raw === undefined || raw === null || typeof raw === "string") return field(...args);
+  return [
+    el("label", { textContent: args[0] }),
+    el("p", { class: "note", textContent: "This text varies each time it's shown (a list, first and later, cycle or random), so it's edited in the game file." }),
+    el("div", { class: "actions" }, button("Show it in the file", () => ctx.showInFile(`${String(path[1])}:`))),
+  ];
+}
+
 export function check(label: string, checked: boolean, onchange: (v: boolean) => void) {
   const box = el("input", { type: "checkbox", checked });
   box.addEventListener("change", () => onchange((box as HTMLInputElement).checked));

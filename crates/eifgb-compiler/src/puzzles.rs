@@ -122,6 +122,7 @@ fn snippets(story: &Story) -> Vec<Snippet<'_>> {
                     text(owner, then, origin, out);
                     text(owner, otherwise, origin, out);
                 }
+                Segment::Vary { options, .. } => options.iter().for_each(|o| text(owner, o, origin, out)),
             }
         }
     }

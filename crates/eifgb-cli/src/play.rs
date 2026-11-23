@@ -42,6 +42,7 @@ fn show(out: &Output, color: bool) {
             LineKind::Text => println!("{text}"),
             LineKind::Notice => println!("{dim}{text}{reset}"),
             LineKind::Choice => println!("  {text}"),
+            LineKind::Locked => println!("  {dim}– {text}{reset}"),
             LineKind::Ending => println!("\n{bold}{text}{reset}"),
             LineKind::Error => println!("{red}{text}{reset}"),
             LineKind::Picture => println!("{dim}[Picture: {text}]{reset}"),

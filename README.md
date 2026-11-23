@@ -788,6 +788,37 @@ There's no obvious way out.
 A dented brass lantern.
 ```
 
+### Text that varies
+
+Anything said often can say something different each time. A description,
+a verb's `default`, a timer's `say`, what a conversation part or reply
+says, and any message can be a list, or one of these:
+
+```yaml
+rooms:
+  square:
+    name: Square
+    description:
+      first: You step into the square for the first time. It's busy.
+      later: The square again${if here.visits > 2}, as familiar as your hand${end}.
+  bakery:
+    name: Bakery
+    # A list: each in turn, then the last one from then on.
+    description: [Warm and floury., Still warm., Warm.]
+
+messages:
+  # Round and round.
+  wait.done: { cycle: [Time passes., A cart rumbles by.] }
+  # At random, never the same twice in a row.
+  listen.nothing: { random: [All quiet., A dog barks somewhere., Nothing.] }
+```
+
+Each one remembers how often it's been shown, with the saved game, so
+UNDO and RESTORE take that back too. Random ones use the game's own
+random numbers, so a walkthrough plays the same every time. For a room,
+`here.visits` (or `world.square.visits`) counts the times the player has
+come in: 1 on the first visit.
+
 ## Containers and supporters
 
 Bags, boxes and jars are **containers**: things go *in* them. Tables and
@@ -1215,6 +1246,28 @@ takes no turn, and JOURNAL (or NOTES) lists them under the goals. Notes
 are kept with the game's saves, but UNDO and RESTART leave them alone:
 they're the player's, not the story's.
 
+## Scenes
+
+A scene is a named stretch of the story: the morning rush, the storm, the
+chase. It begins when its `when` comes true (without one, at the start),
+and ends when its `done` does:
+
+```yaml
+scenes:
+  storm:
+    title: The storm
+    when: vars.clouds_gathered
+    done: clock.hour >= 18
+    begins: The first drops of rain hit the cobbles.
+    ends: The storm blows itself out.
+```
+
+`begins` and `ends` are said then, if given. While a scene is going on,
+RECAP says so ("Now: The storm."), and conditions can check it:
+`scenes.storm` is `nil` (not begun), `"running"` or `"done"`. Scripts can
+begin and end scenes themselves with `start_scene("storm")` and
+`end_scene("storm")`.
+
 ## Time of day
 
 A game can keep a clock that moves on with each turn:
@@ -1266,6 +1319,25 @@ The time is saved and undone with everything else.
 In the web editor, choose **Add component → Time of day**, or **Keep the
 time of day** under **Time of day** in the game's details. The Small House
 starter template uses both goals and a clock.
+
+### Routines
+
+With a clock, characters can keep to a daily routine:
+
+```yaml
+characters:
+  baker:
+    name: baker
+    in: bakery
+    behavior: merchant
+    routine: { "6:00": bakery, "13:00": square, "20:00": cottage }
+```
+
+Each turn, a character with a routine heads for the latest place whose
+time has come, a room at a time, and stays there once it arrives. Before
+the first time of the day, it's where the last one left it. A character
+in a fight, running scared or under orders deals with that first, and a
+hunter with prey in sight hunts. A routine needs a `clock:`.
 
 ## Hints
 
@@ -1832,6 +1904,71 @@ Nineteen features reward players who try something clever:
 
 [The advanced tutorial](docs/ADVANCED.md) builds a whole game around
 factions, with all four tricks as ways through.
+
+### How they feel about you
+
+Every character has a **disposition**: how they feel about the player,
+from -10 to 10. It's one of five feelings: hostile (-5 or less), wary,
+neutral (the usual, around 0), friendly (2 to 4) and devoted (5 or more).
+Set where it starts with a number or a word:
+
+```yaml
+characters:
+  baker: { name: baker, in: bakery, behavior: merchant, disposition: friendly }
+```
+
+What already decides whether someone fights moves it too:
+
+- Up: a gift they like (+2), an apology or a bribe (+1), taming
+  (devoted), and their side warming to the player (+1 for each member).
+- Down: an attack (-2), theft they notice (it counts as an attack), an
+  insulting offer (-1), and their side souring (-1 each). Becoming
+  someone's foe makes them hostile.
+
+And it matters:
+
+- EXAMINE says how they seem: "The baker seems glad to see you."
+- Merchants charge a friend less (10% off, devoted 20%) and someone they're
+  wary of more (20% more), and pay them more or less for things.
+- At hostile, they won't talk ("The baker won't talk to you.") or trade,
+  and one that fights back treats the player as a foe.
+- In a conversation, `self` is the one being talked to, so an option can
+  be for friends only. `why_not` shows it greyed, with the reason, while
+  it's closed, and `disposition` on an option changes how they feel when
+  it's chosen:
+
+```yaml
+choices:
+  baker_talk:
+    start: hi
+    nodes:
+      hi:
+        text: '"Morning!" says the baker.'
+        options:
+          - { text: Compliment the bread, say: '"Why, thank you!"', disposition: 2, goto: hi }
+          - text: Ask for the secret recipe
+            when: self.disposition >= 4
+            why_not: The baker doesn't trust you enough yet.
+            say: '"Butter. Lots of butter."'
+            end: true
+          - { text: Goodbye, end: true }
+```
+
+```
+> talk to baker
+"Morning!" says the baker.
+  1. Compliment the bread
+  2. Goodbye
+  – Ask for the secret recipe (The baker doesn't trust you enough yet.)
+
+> 1
+"Why, thank you!"
+[The baker warms to you: friendly now.]
+```
+
+Scripts can read and set `self.disposition`, and read `self.feeling`
+("friendly"). Setting it directly doesn't make anyone a foe; only the
+game's own changes do.
 
 ### Trading
 

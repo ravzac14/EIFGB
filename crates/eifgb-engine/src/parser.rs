@@ -159,6 +159,7 @@ fn text_words(text: &eifgb_ir::Text, out: &mut Vec<String>) {
                 text_words(then, out);
                 text_words(otherwise, out);
             }
+            Segment::Vary { options, .. } => options.iter().for_each(|o| text_words(o, out)),
         }
     }
 }

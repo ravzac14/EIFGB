@@ -3,7 +3,7 @@
 
 import { EVENTS } from "./model.ts";
 import { weatherSection } from "./world-ui.ts";
-import { boolField, button, check, el, field, help, numField, select, type InspectorContext } from "./ui.ts";
+import { boolField, button, check, el, field, help, numField, proseField, select, type InspectorContext } from "./ui.ts";
 
 // ------------------------------------------------------------ scripts
 
@@ -575,7 +575,7 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
     ...ruleBuilder(ctx, [...p, "started_by"], "It starts when the player", "(when the game starts)"),
     ...ruleBuilder(ctx, [...p, "stopped_by"], "It stops when the player", "(never)"),
     el("h3", { textContent: "When it goes off" }),
-    ...field("It says", str("say"), (v) => ctx.change((x) => x.set([...p, "say"], v || undefined), { coalesce: `${id}.say`, redraw: false }), { multiline: true, placeholder: "Thunder rolls closer." }),
+    ...proseField(ctx, [...p, "say"], "It says", str("say"), (v) => ctx.change((x) => x.set([...p, "say"], v || undefined), { coalesce: `${id}.say`, redraw: false }), { multiline: true, placeholder: "Thunder rolls closer." }),
     ...field("After the first time, it says", str("say_again"), (v) => ctx.change((x) => x.set([...p, "say_again"], v || undefined), { coalesce: `${id}.say_again`, redraw: false }), {
       multiline: true,
       placeholder: "More thunder.",
@@ -740,7 +740,7 @@ export function choicePanel(panel: HTMLElement, ctx: InspectorContext, id: strin
         if (c.nodes.length < 2) return ctx.notice("A conversation needs at least one part.");
         if (confirm(`Delete the part “${n.id}”? Replies that lead to it will end the conversation instead.`)) ctx.change((x) => x.deleteNode(id, n.id));
       }, "small")),
-      ...field("They say", n.text, (v) => ctx.change((x) => x.set([...p, "text"], v || undefined), { coalesce: `${id}.${n.id}.text`, redraw: false }), {
+      ...proseField(ctx, [...p, "text"], "They say", n.text, (v) => ctx.change((x) => x.set([...p, "text"], v || undefined), { coalesce: `${id}.${n.id}.text`, redraw: false }), {
         multiline: true,
         placeholder: '"Another storm," the old man murmurs.',
       }),
@@ -766,9 +766,20 @@ export function choicePanel(panel: HTMLElement, ctx: InspectorContext, id: strin
             "details",
             { open: !!(o.when || o.say || o.do) },
             el("summary", { textContent: "More" }),
-            ...field("Also says", o.say, (v) => ctx.change((x) => x.set([...op, "say"], v || undefined), { coalesce: `${id}.${n.id}.${i}.say`, redraw: false })),
+            ...proseField(ctx, [...op, "say"], "Also says", o.say, (v) => ctx.change((x) => x.set([...op, "say"], v || undefined), { coalesce: `${id}.${n.id}.${i}.say`, redraw: false })),
             el("label", { textContent: "Only shown if (Lua)" }),
             codeBox(o.when, (v) => ctx.change((x) => x.set([...op, "when"], v.trim() || undefined), { coalesce: `${id}.${n.id}.${i}.when`, redraw: false }), "Only shown if", 1),
+            help("self is the one being talked to: self.disposition >= 2 for a friend."),
+            ...field("While it's not shown: greyed, saying why", String(ctx.model.get([...op, "why_not"]) ?? ""), (v) => ctx.change((x) => x.set([...op, "why_not"], v || undefined), { coalesce: `${id}.${n.id}.${i}.why`, redraw: false }), {
+              placeholder: "You'd need something to trade.",
+            }),
+            el("label", { textContent: "How they feel about it" }),
+            select(
+              [["", "No change"], ["2", "Pleased (+2)"], ["1", "A little pleased (+1)"], ["-1", "A little put out (−1)"], ["-2", "Offended (−2)"], ["-5", "Insulted (−5)"]],
+              ctx.model.get([...op, "disposition"]) === undefined ? "" : String(ctx.model.get([...op, "disposition"])),
+              (v) => ctx.change((x) => x.set([...op, "disposition"], v ? Number(v) : undefined)),
+              "How they feel about it",
+            ),
             el("label", { textContent: "Runs (Lua)" }),
             codeBox(o.do, (v) => ctx.change((x) => x.set([...op, "do"], v.trim() ? v : undefined), { coalesce: `${id}.${n.id}.${i}.do`, redraw: false }), "Runs", 1),
           ),
@@ -814,7 +825,7 @@ export function verbPanel(panel: HTMLElement, ctx: InspectorContext, id: string)
     el("label", { textContent: "What players type, one per line" }),
     pat,
     help("{target} is the thing it's done to, {tool} what it's done with, {text} any words: ring {target}, ring {target} with {tool}."),
-    ...field("Said when nothing has a script for it", String(m.get([...p, "default"]) ?? ""), (v) => ctx.change((x) => x.set([...p, "default"], v || undefined), { coalesce: `${id}.default`, redraw: false }), {
+    ...proseField(ctx, [...p, "default"], "Said when nothing has a script for it", String(m.get([...p, "default"]) ?? ""), (v) => ctx.change((x) => x.set([...p, "default"], v || undefined), { coalesce: `${id}.default`, redraw: false }), {
       placeholder: "Nothing happens.",
     }),
     check("The player has to be able to reach it", m.bool([...p, "reach"], true), (v) => ctx.change((x) => x.setBool([...p, "reach"], v, true))),

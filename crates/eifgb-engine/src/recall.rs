@@ -235,6 +235,11 @@ impl<H: ScriptHost> Game<H> {
             self.world.def(self.world.here()).name.clone()
         };
         self.msg("recap.where", &ctx.clone().text("place", place));
+        let scenes = self.scenes_now();
+        if !scenes.is_empty() {
+            let list = (self.grammar.lang().list_and)(&scenes);
+            self.msg("recap.scene", &ctx.clone().text("scene", list));
+        }
         let held = self.world.inventory();
         if held.is_empty() {
             self.msg("recap.empty_handed", &ctx);
@@ -285,6 +290,15 @@ impl<H: ScriptHost> Game<H> {
         if talk.len() > KEPT {
             talk.drain(..talk.len() - KEPT);
         }
+    }
+
+    /// Who the open conversation is with: whoever has it as their `talk`
+    /// and is here, else whoever has it.
+    pub(crate) fn talker_now(&self, key: &str) -> Option<EntityId> {
+        let story = self.world.story();
+        let c = story.choices.iter().position(|c| c.key == key)?;
+        let has = |i: EntityId| self.world.def(i).talk.is_some_and(|t| t.0 as usize == c);
+        self.world.ids().find(|&i| has(i) && self.world.in_scope(i)).or_else(|| self.talker(key))
     }
 
     /// Who a conversation is with: whoever has it as their `talk`.

@@ -193,6 +193,7 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .tp-log .cmd { color: var(--accent); margin-top: 0.8em; }
 .tp-log .cmd::before { content: "> "; }
 .tp-log .choice { margin: 0 0 0.2em; padding-left: 1em; }
+.tp-log .locked { margin: 0 0 0.2em; padding-left: 1em; color: var(--dim); font-style: italic; }
 .tp-prompt { display: flex; gap: 0.4em; align-items: baseline; padding-top: 0.35rem; }
 .tp-prompt[hidden] { display: none; }
 .tp-prompt .caret { color: var(--accent); font-family: var(--serif); }

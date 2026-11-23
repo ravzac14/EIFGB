@@ -187,6 +187,13 @@ env.clock = setmetatable({}, {
   __metatable = "locked",
 })
 
+-- Scenes: scenes.storm is nil (not begun), "running" or "done".
+env.scenes = setmetatable({}, {
+  __index = function(_, k) return H.scene_get(k) end,
+  __newindex = locked("scenes can't be assigned to; use start_scene(key) or end_scene(key)"),
+  __metatable = "locked",
+})
+
 -- Goals: goals.find_key is nil (not in the journal yet), "active" or "done".
 env.goals = setmetatable({}, {
   __index = function(_, k) return H.goal_get(k) end,
@@ -212,6 +219,8 @@ function env.stop_timer(key) H.stop_timer(key) end
 function env.start_goal(key) H.start_goal(key) end
 function env.set_weather(key) H.set_weather(key) end
 function env.complete_goal(key) H.complete_goal(key) end
+function env.start_scene(key) H.start_scene(key) end
+function env.end_scene(key) H.end_scene(key) end
 -- Moves the clock on: pass_time(30), or set_clock("6:00") for the next 6:00.
 function env.pass_time(minutes)
   if type(minutes) ~= "number" then error("pass_time needs a number of minutes", 2) end

@@ -11,6 +11,9 @@ use eifgb_ir::{Behavior, Direction, EntityId, EntityKind, Faction, Value, PLAYER
 
 use std::collections::{HashMap, VecDeque};
 
+/// At or below this, a character is hostile to the player (see [`eifgb_ir::feeling`]).
+pub const HOSTILE: i64 = -5;
+
 /// How a gift went.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Gift {
@@ -495,6 +498,9 @@ impl World {
         if self.is_pacifist(target) {
             let new_foe = self.add_foe(target, attacker);
             if new_foe && attacker == PLAYER {
+                self.become_hostile(target);
+            }
+            if new_foe && attacker == PLAYER {
                 self.unset(target, "_tamed");
                 self.unset(target, "_bribed");
             }
@@ -512,11 +518,17 @@ impl World {
             Some(Value::Float(f)) => f.floor() as i64,
             _ => 0,
         };
+        if attacker == PLAYER {
+            self.shift_disposition(target, -2);
+        }
         if patience > 0 {
             self.set(target, "patience", Value::Int(patience - 1));
             return (true, None);
         }
         let new_foe = self.add_foe(target, attacker);
+        if new_foe && attacker == PLAYER {
+            self.become_hostile(target);
+        }
         if new_foe && attacker == PLAYER {
             self.unset(target, "_tamed");
             self.unset(target, "_bribed");
@@ -762,13 +774,105 @@ impl World {
             self.set(npc, "patience", Value::Int(i64::from(n.patience)));
         }
         self.unset(npc, "_refuses");
+        // Peace made: warmer, and no longer hostile.
+        self.shift_disposition(npc, 1);
+        if self.disposition(npc) <= HOSTILE {
+            self.set(npc, "disposition", Value::Int(HOSTILE + 1));
+        }
         let f = self.def(npc).faction.clone()?;
         if self.attitude(&f) >= self.starting_attitude(&f) {
             return None;
         }
         let now = self.attitude(&f) + 1;
         self.set_attitude(&f, now);
+        // The whole side warms a little.
+        for m in self.members(&f) {
+            if m != npc {
+                self.shift_disposition(m, 1);
+            }
+        }
         Some(f)
+    }
+
+    // --------------------------------------------------------- disposition
+
+    /// How a character feels about the player, -10 to 10 (0 neutral): its
+    /// `disposition` state field. See [`eifgb_ir::feeling`] for the words.
+    pub fn disposition(&self, id: EntityId) -> i64 {
+        match self.get(id, "disposition") {
+            Some(Value::Int(n)) => *n,
+            Some(Value::Float(f)) => f.round() as i64,
+            _ => 0,
+        }
+    }
+
+    /// Moves a character's disposition by `by` (kept within -10 to 10).
+    /// Falling to hostile, it turns on the player: one that fights makes
+    /// them a foe, a merchant won't trade. Returns the feeling before and
+    /// after, when it changed.
+    pub fn shift_disposition(&mut self, id: EntityId, by: i64) -> Option<(&'static str, &'static str)> {
+        if self.def(id).kind != EntityKind::Character || by == 0 {
+            return None;
+        }
+        let was = self.disposition(id);
+        let now = (was + by).clamp(-10, 10);
+        self.set(id, "disposition", Value::Int(now));
+        if now <= HOSTILE && was > HOSTILE {
+            self.turn_hostile(id);
+        }
+        let (a, b) = (eifgb_ir::feeling(was), eifgb_ir::feeling(now));
+        (a != b).then_some((a, b))
+    }
+
+    /// Made a foe of the player: hostile, at least.
+    fn become_hostile(&mut self, id: EntityId) {
+        if self.disposition(id) > HOSTILE {
+            self.set(id, "disposition", Value::Int(HOSTILE));
+        }
+    }
+
+    /// Hostile now: one that fights back treats the player as a foe; a
+    /// merchant won't trade.
+    fn turn_hostile(&mut self, id: EntityId) {
+        let Some(n) = self.def(id).npc.clone() else { return };
+        if n.fights_back && !self.is_pacifist(id) {
+            self.add_foe(id, PLAYER);
+            self.unset(id, "_tamed");
+            self.unset(id, "_bribed");
+        }
+        if n.behavior == Behavior::Merchant {
+            self.set(id, "_refuses", Value::Bool(true));
+        }
+    }
+
+    /// A merchant's price for something, by how it feels about the player:
+    /// a friend pays less, someone wary of them more.
+    pub fn asking_price(&self, merchant: EntityId, price: i64) -> i64 {
+        let pct = match eifgb_ir::feeling(self.disposition(merchant)) {
+            "devoted" => 80,
+            "friendly" => 90,
+            "wary" => 120,
+            "hostile" => 150,
+            _ => 100,
+        };
+        (price * pct + 50) / 100
+    }
+
+    /// What a merchant pays for things, in percent of their price, by how it feels.
+    pub fn buying_at(&self, merchant: EntityId, buys_at: u32) -> u32 {
+        let by: i64 = match eifgb_ir::feeling(self.disposition(merchant)) {
+            "devoted" => 20,
+            "friendly" => 10,
+            "wary" => -20,
+            "hostile" => -40,
+            _ => 0,
+        };
+        (i64::from(buys_at) + by).clamp(0, 100) as u32
+    }
+
+    /// The living members of a faction.
+    fn members(&self, faction: &str) -> Vec<EntityId> {
+        (0..self.story().entities.len() as u32).map(EntityId).filter(|&c| self.def(c).faction.as_deref() == Some(faction)).collect()
     }
 
     /// The percent of its health below which it flees: its own `morale`,
@@ -973,8 +1077,14 @@ impl World {
         let calmed = self.pacify(npc);
         if tames {
             self.set(npc, "_tamed", Value::Bool(true));
+            // Tamed: devoted.
+            if self.disposition(npc) < 5 {
+                self.set(npc, "disposition", Value::Int(5));
+            }
             Gift::Tamed { eaten: food }
         } else {
+            // Something it likes: warmer still.
+            self.shift_disposition(npc, 1);
             Gift::Liked { calmed }
         }
     }
@@ -1014,6 +1124,10 @@ impl World {
             return None;
         }
         self.set_attitude(faction, now - 1);
+        // The whole side cools a little.
+        for m in self.members(faction) {
+            self.shift_disposition(m, -1);
+        }
         let side = self.player_side();
         let disguise = (side != PLAYER_FACTION).then(|| side.to_string());
         Some(AttitudeChange { faction: faction.to_string(), left: now - 1, disguise })
@@ -1186,6 +1300,17 @@ impl World {
         self.npc_move(npc, dir, to)
     }
 
+    /// Where a character's routine says it should be now: the latest place
+    /// whose time has come today (before the first, the last of yesterday's).
+    pub fn routine_room(&self, npc: EntityId) -> Option<EntityId> {
+        let routine = &self.def(npc).npc.as_ref()?.routine;
+        if routine.is_empty() || self.story().clock.is_none() {
+            return None;
+        }
+        let now = (self.state.clock % 1440) as u32;
+        routine.iter().rev().find(|(t, _)| *t <= now).or(routine.last()).map(|(_, r)| *r)
+    }
+
     /// Takes one step along the shortest route to `target`'s room.
     pub fn npc_step_toward(&mut self, npc: EntityId, target: EntityId) -> Option<NpcEvent> {
         let goal = self.room_of(target)?;
@@ -1350,6 +1475,18 @@ impl World {
         // Food beats everything, even a fight.
         if let Some(&food) = self.food_in(npc, room).first() {
             return self.npc_feed(npc, food).into_iter().collect();
+        }
+        // A routine: on its way to where it should be by the clock, and
+        // staying there once it is (a hunter with prey in range hunts).
+        if let Some(due) = self.routine_room(npc)
+            && !(n.behavior.hostile() && nearest.is_some())
+        {
+            if due != room {
+                return self.npc_step_toward(npc, due).into_iter().collect();
+            }
+            if !matches!(n.behavior, Behavior::Hunter | Behavior::Guard) {
+                return Vec::new();
+            }
         }
         let corpse_here = self.corpses_in(room).into_iter().next();
         let event = match n.behavior {

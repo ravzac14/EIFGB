@@ -123,6 +123,60 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
+    // -------------------------------------------------------------- scenes
+
+    /// Begins scenes whose `when` has come true, and ends those whose `done` has.
+    pub(crate) fn update_scenes(&mut self) {
+        if self.world.story().scenes.is_empty() || self.world.state.ending.is_some() {
+            return;
+        }
+        for s in self.world.story().scenes.clone() {
+            match self.world.state.scenes.get(&s.key).copied() {
+                Some(true) => {}
+                Some(false) => {
+                    if s.done.as_ref().is_some_and(|d| self.run(d, &Ctx::new()).truthy()) {
+                        self.end_scene(&s.key);
+                    }
+                }
+                None => {
+                    if s.when.as_ref().is_none_or(|w| self.run(w, &Ctx::new()).truthy()) {
+                        self.begin_scene(&s.key);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A scene begins (if it hasn't yet): its `begins` text.
+    pub(crate) fn begin_scene(&mut self, key: &str) {
+        let Some(s) = self.world.story().scenes.iter().find(|s| s.key == key).cloned() else { return };
+        if self.world.state.scenes.contains_key(key) {
+            return;
+        }
+        self.world.state.scenes.insert(key.to_string(), false);
+        if let Some(t) = &s.begins {
+            self.render_line(LineKind::Text, t, &Ctx::new());
+        }
+    }
+
+    /// A scene ends (begun or not): its `ends` text.
+    pub(crate) fn end_scene(&mut self, key: &str) {
+        let Some(s) = self.world.story().scenes.iter().find(|s| s.key == key).cloned() else { return };
+        if self.world.state.scenes.get(key) == Some(&true) {
+            return;
+        }
+        self.world.state.scenes.insert(key.to_string(), true);
+        if let Some(t) = &s.ends {
+            self.render_line(LineKind::Text, t, &Ctx::new());
+        }
+    }
+
+    /// The scenes going on now, by title, for RECAP.
+    pub(crate) fn scenes_now(&mut self) -> Vec<String> {
+        let now: Vec<eifgb_ir::Scene> = self.world.story().scenes.iter().filter(|s| self.world.state.scenes.get(&s.key) == Some(&false)).cloned().collect();
+        now.iter().map(|s| self.render_str(&s.title, &Ctx::new())).collect()
+    }
+
     fn goal_def(&self, key: &str) -> Option<Goal> {
         self.world.story().goals.iter().find(|g| g.key == key).cloned()
     }

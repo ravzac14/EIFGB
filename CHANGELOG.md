@@ -4,7 +4,12 @@ What's new, newest first. EIFGB is still early (version 0.1), and the game
 file format may change before 1.0; anything that changes how existing games
 behave will be called out here.
 
-## Unreleased
+<!-- New entries go under "## Unreleased" here, at the top (add the heading
+if it's not there). When the site is deployed, GitHub Actions turns it into
+the day's date (web/scripts/date-changelog.mjs); add a title after the date
+if you like ("## 2026-11-24: editor tools"). -->
+
+## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - New in the editor:
   - Find (Ctrl+Shift+F) searches every room, thing, character, message and
@@ -72,6 +77,9 @@ behave will be called out here.
 - BRIEF is now a command, so it's no longer an unknown word.
 - Fixed: FEEL FOR THE COIN in the dark no longer counts everything else
   there as found.
+
+## 2026-11-20: notes, how things behave, and the puzzle chain
+
 - Players can keep notes: NOTE THE CODE MIGHT BE 4512 writes one, word for
   word, with no turn taken. JOURNAL and NOTES list them; ERASE NOTE 2 and
   CLEAR NOTES rub them out. They're kept with saves, and UNDO and RESTART
@@ -136,6 +144,9 @@ behave will be called out here.
   thing's when it's examined, for clues the player has to see. In the
   editor: a **Picture** section on each, and **Add component → Picture**.
   The Small House starter has a note on the fridge to look at.
+
+## 2026-11-19: talking naturally, goals, the time of day, and hints
+
 - Players can talk more naturally:
   - Lists with commas (TAKE THE KEY, THE COIN AND THE LAMP), MY HAT, THE
     BRASS ONE, THE OTHER ONE, THE SECOND KEY, TWO COINS. Identical things
@@ -221,7 +232,6 @@ behave will be called out here.
 - Download a game as one web page: the editor's **Download** offers a
   single .html file with the game and engine inside, that plays anywhere,
   even offline. The zip of the game's files is still there too.
-
 - A Parchment look in *Text and colours*: ink on old paper, room names in
   small capitals, and a drop capital at the start of each room's
   description. Games can choose it too, with
@@ -229,49 +239,40 @@ behave will be called out here.
 - *Text appears: letter by letter*, in *Text and colours* while playing:
   new text is typed out like a typewriter. It's off unless you turn it on,
   and any key, click or tap shows the rest at once.
-
 - Starter templates in the editor: start a new game from "A Small House"
   (five rooms, a locked front door and keys to find), "The Locked Door"
   (a dungeon cell, a sleeping guard and an iron door) or "Market Day"
   (someone to talk to, a baker, and someone to help), instead of a blank
   room. Each is a small, finished game to change into your own.
-
 - The editor's "+ Room" button is now "Add component", for anything a game
   can have: a room (added straight away, as before), an object or a
   character (it asks which room first), a door, a side, an ending, a
   conversation, a verb, a timer, a variable or a script file.
-
 - Room colours in the editor, to group rooms into areas (the castle, the
   forest): pick one for each room, and it shows on the player's map too.
   They're kept in `map.yaml`, so the game itself doesn't change.
 - An "Editor theme" choice on the editor's map: the site's colours, or
   Blueprint (white lines on blue), so working on the map feels different
   from playing. It's remembered in your browser.
-
 - Room descriptions end with "Known exits:", and list only the ways out
   that are open to the player right now: not an exit whose `when` is
   false, and not a secret door that hasn't been found. Games can turn the
   list off with `settings: { list_exits: false }`, or per room; the
   editor has a switch for both.
-
 - Test play in the editor: play your game in the editor's bottom panel
   while you work on it, from the start or from the room selected on the
   map, with the room you're in lit up on the map. It tells you when you've
   changed the game since starting.
-
 - When a game ends on the website, you can still type: UNDO, RESTORE and
   RESTART work, as the game says.
-
 - For AI assistants: a guide to writing games with one (format, common
   mistakes, a complete checked example), every docs page as Markdown next
   to its HTML, and `llms.txt`, `llms-full.txt` and `sitemap.xml` at the
   site's root.
-
 - Send feedback from anywhere on the site: report something broken or
   confusing, or an idea for playing, the editor or the website. It says
   which page (or which game, room and turn) you were on and which version
   of the site you're seeing, and shows everything it sends first.
-
 - Download a transcript of your game, as a text file, from Saves or when
   the game ends.
 - Endings found: a game's card on the home page and in the gallery says
@@ -292,19 +293,9 @@ behave will be called out here.
   things are out of reach until the player stands on something (CLIMB ON
   THE CRATE). See [Pushing and climbing](README.md#pushing-and-climbing).
   CLIMB UP and CLIMB DOWN now go up and down.
-
 - Light shows through open ways between rooms: in a dark room next to a
   lit one, "Light spills in from the north."; in a lit room next to a dark
   one, "It's dark to the north."
-
-- The home page's heading is now *Interactive Fiction Game Builder/Player*.
-- This changelog, on the website.
-- A tiny game to try at the top of the home page: you're locked in a study.
-- New looks in *Text and colours*: Terminal (green or amber, with a soft
-  glow and scan lines) and High contrast. A *Very legible* typeface
-  (Atkinson Hyperlegible), roomier line spacing, and narrow, medium or wide
-  columns. They apply to the player, the editor and the docs.
-- The site has an icon, and links to it show a preview card when shared.
 - A map in the player that fills in as you explore: the places you've been,
   the ways between them, doors, and the ways out you haven't tried yet.
   Rooms sit where the author put them in the editor.
@@ -314,6 +305,15 @@ behave will be called out here.
   other command, rather than clicked.
 - The guide's list of commands every game understands is now a set of
   tables, with the other ways to say each one.
+
+## 2026-11-18: new looks, and a game on the home page
+
+- A tiny game to try at the top of the home page: you're locked in a study.
+- New looks in *Text and colours*: Terminal (green or amber, with a soft
+  glow and scan lines) and High contrast. A *Very legible* typeface
+  (Atkinson Hyperlegible), roomier line spacing, and narrow, medium or wide
+  columns. They apply to the player, the editor and the docs.
+- The site has an icon, and links to it show a preview card when shared.
 
 ## 2026-11-17: the website
 
@@ -354,6 +354,8 @@ Everything now runs in the browser, at
 
 - The guide, both tutorials and the format reference are pages on the site,
   with a page for each example game showing its files.
+- The home page's heading is now *Interactive Fiction Game Builder/Player*.
+- This changelog, on the website.
 
 ### Checking games
 

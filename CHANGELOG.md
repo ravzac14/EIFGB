@@ -9,7 +9,7 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
-## Unreleased
+## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - The editor is simpler to find your way around: each panel starts with
   the essentials, and folds the rest under headings that say what's set;
@@ -24,8 +24,6 @@ if you like ("## 2026-11-24: editor tools"). -->
   as files with the command line.
 - Fixed: the editor's description helper suggested words like "would" and
   "starts" as things to add.
-
-## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - Text that varies: a description, message or reply can be a list (each
   in turn), `first:` and `later:`, `cycle:` or `random:`, so WAIT and a

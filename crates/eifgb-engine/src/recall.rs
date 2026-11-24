@@ -387,7 +387,10 @@ impl<H: ScriptHost> Game<H> {
                 ways.push(way);
             }
             let ways = if ways.is_empty() { self.msg_str("map.no_ways", &Ctx::new()) } else { ways.join("; ") };
-            let ctx = Ctx::new().text("room", self.world.def(r).name.clone()).value("here", Value::Bool(r == here)).text("ways", ways);
+            let mut ctx = Ctx::new().text("room", self.world.def(r).name.clone()).value("here", Value::Bool(r == here)).text("ways", ways);
+            if let Some(m) = self.mark_in(r) {
+                ctx = ctx.text("mark", m);
+            }
             self.msg("map.room", &ctx);
         }
     }

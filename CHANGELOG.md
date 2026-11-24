@@ -9,6 +9,20 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+
+## Unreleased
+
+- New things for creative players:
+  - Making things: `combines:` turns two things into a third, by TIE,
+    COMBINE, PUT IN and the like (TIE THE ROPE TO THE HOOK).
+  - Barricades: PUSH THE WARDROBE AGAINST THE DOOR blocks it both ways
+    until it's moved.
+  - Marks: with chalk (`marks: true`), CHALK AN ARROW leaves a mark in the
+    room, shown on LOOK and MAP.
+  - Swaps: a character can watch a thing (`watches:`), and a fake
+    (`decoy_for:`) can be swapped for it unseen.
+  - PLAY DEAD: hunters lose interest, unless they eat the dead.
+
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
 - Making a game with an AI assistant: *Make a game with your AI*, on the

@@ -106,6 +106,9 @@ impl<'a> Lowerer<'a> {
             size: s.player.size.unwrap_or(1),
             picture: None,
             revealed_by: vec![],
+            combines: vec![],
+            marks: false,
+            decoy_for: None,
             handlers: vec![],
             npc: None,
             health: s.player.health,
@@ -639,6 +642,9 @@ impl<'a> Lowerer<'a> {
             size: 1,
             picture: self.picture(r.picture.as_ref(), &format!("{path}.picture")),
             revealed_by: vec![],
+            combines: vec![],
+            marks: false,
+            decoy_for: None,
             handlers,
             npc: None,
             health: None,
@@ -971,6 +977,22 @@ impl<'a> Lowerer<'a> {
         if let Some(l) = &t.full_of {
             state.entry("liquid".into()).or_insert(Value::Str(l.trim().to_lowercase()));
         }
+        // What it makes with something else.
+        let mut combines = Vec::new();
+        let rules: Vec<&src::CombineSrc> = match &t.combines {
+            None => vec![],
+            Some(src::CombinesSrc::One(c)) => vec![c],
+            Some(src::CombinesSrc::Many(l)) => l.iter().collect(),
+        };
+        for (i, c) in rules.into_iter().enumerate() {
+            let cpath = format!("{path}.combines[{i}]");
+            let (Some(with), Some(makes)) = (self.entity_ref(&c.with, &format!("{cpath}.with")), self.entity_ref(&c.makes, &format!("{cpath}.makes"))) else { continue };
+            let by = c.by.as_ref().map(|b| b.items().into_iter().map(|v| v.trim().to_lowercase()).collect()).unwrap_or_default();
+            let keep = c.keep.as_ref().map(|k| k.items().into_iter().filter_map(|x| self.entity_ref(x, &format!("{cpath}.keep"))).collect()).unwrap_or_default();
+            let say = self.text_opt(c.say.as_deref(), &format!("{cpath}.say"));
+            combines.push(Combination { with, makes, by, say, keep });
+        }
+        let decoy_for = t.decoy_for.as_deref().and_then(|d| self.entity_ref(d, &format!("{path}.decoy_for")));
         Entity {
             key: key.into(),
             kind,
@@ -987,6 +1009,9 @@ impl<'a> Lowerer<'a> {
             size: t.size.unwrap_or(1),
             picture: self.picture(t.picture.as_ref(), &format!("{path}.picture")),
             revealed_by,
+            combines,
+            marks: t.marks,
+            decoy_for,
             handlers,
             npc,
             health: t.health.filter(|_| is_char),
@@ -1129,9 +1154,11 @@ impl<'a> Lowerer<'a> {
             }
         }
         routine.sort_by_key(|(t, _)| *t);
+        let watches = t.watches.iter().enumerate().filter_map(|(i, w)| self.entity_ref(w, &format!("{path}.watches[{i}]"))).collect();
         Some(Npc {
             behavior,
             routine,
+            watches,
             wander: t.wander.unwrap_or(behavior.default_wander()),
             area,
             range: t.range,

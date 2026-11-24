@@ -1951,6 +1951,28 @@ Nineteen features reward players who try something clever:
   Without one, it names the killer: "You killed the grey wolf." A
   character can start dead, with `state: { dead: true, killed_by: alpha }`.
 
+- **Making things:** `combines: { with: hook, makes: grapple }` on an
+  object makes a third thing from two: TIE THE ROPE TO THE HOOK, COMBINE
+  …, PUT … IN … and the like all do it (`by: [tie]` to say which verbs).
+  Both are used up unless listed in `keep:`, and `say:` words it ("You tie
+  the rope to the hook."). The made thing starts nowhere, with no `in:`.
+- **Barricades:** PUSH THE WARDROBE AGAINST THE DOOR (or BARRICADE THE
+  DOOR, with whatever `pushable` thing is there) shuts the door and blocks
+  it both ways, for characters too, until it's moved: MOVE THE WARDROBE
+  AWAY, UNBLOCK THE DOOR, or pushing it off to another room.
+- **Leaving marks:** with something that `marks: true` (chalk, a knife),
+  MARK, CHALK AN ARROW or SCRATCH "THIS WAY" leaves a mark of the player's
+  in the room, one each. LOOK shows it ("Your mark is here: an arrow."),
+  and so does MAP; RUB OUT THE MARK takes it away. For mazes.
+- **Swaps:** a character with `watches: [ruby]` won't let the player take
+  it while they can see ("The guard won't let you near the ruby."). A fake
+  with `decoy_for: ruby` can be swapped for it unseen: REPLACE THE RUBY
+  WITH THE GLASS GEM, or TRADE THE GLASS GEM FOR THE RUBY.
+- **Playing dead:** PLAY DEAD (FEIGN DEATH, LIE STILL) and anything that
+  doesn't eat the dead leaves the player alone ("The wolf sniffs at you,
+  and loses interest."), until they do something besides waiting or
+  looking about. A faction that `eats_corpses` isn't fooled.
+
 [The advanced tutorial](docs/ADVANCED.md) builds a whole game around
 factions, with all four tricks as ways through.
 

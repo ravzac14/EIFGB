@@ -52,6 +52,27 @@ scenes, and locked conversation options. So are WHAT DID SHE SAY?, MAP in words,
 (WHERE IS on something carried, INVENTORY BY PLACE); counting (TAKE TWO
 COINS, TAKE ALL BUT THE KEY) was already there.
 
+## Players
+
+Built from this list: making things (`combines:`), barricades, marks,
+swaps for fakes, and playing dead. Still to do:
+
+- **Favours from friends:** ASK THE BAKER TO OPEN THE GATE, if they're
+  friendly enough: orders, for those who like you.
+- **Threats:** THREATEN THE GUARD (WITH THE SWORD): someone who fears you
+  gives in; someone who doesn't cools, and may fight.
+- **Persuasion and lies:** TELL THE GUARD THE CAPTAIN WANTS HIM, with
+  `believes:` topics; a lie works on someone who trusts you, and costs
+  dear if found out.
+- **Asking what they've seen:** ASK THE GUARD ABOUT THE THIEF: characters
+  remember who went where.
+- **Making a new way:** smashing a window or digging through soft ground
+  opens an exit that wasn't there.
+- **Following someone:** FOLLOW THE BAKER, a room behind on their routine,
+  unseen if sneaking.
+- **Busking and odd jobs:** SING in a busy square for coins; characters
+  with `jobs:` pay for errands.
+
 ## Writing games
 
 - **Games in more than one language:** a game's own text in a second

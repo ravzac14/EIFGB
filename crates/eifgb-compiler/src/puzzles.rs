@@ -422,10 +422,24 @@ pub fn puzzles(story: &Story) -> Puzzles {
             }
             lists.push(ways);
         }
+        // Watched by someone: a fake to swap for it, or taken on trust.
+        let watcher = (0..n).find(|&c| def(c).npc.as_ref().is_some_and(|w| w.watches.contains(&EntityId(i as u32))));
+        if let Some(c) = watcher {
+            let decoys: Vec<usize> = (0..n).filter(|&d| def(d).decoy_for == Some(EntityId(i as u32))).collect();
+            if !decoys.is_empty() {
+                lists.push(decoys.iter().map(|&d| Part::new(vec![Fact::Thing(d)], format!("swap:Swap {} for {}", the(&name(d)), the(&name(i))))).collect());
+            } else {
+                lists.push(vec![Part::new(vec![], format!("watched:{c}"))]);
+            }
+        }
         for parts in combos(&lists) {
             let needs: Vec<Fact> = parts.iter().flat_map(|p| p.needs.clone()).collect();
             let tag = |t: &str| parts.iter().find_map(|p| p.text.strip_prefix(t).map(str::to_string));
-            let (kind, text) = if let Some(r) = tag("reveal:") {
+            let (kind, text) = if let Some(s) = tag("swap:") {
+                (Some("find"), format!("{s}, unseen by {}.", the(&name(watcher.unwrap_or(i)))))
+            } else if let Some(c) = tag("watched:").and_then(|c| c.parse::<usize>().ok()) {
+                (Some("find"), format!("Take {} while {} isn't looking.", the(&name(i)), the(&name(c))))
+            } else if let Some(r) = tag("reveal:") {
                 (Some("find"), format!("{r}: {}.", a(&name(i))))
             } else if let Some(sh) = tag("shut:") {
                 let (h, how) = sh.split_once(':').unwrap_or(("", ""));
@@ -445,7 +459,10 @@ pub fn puzzles(story: &Story) -> Puzzles {
             let script = parts.iter().find_map(|p| p.script.clone());
             let assume = held_by
                 .filter(|_| kind == Some("find") && text.starts_with("Get "))
-                .map(|c| format!("the player can get {} from {}, by asking, buying, stealing or fighting", the(&name(i)), the(&name(c))));
+                .map(|c| format!("the player can get {} from {}, by asking, buying, stealing or fighting", the(&name(i)), the(&name(c))))
+                .or_else(|| {
+                    tag("watched:").and_then(|c| c.parse::<usize>().ok()).map(|c| format!("the player can take {} while {} isn't looking (it's watched, and there's no fake to swap for it)", the(&name(i)), the(&name(c))))
+                });
             rules.push(Rule { fact: Fact::Thing(i), needs, kind, text, wears, script, assume });
         }
     }
@@ -536,6 +553,16 @@ pub fn puzzles(story: &Story) -> Puzzles {
                 let assume = e.when.as_ref().filter(|_| !understood).map(|w| format!("the way {} from {} to {} opens (when: {})", e.direction.key(), the_room(&name(r)), the_room(&name(to)), w.src.trim()));
                 rules.push(Rule { fact: Fact::Room(to), needs, kind, text, wears, script, assume });
             }
+        }
+    }
+    // Things made from two others: COMBINE, TIE, PUT IN.
+    for one in 0..n {
+        for c in &def(one).combines {
+            let (other, made) = (c.with.index(), c.makes.index());
+            let mut r = Rule::new(Fact::Thing(made), vec![Fact::Thing(one), Fact::Thing(other)]);
+            r.kind = Some("find");
+            r.text = format!("Put {} and {} together: {}.", the(&name(one)), the(&name(other)), a(&name(made)));
+            rules.push(r);
         }
     }
     // Rooms a script moves the player to.

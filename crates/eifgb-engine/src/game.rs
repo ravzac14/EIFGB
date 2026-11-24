@@ -654,6 +654,13 @@ impl<H: ScriptHost> Game<H> {
         }
 
         let before = self.world.state.clone();
+        // Lying still is over, with anything but waiting or looking about.
+        if !matches!(
+            verb.action,
+            VerbAction::Builtin(BuiltinAction::Wait | BuiltinAction::PlayDead | BuiltinAction::Look | BuiltinAction::Examine | BuiltinAction::Listen | BuiltinAction::Smell)
+        ) {
+            self.stop_playing_dead();
+        }
         self.in_action = true;
         self.perform(&verb, &cmd);
         self.in_action = false;
@@ -665,6 +672,8 @@ impl<H: ScriptHost> Game<H> {
             self.world.state.mentioned = mentioned;
         }
         self.end_turn();
+        self.keep_barricades();
+        self.dead_act_seen();
         self.world.push_undo(before);
         self.last = Some(cmd.words);
         self.settle();
@@ -879,9 +888,15 @@ impl<H: ScriptHost> Game<H> {
                 || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search | BuiltinAction::Smell | BuiltinAction::Listen | BuiltinAction::Read)));
 
         let before_action = self.out.lines.len();
+        let combination = self.combination(&verb.key, target, cmd.tool);
         let ok = match self.handlers(target, here, Phase::On, &verb.key).into_iter().next() {
             Some((owner, code)) => self.run(&code, &with_owner(owner)) != ScriptValue::Block,
             None if quiet => true,
+            // Two things that make a third: TIE THE ROPE TO THE HOOK.
+            None if combination.is_some() => {
+                let (a, b, c) = combination.expect("a combination");
+                self.combine_now(a, b, &c)
+            }
             None => match verb.action {
                 VerbAction::Builtin(a) => self.builtin(a, target, cmd, &ctx),
                 VerbAction::Script => {

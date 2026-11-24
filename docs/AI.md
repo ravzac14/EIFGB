@@ -143,6 +143,12 @@ field is an error, not ignored, so a typo is caught.
   insults cool them. It shows on EXAMINE, in merchants' prices, and a
   hostile one won't talk or trade. Scripts read `self.disposition` and
   `self.feeling`.
+- **Tricks:** `combines: { with: hook, makes: grapple }` on an object
+  (TIE ROPE TO HOOK makes a grappling hook that starts with no `in:`);
+  `pushable` things barricade doors (PUSH WARDROBE AGAINST DOOR); objects
+  with `marks: true` (chalk) let players mark rooms; `watches: [ruby]` on a
+  character guards a thing, and `decoy_for: ruby` on a fake swaps for it
+  unseen; PLAY DEAD fools anything that doesn't eat the dead.
 - **Routines:** with a `clock:`, a character can keep to one: `routine: {
   "6:00": bakery, "13:00": square }`.
 - **Scenes:** under `scenes:`, each with `title`, Lua `when` (begins) and

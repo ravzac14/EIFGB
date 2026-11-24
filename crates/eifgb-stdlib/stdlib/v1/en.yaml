@@ -270,6 +270,61 @@ verbs:
       - "where did {text} come from"
       - "find {text}"
       - "locate {text}"
+  combine:
+    action: combine
+    patterns:
+      - "combine {target} with {tool}"
+      - "combine {target} and {tool}"
+      - "join {target} to {tool}"
+      - "join {target} with {tool}"
+      - "connect {target} to {tool}"
+      - "mix {target} with {tool}"
+      - "mix {target} into {tool}"
+      - "mix {target} and {tool}"
+      - "fit {target} to {tool}"
+      - "fit {target} on {tool}"
+      - "fix {target} to {tool}"
+  barricade:
+    action: barricade
+    patterns:
+      - "push {target} against {tool}"
+      - "shove {target} against {tool}"
+      - "move {target} against {tool}"
+      - "drag {target} against {tool}"
+      - "put {target} against {tool}"
+      - "block {tool} with {target}"
+      - "barricade {tool} with {target}"
+      - "wedge {tool} shut with {target}"
+      - "barricade {target}"
+      - "block {target}"
+  unbarricade:
+    action: unbarricade
+    patterns:
+      - "move {target} away from {tool}"
+      - "pull {target} away from {tool}"
+      - "drag {target} away from {tool}"
+      - "move {target} away"
+      - "push {target} away"
+      - "pull {target} away"
+      - "drag {target} away"
+      - "unblock {target}"
+      - "unbarricade {target}"
+  mark:
+    action: mark
+    patterns: ["mark", "mark {text}", "make a mark", "leave a mark", "chalk {text}", "scratch {text}", "carve {text}", "write {text} on the wall"]
+  unmark:
+    action: unmark
+    patterns: ["rub out the mark", "rub out mark", "rub out my mark", "rub the mark out", "wipe the mark", "wipe off the mark", "wipe the mark off", "scrub the mark", "clean off the mark"]
+  swap:
+    action: swap
+    patterns:
+      - "replace {target} with {tool}"
+      - "substitute {tool} for {target}"
+      - "switch {target} with {tool}"
+      - "switch {target} for {tool}"
+  play_dead:
+    action: play_dead
+    patterns: ["play dead", "feign death", "pretend to be dead", "pretend to die", "play possum", "lie still", "fake my death"]
   last_talk:
     action: last_talk
     patterns:
@@ -967,6 +1022,32 @@ messages:
   recap.recent: "Your last few moves: ${args.list}."
   recap.notes: "You've written ${args.n} ${if args.n == 1}note${else}notes${end}: NOTES shows them."
   choice.locked: "${args.text} (${args.why})"
+  combine.done: "You make ${a(args.target)}."
+  combine.cant: "You can't see how to put those together."
+  barricade.done: "You push ${the(args.target)} against ${the(args.tool)}. Nobody's getting through that way now."
+  barricade.not_door: "There's no door like that here to barricade."
+  barricade.already: "${The(args.tool)} is already blocked."
+  barricade.nothing: "There's nothing here heavy enough to block ${the(args.tool)} with."
+  barricade.not_pushable: "${The(args.target)} won't do to block a door."
+  barricade.against: "${The(args.target)} is pushed against ${the(args.tool)}."
+  unbarricade.done: "You move ${the(args.target)} away from ${the(args.tool)}."
+  unbarricade.nothing: "There's nothing blocking that."
+  mark.plain: "an X"
+  mark.done: "You mark ${args.mark} here, with ${the(args.tool)}."
+  mark.no_tool: "You've nothing to mark with."
+  mark.here: "Your mark is here: ${args.mark}."
+  unmark.done: "You rub out your mark."
+  unmark.none: "There's no mark of yours here."
+  swap.done: "You swap ${the(args.tool)} for ${the(args.target)}."
+  swap.fooled: "You swap ${the(args.tool)} for ${the(args.target)}. ${The(args.npc)} doesn't notice a thing."
+  swap.with_what: "Swap it for what?"
+  swap.cant: "You can't swap that."
+  watch.stopped: "${The(args.npc)} won't let you near ${the(args.target)}."
+  play_dead.start: "You drop to the ground and lie very still."
+  play_dead.again: "You lie very still."
+  play_dead.end: "[You get back to your feet.]"
+  npc.fooled: "${The(args.npc)} sniffs at you, and loses interest."
+  npc.not_fooled: "${The(args.npc)} isn't fooled: the dead are what it eats."
   talk.hostile: "${The(args.target)} won't talk to you."
   disposition.hostile: "${The(args.target)} glares at you."
   disposition.wary: "${The(args.target)} eyes you warily."
@@ -979,7 +1060,7 @@ messages:
   talk.recall_none: "You haven't talked to anyone yet."
   talk.recall_not_them: "You haven't talked to ${the(args.target)} yet."
   map.head: "[You've been to ${args.n} ${if args.n == 1}place${else}places${end}.]"
-  map.room: "${args.room}${if args.here} (you're here)${end}: ${args.ways}."
+  map.room: "${args.room}${if args.here} (you're here)${end}${if args.mark}, marked ${args.mark}${end}: ${args.ways}."
   map.no_ways: "no ways out that you know of"
   map.way_to: "${args.dir} to the ${args.room}"
   map.way_new: "${args.dir}, somewhere you haven't been"

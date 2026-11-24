@@ -353,6 +353,18 @@ pub struct Thing {
     /// thing while it's hidden.
     #[serde(default)]
     pub revealed_by: Option<OneOrMany>,
+    /// What it makes with something else: `{ with: hook, makes: grappling_hook }`, or a list.
+    #[serde(default)]
+    pub combines: Option<CombinesSrc>,
+    /// Leaves a mark: chalk, a knife.
+    #[serde(default)]
+    pub marks: bool,
+    /// A fake of that thing, good enough to swap for it unseen.
+    #[serde(default)]
+    pub decoy_for: Option<String>,
+    /// Characters: things they won't let the player take while they're looking.
+    #[serde(default)]
+    pub watches: Vec<String>,
     #[serde(default)]
     pub on: IndexMap<String, String>,
 
@@ -676,6 +688,27 @@ pub struct Scene {
     pub begins: Option<String>,
     #[serde(default)]
     pub ends: Option<String>,
+}
+
+/// One combination, or a list of them.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum CombinesSrc {
+    One(CombineSrc),
+    Many(Vec<CombineSrc>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CombineSrc {
+    pub with: String,
+    pub makes: String,
+    #[serde(default)]
+    pub by: Option<OneOrMany>,
+    #[serde(default)]
+    pub say: Option<String>,
+    #[serde(default)]
+    pub keep: Option<OneOrMany>,
 }
 
 /// Text that can vary: a string, a list (each in turn, then the last), or

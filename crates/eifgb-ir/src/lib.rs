@@ -520,6 +520,15 @@ pub struct Entity {
     /// Actions that reveal this entity while it's `hidden`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revealed_by: Vec<ActionRule>,
+    /// What it makes with something else: COMBINE, TIE, PUT IN…
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub combines: Vec<Combination>,
+    /// Objects: leaves a mark (chalk, a knife): MARK, CHALK AN X.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub marks: bool,
+    /// Objects: a fake of that thing, good enough to swap for it unseen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decoy_for: Option<EntityId>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
     /// How a character acts on its turn. Only characters have one.
@@ -650,6 +659,9 @@ pub struct Npc {
     /// time order. Each day it heads for the latest place whose time has come.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub routine: Vec<(u32, EntityId)>,
+    /// Things it won't let the player take while it can see them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub watches: Vec<EntityId>,
     /// Percent chance of moving to a neighbouring room on a turn with
     /// nothing better to do.
     #[serde(default)]
@@ -1131,6 +1143,21 @@ pub fn disposition_of(word: &str) -> Option<i64> {
     }
 }
 
+/// Two things that make a third: `with` is the other, `makes` what they make.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Combination {
+    pub with: EntityId,
+    pub makes: EntityId,
+    /// Verbs that do it (empty: the usual ones, COMBINE, TIE, PUT IN, POUR…).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub by: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say: Option<Text>,
+    /// Of the two, those that are left, not used up.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keep: Vec<EntityId>,
+}
+
 /// How varied text chooses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1406,6 +1433,20 @@ pub enum BuiltinAction {
     Map,
     /// INVENTORY BY PLACE: what's carried, by where it was found.
     InventoryByPlace,
+    /// COMBINE X WITH Y: what they make together.
+    Combine,
+    /// PUSH X AGAINST THE DOOR: blocked until it's moved.
+    Barricade,
+    /// MOVE X AWAY: the door's clear again.
+    Unbarricade,
+    /// MARK, CHALK AN X: a mark of the player's in this room.
+    Mark,
+    /// RUB OUT THE MARK.
+    Unmark,
+    /// REPLACE X WITH Y: take one, leave the other.
+    Swap,
+    /// PLAY DEAD: lie still, until anything else.
+    PlayDead,
 }
 
 impl BuiltinAction {

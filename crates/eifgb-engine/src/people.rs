@@ -1154,6 +1154,12 @@ impl<H: ScriptHost> Game<H> {
             self.msg("sell.not_held", ctx);
             return false;
         }
+        // Watched, or a fake of it: TRADE THE GLASS GEM FOR THE RUBY is a swap.
+        let sold = self.world.merchants_here().iter().any(|&m| self.world.location(wanted) == Some(m));
+        let watched = self.world.ids().any(|c| self.world.def(c).npc.as_ref().is_some_and(|n| n.watches.contains(&wanted)));
+        if !sold && (watched || self.world.def(t).decoy_for == Some(wanted)) {
+            return self.swap(wanted, Some(t), ctx);
+        }
         let Some((seller, price)) = self.seller_of(wanted, None, &ctx.clone().entity("target", wanted)) else { return false };
         let ctx = ctx.clone().entity("merchant", seller);
         let (buys_at, haggle) = self.world.def(seller).npc.as_ref().map_or((0, 0), |n| (self.world.buying_at(seller, n.buys_at), n.haggle));

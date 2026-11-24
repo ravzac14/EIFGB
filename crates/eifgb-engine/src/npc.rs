@@ -271,6 +271,20 @@ impl World {
     /// `hostile_to` says; without one, hunters and guards go for the
     /// player only. Nobody attacks the dead, or themselves.
     pub fn is_hostile(&self, a: EntityId, b: EntityId) -> bool {
+        // Playing dead: no enemy, to anything that doesn't eat the dead.
+        if b == PLAYER && self.fooled_by_dead(a) {
+            return false;
+        }
+        self.would_be_hostile(a, b)
+    }
+
+    /// The player is playing dead, and `npc` doesn't eat the dead: fooled.
+    pub fn fooled_by_dead(&self, npc: EntityId) -> bool {
+        self.flag(PLAYER, "_playing_dead") && !self.faction(npc).is_some_and(|f| f.eats_corpses)
+    }
+
+    /// Hostile, whatever the player is pretending.
+    pub fn would_be_hostile(&self, a: EntityId, b: EntityId) -> bool {
         if a == b {
             return false;
         }
@@ -1173,7 +1187,7 @@ impl World {
         let chars = (0..self.story().entities.len() as u32).map(EntityId).filter(|&id| self.def(id).kind == EntityKind::Character);
         std::iter::once(PLAYER)
             .chain(chars)
-            .filter(|&b| self.together(npc, b) && self.is_foe(npc, b) && self.is_hostile_or_foe_alive(b))
+            .filter(|&b| self.together(npc, b) && self.is_foe(npc, b) && self.is_hostile_or_foe_alive(b) && !(b == PLAYER && self.fooled_by_dead(npc)))
             .filter(|&b| self.can_see(npc, b))
             .collect()
     }

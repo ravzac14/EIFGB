@@ -155,6 +155,13 @@ impl<H: ScriptHost> Game<H> {
             (A::Give, Some(t)) => self.give_action(t, cmd.tool, ctx),
             (A::Bribe, Some(t)) => self.bribe_action(t, cmd.text.as_deref(), ctx),
             (A::Trade, Some(t)) => self.trade(t, cmd.tool, ctx),
+            (A::Combine, Some(t)) => self.combine_action(t, cmd.tool, ctx),
+            (A::Barricade, t) => self.barricade(t, cmd.tool, ctx),
+            (A::Unbarricade, t) => self.unbarricade(t, cmd.tool, ctx),
+            (A::Mark, _) => self.mark(cmd.text.as_deref(), ctx),
+            (A::Unmark, _) => self.unmark(ctx),
+            (A::Swap, Some(t)) => self.swap(t, cmd.tool, ctx),
+            (A::PlayDead, _) => self.play_dead(ctx),
             (A::PushTo, Some(t)) => self.push_to(t, cmd, ctx),
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
@@ -308,6 +315,10 @@ impl<H: ScriptHost> Game<H> {
         if !self.world.player_sees_in_dark() {
             self.light_next_door(here, false);
         }
+        // The player's own mark, left here.
+        if let Some(mark) = self.mark_in(here) {
+            self.msg("mark.here", &Ctx::new().text("mark", mark));
+        }
         let list = self.world.def(here).list_exits.unwrap_or(self.world.story().meta.settings.list_exits);
         if !list {
             return;
@@ -423,6 +434,10 @@ impl<H: ScriptHost> Game<H> {
         }
         let described = self.out.lines.len() > before;
         self.describe_state(t, description.as_ref(), described);
+        // Pushed against a door.
+        if let Some(s) = self.against_note(t) {
+            self.push_sentence(s, true);
+        }
         // How someone seems to feel about the player, unless it's neither way.
         if self.world.def(t).kind == EntityKind::Character && self.world.is_active(t) {
             let feeling = eifgb_ir::feeling(self.world.disposition(t));
@@ -1034,6 +1049,10 @@ impl<H: ScriptHost> Game<H> {
             && f != PLAYER
         {
             return self.steal_action(Some(t), Some(f), ctx);
+        }
+        // Someone's watching it: not while they can see.
+        if from.is_none() && self.stopped_taking(t, ctx) {
+            return false;
         }
         // TAKE THE PATH: a way out that goes by it.
         if from.is_none() && !self.world.has(t, Trait::Portable) && self.way_via(t).is_some() {

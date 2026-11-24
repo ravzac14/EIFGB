@@ -37,6 +37,7 @@ pub mod script;
 pub mod state;
 pub mod testing;
 pub mod text;
+mod tricks;
 pub mod world;
 
 pub use game::{Game, Line, LineKind, Missed, Output, Status};

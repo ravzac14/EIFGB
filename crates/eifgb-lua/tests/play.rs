@@ -1467,7 +1467,7 @@ fn description_words_refer_to_what_they_describe() {
     assert_says(&mut g, "x bench", "You can't see any such thing.");
     assert_says(&mut g, "x zorkmid", "I don't know the word \"zorkmid\".");
     // Stopwords never match. Directions are known words (they name doors: "the north door").
-    assert_says(&mut g, "x against", "I don't know the word");
+    assert_says(&mut g, "x beyond", "I don't know the word");
     assert_says(&mut g, "x north", "You can't see any such thing.");
 }
 
@@ -5103,6 +5103,122 @@ fn disposition_follows_the_trust_system() {
     assert_eq!(say(&mut s, "x cat"), "devoted\nhostile");
     let bad = compile_str("format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\ncharacters:\n  c: { name: c, in: hall, disposition: grumpy }\n");
     assert!(bad.diagnostics.iter().any(|d| d.message.contains("'grumpy' isn't a disposition")), "{:#?}", bad.diagnostics);
+}
+
+/// A house for the tricks tests: something to make, something to push
+/// against a door, chalk, a watched ruby and its fake, and a wolf.
+const TRICKS: &str = "\
+format: eifgb/0.1
+game: { id: tricks, title: Tricks, version: '1', start: hall }
+player: { health: 20 }
+rooms:
+  hall: { name: Hall, exits: { north: { to: vault, through: vault_door }, east: den } }
+  vault: { name: Vault, exits: { south: { to: hall, through: vault_door } } }
+  den: { name: Den, exits: { west: hall } }
+objects:
+  vault_door: { name: oak door, synonyms: [door], in: hall, traits: [door, openable], state: { open: true } }
+  wardrobe: { name: heavy wardrobe, synonyms: [wardrobe], in: hall, traits: [pushable] }
+  rope: { name: rope, in: hall, traits: [portable], combines: { with: hook, makes: grapple, say: You tie the rope to the hook. } }
+  hook: { name: iron hook, synonyms: [hook], in: hall, traits: [portable] }
+  grapple: { name: grappling hook, traits: [portable] }
+  chalk: { name: stick of chalk, synonyms: [chalk], in: hall, traits: [portable], marks: true }
+  ruby: { name: ruby, in: den, traits: [portable] }
+  glass: { name: glass gem, synonyms: [gem], in: hall, traits: [portable], decoy_for: ruby }
+  pebble: { name: pebble, in: hall, traits: [portable] }
+characters:
+  guard: { name: guard, in: den, watches: [ruby] }
+";
+
+fn tricks(extra: &str) -> Game<LuaHost> {
+    let out = compile_str(&format!("{TRICKS}{extra}"));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+/// Two things that make a third, by the verbs that would.
+#[test]
+fn things_combine_into_others() {
+    let mut g = tricks("");
+    assert_eq!(say(&mut g, "take rope"), "Taken.");
+    assert_eq!(say(&mut g, "tie rope to hook"), "You tie the rope to the hook.");
+    assert_says(&mut g, "i", "a grappling hook");
+    assert_says(&mut g, "look", "You can see");
+    assert!(!say(&mut g, "look").contains("rope"), "both used up");
+    // The other way round, by COMBINE; and two that don't.
+    let mut g = tricks("");
+    assert_eq!(say(&mut g, "combine hook with rope"), "You tie the rope to the hook.");
+    assert_eq!(say(&mut g, "combine chalk with pebble"), "You can't see how to put those together.");
+    // The puzzle chain knows where the grappling hook comes from.
+    let p = eifgb_compiler::puzzles::puzzles(&compile_str(TRICKS).story.unwrap());
+    assert!(p.steps.iter().any(|s| s.text == "Put the rope and the iron hook together: a grappling hook."), "{:#?}", p.steps.iter().map(|s| &s.text).collect::<Vec<_>>());
+}
+
+/// Barricades: shut, and blocked both ways, until moved.
+#[test]
+fn doors_can_be_barricaded() {
+    let mut g = tricks("");
+    assert_eq!(say(&mut g, "push wardrobe against door"), "You push the heavy wardrobe against the oak door. Nobody's getting through that way now.");
+    assert_eq!(say(&mut g, "n"), "The oak door won't open.");
+    assert_says(&mut g, "x wardrobe", "The heavy wardrobe is pushed against the oak door.");
+    assert_eq!(say(&mut g, "barricade door"), "The oak door is already blocked.");
+    assert_eq!(say(&mut g, "move wardrobe away"), "You move the heavy wardrobe away from the oak door.");
+    assert_says(&mut g, "n", "Vault");
+    // BARRICADE THE DOOR: with whatever heavy thing is here.
+    say(&mut g, "s");
+    assert_says(&mut g, "barricade the door", "You push the heavy wardrobe against the oak door.");
+    assert_eq!(say(&mut g, "unblock the door"), "You move the heavy wardrobe away from the oak door.");
+    assert_eq!(say(&mut g, "push rope against door"), "The rope won't do to block a door.");
+}
+
+/// Marks: left with something to mark with, shown here and on the map.
+#[test]
+fn marks_help_find_the_way() {
+    let mut g = tricks("");
+    assert_eq!(say(&mut g, "mark"), "You've nothing to mark with.");
+    say(&mut g, "take chalk");
+    assert_eq!(say(&mut g, "chalk an arrow"), "You mark an arrow here, with the stick of chalk.");
+    assert_says(&mut g, "look", "Your mark is here: an arrow.");
+    assert_says(&mut g, "map", "Hall (you're here), marked an arrow:");
+    assert_eq!(say(&mut g, "mark the wall"), "You mark an X here, with the stick of chalk.");
+    assert_eq!(say(&mut g, "rub out the mark"), "You rub out your mark.");
+    assert_eq!(say(&mut g, "rub out the mark"), "There's no mark of yours here.");
+}
+
+/// Swaps: a watched thing, taken only for a good fake.
+#[test]
+fn watched_things_can_be_swapped_for_fakes() {
+    let mut g = tricks("");
+    say(&mut g, "take glass");
+    say(&mut g, "take pebble");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "take ruby"), "The guard won't let you near the ruby.");
+    assert_eq!(say(&mut g, "replace ruby with pebble"), "The guard won't let you near the ruby.");
+    assert_eq!(say(&mut g, "replace ruby with glass gem"), "You swap the glass gem for the ruby. The guard doesn't notice a thing.");
+    assert_says(&mut g, "i", "a ruby");
+    assert_says(&mut g, "look", "a glass gem");
+    // TRADE … FOR is one too, for a watched thing.
+    let mut g = tricks("");
+    say(&mut g, "take glass");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "trade glass gem for ruby"), "You swap the glass gem for the ruby. The guard doesn't notice a thing.");
+    let p = eifgb_compiler::puzzles::puzzles(&compile_str(TRICKS).story.unwrap());
+    assert!(p.steps.iter().any(|s| s.text == "Swap the glass gem for the ruby, unseen by the guard."), "{:#?}", p.steps.iter().map(|s| &s.text).collect::<Vec<_>>());
+}
+
+/// Playing dead: a hunter loses interest, until the player moves.
+#[test]
+fn playing_dead_fools_hunters() {
+    let mut g = tricks("  wolf: { name: wolf, in: hall, behavior: hunter, health: 10, damage: 2, wander: 0 }\n");
+    assert_eq!(say(&mut g, "play dead"), "You drop to the ground and lie very still.\nThe wolf sniffs at you, and loses interest.");
+    assert_eq!(say(&mut g, "wait"), "Time passes.");
+    assert!(!say(&mut g, "look").contains("attacks"), "looking about keeps the act");
+    let up = say(&mut g, "take rope");
+    assert!(up.starts_with("[You get back to your feet.]\nTaken."), "{up}");
+    assert!(up.contains("The wolf attacks you."), "{up}");
+    // Something that eats the dead isn't fooled.
+    let mut h = tricks("  crow: { name: crow, in: hall, behavior: hunter, faction: crows, health: 4, damage: 1, wander: 0 }\nfactions:\n  crows: { eats_corpses: true, hostile_to: [player] }\n");
+    let fooled = say(&mut h, "play dead");
+    assert!(fooled.contains("The crow isn't fooled: the dead are what it eats."), "{fooled}");
+    assert!(fooled.contains("The crow attacks you."), "{fooled}");
 }
 
 #[test]

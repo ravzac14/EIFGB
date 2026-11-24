@@ -9,6 +9,31 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+## Unreleased
+
+- More for creative players:
+  - Throwing something distracts whoever's watching.
+  - Mirrors see round corners and throw light into dark rooms.
+  - A pole reaches what's far off or high up.
+  - Things come apart (`splits_into:`).
+  - CALL OUT AS THE CAPTAIN draws those who answer to him away from
+    their posts.
+  - PLANT THE RUBY ON THE COOK gets someone else blamed.
+- Characters remember what you did (`remembers:`), and word gets round
+  their `friends:`.
+- Moods: drunk, dreaming or frightened, rooms and things read differently
+  (`moods:`), like a room in the dark.
+- Several player characters: `playable:` and `player.plays:`, and SWITCH
+  TO.
+- Names written with a capital ("Tobin") no longer get "the" in front.
+- In the editor: Read it aloud, under a description, and "What a player
+  might try" for each room.
+- In the player: Look back over the story after an ending (and play on
+  from any turn), and easier reading: OpenDyslexic, roomier spacing, and
+  a sentence at a time.
+- The engine the browser downloads is about 30% smaller (3.0 MB to 2.15
+  MB), for every game played on the site and every game saved as a page.
+
 ## 2026-11-24
 
 - The editor's typo check has a dictionary: a word list kept with the

@@ -19,3 +19,11 @@ serde_json = "1"
 serde_yaml = "0.9"
 indexmap = { version = "2", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
+
+# The engine for the browser (web/scripts/build-wasm.sh): small, since it's
+# downloaded with every game, and inside every game saved as one web page.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1

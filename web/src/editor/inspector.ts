@@ -10,6 +10,58 @@ import { pictureSection } from "./picture-ui.ts";
 import { describeWords } from "./describe-words.ts";
 import { foldSections } from "./fold.ts";
 import { gettingStartedHidden } from "../store.ts";
+import { canSpeak, speak, stopSpeaking } from "../speech.ts";
+import { answeredShare, triesHere } from "./try-here.ts";
+
+/** "Read it aloud": the text as a player's browser would speak it, to hear how it runs. */
+function readAloud(text: () => string): HTMLElement | "" {
+  if (!canSpeak()) return "";
+  let on = false;
+  const b = button("Read it aloud", () => {
+    if (on) {
+      stopSpeaking();
+      on = false;
+      b.textContent = "Read it aloud";
+      return;
+    }
+    // Without the ${...} the player never sees.
+    const plain = text().replace(/\$\{[^}]*\}/g, " ").replace(/\s+/g, " ").trim();
+    if (!plain) return;
+    speak([plain], "on");
+    on = true;
+    b.textContent = "Stop reading";
+    const done = () => {
+      if (!speechSynthesis.speaking) {
+        on = false;
+        b.textContent = "Read it aloud";
+      } else setTimeout(done, 400);
+    };
+    setTimeout(done, 400);
+  }, "link small-link");
+  b.title = "Hear it in the browser's voice: repeated words and long sentences stand out";
+  return b;
+}
+
+/** What a player might try at each thing and person here, and what answers. */
+function triesSection(m: Model, room: string): HTMLElement[] {
+  const rows = triesHere(m, room);
+  if (!rows.length) return [];
+  const { does, all } = answeredShare(rows);
+  const ul = el("ul", { class: "tries" });
+  for (const r of rows) {
+    const yes = r.tries.filter((t) => t.does);
+    const no = r.tries.filter((t) => !t.does);
+    const li = el("li", {}, el("strong", { textContent: r.name }));
+    if (yes.length) li.append(el("div", { class: "tries-yes" }, "✓ ", yes.map((t) => `${t.command}${t.why ? ` (${t.why})` : ""}`).join(", ")));
+    if (no.length) li.append(el("div", { class: "tries-no dim" }, "Only the usual reply: ", no.map((t) => t.command).join(", ")));
+    ul.append(li);
+  }
+  return [
+    el("h3", { textContent: "What a player might try" }),
+    help(`What a curious player types here, and whether the game has an answer of its own: ${does} of ${all} do. Not everything needs one, but a lever that does nothing when pulled is worth a second look.`),
+    ul,
+  ];
+}
 
 /** A description field, with the words in it players can use (and nouns that aren't anything yet) underneath. */
 function withWords(ctx: InspectorContext, owner: { room: string } | { thing: string } | { character: string }, parts: HTMLElement[]): HTMLElement[] {
@@ -24,7 +76,7 @@ function withWords(ctx: InspectorContext, owner: { room: string } | { thing: str
     return proseField(ctx, [section, id, "description"], "Description", "", () => {}, { multiline: true });
   }
   const input = parts.find((p) => p instanceof HTMLTextAreaElement) as HTMLTextAreaElement | undefined;
-  return input ? [...parts, el("div", { class: "vary-link" }, vary), describeWords(ctx, owner, input)] : parts;
+  return input ? [...parts, el("div", { class: "vary-link" }, vary, " ", readAloud(() => input.value)), describeWords(ctx, owner, input)] : parts;
 }
 import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
@@ -305,6 +357,7 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ),
     colourPicker(ctx, id),
     ...roomBehaviour(ctx, id),
+    ...triesSection(m, id),
     ...pictureSection(ctx, ["rooms", id], "room"),
   );
   scriptsSection(panel, ctx, ["rooms", id], "room");

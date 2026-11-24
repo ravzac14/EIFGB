@@ -47,6 +47,10 @@ figure.picture p { margin: 0; }
 /* Typewriter reveal: the rest of a line being typed is on the page, but
    see-through, so the layout doesn't shift and screen readers get it all. */
 .log .untyped { color: transparent; text-shadow: none; }
+.log .unread { color: transparent; text-shadow: none; }
+.log .replay-here { outline: 2px solid var(--accent); outline-offset: 0.3em; border-radius: 2px; }
+.log .replay-later { opacity: 0.35; }
+.replay-bar { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: center; }
 .diagnostics { font-family: var(--sans); font-size: 0.9rem; }
 .diagnostics li { margin: 0.4rem 0; }
 .diagnostics code { font-family: var(--mono); background: var(--panel); padding: 0 0.3em; border-radius: 4px; }

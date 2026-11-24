@@ -78,6 +78,12 @@ swaps for fakes, and playing dead. Still to do:
 - **Games in more than one language:** a game's own text in a second
   language, chosen by the player.
 
+## The editor
+
+- **Difficulty estimate:** from the puzzle chain, how many steps, how far
+  apart, and how many need an unusual verb, as a rough "easy / tricky /
+  fiendish".
+
 ## AI assistants
 
 - **Checking from inside the chat:** a small MCP server (or a skill) for
@@ -99,6 +105,8 @@ swaps for fakes, and playing dead. Still to do:
 - **Embedding:** a snippet to put a game in a frame on any web page.
 - **Collections:** a list of games around a theme, to share as one link.
 - **Author pages:** an author's games together, from the gallery.
+- **Remix a game:** "Make a copy to change" on a gallery game, crediting
+  the original. A quick way to learn the format.
 
 ## No, for now
 

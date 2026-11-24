@@ -37,11 +37,11 @@ function remove(key: string) {
 
 export type Theme = "auto" | "light" | "dark" | "sepia" | "parchment" | "terminal" | "amber" | "contrast";
 export type Size = "small" | "medium" | "large" | "xlarge";
-export type Face = "serif" | "sans" | "legible";
-export type Spacing = "normal" | "relaxed";
+export type Face = "serif" | "sans" | "legible" | "dyslexic";
+export type Spacing = "normal" | "relaxed" | "roomiest";
 export type Width = "narrow" | "medium" | "wide";
 /** How new text appears in the player: all at once, or typed out letter by letter. */
-export type Reveal = "instant" | "typewriter";
+export type Reveal = "instant" | "typewriter" | "sentence";
 /** Whether the player reads new text aloud, and how fast. */
 export type Speech = "off" | "on" | "slow" | "fast";
 export interface Settings {

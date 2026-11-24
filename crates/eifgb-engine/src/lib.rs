@@ -38,6 +38,7 @@ pub mod state;
 pub mod testing;
 pub mod text;
 mod tricks;
+mod cunning;
 pub mod world;
 
 pub use game::{Game, Line, LineKind, Missed, Output, Status};

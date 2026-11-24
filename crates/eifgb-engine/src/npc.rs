@@ -155,6 +155,7 @@ impl World {
     /// The player is caught stealing from `victim`: as good as an attack,
     /// without the damage. Returns (let off this time, faction change).
     pub fn caught_stealing(&mut self, victim: EntityId) -> (bool, Option<AttitudeChange>) {
+        self.remember(victim, "robbed");
         self.provoke(victim, PLAYER)
     }
 
@@ -443,7 +444,9 @@ impl World {
 
     /// Named by the player, so it's a proper name: "Rex", not "the Rex".
     pub fn is_proper(&self, id: EntityId) -> bool {
+        // Named by the player, or by the author with a capital: Tobin, Excalibur.
         matches!(self.get(id, "_name"), Some(Value::Str(_)))
+            || (self.def(id).kind != EntityKind::Room && self.def(id).name.chars().next().is_some_and(char::is_uppercase))
     }
 
     /// Tidies a name: up to three words of letters, digits, ' or -, each
@@ -598,10 +601,7 @@ impl World {
     /// Whether `room` can be seen in: it isn't dark, or a burning light
     /// is there in plain sight (lying about, or carried by anyone).
     pub fn is_lit(&self, room: EntityId) -> bool {
-        !self.is_dark_room(room)
-            || (0..self.story().entities.len() as u32)
-                .map(EntityId)
-                .any(|i| self.room_of(i) == Some(room) && self.is_burning(i) && self.in_plain_sight(i))
+        self.lit_plainly(room) || self.lit_by_mirror(room)
     }
 
     /// Whether the player is in the dark: their surroundings aren't lit,
@@ -825,6 +825,14 @@ impl World {
     /// them a foe, a merchant won't trade. Returns the feeling before and
     /// after, when it changed.
     pub fn shift_disposition(&mut self, id: EntityId, by: i64) -> Option<(&'static str, &'static str)> {
+        if self.def(id).kind == EntityKind::Character && by != 0 && self.ids().any(|c| self.def(c).npc.as_ref().is_some_and(|n| !n.friends.is_empty())) {
+            self.pass_word(id, by);
+        }
+        self.shift_disposition_quietly(id, by)
+    }
+
+    /// The same, without word of it getting round.
+    pub fn shift_disposition_quietly(&mut self, id: EntityId, by: i64) -> Option<(&'static str, &'static str)> {
         if self.def(id).kind != EntityKind::Character || by == 0 {
             return None;
         }
@@ -970,7 +978,13 @@ impl World {
             .find(|&(_, to)| safe(self, to))
             .or_else(|| exits.iter().copied().find(|&(_, to)| self.room_of(threat) != Some(to)))?;
         match self.npc_move(npc, pick.0, pick.1)? {
-            NpcEvent::Moved { npc, from, to, direction } => Some(NpcEvent::Fled { npc, from, to, direction }),
+            NpcEvent::Moved { npc, from, to, direction } => {
+                // Fled from a fight with the player: spared, if they let it go.
+                if self.is_foe(npc, PLAYER) || self.is_hostile(npc, PLAYER) {
+                    self.remember(npc, "spared");
+                }
+                Some(NpcEvent::Fled { npc, from, to, direction })
+            }
             other => Some(other),
         }
     }
@@ -1089,6 +1103,7 @@ impl World {
         let food = self.def(npc).faction.as_ref().is_some_and(|f| self.def(item).eaten_by.contains(f));
         let _ = self.move_to(item, if food { None } else { Some(npc) });
         let calmed = self.pacify(npc);
+        self.remember(npc, "gift");
         if tames {
             self.set(npc, "_tamed", Value::Bool(true));
             // Tamed: devoted.
@@ -1150,7 +1165,7 @@ impl World {
     /// Remembers that `attacker` attacked `target`, in the target's `foes`
     /// (a list of keys, which scripts can read or clear).
     /// Returns whether `attacker` is a new foe.
-    fn add_foe(&mut self, target: EntityId, attacker: EntityId) -> bool {
+    pub(crate) fn add_foe(&mut self, target: EntityId, attacker: EntityId) -> bool {
         if target == attacker || self.def(target).kind != EntityKind::Character {
             return false;
         }
@@ -1336,6 +1351,9 @@ impl World {
     /// `attacker` hits `target`, which must be able to be hurt. The damage
     /// is the weapon's, or else the attacker's own, or else 1.
     pub fn attack(&mut self, attacker: EntityId, target: EntityId, weapon: Option<EntityId>) -> Option<NpcEvent> {
+        if attacker == PLAYER {
+            self.remember(target, "attacked");
+        }
         if self.is_invincible(target) {
             let (tolerated, attitude) = self.provoke(target, attacker);
             return Some(NpcEvent::Attacked { attacker, target, weapon, damage: 0, tolerated, attitude });
@@ -1489,6 +1507,21 @@ impl World {
         // Food beats everything, even a fight.
         if let Some(&food) = self.food_in(npc, room).first() {
             return self.npc_feed(npc, food).into_iter().collect();
+        }
+        // Called for, in a voice it answers to: off to see what's wanted.
+        if let Some(Value::Str(key)) = self.get(npc, "_called_to").cloned()
+            && let Some(spot) = self.id(&key)
+        {
+            let late = matches!(self.get(npc, "_called_until"), Some(Value::Int(t)) if (*t as u64) < self.state.turn);
+            if room == spot || late {
+                self.unset(npc, "_called_to");
+                self.unset(npc, "_called_until");
+                return (room == spot).then_some(NpcEvent::Searched { npc, room }).into_iter().collect();
+            }
+            if let Some(step) = self.npc_step_toward(npc, spot) {
+                return vec![step];
+            }
+            self.unset(npc, "_called_to");
         }
         // A routine: on its way to where it should be by the clock, and
         // staying there once it is (a hunter with prey in range hunts).

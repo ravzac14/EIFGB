@@ -326,7 +326,31 @@ impl World {
             high |= self.def(c).high;
             cur = self.location(c);
         }
-        high && !self.standing_on_something()
+        high && !self.standing_on_something() && !self.holds_a_reach()
+    }
+
+    /// Whether `id` is `far` (or on or in something that is): out of reach
+    /// across a gap, unless the player holds something that `reaches`.
+    pub fn out_of_reach_far(&self, id: EntityId) -> bool {
+        if self.is_within(id, PLAYER) || self.is_within(PLAYER, id) || self.holds_a_reach() {
+            return false;
+        }
+        let mut cur = Some(id);
+        while let Some(c) = cur {
+            if self.def(c).kind == EntityKind::Room {
+                return false;
+            }
+            if self.def(c).far {
+                return true;
+            }
+            cur = self.location(c);
+        }
+        false
+    }
+
+    /// Holding a pole, or anything else long enough to reach with.
+    pub fn holds_a_reach(&self) -> bool {
+        self.contents(PLAYER).into_iter().any(|t| self.def(t).reaches)
     }
 
     /// Whether the player is up on a supporter (a crate, a chair, a table).

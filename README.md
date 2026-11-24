@@ -603,6 +603,14 @@ A few more tools in the editor:
   that aren't anything yet are underlined, each a click from being
   scenery ("A narrow path climbs north" means someone will type EXAMINE
   PATH).
+- **Read it aloud**, under a description, speaks it in the browser's
+  voice: a sentence that runs on, or a word said twice, stands out when
+  it's heard.
+- **What a player might try**, on a room's panel: for each thing and
+  person there, what a curious player types (PULL LEVER, SMELL ROSE, TALK
+  TO BAKER), split into what the game answers with something of its own
+  (a script, a smell, a description) and what gets only the usual reply.
+  A lever that does nothing when pulled is worth a second look.
 - **Possible typos**, under Problems: words that aren't in the dictionary
   or the game's names, a letter off a word that is ("lantren", perhaps
   "lantern"), however often they're used. The dictionary is a word list
@@ -1321,6 +1329,55 @@ RECAP says so ("Now: The storm."), and conditions can check it:
 begin and end scenes themselves with `start_scene("storm")` and
 `end_scene("storm")`.
 
+## Moods
+
+The player can be drunk, frightened, dreaming, or anything else a game
+needs, and the world looks different while they are. It works the way
+darkness does: in a dark room, the room's description gives way to "It's
+pitch dark", and in a mood, a room's, thing's or character's `moods:` text
+for it takes the place of its description.
+
+```yaml
+moods:
+  drunk: Everything sways, just a little.
+
+rooms:
+  hall:
+    name: Hall
+    description: A plain hall.
+    moods: { dreaming: The hall stretches on forever. }
+
+objects:
+  wine: { name: cup of wine, in: hall, traits: [portable, drinkable], mood: { drunk: 5 } }
+```
+
+A mood is a player state of that name: `player.state.drunk = true` in a
+script turns it on, `nil` off. Something eaten or drunk with `mood: {
+drunk: 5 }` brings it on for that many turns (0: until a script ends it),
+and "[You feel more yourself again.]" when it passes. The top-level
+`moods:` adds its line to LOOK in every room without its own text for
+the mood.
+
+## Several player characters
+
+A game can let the player be more than one person: a heist crew, a
+family. Mark each with `playable: true`, and say who the player starts
+as:
+
+```yaml
+player: { plays: mara }
+
+characters:
+  mara: { name: Mara, in: hall, playable: true, description: A wiry thief. }
+  tobin: { name: Tobin, in: kitchen, playable: true, description: A big cook. }
+```
+
+SWITCH TO TOBIN (BECOME, PLAY AS) makes the player Tobin, where he is,
+with what he carries and his health; Mara stays where she was, holding
+what she held. EXAMINE ME describes whoever the player is now. What the
+player has seen and learned is shared between them. Characters who are
+enemies of one are enemies of all, since it's the player they know.
+
 ## Time of day
 
 A game can keep a clock that moves on with each turn:
@@ -1972,6 +2029,41 @@ Nineteen features reward players who try something clever:
   it while they can see ("The guard won't let you near the ruby."). A fake
   with `decoy_for: ruby` can be swapped for it unseen: REPLACE THE RUBY
   WITH THE GLASS GEM, or TRADE THE GLASS GEM FOR THE RUBY.
+- **Distractions:** THROW THE PEBBLE WEST (or just THROW IT) and everyone
+  here looks toward the noise ("The guard turns toward the sound."), for
+  this turn and the next: long enough to take what they were watching, or
+  slip past. Companions aren't fooled.
+- **Mirrors:** with something that `reflects: true`, LOOK EAST WITH THE
+  MIRROR (or LOOK AROUND THE CORNER) shows the next room, through an open
+  way, without going in or being seen. ANGLE THE MIRROR NORTH sets it down
+  to throw this room's light into a dark one next door, for as long as
+  it's left there.
+- **Reaching:** a thing that's `far: true` (a nest over a ravine) can't
+  be reached from here at all ("too far off to reach"), and one that's
+  `high` needs climbing. Holding something that `reaches: true` (a long
+  pole) reaches both: HOOK THE NEST WITH THE POLE.
+- **Taking apart:** `splits_into: [lens, oil]` (or `{ parts: [...], say:
+  ... }`) on an object: TAKE THE LANTERN APART (DISMANTLE) leaves its
+  parts where it was. The parts start with no `in:`.
+- **Voices:** a character the player has talked to or overheard has a
+  voice they can put on. CALL OUT AS THE CAPTAIN (IMPERSONATE, PRETEND TO
+  BE, or IMITATE) brings anyone with `answers_to: [captain]` within two
+  rooms, who can't see who's calling, hurrying to the voice: away from
+  their post. If they find the player, they think less of them.
+- **Planting evidence:** PLANT THE RUBY ON THE COOK (SLIP … INTO …) puts
+  it in their pockets, if they don't notice (as for pickpocketing). When
+  whoever it was stolen from, or a character that `watches` it, sees it on
+  them, they take it back and turn on them ("Thief!"), and forgive the
+  player.
+- **Word gets round:** `friends: [baker]` on a character: when how it
+  feels about the player changes, its friends (and those who count it a
+  friend) hear of it three turns later, and shift a step the same way.
+  Factions already share their own word, their attitude.
+- **Remembering:** characters remember the last thing the player did to
+  them: `gift`, `attacked`, `robbed`, `spared` (fled from a fight) or
+  `fooled`. `remembers: { gift: "She smiles at the brooch.", robbed: "He
+  keeps a hand on his purse." }` is said the next time they meet, once.
+  Scripts read it as `world.guard.remembers`.
 - **Playing dead:** PLAY DEAD (FEIGN DEATH, LIE STILL) and anything that
   doesn't eat the dead leaves the player alone ("The wolf sniffs at you,
   and loses interest."), until they do something besides waiting or
@@ -2326,6 +2418,16 @@ TAKE LANTERN. With several matches it puts in the first and shows them all
 under the line; Tab again (Shift+Tab back) goes through them, and Esc puts
 back what you typed. It only offers what you can see or carry, places
 you've been, and the game's commands, never something you haven't found.
+
+After an ending, **Look back over the story** steps through it a turn at
+a time (◀ and ▶, or the arrow keys), marking each turn in the story and
+fading what came after. **Play on from here** takes the story back to
+that turn and carries on, as if the rest hadn't happened.
+
+Text and colours has ways to make reading easier: the OpenDyslexic
+typeface, the "Roomiest" line spacing (more space between letters and
+words too), and text that appears **a sentence at a time**, Enter for the
+next. Screen readers still get the whole of it at once.
 
 Some verbs exist so that players can try them and authors can respond:
 PUSH, PULL, KICK, MOVE (DRAG), LIFT, SHAKE, TURN (TWIST), TOUCH (FEEL),

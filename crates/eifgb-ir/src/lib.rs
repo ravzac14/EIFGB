@@ -91,6 +91,12 @@ pub struct Story {
     /// Named stretches of the story, in the order they're listed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scenes: Vec<Scene>,
+    /// A line for LOOK in every room without its own text for the mood.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub moods: BTreeMap<String, Text>,
+    /// The character the player starts out as, in a game with several.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plays: Option<EntityId>,
     /// The time of day, if the game keeps one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clock: Option<Clock>,
@@ -529,6 +535,27 @@ pub struct Entity {
     /// Objects: a fake of that thing, good enough to swap for it unseen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decoy_for: Option<EntityId>,
+    /// Objects: long enough to reach what's up high or far off (a pole).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reaches: bool,
+    /// Out of reach across a gap, whatever the player stands on, unless
+    /// they hold something that `reaches`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub far: bool,
+    /// Objects: what TAKE APART leaves, and what it says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splits_into: Option<Split>,
+    /// Objects: a mirror: LOOK AROUND THE CORNER with it, or angle light.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reflects: bool,
+    /// Its description while the player is in a mood (`drunk`, `dreaming`):
+    /// the player state of that name is true.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub moods: BTreeMap<String, Text>,
+    /// Objects: eaten or drunk, it puts the player in a mood for so many
+    /// turns (0: until a script ends it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mood: Option<(String, u32)>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
     /// How a character acts on its turn. Only characters have one.
@@ -662,6 +689,19 @@ pub struct Npc {
     /// Things it won't let the player take while it can see them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub watches: Vec<EntityId>,
+    /// Whose voice it comes running to: a call in that voice, unseen, draws it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub answers_to: Vec<EntityId>,
+    /// Who it tells what the player did (besides its faction).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub friends: Vec<EntityId>,
+    /// What it says on seeing the player again, by what it remembers they
+    /// did: `gift`, `attacked`, `robbed`, `spared`, `fooled`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub remembers: BTreeMap<String, Text>,
+    /// The player can SWITCH TO it, and be it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub playable: bool,
     /// Percent chance of moving to a neighbouring room on a turn with
     /// nothing better to do.
     #[serde(default)]
@@ -1143,6 +1183,14 @@ pub fn disposition_of(word: &str) -> Option<i64> {
     }
 }
 
+/// What a thing comes apart into.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Split {
+    pub parts: Vec<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say: Option<Text>,
+}
+
 /// Two things that make a third: `with` is the other, `makes` what they make.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Combination {
@@ -1447,6 +1495,20 @@ pub enum BuiltinAction {
     Swap,
     /// PLAY DEAD: lie still, until anything else.
     PlayDead,
+    /// HOOK X WITH THE POLE: take what's out of reach.
+    Reach,
+    /// TAKE APART X.
+    TakeApart,
+    /// LOOK AROUND THE CORNER (WITH THE MIRROR), LOOK NORTH WITH IT.
+    LookAround,
+    /// ANGLE THE MIRROR NORTH: light into the next room.
+    Reflect,
+    /// CALL OUT AS THE CAPTAIN.
+    Imitate,
+    /// PLANT X ON Y.
+    Plant,
+    /// SWITCH TO MARA.
+    SwitchTo,
 }
 
 impl BuiltinAction {

@@ -149,6 +149,8 @@ function status(o: Output) {
 function show(o: Output): HTMLElement | null {
   const first = log.lastElementChild;
   const typed = settings.get().reveal === "typewriter";
+  readAll();
+  oneShown = false;
   // Choices are numbered lines; the player types the number.
   for (const [i, l] of o.lines.entries()) {
     if (l.kind === "picture") {
@@ -160,6 +162,7 @@ function show(o: Output): HTMLElement | null {
     if (l.kind === "title") roomPicture = null;
     const p = say(l.text, l.kind === "text" ? "" : l.kind);
     if (typed) typeOut(p);
+    else if (settings.get().reveal === "sentence") readOut(p);
   }
   speak(o.lines.filter((l) => l.kind !== "error").map((l) => (l.kind === "picture" ? `Picture: ${l.text}` : l.text)), settings.get().speech, meta?.language ?? "en");
   status(o);
@@ -222,6 +225,49 @@ function skipTyping() {
   typingFrame = 0;
 }
 for (const type of ["keydown", "pointerdown"]) document.addEventListener(type, () => typing.length && skipTyping(), true);
+// ------------------------------------------------- a sentence at a time
+
+/*
+ * "Text appears: a sentence at a time": the first new sentence shows, and
+ * Enter (with nothing typed) shows the next. As with the typewriter, the
+ * rest is on the page from the start, just not to be seen, so screen
+ * readers and the transcript have it all. Typing a command shows it all.
+ */
+const unread: HTMLElement[] = [];
+/** Whether a sentence of the latest reply is showing yet. */
+let oneShown = false;
+
+function readOut(p: HTMLElement) {
+  const text = p.textContent ?? "";
+  // Titles (the room's name) always show.
+  if (!text || p.classList.contains("title")) return;
+  const parts = text.match(/[^.!?]+[.!?]+["'”’)\]]*\s*|[^.!?]+$/g) ?? [text];
+  const spans = parts.map((s) => el("span", { textContent: s }));
+  p.replaceChildren(...spans);
+  for (const s of spans) {
+    if (!oneShown) {
+      oneShown = true;
+      continue;
+    }
+    s.className = "unread";
+    unread.push(s);
+  }
+  line.placeholder = unread.length ? "Enter for more" : "";
+}
+
+function readNext(): boolean {
+  const s = unread.shift();
+  if (!s) return false;
+  s.classList.remove("unread");
+  line.placeholder = unread.length ? "Enter for more" : "";
+  s.scrollIntoView({ block: "nearest" });
+  return true;
+}
+
+function readAll() {
+  while (readNext());
+}
+
 // Escape stops reading aloud.
 document.addEventListener("keydown", (e) => e.key === "Escape" && stopSpeaking());
 
@@ -297,15 +343,120 @@ function downloadTranscript() {
  * The game has ended (or the player quit). The prompt stays: the game says
  * UNDO, RESTORE or RESTART still work, and they do.
  */
+let finished = "";
 function finish(message: string) {
   over = true;
+  finished = message;
   saves.clearAuto();
   after.replaceChildren(
     el("span", { className: "dim", textContent: message }),
     button("Play again", () => restart(false), "primary"),
+    button("Look back over the story", lookBack),
     button("Download the transcript", downloadTranscript),
     el("a", { href: "./", textContent: "Back to the games" }),
   );
+}
+
+// ------------------------------------------------------- looking back
+
+/*
+ * After an ending: step back through the story a turn at a time (the turn
+ * marked in the story, what came after it faded), and play on from any
+ * turn, as if the rest hadn't happened. Each turn keeps the game as it was
+ * after it, in memory only.
+ */
+interface Turn {
+  start: HTMLElement;
+  save: string;
+  command: string;
+  /** It ended the story: nothing to play on from. */
+  ended: boolean;
+}
+let turns: Turn[] = [];
+let replayAt = -1;
+const MAX_TURNS = 2000;
+
+function noteTurn(start: HTMLElement | null, command: string, ended = false) {
+  if (!start || !engine) return;
+  turns.push({ start, save: engine.save(), command, ended });
+  // A very long game: forget the oldest (but not the start).
+  if (turns.length > MAX_TURNS) turns.splice(1, 1);
+}
+
+function clearReplay() {
+  for (const e of log.querySelectorAll(".replay-here, .replay-later")) e.classList.remove("replay-here", "replay-later");
+}
+
+function showTurn(i: number) {
+  replayAt = Math.max(0, Math.min(turns.length - 1, i));
+  clearReplay();
+  const t = turns[replayAt];
+  t.start.classList.add("replay-here");
+  const next = turns[replayAt + 1]?.start;
+  if (next) for (let e: Element | null = next; e; e = e.nextElementSibling) e.classList.add("replay-later");
+  t.start.scrollIntoView?.({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  drawReplayBar();
+}
+
+function drawReplayBar() {
+  const t = turns[replayAt];
+  const lastTurn = replayAt === turns.length - 1;
+  const prev = button("◀ Back a turn", () => showTurn(replayAt - 1));
+  const next = button("On a turn ▶", () => showTurn(replayAt + 1));
+  prev.disabled = replayAt === 0;
+  next.disabled = lastTurn;
+  const playOn = button("Play on from here", () => playOnFrom(replayAt), "primary");
+  // An ending: nothing to play on from.
+  playOn.disabled = t.ended;
+  if (t.ended) playOn.title = "This turn ended the story";
+  const label = el("span", { className: "dim", textContent: replayAt === 0 ? `The start, of ${turns.length - 1} turns` : `Turn ${replayAt} of ${turns.length - 1}: > ${t.command}` });
+  label.setAttribute("aria-live", "polite");
+  const bar = el("div", { className: "replay-bar" }, prev, label, next, playOn, button("Done", endReplay));
+  bar.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") showTurn(replayAt - 1);
+    else if (e.key === "ArrowRight") showTurn(replayAt + 1);
+    else if (e.key === "Escape") endReplay();
+    else return;
+    e.preventDefault();
+    after.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+  });
+  after.replaceChildren(bar);
+}
+
+function lookBack() {
+  if (turns.length < 2) return;
+  showTurn(turns.length - 2);
+  after.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+}
+
+function endReplay() {
+  clearReplay();
+  replayAt = -1;
+  if (over) finish(finished);
+  else after.replaceChildren();
+}
+
+/** Back to how it was after turn `i`: what came after is gone, and play goes on. */
+function playOnFrom(i: number) {
+  const t = turns[i];
+  const next = turns[i + 1]?.start;
+  if (next) {
+    while (log.lastElementChild && log.lastElementChild !== next) log.lastElementChild.remove();
+    next.remove();
+  }
+  turns = turns.slice(0, i + 1);
+  clearReplay();
+  replayAt = -1;
+  const o = engine.restore(t.save);
+  status(o);
+  last = o;
+  refreshMap();
+  over = false;
+  form.hidden = false;
+  after.replaceChildren();
+  momentFrom(say(i === 0 ? "You pick the story up again from the start." : `You pick the story up again after turn ${i}.`, "notice"));
+  saves.setAuto(engine.save());
+  line.focus();
 }
 
 function handle(o: Output) {
@@ -344,6 +495,7 @@ function send(text: string, echo = text) {
   show(o);
   handle(o);
   momentFrom(start);
+  noteTurn(start, echo, !!o.ended);
   scrollTo(start);
 }
 
@@ -370,7 +522,10 @@ function begin(): boolean {
     p.append(el("a", { href: SAFETY, target: "_blank", rel: "noopener", textContent: "Is that safe?" }));
   }
   showDiagnostics(loaded.diagnostics, "The game has some warnings for its author:");
-  momentFrom(show(loaded.output));
+  const first = show(loaded.output);
+  momentFrom(first);
+  turns = [];
+  noteTurn(first, "");
   return true;
 }
 
@@ -402,6 +557,8 @@ function restoreFrom(save: string) {
   start.remove();
   const first = show(o);
   momentFrom(first);
+  turns = [];
+  noteTurn(first, "");
   saves.setAuto(engine.save());
   scrollTo(first);
   line.focus();
@@ -577,6 +734,12 @@ function openSaves() {
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
+  // Reading a sentence at a time: Enter on its own is "more".
+  if (!line.value.trim() && unread.length) {
+    readNext();
+    return;
+  }
+  readAll();
   const text = line.value.trim();
   line.value = "";
   if (text) {
@@ -643,8 +806,10 @@ async function main() {
     const o = engine.restore(auto);
     if (o.lines.some((l) => l.kind === "notice")) {
       log.replaceChildren();
-      say("Welcome back. Here's where you were.", "notice");
+      const first = say("Welcome back. Here's where you were.", "notice");
       momentFrom(show(o));
+      turns = [];
+      noteTurn(first, "");
       say("(Restart, at the top, begins again.)", "notice");
       scrollTo(log.lastElementChild as HTMLElement);
     } else {

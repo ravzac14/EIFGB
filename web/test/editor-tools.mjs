@@ -17,6 +17,7 @@ import { typos, useDictionary } from "../src/editor/spelling.ts";
 import { talkLayout } from "../src/editor/talk-graph.ts";
 import { readTalk, writeMap } from "../src/editor/layout.ts";
 import { forChat, fromChat, instructions } from "../src/editor/ai.ts";
+import { answeredShare, triesHere } from "../src/editor/try-here.ts";
 import { loadEngine } from "../src/engine.ts";
 
 const spec = (p) => readFileSync(new URL(`../../spec/${p}`, import.meta.url), "utf8");
@@ -268,6 +269,40 @@ characters:
     ],
   );
   useDictionary(null);
+}
+
+// ------------------------------------------- what a player might try here
+{
+  const m = new Model(`format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall }
+objects:
+  lever: { name: lever, in: hall, traits: [scenery], description: A rusty lever., on: { pull: 'say("Clunk.")' } }
+  rose: { name: rose, in: hall, traits: [portable], smell: Sweet. }
+  safe: { name: safe, in: hall, traits: [container, scenery] }
+  coin: { name: coin, in: safe, state: { hidden: true }, revealed_by: search }
+  ghost: { name: ghost coin, in: hall, state: { hidden: true } }
+characters:
+  baker: { name: baker, in: hall, talk: { start: { say: Hello. } }, likes: [rose] }
+`);
+  const rows = triesHere(m, "hall");
+  assert.deepEqual(rows.map((r) => r.name), ["lever", "rose", "safe", "baker"], "hidden things aren't tried");
+  const lever = rows[0].tries;
+  assert.deepEqual(lever.find((t) => t.command === "PULL LEVER"), { command: "PULL LEVER", does: true, why: "on: pull" });
+  assert.equal(lever.find((t) => t.command === "PUSH LEVER").does, false);
+  assert.equal(lever[1].command, "TAKE LEVER", "scenery: TAKE comes early");
+  assert.equal(rows[1].tries.find((t) => t.command === "SMELL ROSE").why, "a smell");
+  assert.equal(rows[2].tries.find((t) => t.command === "SEARCH SAFE").why, "reveals coin");
+  const baker = rows[3].tries;
+  assert.deepEqual(baker.map((t) => [t.command, t.does]), [
+    ["EXAMINE BAKER", false],
+    ["TALK TO BAKER", true],
+    ["GIVE SOMETHING TO BAKER", true],
+    ["ATTACK BAKER", false],
+  ]);
+  const share = answeredShare(rows);
+  assert.ok(share.does > 0 && share.does < share.all);
 }
 
 // ------------------------------------------------- conversations as a graph

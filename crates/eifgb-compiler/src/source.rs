@@ -58,6 +58,9 @@ pub struct Source {
     /// Overrides for standard library messages, by key.
     #[serde(default)]
     pub messages: IndexMap<String, Prose>,
+    /// A line LOOK adds while the player is in a mood, in rooms without their own.
+    #[serde(default)]
+    pub moods: IndexMap<String, Prose>,
     /// The game's own words for words the game knows: `using: with`.
     #[serde(default)]
     pub aliases: IndexMap<String, String>,
@@ -149,6 +152,9 @@ pub struct Player {
     /// Sees in unlit rooms (the `sees_in_dark` state, which scripts can change).
     #[serde(default)]
     pub sees_in_dark: bool,
+    /// In a game with several player characters, the one the player starts as.
+    #[serde(default)]
+    pub plays: Option<String>,
 }
 
 /// A carrying capacity: a whole number, or `none` (or null) for no limit.
@@ -213,6 +219,9 @@ pub struct Room {
     /// Unlit: peeking in shows nothing unless something is burning.
     #[serde(default)]
     pub dark: bool,
+    /// How it seems while the player is in a mood: `{ drunk: ..., dreaming: ... }`.
+    #[serde(default)]
+    pub moods: IndexMap<String, Prose>,
     /// Whether this room's description lists its exits (overrides `settings.list_exits`).
     #[serde(default)]
     pub list_exits: Option<bool>,
@@ -365,6 +374,36 @@ pub struct Thing {
     /// Characters: things they won't let the player take while they're looking.
     #[serde(default)]
     pub watches: Vec<String>,
+    /// Long enough to reach what's high or far: a pole, a hooked rope.
+    #[serde(default)]
+    pub reaches: bool,
+    /// Out of reach across a gap, unless the player holds something that reaches.
+    #[serde(default)]
+    pub far: bool,
+    /// What TAKE APART leaves: `[lens, oil]`, or `{ parts: [...], say: ... }`.
+    #[serde(default)]
+    pub splits_into: Option<SplitSrc>,
+    /// A mirror.
+    #[serde(default)]
+    pub reflects: bool,
+    /// Its description while the player is in a mood: `{ drunk: ..., dreaming: ... }`.
+    #[serde(default)]
+    pub moods: IndexMap<String, Prose>,
+    /// Eaten or drunk: a mood for so many turns (`{ drunk: 10 }`; 0 for until a script ends it).
+    #[serde(default)]
+    pub mood: IndexMap<String, u32>,
+    /// Characters: whose voice they come running to.
+    #[serde(default)]
+    pub answers_to: Vec<String>,
+    /// Characters: who they tell what the player did, besides their faction.
+    #[serde(default)]
+    pub friends: Vec<String>,
+    /// Characters: what they say on seeing the player again, by what they remember.
+    #[serde(default)]
+    pub remembers: IndexMap<String, Prose>,
+    /// Characters: the player can SWITCH TO them.
+    #[serde(default)]
+    pub playable: bool,
     #[serde(default)]
     pub on: IndexMap<String, String>,
 
@@ -688,6 +727,18 @@ pub struct Scene {
     pub begins: Option<String>,
     #[serde(default)]
     pub ends: Option<String>,
+}
+
+/// What a thing comes apart into: a list, or with words.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum SplitSrc {
+    Parts(Vec<String>),
+    Full {
+        parts: Vec<String>,
+        #[serde(default)]
+        say: Option<String>,
+    },
 }
 
 /// One combination, or a list of them.

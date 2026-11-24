@@ -109,6 +109,12 @@ impl<'a> Lowerer<'a> {
             combines: vec![],
             marks: false,
             decoy_for: None,
+            reaches: false,
+            far: false,
+            splits_into: None,
+            reflects: false,
+            moods: Default::default(),
+            mood: None,
             handlers: vec![],
             npc: None,
             health: s.player.health,
@@ -249,6 +255,20 @@ impl<'a> Lowerer<'a> {
         let scenes = self.lower_scenes(&s.scenes);
 
         let presentation = s.presentation.as_ref().map(|p| self.presentation(p));
+        let moods = s.moods.iter().map(|(m, p)| (m.trim().to_lowercase(), self.prose(p, &format!("moods.{m}")))).collect();
+        if s.player.plays.is_none()
+            && let Some((k, _)) = s.characters.iter().find(|(_, c)| c.playable)
+        {
+            self.d.error(format!("characters.{k}.playable"), "say who the player starts as, with `player: { plays: ... }`");
+        }
+        let plays = s.player.plays.as_deref().and_then(|k| {
+            let id = self.entity_ref(k, "player.plays")?;
+            if !s.characters.contains_key(k) {
+                self.d.error("player.plays", format!("'{k}' isn't a character"));
+                return None;
+            }
+            Some(id)
+        });
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
         let story = Story {
             ir_version: IR_VERSION,
@@ -286,6 +306,8 @@ impl<'a> Lowerer<'a> {
             hints,
             goals,
             scenes,
+            moods,
+            plays,
             clock,
             weather,
         };
@@ -645,6 +667,12 @@ impl<'a> Lowerer<'a> {
             combines: vec![],
             marks: false,
             decoy_for: None,
+            reaches: false,
+            far: false,
+            splits_into: None,
+            reflects: false,
+            moods: r.moods.iter().map(|(m, p)| (m.trim().to_lowercase(), self.prose(p, &format!("{path}.moods.{m}")))).collect(),
+            mood: None,
             handlers,
             npc: None,
             health: None,
@@ -993,6 +1021,19 @@ impl<'a> Lowerer<'a> {
             combines.push(Combination { with, makes, by, say, keep });
         }
         let decoy_for = t.decoy_for.as_deref().and_then(|d| self.entity_ref(d, &format!("{path}.decoy_for")));
+        let splits_into = t.splits_into.as_ref().map(|sp| {
+            let (parts, say) = match sp {
+                src::SplitSrc::Parts(p) => (p, None),
+                src::SplitSrc::Full { parts, say } => (parts, say.as_deref()),
+            };
+            let parts = parts.iter().enumerate().filter_map(|(i, x)| self.entity_ref(x, &format!("{path}.splits_into[{i}]"))).collect();
+            Split { parts, say: self.text_opt(say, &format!("{path}.splits_into.say")) }
+        });
+        let moods = t.moods.iter().map(|(m, p)| (m.trim().to_lowercase(), self.prose(p, &format!("{path}.moods.{m}")))).collect();
+        if t.mood.len() > 1 {
+            self.d.error(format!("{path}.mood"), "one mood at a time: `mood: { drunk: 10 }`");
+        }
+        let mood = t.mood.iter().next().map(|(m, n)| (m.trim().to_lowercase(), *n));
         Entity {
             key: key.into(),
             kind,
@@ -1012,6 +1053,12 @@ impl<'a> Lowerer<'a> {
             combines,
             marks: t.marks,
             decoy_for,
+            reaches: t.reaches,
+            far: t.far,
+            splits_into,
+            reflects: t.reflects,
+            moods,
+            mood,
             handlers,
             npc,
             health: t.health.filter(|_| is_char),
@@ -1072,6 +1119,10 @@ impl<'a> Lowerer<'a> {
                 ("tracker", t.tracker.is_some()),
                 ("chatter", !t.chatter.is_empty()),
                 ("obeys", t.obeys.is_some()),
+                ("answers_to", !t.answers_to.is_empty()),
+                ("friends", !t.friends.is_empty()),
+                ("remembers", !t.remembers.is_empty()),
+                ("playable", t.playable),
                 ("morale", t.morale.is_some()),
                 ("fears", !t.fears.is_empty()),
                 ("behavior", t.behavior.is_some()),
@@ -1155,10 +1206,28 @@ impl<'a> Lowerer<'a> {
         }
         routine.sort_by_key(|(t, _)| *t);
         let watches = t.watches.iter().enumerate().filter_map(|(i, w)| self.entity_ref(w, &format!("{path}.watches[{i}]"))).collect();
+        let answers_to = t.answers_to.iter().enumerate().filter_map(|(i, w)| self.entity_ref(w, &format!("{path}.answers_to[{i}]"))).collect();
+        let friends = t.friends.iter().enumerate().filter_map(|(i, w)| self.entity_ref(w, &format!("{path}.friends[{i}]"))).collect();
+        let remembers = t
+            .remembers
+            .iter()
+            .map(|(m, p)| {
+                let m = m.trim().to_lowercase();
+                if !["gift", "attacked", "robbed", "spared", "fooled"].contains(&m.as_str()) {
+                    self.d.error(format!("{path}.remembers.{m}"), "what a character remembers is one of gift, attacked, robbed, spared or fooled");
+                }
+                let text = self.prose(p, &format!("{path}.remembers.{m}"));
+                (m, text)
+            })
+            .collect();
         Some(Npc {
             behavior,
             routine,
             watches,
+            answers_to,
+            friends,
+            remembers,
+            playable: t.playable,
             wander: t.wander.unwrap_or(behavior.default_wander()),
             area,
             range: t.range,

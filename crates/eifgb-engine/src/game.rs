@@ -689,6 +689,7 @@ impl<H: ScriptHost> Game<H> {
         }
         self.end_turn();
         self.keep_barricades();
+        self.cunning_turn();
         self.dead_act_seen();
         self.world.push_undo(before);
         self.last = Some(cmd.words);
@@ -882,6 +883,11 @@ impl<H: ScriptHost> Game<H> {
                     self.msg("reach.high", &Ctx::new().entity("target", thing));
                     return;
                 }
+                // Across a gap: only something long reaches it.
+                if self.world.out_of_reach_far(thing) {
+                    self.msg("reach.far", &Ctx::new().entity("target", thing));
+                    return;
+                }
             }
         }
 
@@ -925,6 +931,13 @@ impl<H: ScriptHost> Game<H> {
             },
         };
 
+        // Eaten or drunk: a mood it brings on.
+        if ok
+            && matches!(verb.action, VerbAction::Builtin(BuiltinAction::Eat | BuiltinAction::Drink))
+            && let Some(t) = target
+        {
+            self.take_mood(t);
+        }
         // A tool that wears out: a use for each time it's used.
         if ok {
             let tool = match verb.action {

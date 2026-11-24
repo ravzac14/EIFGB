@@ -565,6 +565,23 @@ pub fn puzzles(story: &Story) -> Puzzles {
             rules.push(r);
         }
     }
+    // Parts of something taken apart.
+    for whole in 0..n {
+        if let Some(sp) = &def(whole).splits_into {
+            let names: Vec<String> = sp.parts.iter().map(|p| a(&name(p.index()))).collect();
+            let list = match names.split_last() {
+                Some((last, [])) => last.clone(),
+                Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+                None => continue,
+            };
+            for p in &sp.parts {
+                let mut r = Rule::new(Fact::Thing(p.index()), vec![Fact::Thing(whole)]);
+                r.kind = Some("find");
+                r.text = format!("Take {} apart: {list}.", the(&name(whole)));
+                rules.push(r);
+            }
+        }
+    }
     // Rooms a script moves the player to.
     for i in 0..n {
         if def(i).kind != EntityKind::Room {

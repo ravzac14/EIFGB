@@ -87,6 +87,21 @@ pub struct GameState {
     /// The last few commands that took a turn, as typed, for RECAP.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recent: Vec<String>,
+    /// In a game with several player characters, the one the player is now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub playing_as: Option<EntityId>,
+    /// Word of what the player did, on its way to the friends of whoever saw.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rumours: Vec<Rumour>,
+}
+
+/// A change in how someone feels about the player, that their friends and
+/// faction will hear of at turn `due`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Rumour {
+    pub from: EntityId,
+    pub by: i64,
+    pub due: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,7 +128,7 @@ impl GameState {
         // Timers running from the start; a range picks its first wait now.
         let mut rng = Rng::new(seed);
         let timers = story.timers.iter().filter(|t| t.running).map(|t| (t.key.clone(), crate::game::timer_wait(t, &mut rng))).collect();
-        GameState {
+        let mut s = GameState {
             turn: 0,
             score: 0,
             vars: story.vars.clone(),
@@ -154,7 +169,29 @@ impl GameState {
             vary: BTreeMap::new(),
             visits: BTreeMap::from([(story.meta.start, 1)]),
             scenes: BTreeMap::new(),
+            playing_as: None,
+            rumours: Vec::new(),
+        };
+        // Several player characters: the player starts out as one of them,
+        // where they are, with what they carry.
+        if let Some(c) = story.plays {
+            let theirs = std::mem::take(&mut s.entities[c.index()].state);
+            s.entities[PLAYER.index()].state.extend(theirs);
+            let there = s.entities[c.index()].location.take();
+            for i in 0..s.entities.len() {
+                if s.entities[i].location == Some(c) {
+                    s.entities[i].location = Some(PLAYER);
+                    s.known.insert(EntityId(i as u32));
+                }
+            }
+            if let Some(r) = there {
+                s.entities[PLAYER.index()].location = Some(r);
+                s.visited.insert(r);
+                s.visits.insert(r, 1);
+            }
+            s.playing_as = Some(c);
         }
+        s
     }
 }
 

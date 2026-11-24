@@ -102,6 +102,42 @@ assert.match(sentAlong, /state: the game has ended/);
 assert.match(sentAlong, /last lines of the game:[^]*> eat it/);
 $("#feedback").close?.();
 
+// Looking back over the story after the ending, and playing on from a turn.
+clickIn($("#after"), "Look back over the story");
+const bar = $("#after .replay-bar");
+assert.ok(bar, "the look-back bar");
+assert.match(bar.textContent, /Turn \d+ of \d+: > /);
+const at = Number(bar.textContent.match(/Turn (\d+) of/)[1]);
+assert.ok($("#log .replay-here")?.classList.contains("cmd"), "the turn's command is marked");
+assert.match(bar.textContent, new RegExp(`> ${$("#log .replay-here").textContent}`));
+assert.ok($("#log .replay-later"), "what came after is faded");
+clickIn($("#after"), "◀ Back a turn");
+assert.match($("#after").textContent, new RegExp(`Turn ${at - 1} of`));
+// That turn won the game: nothing to play on from there.
+assert.equal([...$("#after").querySelectorAll("button")].find((b) => b.textContent === "Play on from here").disabled, true);
+clickIn($("#after"), "◀ Back a turn");
+const keep = $("#log .replay-here");
+clickIn($("#after"), "Play on from here");
+assert.equal($("#log .replay-here"), null);
+assert.match($("#log").lastElementChild.textContent, new RegExp(`after turn ${at - 2}\\.`));
+assert.ok(keep.isConnected, "the turn played on from is kept");
+assert.equal($("#after").textContent, "", "playing again");
+assert.doesNotMatch($("#log").textContent.slice(-400), /You have won/, "what came after is gone");
+
+// A sentence at a time: one shows, Enter on its own shows the next.
+localStorage.setItem("eifgb:settings", JSON.stringify({ reveal: "sentence" }));
+type("look");
+const hiddenNow = $("#log").querySelectorAll(".unread").length;
+assert.ok(hiddenNow >= 1, "the rest waits");
+assert.equal($("#line").placeholder, "Enter for more");
+type("");
+assert.equal($("#log").querySelectorAll(".unread").length, hiddenNow - 1);
+// A command shows the rest first.
+type("look");
+type("inventory");
+assert.ok(![...$("#log").children].slice(0, -3).some((e) => e.querySelector(".unread")), "nothing earlier left hidden");
+localStorage.removeItem("eifgb:settings");
+
 // Typewriter reveal: new lines start see-through and are typed out, but
 // their whole text is there from the start.
 localStorage.setItem("eifgb:settings", JSON.stringify({ reveal: "typewriter" }));

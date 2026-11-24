@@ -270,6 +270,56 @@ verbs:
       - "where did {text} come from"
       - "find {text}"
       - "locate {text}"
+  reach:
+    action: reach
+    patterns:
+      - "hook {target} with {tool}"
+      - "reach {target} with {tool}"
+      - "reach for {target} with {tool}"
+      - "fish for {target} with {tool}"
+      - "fish {target} out with {tool}"
+      - "knock {target} down with {tool}"
+      - "pull {target} over with {tool}"
+      - "get {target} down with {tool}"
+  take_apart:
+    action: take_apart
+    patterns: ["take apart {target}", "take {target} apart", "dismantle {target}", "disassemble {target}", "pull apart {target}", "pull {target} apart", "strip {target} down", "unscrew {target}"]
+  look_around:
+    action: look_around
+    reach: false
+    patterns:
+      - "look around the corner with {target}"
+      - "look round the corner with {target}"
+      - "look around corner with {target}"
+      - "look around the corner"
+      - "look round the corner"
+      - "look around corner"
+      - "look {direction} with {target}"
+      - "look around {direction} with {target}"
+      - "use {target} to look {direction}"
+      - "use {target} to look around the corner"
+  reflect:
+    action: reflect
+    patterns:
+      - "angle {target} {direction}"
+      - "aim {target} {direction}"
+      - "point {target} {direction}"
+      - "tilt {target} {direction}"
+      - "angle {target}"
+      - "reflect light {direction} with {target}"
+      - "shine light {direction} with {target}"
+      - "bounce light {direction} with {target}"
+  imitate:
+    action: imitate
+    reach: false
+    patterns: ["impersonate {text}", "call out as {text}", "shout as {text}", "speak as {text}", "call as {text}", "pretend to be {text}", "do a voice like {text}"]
+  plant:
+    action: plant
+    patterns: ["plant {target} on {tool}", "plant {target} in {tool}", "slip {target} into {tool}", "slip {target} to {tool}", "frame {tool} with {target}"]
+  switch_to:
+    action: switch_to
+    reach: false
+    patterns: ["switch to {text}", "become {text}", "play as {text}", "change to {text}", "be {text}"]
   combine:
     action: combine
     patterns:
@@ -1022,6 +1072,40 @@ messages:
   recap.recent: "Your last few moves: ${args.list}."
   recap.notes: "You've written ${args.n} ${if args.n == 1}note${else}notes${end}: NOTES shows them."
   choice.locked: "${args.text} (${args.why})"
+  npc.distracted: "${The(args.npc)} turns toward the sound."
+  look_around.no_mirror: "You'd need a mirror for that."
+  look_around.no_way: "There's no way to look along from here."
+  look_around.which: "Which way?"
+  look_around.closed: "There's a closed door in the way."
+  look_around.dark: "In ${the(args.tool)}, ${args.place} is too dark to make out."
+  look_around.see: "In ${the(args.tool)}, unseen, you can make out ${args.place}."
+  look_around.things: "You can see ${args.list} there."
+  reflect.cant: "That won't reflect anything."
+  reflect.no_light: "There's no light here to reflect."
+  reflect.which: "Angle it which way?"
+  reflect.done: "You set ${the(args.target)} down at an angle, and light falls ${args.direction} into ${args.place}."
+  reach.far: "${The(args.target)} is too far off to reach."
+  reach.done: "You hook ${the(args.target)} with ${the(args.tool)}, and draw it in."
+  reach.wont: "That won't reach anything."
+  take_apart.cant: "${The(args.target)} doesn't come apart."
+  take_apart.done: "You take ${the(args.target)} apart: ${args.list}."
+  imitate.who: "Whose voice?"
+  imitate.unknown: "You've never heard ${the(args.target)} speak."
+  imitate.here: "Not with ${the(args.target)} right here."
+  imitate.done: "You call out, in ${the(args.target)}'s voice."
+  imitate.seen: "${The(args.npc)} just stares at you."
+  imitate.answered: "Somewhere, ${the(args.npc)} answers, and hurries toward your voice."
+  npc.voice_found_out: "${The(args.npc)} looks for whoever called, and finds you instead."
+  npc.heard_word: "${The(args.npc)} has heard about you. ${The(args.npc)} seems ${args.feeling} now."
+  plant.not_person: "Plant it on whom?"
+  plant.caught: "${The(args.npc)} catches your hand."
+  plant.done: "You slip ${the(args.target)} onto ${the(args.npc)}, unseen."
+  npc.blames: "${The(args.npc)} spots ${the(args.target)} on ${the(args.holder)}, and snatches it back: \"Thief!\""
+  mood.ends: "[You feel more yourself again.]"
+  switch.none: "You can only be yourself here."
+  switch.who: "Who? You could be ${args.list}."
+  switch.already: "You're ${the(args.target)} already."
+  switch.done: "You're ${the(args.target)} now."
   combine.done: "You make ${a(args.target)}."
   combine.cant: "You can't see how to put those together."
   barricade.done: "You push ${the(args.target)} against ${the(args.tool)}. Nobody's getting through that way now."

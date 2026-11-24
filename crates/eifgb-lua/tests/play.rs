@@ -5134,6 +5134,202 @@ fn tricks(extra: &str) -> Game<LuaHost> {
     game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
 }
 
+/// A house for the cunning tests: a watched ruby, a mirror and a dark
+/// cellar, a nest out of reach, a lantern that comes apart, wine, a
+/// captain's voice, friends who talk, and two people to be.
+const CUNNING: &str = r#"format: eifgb/0.1
+game: { id: cunning, title: Cunning, version: '1', start: hall }
+player: { plays: mara }
+moods:
+  drunk: Everything sways, just a little.
+rooms:
+  hall: { name: Hall, description: A plain hall., moods: { dreaming: The hall stretches on forever. }, exits: { east: gallery, north: cellar, west: yard } }
+  gallery: { name: Gallery, description: Paintings hang here., exits: { west: hall, south: kitchen } }
+  kitchen: { name: Kitchen, description: A warm kitchen., exits: { north: gallery } }
+  cellar: { name: Cellar, description: Barrels and dust., dark: true, exits: { south: hall } }
+  yard: { name: Yard, description: A yard by a ravine., exits: { east: hall } }
+objects:
+  pebble: { name: pebble, in: hall, traits: [portable] }
+  mirror: { name: hand mirror, synonyms: [mirror], in: hall, traits: [portable], reflects: true }
+  pole: { name: long pole, synonyms: [pole], in: yard, traits: [portable], reaches: true }
+  nest: { name: bird's nest, synonyms: [nest], in: yard, far: true, traits: [portable] }
+  lantern: { name: old lantern, synonyms: [lantern], in: hall, traits: [portable], splits_into: [lens, oil] }
+  lens: { name: glass lens, synonyms: [lens], traits: [portable] }
+  oil: { name: flask of oil, synonyms: [flask, oil], traits: [portable] }
+  wine: { name: cup of wine, synonyms: [wine, cup], in: hall, traits: [portable, drinkable], mood: { drunk: 3 } }
+  ruby: { name: ruby, in: gallery, traits: [portable] }
+characters:
+  mara: { name: Mara, in: hall, playable: true, description: A wiry thief. }
+  tobin: { name: Tobin, in: kitchen, playable: true, description: A big cook. }
+  captain: { name: captain, in: kitchen, chatter: ["The captain barks at the cook."] }
+  guard: { name: guard, in: gallery, watches: [ruby], likes: [pebble], answers_to: [captain], friends: [cook2], remembers: { gift: "The guard nods: thanks again for the pebble." } }
+  cook2: { name: scullion, in: kitchen }
+"#;
+
+fn cunning(extra: &str) -> Game<LuaHost> {
+    let out = compile_str(&format!("{CUNNING}{extra}"));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+/// Throwing something away draws the eye: a watched thing, taken unseen.
+#[test]
+fn a_noise_distracts_a_watcher() {
+    let mut g = cunning("");
+    say(&mut g, "take pebble");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "take ruby"), "The guard won't let you near the ruby.");
+    assert_says(&mut g, "throw pebble west", "The guard turns toward the sound.");
+    assert_eq!(say(&mut g, "take ruby"), "Taken.");
+}
+
+/// A mirror: round the corner, unseen, and light into the dark.
+#[test]
+fn mirrors_see_round_corners_and_carry_light() {
+    let mut g = cunning("");
+    say(&mut g, "take mirror");
+    assert_eq!(say(&mut g, "look east with mirror"), "In the hand mirror, unseen, you can make out Gallery.\nPaintings hang here.\nYou can see a ruby and a guard there.");
+    assert_eq!(say(&mut g, "look around the corner"), "Which way?");
+    assert_eq!(say(&mut g, "look north with mirror"), "In the hand mirror, Cellar is too dark to make out.");
+    assert_says(&mut g, "angle mirror north", "light falls north into Cellar");
+    assert_says(&mut g, "n", "Barrels and dust.");
+    // Moved, it lights nothing.
+    say(&mut g, "s");
+    say(&mut g, "take mirror");
+    assert_says(&mut g, "n", "dark");
+}
+
+/// Out of reach across a gap, until there's a pole.
+#[test]
+fn a_pole_reaches_what_is_far() {
+    let mut g = cunning("");
+    say(&mut g, "w");
+    assert_eq!(say(&mut g, "take nest"), "The bird's nest is too far off to reach.");
+    assert_eq!(say(&mut g, "hook nest with pebble"), "You can't see any such thing.");
+    say(&mut g, "take pole");
+    assert_eq!(say(&mut g, "hook nest with pole"), "You hook the bird's nest with the long pole, and draw it in.");
+    assert_says(&mut g, "i", "a bird's nest");
+}
+
+/// Taking things apart, and the puzzle chain knowing where the parts come from.
+#[test]
+fn things_come_apart() {
+    let mut g = cunning("");
+    assert_eq!(say(&mut g, "take apart lantern"), "You take the old lantern apart: a glass lens and a flask of oil.");
+    assert_says(&mut g, "look", "a glass lens, a flask of oil");
+    assert_eq!(say(&mut g, "dismantle pebble"), "The pebble doesn't come apart.");
+    let p = eifgb_compiler::puzzles::puzzles(&compile_str(CUNNING).story.unwrap());
+    assert!(p.steps.iter().any(|s| s.text == "Take the old lantern apart: a glass lens and a flask of oil."), "{:#?}", p.steps.iter().map(|s| &s.text).collect::<Vec<_>>());
+}
+
+/// A voice heard can be imitated: those who answer to it come, and find the player.
+#[test]
+fn calling_out_in_someone_elses_voice() {
+    let mut g = cunning("");
+    assert_eq!(say(&mut g, "call out as the captain"), "You've never heard the captain speak.");
+    say(&mut g, "e");
+    say(&mut g, "s");
+    assert_says(&mut g, "talk to captain", "");
+    say(&mut g, "n");
+    say(&mut g, "w");
+    let out = say(&mut g, "imitate the captain");
+    assert!(out.starts_with("You call out, in the captain's voice.") && out.contains("the guard answers"), "{out}");
+    // He leaves his post, and finds the player instead.
+    assert!(out.contains("The guard arrives.\nThe guard looks for whoever called, and finds you instead."), "{out}");
+    assert_says(&mut g, "look", "a guard");
+    // A mimicked animal call is still that.
+    assert_says(&mut g, "mimic a seagull", "You make a strange noise.");
+}
+
+/// Word gets round friends; characters remember, and say so next time.
+#[test]
+fn word_travels_and_characters_remember() {
+    let mut g = cunning("");
+    say(&mut g, "take pebble");
+    say(&mut g, "e");
+    assert_says(&mut g, "give pebble to guard", "");
+    say(&mut g, "w");
+    assert_says(&mut g, "e", "The guard nods: thanks again for the pebble.");
+    assert!(!say(&mut g, "look").contains("thanks again"), "said once");
+    let mut later = String::new();
+    for _ in 0..4 {
+        later.push_str(&say(&mut g, "wait"));
+    }
+    let _ = later;
+    say(&mut g, "s");
+    assert_says(&mut g, "x scullion", "");
+}
+
+/// Planting a stolen thing on someone: its owner blames them.
+#[test]
+fn planted_evidence_is_blamed_on_whoever_has_it() {
+    let mut g = cunning("");
+    say(&mut g, "take pebble");
+    say(&mut g, "e");
+    say(&mut g, "throw pebble west");
+    say(&mut g, "take ruby");
+    say(&mut g, "s");
+    assert_eq!(say(&mut g, "plant ruby on scullion"), "The scullion catches your hand.");
+    // Asleep, the scullion doesn't notice.
+    let out = compile_str(&CUNNING.replace("cook2: { name: scullion, in: kitchen }", "cook2: { name: scullion, in: kitchen, state: { asleep: true } }"));
+    let mut g = game(out.story.unwrap());
+    say(&mut g, "take pebble");
+    say(&mut g, "e");
+    say(&mut g, "throw pebble west");
+    say(&mut g, "take ruby");
+    say(&mut g, "sneak s");
+    assert_eq!(say(&mut g, "plant ruby on scullion"), "You slip the ruby onto the scullion, unseen.");
+    // With the guard there to see it on the scullion: the scullion's blamed.
+    let src = CUNNING
+        .replace("cook2: { name: scullion, in: kitchen }", "cook2: { name: scullion, in: kitchen, state: { asleep: true }, fights_back: true, health: 5 }")
+        .replace("ruby: { name: ruby, in: gallery", "ruby: { name: ruby, in: hall")
+        .replace("guard: { name: guard, in: gallery", "guard: { name: guard, in: kitchen, fights_back: true, health: 5");
+    let out = compile_str(&src);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    say(&mut g, "take ruby");
+    say(&mut g, "e");
+    say(&mut g, "sneak s");
+    let out = say(&mut g, "plant ruby on scullion");
+    assert!(out.contains("The guard spots the ruby on the scullion, and snatches it back: \"Thief!\""), "{out}");
+    assert_says(&mut g, "x guard", "");
+    let foes = say(&mut g, "x guard");
+    assert!(!foes.contains("hostile"), "{foes}");
+}
+
+/// Moods: wine makes everything sway, a dream changes the hall, then it passes.
+#[test]
+fn moods_change_how_things_seem() {
+    let mut g = cunning("");
+    assert_says(&mut g, "drink wine", "");
+    let look = say(&mut g, "look");
+    assert!(look.contains("A plain hall.\nEverything sways, just a little."), "{look}");
+    say(&mut g, "wait");
+    assert!(!say(&mut g, "look").contains("sways"));
+    let out = compile_str(&CUNNING.replace("objects:\n", "objects:\n  cake: { name: dream cake, synonyms: [cake], in: hall, traits: [portable, edible], mood: { dreaming: 0 } }\n"));
+    let mut g = game(out.story.unwrap());
+    say(&mut g, "eat cake");
+    assert_says(&mut g, "look", "The hall stretches on forever.");
+    assert!(!say(&mut g, "look").contains("A plain hall"));
+}
+
+/// Several people to be: each with their own place and things.
+#[test]
+fn switching_between_player_characters() {
+    let mut g = cunning("");
+    assert_eq!(say(&mut g, "x me"), "A wiry thief.");
+    say(&mut g, "take pebble");
+    let out = say(&mut g, "switch to tobin");
+    assert!(out.starts_with("You're Tobin now.\nKitchen"), "{out}");
+    assert_eq!(say(&mut g, "i"), "You're empty-handed.");
+    assert_eq!(say(&mut g, "x me"), "A big cook.");
+    assert_eq!(say(&mut g, "switch to tobin"), "You're Tobin already.");
+    let back = say(&mut g, "become mara");
+    assert!(back.contains("Hall") && back.contains("You're Mara now."), "{back}");
+    assert_says(&mut g, "i", "a pebble");
+    // A game with playable characters says who the player starts as.
+    let out = compile_str(&CUNNING.replace("player: { plays: mara }\n", ""));
+    assert!(out.diagnostics.iter().any(|d| d.message.contains("plays")), "{:#?}", out.diagnostics);
+}
+
 /// Tab: words that finish the last one, from what the player can see.
 #[test]
 fn tab_completes_only_what_the_player_knows() {

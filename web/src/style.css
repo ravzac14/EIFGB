@@ -72,6 +72,8 @@
 :root[data-theme="contrast"] :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 :root[data-theme="contrast"] button { border-width: 2px; }
 :root[data-spacing="relaxed"] { --leading: 1.95; }
+:root[data-spacing="roomiest"] { --leading: 2.2; }
+:root[data-spacing="roomiest"] body { letter-spacing: 0.06em; word-spacing: 0.16em; }
 :root[data-width="narrow"] { --measure: 34rem; }
 :root[data-width="wide"] { --measure: 54rem; }
 :root[data-size="small"] { --text: 1rem; }
@@ -90,6 +92,7 @@ body {
 }
 :root[data-face="sans"] body { font-family: var(--sans); }
 :root[data-face="legible"] body { font-family: var(--legible); }
+:root[data-face="dyslexic"] body { font-family: "OpenDyslexic", var(--legible); }
 a { color: var(--accent); }
 button, input, select { font: inherit; color: inherit; }
 button {

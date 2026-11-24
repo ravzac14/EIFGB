@@ -268,7 +268,7 @@ fn kind_name(k: EntityKind) -> &'static str {
 }
 
 /// Fields every entity has. Scripts can read them but not assign them.
-const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling"];
+const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling", "remembers"];
 
 impl ScriptHost for LuaHost {
     fn load(&mut self, story: &Story) -> Result<(), ScriptError> {
@@ -338,6 +338,11 @@ impl ScriptHost for LuaHost {
                             // A room: how many times the player has come in (0: never).
                             "visits" => (mlua::Value::Integer(i64::from(w.state.visits.get(&id).copied().unwrap_or(0))), false),
                             // A character: how it feels about the player, as a word.
+                            // A character: the last thing it remembers the player doing.
+                            "remembers" => match w.get(id, "_remembers") {
+                                Some(eifgb_engine::ir::Value::Str(d)) => (s(d)?, false),
+                                _ => (mlua::Value::Nil, false),
+                            },
                             "feeling" => match w.get(id, "disposition") {
                                 Some(eifgb_engine::ir::Value::Int(d)) => (s(eifgb_engine::ir::feeling(*d))?, false),
                                 _ => (mlua::Value::Nil, false),

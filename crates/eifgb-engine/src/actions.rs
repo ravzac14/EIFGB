@@ -162,6 +162,13 @@ impl<H: ScriptHost> Game<H> {
             (A::Unmark, _) => self.unmark(ctx),
             (A::Swap, Some(t)) => self.swap(t, cmd.tool, ctx),
             (A::PlayDead, _) => self.play_dead(ctx),
+            (A::Reach, Some(t)) => self.reach(t, cmd.tool, ctx),
+            (A::TakeApart, Some(t)) => self.take_apart(t, ctx),
+            (A::LookAround, _) => self.look_around(cmd.tool.or(cmd.targets.first().copied()), cmd.direction, ctx),
+            (A::Reflect, Some(t)) => self.reflect(t, cmd.direction, ctx),
+            (A::Imitate, _) => self.imitate(cmd.text.as_deref(), ctx),
+            (A::Plant, Some(t)) => self.plant(t, cmd.tool, ctx),
+            (A::SwitchTo, _) => self.switch_to(cmd.text.as_deref(), ctx),
             (A::PushTo, Some(t)) => self.push_to(t, cmd, ctx),
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
@@ -189,6 +196,8 @@ impl<H: ScriptHost> Game<H> {
             (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
             (A::SetTrap, Some(t)) => self.set_trap(t, ctx),
             (A::DisarmTrap, Some(t)) => self.disarm_trap(t, ctx),
+            // IMITATE THE CAPTAIN: a voice the player has heard, not a call.
+            (A::Mimic, _) if self.names_known_voice(cmd.text.as_deref()) => self.imitate(cmd.text.as_deref(), ctx),
             (A::Mimic, _) => self.mimic_action(cmd, ctx),
             (A::Light, Some(t)) => self.light(t, true, ctx),
             (A::Extinguish, Some(t)) => self.light(t, false, ctx),
@@ -286,9 +295,15 @@ impl<H: ScriptHost> Game<H> {
             return;
         }
         let before = self.out.lines.len();
+        // In a mood: the room as it seems, or the game's line for the mood.
+        let mood_line = self.mood_line(here);
+        let description = self.mood_text(here).or(description);
         if !self.briefly {
             if let Some(d) = &description {
                 self.render_line(LineKind::Text, d, &Ctx::new().this(here));
+            }
+            if let Some(m) = &mood_line {
+                self.render_line(LineKind::Text, m, &Ctx::new().this(here));
             }
             // Outdoors: the weather.
             self.describe_weather();
@@ -423,7 +438,9 @@ impl<H: ScriptHost> Game<H> {
             self.msg("examine.dark", &Ctx::new().entity("target", t));
             return true;
         }
-        let description = def.description.clone();
+        // Being someone else: their description is the player's.
+        let as_who = (t == PLAYER).then_some(self.world.state.playing_as).flatten();
+        let description = self.mood_text(t).or_else(|| as_who.and_then(|c| self.world.def(c).description.clone())).or_else(|| def.description.clone());
         let pictured = self.show_picture(t);
         let before = self.out.lines.len();
         match &description {
@@ -1422,6 +1439,9 @@ impl<H: ScriptHost> Game<H> {
             self.topic = None;
             self.msg("talk.not_person", ctx);
             return false;
+        }
+        if self.world.is_active(t) && !self.world.is_asleep(t) {
+            self.hear_voice(t);
         }
         if self.world.is_dead(t) || self.world.is_asleep(t) {
             self.topic = None;

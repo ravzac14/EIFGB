@@ -143,6 +143,20 @@ field is an error, not ignored, so a typo is caught.
   insults cool them. It shows on EXAMINE, in merchants' prices, and a
   hostile one won't talk or trade. Scripts read `self.disposition` and
   `self.feeling`.
+- **More tricks:** `reflects: true` (a mirror: LOOK EAST WITH IT, ANGLE
+  IT NORTH to light a dark room); `far: true` things need something that
+  `reaches: true` (HOOK NEST WITH POLE); `splits_into: [lens, oil]` (TAKE
+  LANTERN APART); characters with `answers_to: [captain]` come when the
+  player CALLS OUT AS THE CAPTAIN; `friends: [baker]` hear how a
+  character feels about the player; `remembers: { gift: ..., robbed: ...,
+  attacked: ..., spared: ..., fooled: ... }` is said when they meet again.
+  Throwing something distracts watchers; PLANT RUBY ON COOK frames them.
+- **Moods:** `moods: { drunk: ... }` on rooms, things and characters
+  replaces their description while the player's state `drunk` is true;
+  a top-level `moods` section adds a line to every LOOK; `mood: { drunk:
+  5 }` on something eaten or drunk brings one on.
+- **Several player characters:** `playable: true` on characters, and
+  `player: { plays: mara }` for who the player starts as; SWITCH TO TOBIN.
 - **Tricks:** `combines: { with: hook, makes: grapple }` on an object
   (TIE ROPE TO HOOK makes a grappling hook that starts with no `in:`);
   `pushable` things barricade doors (PUSH WARDROBE AGAINST DOOR); objects

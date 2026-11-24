@@ -91,6 +91,9 @@ impl<H: ScriptHost> Game<H> {
                 let mut ctx = Ctx::new().text("line", line);
                 ctx = if dark { ctx.text("npc", "someone").text("listener", "someone else") } else { ctx.entity("npc", npc).entity("listener", partner) };
                 self.msg("chatter.overheard", &ctx);
+                if !dark {
+                    self.hear_voice(npc);
+                }
                 heard = true;
                 self.mark_said(npc, index, repeat);
             } else if let Some(dir) = self.world.def(here).exits.iter().find(|e| e.to == Some(room)).map(|e| e.direction)
@@ -98,6 +101,7 @@ impl<H: ScriptHost> Game<H> {
             {
                 let from = self.msg_str(&format!("from.{}", dir.key()), &Ctx::new());
                 self.msg("chatter.nearby", &Ctx::new().text("line", line).text("from", from));
+                self.hear_voice(npc);
                 heard = true;
                 self.mark_said(npc, index, repeat);
             }
@@ -547,10 +551,12 @@ impl<H: ScriptHost> Game<H> {
             let words = self.grammar.direction_word(d);
             self.msg("throw.direction", &ctx.clone().text("direction", words));
             self.world.make_noise(to, 1);
+            self.distract_onlookers();
         } else {
             self.world.unset(t, "worn");
             let _ = self.world.move_to(t, Some(here));
             self.msg("throw.away", ctx);
+            self.distract_onlookers();
         }
         for f in self.world.send_fetchers(t) {
             if self.world.together(f, PLAYER) {
@@ -650,6 +656,8 @@ impl<H: ScriptHost> Game<H> {
         self.world.unset(item, "worn");
         let _ = self.world.move_to(item, Some(PLAYER));
         self.world.learn(item);
+        let key = self.world.def(victim).key.clone();
+        self.world.set(item, "_stolen_from", Value::Str(key));
         self.msg(if asleep { "steal.done_asleep" } else { "steal.done" }, &ctx);
         true
     }

@@ -4,6 +4,9 @@ import { canSpeak, stopSpeaking } from "./speech.ts";
 // A typeface made for legibility, served with the site (not from a font service).
 import "@fontsource/atkinson-hyperlegible/400.css";
 import "@fontsource/atkinson-hyperlegible/700.css";
+// Made for readers with dyslexia; loaded only if chosen.
+import "@fontsource/opendyslexic/400.css";
+import "@fontsource/opendyslexic/700.css";
 
 const CHOICES: { [K in keyof Settings]: [Settings[K], string][] } = {
   theme: [
@@ -17,10 +20,10 @@ const CHOICES: { [K in keyof Settings]: [Settings[K], string][] } = {
     ["contrast", "High contrast"],
   ],
   size: [["small", "Small"], ["medium", "Medium"], ["large", "Large"], ["xlarge", "Very large"]],
-  face: [["serif", "Book"], ["sans", "Plain"], ["legible", "Very legible"]],
-  spacing: [["normal", "Normal"], ["relaxed", "Roomy"]],
+  face: [["serif", "Book"], ["sans", "Plain"], ["legible", "Very legible"], ["dyslexic", "OpenDyslexic (for dyslexia)"]],
+  spacing: [["normal", "Normal"], ["relaxed", "Roomy"], ["roomiest", "Roomiest, letters and words too"]],
   width: [["narrow", "Narrow"], ["medium", "Medium"], ["wide", "Wide"]],
-  reveal: [["instant", "All at once"], ["typewriter", "Letter by letter"]],
+  reveal: [["instant", "All at once"], ["typewriter", "Letter by letter"], ["sentence", "A sentence at a time (Enter for the next)"]],
   speech: [["off", "Off"], ["on", "Read new text aloud"], ["slow", "Read aloud, slower"], ["fast", "Read aloud, faster"]],
 };
 const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width", reveal: "Text appears", speech: "Read aloud" };

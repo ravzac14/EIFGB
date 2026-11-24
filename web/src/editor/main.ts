@@ -24,6 +24,7 @@ import { findInGame, MAX_FOUND } from "./find.ts";
 import { mapProblems, tidy, wayKey, type MapProblem, type Way } from "./tidy.ts";
 import { draftHints } from "./hint-drafts.ts";
 import { hasDictionary, loadDictionary, typos } from "./spelling.ts";
+import { voices } from "./voices.ts";
 import { copyText, forChat, fromChat, instructions } from "./ai.ts";
 import { timeline, timeText } from "./timeline.ts";
 
@@ -845,6 +846,41 @@ function typoList(): HTMLElement | "" {
   );
 }
 
+/** How each character sounds, under the problems: their lines side by side. */
+function voiceList(): HTMLElement | "" {
+  const r = voices(model?.toString() ?? project.files["game.yaml"] ?? "");
+  if (r.voices.length < 2) return "";
+  const name = (id: string) => r.voices.find((v) => v.id === id)?.name ?? id;
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const hints: HTMLElement[] = [
+    ...r.alike.map((a) => el("p", { className: "tp-walk" }, `${name(a.a)} and ${name(a.b)} sound alike: much the same little words, and the same way of ending a sentence. Read them side by side.`)),
+    ...r.shifts.map((s) => el("p", { className: "tp-walk" }, `${name(s.id)} sounds different in their later lines than their earlier ones. Deliberate? If not, read them in order.`)),
+  ];
+  const cols = el("div", { className: "voices" });
+  for (const v of r.voices) {
+    const head = el("button", { type: "button", className: "link", textContent: v.name });
+    head.addEventListener("click", () => select({ kind: "character", id: v.id }));
+    cols.append(
+      el(
+        "section",
+        { className: "voice" },
+        el("h4", {}, head),
+        el("p", { className: "dim", textContent: `${v.words} words; ${v.perSentence} a sentence; ${pct(v.questions)} questions, ${pct(v.exclaims)} exclamations; ${pct(v.contractions)} of words shortened (don't, I'm).${v.own.length ? ` Their own words: ${v.own.join(", ")}.` : ""}` }),
+        el("ul", {}, ...v.lines.slice(0, 12).map((l) => el("li", { textContent: l }))),
+        ...(v.lines.length > 12 ? [el("p", { className: "dim", textContent: `and ${v.lines.length - 12} more` })] : []),
+      ),
+    );
+  }
+  return el(
+    "details",
+    { className: "typos-box voices-box" },
+    el("summary", { textContent: `How characters sound (${r.voices.length})${hints.length ? `: ${hints.length} to look at` : ""}` }),
+    el("p", { className: "dim", textContent: "What each character says, side by side: in conversations, chatter, favours and memories. Two who sound alike, or one whose voice drifts, are only guesses from the words." }),
+    ...hints,
+    cols,
+  );
+}
+
 function showProblems() {
   const panel = $("panel-problems");
   const errors = problems.filter((p) => p.severity === "error").length;
@@ -858,7 +894,7 @@ function showProblems() {
   forAi.title = "The problems and how the walkthrough went, as a message for the AI assistant writing your game";
   const aiRow = el("div", { className: "problems-bar" }, forAi);
   if (!problems.length) {
-    panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }), typoList());
+    panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }), typoList(), voiceList());
     return;
   }
   const ul = el("ul", { className: "problems" });
@@ -875,6 +911,7 @@ function showProblems() {
     el("p", { className: "dim", textContent: errors ? "The game can't be played until the errors are fixed. Click one to go to it." : "Warnings don't stop the game, but are worth a look." }),
     ul,
     typoList(),
+    voiceList(),
   );
 }
 

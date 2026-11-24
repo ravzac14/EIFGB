@@ -5582,3 +5582,335 @@ fn again_with_something_else() {
     assert_eq!(say(&mut g, "put ring in box"), "You put the ring in the wooden box.");
     assert_eq!(say(&mut g, "again, the coin"), "You put the coin in the wooden box.");
 }
+
+const KNOWING: &str = r#"format: eifgb/0.1
+game: { id: knowing, title: Knowing, version: '1', start: square }
+facts:
+  meeting: "The smugglers meet at midnight."
+  mill: { text: "The smugglers meet at the old mill, past the bridge.", place: mill }
+  built: "The bridge was built in 1802."
+rooms:
+  square: { name: Square, description: A market square., exits: { north: lane, east: shop } }
+  shop: { name: Shop, description: A small shop., exits: { west: square } }
+  lane: { name: Lane, description: A narrow lane., exits: { south: square, north: bridge } }
+  bridge: { name: Bridge, description: An old bridge., exits: { south: lane, east: mill } }
+  mill: { name: Old Mill, description: The mill wheel creaks., exits: { west: bridge } }
+objects:
+  pass: { name: travel pass, synonyms: [pass], in: shop, traits: [portable], text: "Let the bearer through.", copy: forged_pass }
+  forged_pass: { name: forged pass, traits: [portable] }
+  paper: { name: sheet of paper, synonyms: [paper, sheet], in: shop, traits: [portable], blank: true }
+  quill: { name: quill, in: shop, traits: [portable], writes: true }
+  cat: { name: cat, in: mill, traits: [portable] }
+  coin: { name: silver coin, synonyms: [coin] }
+  plaque: { name: plaque, in: bridge, text: "Built in 1802.", teaches: built }
+characters:
+  gossip: { name: gossip, in: square, talk: gossip }
+  baker:
+    name: baker
+    in: shop
+    asks:
+      for: cat
+      say: '"Have you seen my cat? Would you find her?"'
+      promise: find her cat
+      thanks: '"Whiskers!" The baker hugs the cat.'
+      gives: coin
+      within: 40
+      broken: '"You said you''d find her," says the baker coldly.'
+choices:
+  gossip:
+    start: hello
+    nodes:
+      hello:
+        text: '"Psst," says the gossip.'
+        options:
+          - { text: "Any news?", say: '"The smugglers meet at midnight."', teaches: meeting }
+          - { text: "Where do they meet?", when: 'knows("meeting")', say: '"At the old mill, past the bridge."', teaches: mill }
+          - { text: Bye, end: true }
+"#;
+
+fn knowing(extra: &str) -> Game<LuaHost> {
+    let out = compile_str(&format!("{KNOWING}{extra}"));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+/// What the player's told is remembered: listed, and said again knowingly.
+#[test]
+fn what_the_player_has_been_told() {
+    let mut g = knowing("");
+    assert_eq!(say(&mut g, "what do i know"), "You haven't learned anything that seems to matter yet.");
+    say(&mut g, "talk to gossip");
+    let out = say(&mut g, "1");
+    assert!(out.contains("The smugglers meet at midnight.") && out.contains("[You'll remember that. WHAT DO I KNOW lists what you've learned.]"), "{out}");
+    // Asked again: "As I told you".
+    assert_says(&mut g, "1", "\"As I told you before…\" says the gossip.");
+    // Only now: where.
+    let out = say(&mut g, "2");
+    assert!(out.contains("At the old mill") && out.contains("[You'll remember that.]"), "{out}");
+    say(&mut g, "3");
+    let out = say(&mut g, "what do i know");
+    assert!(out.contains("– The smugglers meet at midnight. (The gossip told you.)"), "{out}");
+    assert!(out.contains("– The smugglers meet at the old mill, past the bridge."), "{out}");
+    assert_eq!(say(&mut g, "what do i know about the bridge"), "[What you know:]\n– The smugglers meet at the old mill, past the bridge. (The gossip told you.)");
+    assert_eq!(say(&mut g, "what do i know about cheese"), "You don't know anything about that yet.");
+    // Read, too.
+    say(&mut g, "n");
+    say(&mut g, "n");
+    assert_says(&mut g, "read plaque", "[You'll remember that.]");
+}
+
+/// A place heard of: on the map, and found by asking the way.
+#[test]
+fn places_heard_of_and_the_way_there() {
+    let mut g = knowing("");
+    assert_eq!(say(&mut g, "go to the mill"), "You don't know of a place called that.".to_string().replace("You don't know of a place called that.", &say_unknown()));
+    say(&mut g, "talk to gossip");
+    say(&mut g, "1");
+    say(&mut g, "2");
+    say(&mut g, "3");
+    assert_says(&mut g, "map", "Heard of, not yet found: Old Mill.");
+    assert_says(&mut g, "go to the mill", "You've heard of Old Mill, but you don't know the way there.");
+    let out = say(&mut g, "ask gossip the way to the mill");
+    assert!(out.contains("\"North twice, then east,\" says the gossip.") && out.contains("[GO TO OLD MILL takes you there now.]"), "{out}");
+    assert_says(&mut g, "go to the mill", "The mill wheel creaks.");
+    // Not everyone gives directions.
+    say(&mut g, "go to square");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "ask baker the way to the lane"), "The baker isn't going to give you directions.");
+}
+
+fn say_unknown() -> String {
+    "You don't know of anywhere called that.".into()
+}
+
+/// A favour asked, promised, and kept (or broken).
+#[test]
+fn promises_kept_and_broken() {
+    let mut g = knowing("");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "talk to baker"), "\"Have you seen my cat? Would you find her?\"");
+    let out = say(&mut g, "i'll do it");
+    assert!(out.contains("\"You will? Thank you,\" says the baker.") && out.contains("[You promised the baker you'd find her cat. JOURNAL lists your promises.]"), "{out}");
+    assert_says(&mut g, "journal", "– To the baker: you'd find her cat.");
+    assert_eq!(say(&mut g, "promise baker"), "You've already promised the baker.");
+    assert_eq!(say(&mut g, "talk to baker"), "\"Any luck?\" asks the baker.");
+    for d in ["w", "n", "n", "e"] {
+        say(&mut g, d);
+    }
+    say(&mut g, "take cat");
+    for d in ["w", "s", "s", "e"] {
+        say(&mut g, d);
+    }
+    let out = say(&mut g, "give cat to baker");
+    assert!(out.contains("\"Whiskers!\" The baker hugs the cat.") && out.contains("The baker gives you a silver coin.") && out.contains("[You kept your promise to the baker.]"), "{out}");
+    assert_says(&mut g, "journal", "✓ To the baker: you'd find her cat.");
+    assert_eq!(say(&mut g, "promise baker"), "You've already done what the baker asked.");
+
+    // Too slow: broken, and said when they meet.
+    let mut g = knowing("");
+    say(&mut g, "e");
+    say(&mut g, "promise baker");
+    say(&mut g, "w");
+    let mut out = String::new();
+    for _ in 0..45 {
+        out.push_str(&say(&mut g, "wait"));
+    }
+    assert!(out.contains("[You didn't keep your promise to the baker.]"), "{out}");
+    assert_says(&mut g, "e", "\"You said you'd find her,\" says the baker coldly.");
+    assert_says(&mut g, "journal", "(broken)");
+}
+
+/// Copying: a forgery with paper and a pen, or words into the notes.
+#[test]
+fn copies_and_forgeries() {
+    let mut g = knowing("");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "copy pass"), "You'd need something to copy it onto: a sheet of paper, say.");
+    say(&mut g, "take paper");
+    assert_eq!(say(&mut g, "copy pass onto paper"), "You'd need something to write with.");
+    say(&mut g, "take quill");
+    assert_eq!(say(&mut g, "copy pass onto paper"), "You copy the travel pass carefully onto the sheet of paper. Now you have a forged pass.");
+    assert_says(&mut g, "i", "a forged pass");
+    assert_eq!(say(&mut g, "forge travel pass"), "You've already made a copy of the travel pass.");
+    let story = compile_str(KNOWING).story.unwrap();
+    let id = |k: &str| story.entities.iter().position(|e| e.key == k).unwrap();
+    assert_eq!(story.entities[id("forged_pass")].decoy_for.map(|d| d.0 as usize), Some(id("pass")), "a copy is a fake of the original");
+    let p = eifgb_compiler::puzzles::puzzles(&story);
+    assert!(p.steps.iter().any(|s| s.text == "Copy the travel pass onto the sheet of paper, with the quill."), "{:#?}", p.steps.iter().map(|s| &s.text).collect::<Vec<_>>());
+    assert!(p.steps.iter().any(|s| s.text == "Bring the cat to the baker, who gives a silver coin for it."), "{:#?}", p.steps.iter().map(|s| &s.text).collect::<Vec<_>>());
+    // Words: into the notes.
+    for d in ["w", "n", "n"] {
+        say(&mut g, d);
+    }
+    assert_says(&mut g, "copy plaque", "You copy it down, word for word.");
+    assert_says(&mut g, "notes", "Plaque: Built in 1802.");
+}
+
+/// The checker knows facts by name.
+#[test]
+fn facts_are_checked() {
+    let out = compile_str(&KNOWING.replace("teaches: built", "teaches: bulit"));
+    assert!(out.diagnostics.iter().any(|d| d.path == "objects.plaque.teaches" && d.message.contains("there's no fact called 'bulit'") && d.message.contains("built")), "{:#?}", out.diagnostics);
+}
+
+const ELEMENTS: &str = r#"format: eifgb/0.1
+game: { id: elements, title: Elements, version: '1', start: yard }
+clock: { start: "20:00", minutes_per_turn: 10, moon: full }
+player: { breath: 3 }
+rooms:
+  yard:
+    name: Yard
+    description: A muddy yard.
+    exits:
+      north: cellar
+      east: vault
+      south: cave
+      west: { to: hollow, open_at: full moon, blocked: Only a blank hillside. }
+  cellar: { name: Cellar, description: A low cellar., floods: { every: 1, depth: 3, drains: sluice }, exits: { south: yard, north: tunnel } }
+  tunnel: { name: Tunnel, description: A dripping tunnel., exits: { south: cellar } }
+  vault: { name: Vault, description: A bare vault., exits: { west: yard, east: { to: treasury, through: gate } } }
+  treasury: { name: Treasury, description: Gold everywhere., exits: { west: vault } }
+  hollow: { name: Hollow Hill, description: Fairy lights dance., exits: { east: yard } }
+  cave:
+    name: Cave
+    description: A vast cave.
+    echo: { help: '"…help… help…" And then, faintly, from far below: "Down here!"' }
+    hears: [tunnel]
+    exits: { north: yard }
+objects:
+  sluice: { name: sluice gate, synonyms: [sluice], in: cellar, traits: [openable] }
+  barrel: { name: empty barrel, synonyms: [barrel], in: yard, traits: [portable], floats: true }
+  plate: { name: stone plate, synonyms: [plate], in: vault, traits: [supporter], size: 4, pressure: { at_least: 3, opens: gate } }
+  boulder: { name: boulder, in: vault, traits: [portable], size: 3 }
+  gate: { name: iron gate, synonyms: [gate], in: vault, traits: [door, openable, scenery] }
+  raft: { name: raft, in: yard, traits: [supporter, enterable], capacity: 2, sinks: true }
+  glove: { name: glove, in: yard, traits: [portable], scent_of: thief }
+characters:
+  dog: { name: dog, in: yard, sniffs: true }
+  thief: { name: thief, in: tunnel, chatter: ["The thief mutters: \"The loot's under the mill.\""] }
+  lookout: { name: lookout, in: tunnel }
+"#;
+
+fn elements(extra: &str) -> Game<LuaHost> {
+    let out = compile_str(&format!("{ELEMENTS}{extra}"));
+    game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+}
+
+/// Water rises a level a turn, over the player's head; breath runs out;
+/// something that floats saves it; a sluice drains it.
+#[test]
+fn water_rises_and_drains() {
+    let mut g = elements("");
+    let out = say(&mut g, "n");
+    assert!(out.contains("The water rises: it's ankle-deep now."), "{out}");
+    // LOOK takes a turn too: the water rises as the player looks.
+    let out = say(&mut g, "look");
+    assert!(out.contains("Water covers the floor, ankle-deep.") && out.contains("waist-deep now"), "{out}");
+    assert_says(&mut g, "wait", "over your head");
+    let out = say(&mut g, "wait");
+    assert!(out.contains("[Your lungs are bursting: you need air.]"), "{out}");
+    let out = say(&mut g, "wait");
+    assert!(out.contains("You can't hold your breath any longer.") && out.contains("A muddy yard."), "{out}");
+    // Afloat with the barrel, there's no hurry.
+    say(&mut g, "take barrel");
+    say(&mut g, "n");
+    for _ in 0..5 {
+        assert!(!say(&mut g, "wait").contains("can't hold"), "afloat");
+    }
+    assert_says(&mut g, "swim north", "A dripping tunnel.");
+    say(&mut g, "s");
+    say(&mut g, "open sluice");
+    let mut out = String::new();
+    for _ in 0..3 {
+        out.push_str(&say(&mut g, "wait"));
+    }
+    assert!(out.contains("The last of the water drains away."), "{out}");
+    assert_eq!(say(&mut g, "swim north"), "There's no water here to swim in.");
+}
+
+/// Weight on a plate opens the gate; off it, the gate shuts. A raft sinks.
+#[test]
+fn weight_opens_and_sinks() {
+    let mut g = elements("");
+    say(&mut g, "e");
+    say(&mut g, "take boulder");
+    let out = say(&mut g, "put boulder on plate");
+    assert!(out.contains("The stone plate sinks under the weight, with a click.") && out.contains("The iron gate swings open."), "{out}");
+    assert_says(&mut g, "e", "Gold everywhere.");
+    say(&mut g, "w");
+    let out = say(&mut g, "take boulder");
+    assert!(out.contains("The stone plate rises again") && out.contains("The iron gate swings shut."), "{out}");
+    say(&mut g, "w");
+    assert_eq!(say(&mut g, "put boulder on raft"), "The raft would sink under the weight.");
+}
+
+/// A dog given a scent leads the way to whoever it belongs to.
+#[test]
+fn a_dog_follows_a_scent() {
+    let mut g = elements("");
+    assert_eq!(say(&mut g, "let dog sniff glove"), "The dog sniffs the glove all over, then puts its nose to the ground.\nThe dog goes north.");
+    say(&mut g, "take barrel");
+    // It waits for the player, then leads on.
+    assert!(!say(&mut g, "wait").contains("dog"));
+    assert_says(&mut g, "n", "The dog goes north.");
+    let out = say(&mut g, "n");
+    assert!(out.contains("The dog stops, and barks at the thief!"), "{out}");
+    assert_eq!(say(&mut g, "let thief sniff barrel"), "The thief isn't going to follow a scent for you.");
+}
+
+/// A door that's only there under a full moon; an echo that answers; a
+/// whispering gallery.
+#[test]
+fn the_moon_echoes_and_a_whispering_gallery() {
+    let mut g = elements("");
+    assert_eq!(say(&mut g, "time"), "It's 8:00 pm.\nThe moon is full.");
+    assert_says(&mut g, "w", "Fairy lights dance.");
+    say(&mut g, "e");
+    // The thief, two rooms away, as if beside the player.
+    assert_says(&mut g, "s", "A voice carries to you, as clear as if it were at your shoulder: The thief mutters");
+    assert_says(&mut g, "shout help", "\"Down here!\"");
+    assert_eq!(say(&mut g, "say hello"), "\"…hello… hello… hello…\" comes back to you.");
+    // A day later, a waxing gibbous moon: no way west.
+    let mut g = elements("").clone_with("clock: { start: \"20:00\", minutes_per_turn: 10, moon: full }", "clock: { start: \"20:00\", minutes_per_turn: 10, moon: waxing gibbous }");
+    assert_eq!(say(&mut g, "w"), "Only a blank hillside.");
+    let bad = compile_str(&ELEMENTS.replace("open_at: full moon", "open_at: blue moon"));
+    assert!(bad.diagnostics.iter().any(|d| d.path == "rooms.yard.exits.west.open_at"), "{:#?}", bad.diagnostics);
+}
+
+trait CloneWith {
+    fn clone_with(self, from: &str, to: &str) -> Game<LuaHost>;
+}
+impl CloneWith for Game<LuaHost> {
+    fn clone_with(self, from: &str, to: &str) -> Game<LuaHost> {
+        let out = compile_str(&ELEMENTS.replace(from, to));
+        game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
+    }
+}
+
+
+/// Dead ends: eating the cake the troll wants, before getting to the troll.
+#[test]
+fn dead_ends_along_the_walkthrough() {
+    let src = r#"format: eifgb/0.1
+game: { id: troll, title: Troll, version: '1', start: kitchen }
+rooms:
+  kitchen: { name: Kitchen, exits: { north: bridge } }
+  bridge: { name: Bridge, exits: { south: kitchen, north: { to: far_side, when: 'vars.fed', blocked: The troll blocks the way. } } }
+  far_side: { name: Far Side, on: { enter: 'end_game("over")' } }
+vars: { fed: false }
+objects:
+  cake: { name: cake, in: kitchen, traits: [portable, edible], on: { give: 'vars.fed = true; self:move_to(nil); say("The troll gobbles it.")' } }
+  bun: { name: bun, in: kitchen, traits: [portable, edible] }
+characters:
+  troll: { name: troll, in: bridge }
+endings:
+  over: { kind: win, text: Over. }
+"#;
+    let story = compile_str(src).story.unwrap();
+    let make = || LuaHost::new().and_then(|h| Game::new(story.clone(), h, 1)).ok();
+    let walk = "take cake\nn\ngive cake to troll\nn\n";
+    assert_eq!(eifgb_engine::testing::play_walkthrough(&mut { let mut g = make().unwrap(); g.start(); g }, walk, &eifgb_engine::testing::Goal::Win, "w").result, "win");
+    let found = eifgb_engine::testing::dead_ends(make, walk);
+    assert!(found.iter().any(|d| d.command == "eat cake" && d.lost == ["cake"] && d.needed_by == "give cake to troll" && d.after == 0), "{found:#?}");
+    // Eating the bun doesn't matter: the walkthrough doesn't need it.
+    assert!(!found.iter().any(|d| d.lost.contains(&"bun".to_string())), "{found:#?}");
+}

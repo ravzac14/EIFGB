@@ -110,6 +110,13 @@ export function placeRooms(map: PlayerMap, author: Map<string, Place>): Map<stri
       }
     }
   }
+  // Places heard of: where the author drew them, else in a row below.
+  const heard = map.heard ?? [];
+  const row = Math.max(0, ...[...pos.values()].map((p) => Math.round(p.y / CELL.y) + 2));
+  for (const r of heard) {
+    const p = author.get(r.id);
+    put(r.id, p && !used.has(cellOf(p)) ? p : free(0, row));
+  }
   return pos;
 }
 
@@ -147,7 +154,8 @@ export function mapDescription(map: PlayerMap, names = new Map(map.rooms.map((r)
       .map((e) => `${e.dir}${e.to ? ` to ${names.get(e.to) ?? e.to}` : ", not visited yet"}${e.closed ? ` (${e.door ?? "door"} closed)` : ""}`);
     return `${r.name}${r.id === map.here ? " (you're here)" : ""}${ways.length ? `: ${ways.join("; ")}` : ""}`;
   });
-  return `Map of the ${map.rooms.length === 1 ? "place" : `${map.rooms.length} places`} you've been. ${places.join(". ")}.`;
+  const heard = (map.heard ?? []).map((r) => r.name);
+  return `Map of the ${map.rooms.length === 1 ? "place" : `${map.rooms.length} places`} you've been. ${places.join(". ")}.${heard.length ? ` Heard of, not yet found: ${heard.join(", ")}.` : ""}`;
 }
 
 /** Draws the map into `into` (replacing what's there) and scrolls the current room into view. */
@@ -158,7 +166,8 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
   const minX = Math.min(...ps.map((p) => p.x - boxOf(p).w / 2)) - pad, minY = Math.min(...ps.map((p) => p.y - boxOf(p).h / 2)) - pad;
   const w = Math.max(...ps.map((p) => p.x + boxOf(p).w / 2)) + pad - minX, h = Math.max(...ps.map((p) => p.y + boxOf(p).h / 2)) + pad - minY;
   const root = svg("svg", { viewBox: `${minX} ${minY} ${w} ${h}`, width: w, height: h, role: "img", class: "pmap" });
-  const names = new Map(map.rooms.map((r) => [r.id, r.name]));
+  const names = new Map([...map.rooms, ...(map.heard ?? [])].map((r) => [r.id, r.name]));
+  const heard = new Set((map.heard ?? []).map((r) => r.id));
   root.setAttribute("aria-label", mapDescription(map, names));
   const here = pos.get(map.here);
 
@@ -208,13 +217,13 @@ export function drawMap(into: HTMLElement, map: PlayerMap, author: Map<string, P
 
   const boxes = svg("g", { class: "rooms" });
   for (const [id, p] of pos) {
-    const g = svg("g", { class: `room${id === map.here ? " here" : ""}${p.colour ? " coloured" : ""}` });
+    const g = svg("g", { class: `room${id === map.here ? " here" : ""}${heard.has(id) ? " heard" : ""}${p.colour ? " coloured" : ""}` });
     if (p.colour) g.setAttribute("style", colourStyle(p.colour));
     const b = boxOf(p);
     g.append(svg("rect", { x: p.x - b.w / 2, y: p.y - b.h / 2, width: b.w, height: b.h, rx: 6 }));
-    const parts = wrap(names.get(id) ?? id, b.w);
+    const parts = wrap(`${names.get(id) ?? id}${heard.has(id) ? " ?" : ""}`, b.w);
     parts.forEach((t, i) => g.append(svg("text", { x: p.x, y: p.y + 5 + (i - (parts.length - 1) / 2) * 15 }, t)));
-    g.append(svg("title", {}, id === map.here ? `${names.get(id)} (you are here)` : names.get(id) ?? id));
+    g.append(svg("title", {}, id === map.here ? `${names.get(id)} (you are here)` : heard.has(id) ? `${names.get(id)}: heard of, not found yet` : names.get(id) ?? id));
     boxes.append(g);
   }
   root.append(boxes);

@@ -129,6 +129,12 @@ pub enum Effect {
     Npc(crate::npc::NpcEvent),
     /// Change the weather to this kind.
     Weather(String),
+    /// `learn`: the player learns a fact.
+    Learn(String),
+    /// `hear_of`: the player hears of a place.
+    HearOf(EntityId),
+    /// `promise`: the player promises someone their favour.
+    Promise(EntityId),
 }
 
 #[derive(Debug, Clone, PartialEq)]

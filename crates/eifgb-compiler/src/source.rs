@@ -61,6 +61,10 @@ pub struct Source {
     /// A line LOOK adds while the player is in a mood, in rooms without their own.
     #[serde(default)]
     pub moods: IndexMap<String, Prose>,
+    /// What the player can learn: `mill: The meeting's at the mill.`, or
+    /// `{ text, place }` for one that tells of a place.
+    #[serde(default)]
+    pub facts: IndexMap<String, FactSrc>,
     /// The game's own words for words the game knows: `using: with`.
     #[serde(default)]
     pub aliases: IndexMap<String, String>,
@@ -155,6 +159,9 @@ pub struct Player {
     /// In a game with several player characters, the one the player starts as.
     #[serde(default)]
     pub plays: Option<String>,
+    /// Turns the player can hold their breath under water (4 unless set).
+    #[serde(default)]
+    pub breath: Option<u32>,
 }
 
 /// A carrying capacity: a whole number, or `none` (or null) for no limit.
@@ -222,6 +229,18 @@ pub struct Room {
     /// How it seems while the player is in a mood: `{ drunk: ..., dreaming: ... }`.
     #[serde(default)]
     pub moods: IndexMap<String, Prose>,
+    /// The player knows of it from the start: GO TO works once they know the way.
+    #[serde(default)]
+    pub heard_of: bool,
+    /// Water rises here: `{ every: 3, depth: 3, starts: true, drains: sluice }`.
+    #[serde(default)]
+    pub floods: Option<FloodSrc>,
+    /// An echo: `true`, or what it answers to words shouted here.
+    #[serde(default)]
+    pub echo: Option<EchoSrc>,
+    /// Rooms whose talk is heard here (a whispering gallery).
+    #[serde(default)]
+    pub hears: Vec<String>,
     /// Whether this room's description lists its exits (overrides `settings.list_exits`).
     #[serde(default)]
     pub list_exits: Option<bool>,
@@ -329,6 +348,9 @@ pub struct FullExit {
     /// Things the way goes by: `via: stairs` lets CLIMB THE STAIRS go this way.
     #[serde(default)]
     pub via: Option<OneOrMany>,
+    /// Only open then: `night`, `day`, `full moon`, `22:00-4:00`, or a list (all must hold).
+    #[serde(default)]
+    pub open_at: Option<OneOrMany>,
 }
 
 /// An object or a character. Only characters may use `talk`.
@@ -404,6 +426,39 @@ pub struct Thing {
     /// Characters: the player can SWITCH TO them.
     #[serde(default)]
     pub playable: bool,
+    /// Facts the player learns reading or examining it.
+    #[serde(default)]
+    pub teaches: Option<OneOrMany>,
+    /// Objects: what COPY makes of it.
+    #[serde(default)]
+    pub copy: Option<String>,
+    /// Objects: paper to copy onto.
+    #[serde(default)]
+    pub blank: bool,
+    /// Objects: a pen to write with.
+    #[serde(default)]
+    pub writes: bool,
+    /// Characters: a favour they ask.
+    #[serde(default)]
+    pub asks: Option<AskSrc>,
+    /// Characters: whether they give directions (people you can talk to do).
+    #[serde(default)]
+    pub knows_the_way: Option<bool>,
+    /// A pressure plate: `{ at_least: 3, opens: gate }`.
+    #[serde(default)]
+    pub pressure: Option<PressureSrc>,
+    /// Overloaded, it sinks (a raft) rather than being full.
+    #[serde(default)]
+    pub sinks: bool,
+    /// Held, it keeps the player afloat.
+    #[serde(default)]
+    pub floats: bool,
+    /// Characters: follows a scent (a dog).
+    #[serde(default)]
+    pub sniffs: bool,
+    /// Objects: whose scent it carries.
+    #[serde(default)]
+    pub scent_of: Option<String>,
     #[serde(default)]
     pub on: IndexMap<String, String>,
 
@@ -612,6 +667,9 @@ pub struct Node {
     pub goto: Option<String>,
     #[serde(default)]
     pub end: bool,
+    /// Facts the player learns here.
+    #[serde(default)]
+    pub teaches: Option<OneOrMany>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -634,6 +692,79 @@ pub struct ChoiceOption {
     pub goto: Option<String>,
     #[serde(default)]
     pub end: bool,
+    /// Facts the player learns choosing it.
+    #[serde(default)]
+    pub teaches: Option<OneOrMany>,
+    /// Choosing it promises the one talked to their favour (`asks:`).
+    #[serde(default)]
+    pub promise: bool,
+}
+
+/// A pressure plate.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PressureSrc {
+    pub at_least: u32,
+    #[serde(default)]
+    pub opens: Option<OneOrMany>,
+    #[serde(default)]
+    pub down: Option<String>,
+    #[serde(default)]
+    pub up: Option<String>,
+}
+
+/// Water rising in a room.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FloodSrc {
+    #[serde(default)]
+    pub every: Option<u32>,
+    #[serde(default)]
+    pub depth: Option<u32>,
+    #[serde(default)]
+    pub starts: Option<bool>,
+    #[serde(default)]
+    pub drains: Option<String>,
+}
+
+/// An echo: on, or with answers.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum EchoSrc {
+    On(bool),
+    Answers(IndexMap<String, String>),
+}
+
+/// A fact: just its text, or with the place it tells of.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum FactSrc {
+    Text(String),
+    Full {
+        text: String,
+        #[serde(default)]
+        place: Option<String>,
+    },
+}
+
+/// A favour a character asks.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AskSrc {
+    #[serde(rename = "for")]
+    pub wants: String,
+    #[serde(default)]
+    pub say: Option<Prose>,
+    #[serde(default)]
+    pub promise: Option<String>,
+    #[serde(default)]
+    pub thanks: Option<Prose>,
+    #[serde(default)]
+    pub gives: Option<OneOrMany>,
+    #[serde(default)]
+    pub within: Option<u32>,
+    #[serde(default)]
+    pub broken: Option<Prose>,
 }
 
 /// A line of chatter: just the words, or `{ say, loud, when, repeat }`.
@@ -807,6 +938,10 @@ pub struct Clock {
     /// Shows the time on the status line (the default).
     #[serde(default)]
     pub show: Option<bool>,
+    /// The moon on the first day: new, waxing crescent, first quarter,
+    /// waxing gibbous, full, waning gibbous, last quarter, waning crescent.
+    #[serde(default)]
+    pub moon: Option<String>,
 }
 
 /// A time as written: "7:30", or a bare hour like 7 (YAML reads 7:30 as text).

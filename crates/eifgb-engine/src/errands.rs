@@ -132,7 +132,9 @@ impl<H: ScriptHost> Game<H> {
         // Several called that: the nearest.
         let Some((to, _)) = self.route(here, &named) else {
             let place = self.world.def(named[0]).name.clone();
-            self.msg("go.no_route", &ctx.text("place", place));
+            // Heard of, but never been: nobody's said the way.
+            let key = if named.iter().all(|r| !self.world.state.visited.contains(r)) { "go.way_unknown" } else { "go.no_route" };
+            self.msg(key, &ctx.text("place", place));
             return false;
         };
         self.walk_to(to)
@@ -195,8 +197,10 @@ impl<H: ScriptHost> Game<H> {
             }
             for e in &w.def(r).exits {
                 let Some(to) = e.to else { continue };
-                // Only through places the player has been (the place itself may be new).
-                let known = w.state.visited.contains(&to) || (targets.contains(&to) && r == from);
+                // Only through places the player has been (the place itself
+                // may be new), unless they've been told the way.
+                let told = targets.iter().any(|t| w.state.way_known.contains(t));
+                let known = told || w.state.visited.contains(&to) || (targets.contains(&to) && r == from);
                 if to == from || came.contains_key(&to) || !known || !w.exit_visible(e) {
                     continue;
                 }

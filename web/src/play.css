@@ -106,6 +106,8 @@ figure.picture p { margin: 0; }
 .pmap .room.coloured:not(.here) rect { stroke: var(--tint-line); }
 .pmap .room.here rect { stroke: var(--accent); stroke-width: 3; }
 .pmap .room.here text { font-weight: bold; }
+.pmap .room.heard rect { fill: none; stroke-dasharray: 5 4; }
+.pmap .room.heard text { fill: var(--dim); font-style: italic; }
 #map-open[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 
 /* Bookmarks: a mark beside a bookmarked moment, a flash when it's shown,

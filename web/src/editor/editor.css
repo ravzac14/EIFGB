@@ -389,3 +389,13 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .tries { list-style: none; padding: 0; margin: 0.3rem 0; display: grid; gap: 0.4rem; }
 .tries li { font-size: 0.9em; }
 .tries-yes { color: var(--ok, inherit); }
+
+/* How characters sound: their lines in columns. */
+.voices { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.8rem; margin-top: 0.5rem; }
+.voice h4 { margin: 0 0 0.2rem; }
+.voice ul { margin: 0.3rem 0; padding-left: 1.1rem; font-size: 0.9em; }
+.voice li { margin-bottom: 0.25rem; }
+/* Test play: starting part-way. */
+.tp-setup { margin: 0.4rem 0; }
+.tp-setup h4 { margin: 0.5rem 0 0.2rem; font-size: 0.9em; }
+.tp-ticks, .tp-vars { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; }

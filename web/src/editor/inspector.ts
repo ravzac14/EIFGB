@@ -80,6 +80,8 @@ function withWords(ctx: InspectorContext, owner: { room: string } | { thing: str
 }
 import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
 import { characterTricks, characterWants, moodNames, moodsSection, startsAs, thingEarlierTricks, thingTricks } from "./cunning-ui.ts";
+import { characterKnowing, factsSection, roomKnowing, thingKnowing } from "./knowing-ui.ts";
+import { breathField, characterElements, roomElements, thingElements } from "./elements-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, proseField, roomName, select, type InspectorContext } from "./ui.ts";
@@ -245,6 +247,8 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
     sidesList(ctx),
     addSideRow(ctx),
     ...moodsSection(ctx, []),
+    ...factsSection(ctx),
+    ...breathField(ctx),
   );
   storySections(panel, ctx);
   scriptsSection(panel, ctx, [], "game");
@@ -360,6 +364,8 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ),
     colourPicker(ctx, id),
     ...roomBehaviour(ctx, id),
+    ...roomKnowing(ctx, id),
+    ...roomElements(ctx, id),
     ...(moodNames(m).length ? moodsSection(ctx, ["rooms", id]) : []),
     ...triesSection(m, id),
     ...pictureSection(ctx, ["rooms", id], "room"),
@@ -483,6 +489,27 @@ function exitPanel(panel: HTMLElement, ctx: InspectorContext, room: string, dir:
     );
   } else if (!via.length) {
     panel.append(help(`Add an object to ${from} (stairs, a path…) to choose it here.`));
+  }
+
+  // Only open at certain times.
+  panel.append(el("h3", { textContent: "When it's open" }));
+  if (m.get(["clock"]) === undefined) {
+    panel.append(help("Always. With a clock (Time of day, in the game's panel), a way can be open only at night, by day, or under a full moon."));
+  } else {
+    const at = (e.openAt ?? []).join(", ");
+    const choices: [string, string][] = [["", "Always"], ["night", "Only at night"], ["day", "Only by day"], ["full moon", "Only under a full moon"], ["new moon", "Only at the new moon"]];
+    if (at && !choices.some(([v]) => v === at)) choices.push([at, at]);
+    panel.append(
+      select(choices, at, (v) => ctx.change((x) => x.setOpenAt(room, dir, v, e.blocked ?? "")), "When it's open"),
+      help("Or hours, in the game file: open_at: 22:00-4:00."),
+    );
+    if (at) {
+      panel.append(
+        ...field("When it isn't, going that way says", e.blocked ?? "", (v) => ctx.change((x) => x.setOpenAt(room, dir, at, v), { coalesce: `openat:${room}:${dir}`, redraw: false }), {
+          placeholder: "Only a blank hillside.",
+        }),
+      );
+    }
   }
 
   panel.append(
@@ -799,7 +826,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
   panel.append(...boolField(ctx, ["objects", id, "far"], "Far off, out of reach", false, "Over a ravine, out on the ice: the player can see it, but needs something that reaches (a pole, a hook) to touch it."));
-  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits));
+  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits), ...thingKnowing(ctx, id), ...thingElements(ctx, id, t.traits));
   if (moodNames(m).length) panel.append(...moodsSection(ctx, ["objects", id]));
 
   // Hidden until found.
@@ -1136,7 +1163,7 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // What they carry.
   panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
-  panel.append(...characterWants(ctx, id), ...characterTricks(ctx, id));
+  panel.append(...characterWants(ctx, id), ...characterKnowing(ctx, id), ...characterElements(ctx, id), ...characterTricks(ctx, id));
   if (moodNames(m).length) panel.append(...moodsSection(ctx, p));
   panel.append(...pictureSection(ctx, p, "character"));
 

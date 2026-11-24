@@ -77,6 +77,12 @@ swaps for fakes, and playing dead. Still to do:
 
 - **Games in more than one language:** a game's own text in a second
   language, chosen by the player.
+- **Characters' own moods:** an angry, tired or drunk character talks and
+  acts differently: the player's moods, for characters.
+- **Seasons and long time:** a game over years: trees grow, a child is
+  grown by the third act, what's left behind rusts.
+- **An unreliable narrator:** the narration lies until caught out ("The
+  door is locked", until the player tries it anyway). Built on moods.
 
 ## The editor
 
@@ -99,6 +105,10 @@ swaps for fakes, and playing dead. Still to do:
   ebook, with bookmarks as chapters.
 - **Sound:** a quiet sound for a room or a timer (`sound_file:`), off
   unless the player turns it on.
+- **Two players, one story:** pass-and-play on one screen, each as one of
+  the playable characters.
+- **Postcards:** at an ending, an image to share: the title, the ending, a
+  line from the story and the room's picture.
 
 ## The website
 
@@ -107,6 +117,8 @@ swaps for fakes, and playing dead. Still to do:
 - **Author pages:** an author's games together, from the gallery.
 - **Remix a game:** "Make a copy to change" on a gallery game, crediting
   the original. A quick way to learn the format.
+- **Daily puzzle:** a small gallery game a day, with a result line to
+  share ("Escaped in 14 turns, no hints").
 
 ## No, for now
 

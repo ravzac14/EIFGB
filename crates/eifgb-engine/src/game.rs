@@ -470,6 +470,13 @@ impl<H: ScriptHost> Game<H> {
                 Effect::StartScene(k) => self.begin_scene(&k),
                 Effect::EndScene(k) => self.end_scene(&k),
                 Effect::Weather(k) => self.set_weather(&k),
+                Effect::Learn(k) => {
+                    self.learn(&k, None);
+                }
+                Effect::HearOf(r) => {
+                    self.world.state.heard_of.insert(r);
+                }
+                Effect::Promise(c) => self.make_promise(c),
                 Effect::Npc(event) => self.narrate(&event),
             }
         }
@@ -690,6 +697,8 @@ impl<H: ScriptHost> Game<H> {
         self.end_turn();
         self.keep_barricades();
         self.cunning_turn();
+        self.promises_turn();
+        self.elements_turn();
         self.dead_act_seen();
         self.world.push_undo(before);
         self.last = Some(cmd.words);
@@ -760,6 +769,10 @@ impl<H: ScriptHost> Game<H> {
             BuiltinAction::Suggest => self.suggest(),
             BuiltinAction::About => self.about(),
             BuiltinAction::Notes => self.show_notes(true),
+            BuiltinAction::Facts => {
+                let about = self.last_text.take();
+                self.facts_action(about.as_deref());
+            }
             BuiltinAction::EraseNote => {
                 let which = self.last_text.take().unwrap_or_default();
                 self.erase_note(&which);
@@ -921,6 +934,8 @@ impl<H: ScriptHost> Game<H> {
             }
             None => match verb.action {
                 VerbAction::Builtin(a) => self.builtin(a, target, cmd, &ctx),
+                // SAY HELLO where there's an echo.
+                VerbAction::Script if verb.key == "say" && self.echo(cmd.text.as_deref()) => false,
                 VerbAction::Script => {
                     match &verb.default {
                         Some(t) => self.render_line(LineKind::Text, t, &ctx),
@@ -1227,9 +1242,12 @@ impl<H: ScriptHost> Game<H> {
         for _ in 0..100 {
             let Some(cur) = self.world.state.choice else { return };
             let node = self.world.story().choice(cur.choice).nodes[cur.node as usize].clone();
+            let who = self.talker_now(&self.world.story().choice(cur.choice).key.clone());
+            self.told_before(&node.teaches, who);
             if let Some(t) = &node.text {
                 self.render_line(LineKind::Text, t, &self.talk_ctx());
             }
+            self.learn_all(&node.teaches, who);
             if let Some(r) = &node.run {
                 self.run(r, &self.talk_ctx());
             }
@@ -1352,8 +1370,16 @@ impl<H: ScriptHost> Game<H> {
         let you = self.msg_str("talk.recall_you", &self.talk_ctx().text("text", said));
         self.world.state.talks.entry(key.clone()).or_default().push(you);
         let shown = self.out.lines.len();
+        let who = self.talker_now(&key);
+        self.told_before(&opt.teaches, who);
         if let Some(s) = &opt.say {
             self.render_line(LineKind::Text, s, &self.talk_ctx());
+        }
+        self.learn_all(&opt.teaches, who);
+        if opt.promise
+            && let Some(w) = who
+        {
+            self.make_promise(w);
         }
         if let Some(r) = &opt.run {
             self.run(r, &self.talk_ctx());

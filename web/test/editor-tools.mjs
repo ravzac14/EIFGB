@@ -18,6 +18,8 @@ import { talkLayout } from "../src/editor/talk-graph.ts";
 import { readTalk, writeMap } from "../src/editor/layout.ts";
 import { forChat, fromChat, instructions } from "../src/editor/ai.ts";
 import { answeredShare, triesHere } from "../src/editor/try-here.ts";
+import { voices } from "../src/editor/voices.ts";
+import { applySetup } from "../src/editor/testplay.ts";
 import { loadEngine } from "../src/engine.ts";
 
 const spec = (p) => readFileSync(new URL(`../../spec/${p}`, import.meta.url), "utf8");
@@ -347,6 +349,88 @@ characters:
   assert.match(msg, /- walkthrough\.txt: the walkthrough no longer wins/);
   assert.match(msg, /send the whole game\.yaml again, in one ```yaml block\.$/);
   assert.equal(forChat([]), "The checker found no problems.");
+}
+
+// ------------------------------------------------------ how characters sound
+
+{
+  const game = `format: eifgb/0.1
+game: { id: v, title: V, version: "1", start: hall }
+rooms: { hall: { name: Hall } }
+characters:
+  pirate:
+    name: pirate
+    in: hall
+    chatter:
+      - "Arr, ye scurvy dog! Where be me treasure?"
+      - "Shiver me timbers, the treasure be gone!"
+      - "Arr! Ye'll walk the plank for that, ye will!"
+      - "Treasure! I smell treasure, matey!"
+  twin_a:
+    name: Ann
+    in: hall
+    chatter: ["I think that it is going to rain today, and I do not like it.", "I think that the road is long, and I do not want to walk it.", "It is a long way to the town, and I am tired of it."]
+  twin_b:
+    name: Bea
+    in: hall
+    chatter: ["I think that it is going to snow today, and I do not like it.", "I think that the hill is steep, and I do not want to climb it.", "It is a long way to the sea, and I am tired of it."]
+`;
+  const r = voices(game);
+  assert.deepEqual(r.voices.map((v) => v.name), ["pirate", "Ann", "Bea"]);
+  const pirate = r.voices[0];
+  assert.ok(pirate.exclaims > 0.5 && pirate.own.includes("treasure"), JSON.stringify(pirate));
+  assert.deepEqual(r.alike.map((a) => [a.a, a.b]), [["twin_a", "twin_b"]], "the twins sound alike");
+  // Spoken words only: the narration around quotes isn't theirs.
+  const said = voices(`characters: { c: { name: C, chatter: ['"Hello there," the cook says, wiping her hands.'] }, d: { name: D, chatter: ["Hm."] } }`);
+  assert.deepEqual(said.voices[0].lines, ["Hello there,"]);
+}
+
+// ------------------------------------------------- test play from part-way
+
+{
+  const m = new Model(`format: eifgb/0.1
+game: { id: s, title: S, version: "1", start: hall }
+vars: { coins: 0 }
+facts: { secret: The code is 42. }
+rooms: { hall: { name: Hall, exits: { north: vault } }, vault: { name: Vault } }
+objects:
+  key: { name: key, in: vault, traits: [portable], state: { hidden: true } }
+  chest: { name: chest, in: vault, traits: [container, openable, lockable], state: { locked: true } }
+on: { start: 'say("Welcome.")' }
+`);
+  applySetup(m, { room: "vault", carry: ["key"], open: ["chest"], unlocked: ["chest"], vars: { coins: "5" }, facts: ["secret"] });
+  assert.equal(m.get(["game", "start"]), "vault");
+  assert.equal(m.get(["objects", "key", "in"]), "player");
+  assert.equal(m.get(["objects", "key", "state", "hidden"]), undefined);
+  assert.equal(m.get(["objects", "chest", "state", "open"]), true);
+  assert.equal(m.get(["objects", "chest", "state", "locked"]), undefined);
+  assert.equal(m.get(["vars", "coins"]), 5);
+  assert.equal(m.get(["on", "start"]), 'say("Welcome.")\nlearn("secret")');
+  const out = engine.load({ "game.yaml": m.toString() }, "game.yaml", 1).output;
+  assert.match(out.lines.map((l) => l.text).join("\n"), /Welcome\.[\s\S]*You'll remember that\.[\s\S]*Vault/);
+  assert.match(engine.input("i").lines.map((l) => l.text).join(" "), /key/);
+}
+
+// ------------------------------------------------------------- dead ends
+
+{
+  const game = `format: eifgb/0.1
+game: { id: troll, title: Troll, version: "1", start: kitchen }
+vars: { fed: false }
+rooms:
+  kitchen: { name: Kitchen, exits: { north: bridge } }
+  bridge: { name: Bridge, exits: { south: kitchen, north: { to: far, when: vars.fed, blocked: The troll blocks the way. } } }
+  far: { name: Far Side, on: { enter: 'end_game("over")' } }
+objects:
+  cake: { name: cake, in: kitchen, traits: [portable, edible], on: { give: 'vars.fed = true; self:move_to(nil); say("The troll gobbles it.")' } }
+characters:
+  troll: { name: troll, in: bridge }
+endings:
+  over: { kind: win, text: Over. }
+`;
+  const found = engine.deadEnds({ "game.yaml": game }, "take cake\nn\ngive cake to troll\nn\n");
+  assert.ok(Array.isArray(found) && found.some((d) => d.command === "eat cake" && d.needed_by === "give cake to troll"), JSON.stringify(found));
+  assert.ok("error" in engine.deadEnds({ "game.yaml": "format: nope" }, "look"));
 }
 
 console.log("ok   editor tools");

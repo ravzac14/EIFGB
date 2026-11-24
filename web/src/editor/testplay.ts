@@ -11,7 +11,7 @@
 // game's walkthrough.txt; the editor's check replays it after every edit
 // and says here (and under Problems) when it no longer wins.
 
-import type { Engine, Files, Missed, Output, Walkthrough, Wandered } from "../engine.ts";
+import type { DeadEnd, Engine, Files, Missed, Output, Walkthrough, Wandered } from "../engine.ts";
 import { Model } from "./model.ts";
 import { figure, pictureSrc } from "../pictures.ts";
 
@@ -77,6 +77,40 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string,
   return e;
 }
 
+/** How a game played from part-way starts: where, carrying what, with what open, set and known. */
+export interface Setup {
+  room: string;
+  carry: string[];
+  open: string[];
+  unlocked: string[];
+  vars: Record<string, string>;
+  facts: string[];
+}
+
+/** A typed value as YAML would read it: true, 3, or words. */
+function typed(v: string): unknown {
+  const t = v.trim();
+  if (t === "true" || t === "false") return t === "true";
+  if (t !== "" && Number.isFinite(Number(t))) return Number(t);
+  return t;
+}
+
+/** The game, set up to start part-way. */
+export function applySetup(m: Model, s: Setup) {
+  if (s.room) m.set(["game", "start"], s.room);
+  for (const id of s.carry) {
+    m.set(["objects", id, "in"], "player");
+    m.setState(id, "hidden", false);
+  }
+  for (const id of s.open) m.setState(id, "open", true);
+  for (const id of s.unlocked) m.setState(id, "locked", false);
+  for (const [k, v] of Object.entries(s.vars)) m.set(["vars", k], typed(v));
+  if (s.facts.length) {
+    const before = String(m.get(["on", "start"]) ?? "").trim();
+    m.set(["on", "start"], [before, ...s.facts.map((f) => `learn("${f}")`)].filter(Boolean).join("\n"));
+  }
+}
+
 export class TestPlay {
   private log: HTMLElement;
   private line: HTMLInputElement;
@@ -106,6 +140,9 @@ export class TestPlay {
   private walks: HTMLElement;
   private wanderBox: HTMLDetailsElement;
   private wanderRuns = 0;
+  private deadBox: HTMLDetailsElement;
+  private deadButton: HTMLButtonElement;
+  private setupBox: HTMLDetailsElement;
   private walk: HTMLElement;
   /** What wasn't understood, this session. */
   private misses: Miss[] = [];
@@ -131,6 +168,14 @@ export class TestPlay {
     wanderButton.addEventListener("click", () => void this.wander());
     this.walks = el("div", { className: "tp-walks" });
     this.wanderBox = el("details", { className: "tp-wander", hidden: true });
+    this.deadButton = el("button", { type: "button", textContent: "Dead ends" });
+    this.deadButton.title = "Along the walkthrough, tries losing what it needs (eating it, burning it, giving it away), and says what makes the game unwinnable";
+    this.deadButton.addEventListener("click", () => void this.deadEnds());
+    this.deadBox = el("details", { className: "tp-wander", hidden: true });
+    const setupButton = el("button", { type: "button", textContent: "Start with…" });
+    setupButton.title = "Start part-way: in a room, carrying things, with doors open and variables set";
+    this.setupBox = el("details", { className: "tp-setup", hidden: true });
+    setupButton.addEventListener("click", () => this.showSetup());
     this.jump = el("select", { className: "tp-jump", hidden: true });
     this.jump.setAttribute("aria-label", "Start at a step of the walkthrough");
     this.jump.addEventListener("change", () => {
@@ -174,7 +219,18 @@ export class TestPlay {
     });
     this.log.append(el("p", { className: "dim", textContent: "Play your game here while you work on it. Press Start over to begin." }));
     this.missBox = el("details", { className: "tp-misses", hidden: true });
-    panel.append(el("div", { className: "tp-bar" }, restart, this.fromRoom, this.jump, this.record, this.recordEnding, wanderButton, this.status), this.walk, this.walks, this.wanderBox, this.missBox, this.stale, this.log, this.form);
+    panel.append(
+      el("div", { className: "tp-bar" }, restart, this.fromRoom, setupButton, this.jump, this.record, this.recordEnding, wanderButton, this.deadButton, this.status),
+      this.setupBox,
+      this.walk,
+      this.walks,
+      this.wanderBox,
+      this.deadBox,
+      this.missBox,
+      this.stale,
+      this.log,
+      this.form,
+    );
     this.walkthrough("none");
     this.update();
   }
@@ -315,6 +371,112 @@ export class TestPlay {
     box.replaceChildren(...out);
   }
 
+  /** Dead ends along the walkthrough: what makes the game unwinnable, and how. */
+  private async deadEnds() {
+    this.engine ??= await this.host.engine();
+    const box = this.deadBox;
+    box.hidden = false;
+    box.open = true;
+    const walk = this.host.files()[WALKTHROUGH];
+    if (!walk?.trim()) {
+      box.replaceChildren(el("summary", { textContent: "Dead ends" }), el("p", { textContent: "It looks along the walkthrough, so it needs one: play to a win from the start, then Save as walkthrough." }));
+      return;
+    }
+    box.replaceChildren(el("summary", { textContent: "Dead ends" }), el("p", { className: "dim", textContent: "Looking…" }));
+    await new Promise((r) => setTimeout(r, 0));
+    const found = this.engine.deadEnds(this.host.files(), walk);
+    if (!Array.isArray(found)) {
+      box.replaceChildren(el("summary", { textContent: "Dead ends" }), el("p", { textContent: `It can't play yet: ${found.error}.` }));
+      return;
+    }
+    const out: (HTMLElement | string)[] = [el("summary", { textContent: `Dead ends: ${found.length || "none found"}` })];
+    out.push(
+      el("p", {
+        className: "dim",
+        textContent: found.length
+          ? "Ways a player can lose something the walkthrough needs, for good, so the game can't be won. Perhaps that's fair; if not, give them another way, or stop it happening."
+          : "At each step of the walkthrough, eating, drinking, burning, smashing, giving away or throwing what it needs later never made the game unwinnable.",
+      }),
+    );
+    for (const d of found as DeadEnd[]) {
+      const here = el("button", { type: "button", textContent: "Play it here" });
+      here.addEventListener("click", () => void this.replay(d.commands, "moves"));
+      const when = d.after ? `After step ${d.after} (${d.commands[d.after - 1].toUpperCase()})` : "From the start";
+      out.push(el("p", { className: "tp-walk bad" }, `✗ ${when}, ${d.command.toUpperCase()} loses the ${d.lost.join(" and the ")} for good, and the walkthrough needs it for ${d.needed_by.toUpperCase()}. `, here));
+    }
+    box.replaceChildren(...out);
+  }
+
+  /** "Start with…": where, carrying what, with what open, set and known. */
+  private showSetup() {
+    const box = this.setupBox;
+    if (!box.hidden) {
+      box.hidden = true;
+      return;
+    }
+    let m: Model;
+    try {
+      m = new Model(this.host.files()["game.yaml"] ?? "");
+    } catch {
+      return;
+    }
+    const ticks = (items: { id: string; name: string }[]) => {
+      const wrap = el("div", { className: "tp-ticks" });
+      for (const t of items) {
+        const c = el("input", { type: "checkbox", value: t.id });
+        wrap.append(el("label", {}, c, ` ${t.name}`));
+      }
+      return wrap;
+    };
+    const ticked = (w: HTMLElement) => [...w.querySelectorAll<HTMLInputElement>("input:checked")].map((i) => i.value);
+    const room = el("select", {}) as HTMLSelectElement;
+    room.setAttribute("aria-label", "Start in");
+    const chosen = this.host.selectedRoom()?.id ?? m.start() ?? "";
+    for (const r of m.rooms()) room.append(el("option", { value: r.id, textContent: r.name, selected: r.id === chosen }));
+    room.value = chosen;
+    const things = m.things();
+    const carry = ticks(things.filter((t) => t.traits.includes("portable")));
+    const openable = things.filter((t) => t.traits.includes("openable"));
+    const open = ticks(openable);
+    const unlocked = ticks(openable.filter((t) => t.traits.includes("lockable") || t.locked));
+    const vars = m.pairs(["vars"]);
+    const varBox = el("div", { className: "tp-vars" });
+    const inputs = vars.map(([k, v]) => {
+      const i = el("input", { type: "text", value: v, ariaLabel: k });
+      varBox.append(el("label", {}, `${k} `, i));
+      return [k, i] as const;
+    });
+    const facts = m.pairs(["facts"]).map(([k]) => ({ id: k, name: k.replace(/_/g, " ") }));
+    const known = ticks(facts);
+    const go = el("button", { type: "button", textContent: "Start with this" });
+    go.addEventListener("click", () => {
+      const s: Setup = {
+        room: room.value,
+        carry: ticked(carry),
+        open: ticked(open),
+        unlocked: ticked(unlocked),
+        vars: Object.fromEntries(inputs.filter(([k, i]) => i.value !== vars.find(([x]) => x === k)?.[1]).map(([k, i]) => [k, i.value])),
+        facts: ticked(known),
+      };
+      box.hidden = true;
+      void this.start(undefined, false, s);
+    });
+    const part = (title: string, body: HTMLElement, empty: boolean) => (empty ? [] : [el("h4", { textContent: title }), body]);
+    box.replaceChildren(
+      el("summary", { textContent: "Start part-way" }),
+      el("p", { className: "dim", textContent: "Try a later part of the game without playing up to it. Only what you choose changes." }),
+      el("label", {}, "Start in ", room),
+      ...part("Carrying", carry, !carry.children.length),
+      ...part("Open", open, !openable.length),
+      ...part("Unlocked", unlocked, !unlocked.children.length),
+      ...part("Variables", varBox, !vars.length),
+      ...part("Already knows", known, !facts.length),
+      el("div", { className: "actions" }, go),
+    );
+    box.hidden = false;
+    box.open = true;
+  }
+
   /** The game was edited: a game in progress may be out of date (moving rooms on the map doesn't count). */
   changed(now: Files) {
     if (!this.running || !this.startedWith) return;
@@ -322,15 +484,16 @@ export class TestPlay {
     this.stale.hidden = game(now) === game(this.startedWith);
   }
 
-  async start(from?: string, quiet = false) {
+  async start(from?: string, quiet = false, setup?: Setup) {
     this.engine ??= await this.host.engine();
     let files = this.host.files();
     this.startedWith = files;
-    if (from) {
-      // The same game, starting somewhere else.
+    if (from || setup) {
+      // The same game, starting somewhere else, or part-way.
       try {
         const m = new Model(files["game.yaml"] ?? "");
-        m.set(["game", "start"], from);
+        if (from) m.set(["game", "start"], from);
+        if (setup) applySetup(m, setup);
         files = { ...files, "game.yaml": m.toString() };
       } catch {
         /* the file doesn't parse: the checker will say so */
@@ -339,7 +502,7 @@ export class TestPlay {
     this.log.replaceChildren();
     this.stale.hidden = true;
     this.played = [];
-    this.fromStart = !from;
+    this.fromStart = !from && !setup;
     this.won = false;
     this.ending = null;
     this.update();
@@ -358,6 +521,19 @@ export class TestPlay {
     this.running = true;
     this.form.hidden = false;
     if (from) this.say(`Started in ${this.host.selectedRoom()?.name ?? from}, as if the game began there.`, "notice");
+    if (setup) {
+      const m = new Model(files["game.yaml"] ?? "");
+      const names = (ids: string[]) => ids.map((i) => m.thing(i)?.name ?? i).join(", ");
+      const parts = [
+        `Started part-way, in ${m.room(setup.room)?.name ?? setup.room}`,
+        setup.carry.length ? `carrying ${names(setup.carry)}` : "",
+        setup.open.length ? `with ${names(setup.open)} open` : "",
+        setup.unlocked.length ? `${names(setup.unlocked)} unlocked` : "",
+        Object.keys(setup.vars).length ? Object.entries(setup.vars).map(([k, v]) => `${k} = ${v}`).join(", ") : "",
+        setup.facts.length ? `knowing ${setup.facts.join(", ")}` : "",
+      ].filter(Boolean);
+      this.say(`${parts.join("; ")}. It isn't a walkthrough.`, "notice");
+    }
     if (!quiet) this.show(loaded.output);
     this.line.focus({ preventScroll: true });
   }

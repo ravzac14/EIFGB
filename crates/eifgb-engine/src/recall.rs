@@ -393,6 +393,12 @@ impl<H: ScriptHost> Game<H> {
             }
             self.msg("map.room", &ctx);
         }
+        // Places heard of, not yet found.
+        let heard: Vec<String> = self.heard_of_only().into_iter().map(|r| self.world.def(r).name.clone()).collect();
+        if !heard.is_empty() {
+            let list = (self.grammar.lang().list_and)(&heard);
+            self.msg("map.heard_of", &Ctx::new().text("places", list));
+        }
     }
 
     // ---------------------------------------------------- inventory by place

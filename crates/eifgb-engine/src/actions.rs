@@ -93,10 +93,14 @@ impl<H: ScriptHost> Game<H> {
                 true
             }
             (A::Drink, Some(t)) => self.drink(t, ctx),
-            (A::Read, Some(t)) => match self.read(t, ctx) {
-                Some(ok) => ok,
-                None => self.examine(t),
-            },
+            (A::Read, Some(t)) => {
+                let ok = match self.read(t, ctx) {
+                    Some(ok) => ok,
+                    None => self.examine(t),
+                };
+                self.taught_by(t, true);
+                ok
+            }
             (A::Listen, Some(t)) => self.sense(t, false, ctx),
             (A::Listen, None) => self.sense_around(false, ctx),
             (A::Smell, Some(t)) => self.sense(t, true, ctx),
@@ -116,7 +120,11 @@ impl<H: ScriptHost> Game<H> {
             (A::GetOut, t) => self.get_out(t),
             (A::Empty, Some(t)) if self.world.def(t).holds_liquid => self.pour(t, cmd.tool, ctx),
             (A::Empty, Some(t)) => self.empty(t, cmd.tool, ctx),
-            (A::Examine, Some(t)) => self.examine(t),
+            (A::Examine, Some(t)) => {
+                let ok = self.examine(t);
+                self.taught_by(t, false);
+                ok
+            }
             (A::Take, Some(t)) => self.take(t, cmd.tool, ctx),
             (A::Drop, Some(t)) => self.drop_thing(t, ctx),
             (A::PutIn, Some(t)) => self.put(t, cmd.tool, false, ctx),
@@ -169,6 +177,11 @@ impl<H: ScriptHost> Game<H> {
             (A::Imitate, _) => self.imitate(cmd.text.as_deref(), ctx),
             (A::Plant, Some(t)) => self.plant(t, cmd.tool, ctx),
             (A::SwitchTo, _) => self.switch_to(cmd.text.as_deref(), ctx),
+            (A::Directions, t) => self.directions(t, cmd.text.as_deref(), ctx),
+            (A::Promise, t) => self.promise_action(t, ctx),
+            (A::Copy, Some(t)) => self.copy_action(t, cmd.tool, ctx),
+            (A::Swim, _) => self.swim(cmd, ctx),
+            (A::Scent, Some(t)) => self.scent_action(t, cmd.tool, ctx),
             (A::PushTo, Some(t)) => self.push_to(t, cmd, ctx),
             (A::Throw, Some(t)) => self.throw_action(t, cmd.tool, cmd.direction, ctx),
             (A::Rename, Some(t)) => self.rename_action(t, cmd.text.as_deref(), ctx),
@@ -207,7 +220,9 @@ impl<H: ScriptHost> Game<H> {
             (A::Apologize, Some(t)) => self.apologize_action(t, ctx),
             (A::Offer, Some(t)) => self.offer(t, cmd.text.as_deref(), ctx),
             (A::Shout, _) => {
-                self.msg("shout.done", ctx);
+                if !self.echo(cmd.text.as_deref()) {
+                    self.msg("shout.done", ctx);
+                }
                 let voice = self.world.story().meta.settings.voice;
                 self.world.make_noise(PLAYER, voice);
                 true
@@ -304,6 +319,9 @@ impl<H: ScriptHost> Game<H> {
             }
             if let Some(m) = &mood_line {
                 self.render_line(LineKind::Text, m, &Ctx::new().this(here));
+            }
+            if let Some(w) = self.water_line(here) {
+                self.push_sentence(w, true);
             }
             // Outdoors: the weather.
             self.describe_weather();
@@ -1157,6 +1175,8 @@ impl<H: ScriptHost> Game<H> {
             Some("put.not_container")
         } else if !on && !w.is_open(dest) {
             Some("put.closed")
+        } else if w.fits(t, dest) != Fit::Yes && w.def(dest).sinks {
+            Some("put.sinks")
         } else if w.fits(t, dest) == Fit::TooBig {
             Some("put.too_big")
         } else if w.fits(t, dest) == Fit::TooHeavy {
@@ -1299,7 +1319,7 @@ impl<H: ScriptHost> Game<H> {
             self.world.set(t, "open", Value::Bool(true));
         }
         if self.world.fits(PLAYER, t) != Fit::Yes {
-            self.msg("enter.full", ctx);
+            self.msg(if self.world.def(t).sinks { "enter.sinks" } else { "enter.full" }, ctx);
             return false;
         }
         if self.world.move_to(PLAYER, Some(t)).is_err() {
@@ -1462,6 +1482,9 @@ impl<H: ScriptHost> Game<H> {
             }
             None => {
                 self.topic = None;
+                if self.ask_favour(t) {
+                    return true;
+                }
                 self.msg("talk.no_response", ctx);
                 false
             }

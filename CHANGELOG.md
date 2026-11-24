@@ -9,6 +9,36 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+## Unreleased
+
+- What the player learns: `facts:`, taught in conversations (`teaches:`)
+  and by reading. WHAT DO I KNOW lists them, someone asked again says "As
+  I told you before…", and `knows("mill")` opens new options.
+- Places heard of: on the player's map with a "?", and ASK THE GOSSIP
+  THE WAY TO THE MILL for directions, after which GO TO goes there.
+- Promises: a character `asks:` a favour; PROMISE, and JOURNAL lists it;
+  keep it and they're grateful (and give something), break it and
+  they'll say so.
+- Water: rooms that flood a level at a time, holding your breath over
+  your head, something that floats, SWIM, and a sluice to drain it.
+- Weight: pressure plates that open a gate while weighed down, and rafts
+  that would sink.
+- Scents: LET THE DOG SNIFF THE GLOVE, and it leads you to its owner, or
+  digs up what's buried.
+- Echoes that answer, and whispering galleries.
+- The moon: a phase a day, and ways out that are only open at night, by
+  day, at certain hours, or under a full moon.
+- Copying: COPY THE PASS ONTO THE PAPER, with a pen, makes a forgery that
+  passes for the real thing; COPY THE INSCRIPTION writes it into your
+  notes.
+- In the editor's Test play: **Start with…** starts part-way, in a room,
+  carrying what you choose, with doors open, variables set and facts
+  known; **Dead ends** finds ways to lose what the walkthrough needs for
+  good.
+- **How characters sound**, under Problems: each character's lines side
+  by side, and a word when two sound alike or one's voice drifts.
+- All of these can be set in the editor's details panels too.
+
 ## 2026-11-24
 
 - The tricks can all be set in the editor's details panels now, without

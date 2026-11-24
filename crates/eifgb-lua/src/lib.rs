@@ -268,7 +268,7 @@ fn kind_name(k: EntityKind) -> &'static str {
 }
 
 /// Fields every entity has. Scripts can read them but not assign them.
-const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling", "remembers"];
+const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling", "remembers", "promise", "water"];
 
 impl ScriptHost for LuaHost {
     fn load(&mut self, story: &Story) -> Result<(), ScriptError> {
@@ -339,6 +339,16 @@ impl ScriptHost for LuaHost {
                             "visits" => (mlua::Value::Integer(i64::from(w.state.visits.get(&id).copied().unwrap_or(0))), false),
                             // A character: how it feels about the player, as a word.
                             // A character: the last thing it remembers the player doing.
+                            // A room: how deep the water is, 0 to 3.
+                            "water" => match w.get(id, "_water") {
+                                Some(eifgb_engine::ir::Value::Int(n)) => (mlua::Value::Integer(*n), false),
+                                _ => (mlua::Value::Integer(0), false),
+                            },
+                            // A character: the favour the player promised ("made", "kept", "broken").
+                            "promise" => match w.get(id, "_promise") {
+                                Some(eifgb_engine::ir::Value::Str(d)) => (s(d)?, false),
+                                _ => (mlua::Value::Nil, false),
+                            },
                             "remembers" => match w.get(id, "_remembers") {
                                 Some(eifgb_engine::ir::Value::Str(d)) => (s(d)?, false),
                                 _ => (mlua::Value::Nil, false),
@@ -665,9 +675,10 @@ impl ScriptHost for LuaHost {
                             "period" => mlua::Value::String(lua.create_string(c.period)?),
                             "night" => mlua::Value::Boolean(c.night),
                             "daytime" => mlua::Value::Boolean(!c.night),
+                            "moon" => mlua::Value::String(lua.create_string(w.moon().unwrap_or("full"))?),
                             other => {
                                 return Err(rt(format!(
-                                    "clock.{other} doesn't exist; there's day, hour, minute, minutes, time, period, night and daytime"
+                                    "clock.{other} doesn't exist; there's day, hour, minute, minutes, time, period, night, daytime and moon"
                                 )))
                             }
                         })
@@ -704,6 +715,70 @@ impl ScriptHost for LuaHost {
                             None => mlua::Value::Nil,
                             Some(done) => mlua::Value::String(lua.create_string(if done { "done" } else { "active" })?),
                         })
+                    })?,
+                )?;
+                h.set(
+                    "knows",
+                    scope.create_function(move |_, key: String| {
+                        let w = world.borrow();
+                        if !w.story().facts.iter().any(|f| f.key == key) {
+                            return Err(rt(format!("knows: there's no fact called '{key}'")));
+                        }
+                        Ok(w.state.learned.iter().any(|l| l.key == key))
+                    })?,
+                )?;
+                h.set(
+                    "learn",
+                    scope.create_function(move |_, key: String| {
+                        if !world.borrow().story().facts.iter().any(|f| f.key == key) {
+                            return Err(rt(format!("learn: there's no fact called '{key}'")));
+                        }
+                        effects.borrow_mut().push(Effect::Learn(key));
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "flood",
+                    scope.create_function(move |_, (at, level): (u32, Option<i64>)| {
+                        let at = check(at)?;
+                        let mut w = world.borrow_mut();
+                        if w.def(at).kind != eifgb_engine::ir::EntityKind::Room {
+                            return Err(rt("flood: that isn't a room"));
+                        }
+                        use eifgb_engine::ir::Value;
+                        match level {
+                            // Rising, from now.
+                            None => w.set(at, "_flooding", Value::Bool(true)),
+                            Some(n) => {
+                                w.set(at, "_water", Value::Int(n.clamp(0, 3)));
+                                if n <= 0 {
+                                    w.set(at, "_flooding", Value::Bool(false));
+                                }
+                            }
+                        }
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "hear_of",
+                    scope.create_function(move |_, at: u32| {
+                        let at = check(at)?;
+                        if world.borrow().def(at).kind != eifgb_engine::ir::EntityKind::Room {
+                            return Err(rt("hear_of: that isn't a room"));
+                        }
+                        effects.borrow_mut().push(Effect::HearOf(at));
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "promise",
+                    scope.create_function(move |_, who: u32| {
+                        let who = check(who)?;
+                        if world.borrow().def(who).npc.as_ref().and_then(|n| n.asks.as_ref()).is_none() {
+                            return Err(rt(format!("promise: '{}' hasn't asked a favour (`asks:`)", world.borrow().def(who).key)));
+                        }
+                        effects.borrow_mut().push(Effect::Promise(who));
+                        Ok(())
                     })?,
                 )?;
                 h.set(

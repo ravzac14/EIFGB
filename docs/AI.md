@@ -157,6 +157,29 @@ field is an error, not ignored, so a typo is caught.
   5 }` on something eaten or drunk brings one on.
 - **Several player characters:** `playable: true` on characters, and
   `player: { plays: mara }` for who the player starts as; SWITCH TO TOBIN.
+- **What the player learns:** a top-level `facts` section, `{ meeting: text }` (or
+  `{ text, place: mill }`, for one that tells of a room); `teaches:
+  meeting` on a conversation node or option, or on a thing (READ teaches
+  it). WHAT DO I KNOW lists them; `when: 'knows("meeting")'` opens an
+  option once it's known. A place heard of is on the player's map; ASK
+  THE GOSSIP THE WAY TO THE MILL, then GO TO MILL. `heard_of: true` on a
+  room knows it from the start.
+- **Promises:** `asks: { for: cat, say: ..., promise: find her cat,
+  thanks: ..., gives: coin, within: 40, broken: ... }` on a character:
+  TALK says it, PROMISE (I'LL DO IT) promises, GIVE CAT TO BAKER keeps
+  it; `promise: true` on a conversation option promises too.
+- **The physical world:** `floods: { every: 3, depth: 3, drains: sluice }`
+  on a room (water rises; over the player's head they hold their breath,
+  `player: { breath: 4 }`, unless they carry something that `floats:
+  true`; SWIM NORTH); `pressure: { at_least: 3, opens: gate }` on a
+  supporter (a plate that opens a door while weighed down: sizes add up);
+  `sinks: true` on a raft; `sniffs: true` on a dog and `scent_of: thief`
+  on a thing (LET DOG SNIFF GLOVE, and it leads the way); `echo: { help:
+  ... }` and `hears: [tunnel]` on rooms; `clock: { moon: full }` and
+  `open_at: full moon` (or `night`, `day`, `22:00-4:00`) on an exit.
+- **Copying:** `copy: forged_pass` on an object (the copy starts with no
+  `in:`); COPY PASS ONTO PAPER with something `blank: true` and something
+  that `writes: true` carried. The copy can be swapped for the original.
 - **Tricks:** `combines: { with: hook, makes: grapple }` on an object
   (TIE ROPE TO HOOK makes a grappling hook that starts with no `in:`);
   `pushable` things barricade doors (PUSH WARDROBE AGAINST DOOR); objects

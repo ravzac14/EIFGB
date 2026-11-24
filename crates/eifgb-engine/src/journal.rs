@@ -220,12 +220,14 @@ impl<H: ScriptHost> Game<H> {
     /// JOURNAL: the goals still to do, then those done.
     pub(crate) fn journal(&mut self) {
         if self.world.story().goals.is_empty() {
-            if self.world.state.notes.is_empty() {
+            let promised = self.journal_promises();
+            if !promised && self.world.state.notes.is_empty() {
                 return self.msg("journal.none_in_game", &Ctx::new());
             }
             return self.show_notes(false);
         }
         self.journal_goals();
+        self.journal_promises();
         self.show_notes(false);
     }
 
@@ -338,6 +340,11 @@ impl<H: ScriptHost> Game<H> {
             .value("hour", Value::Int(i64::from(c.hour)))
             .value("minute", Value::Int(i64::from(c.minute)));
         self.msg("clock.now", &ctx);
+        if c.night
+            && let Some(m) = self.world.moon()
+        {
+            self.msg("clock.moon", &Ctx::new().text("moon", m));
+        }
     }
 
     /// Each action moves the clock on.

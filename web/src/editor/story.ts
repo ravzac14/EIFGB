@@ -3,6 +3,7 @@
 
 import { EVENTS } from "./model.ts";
 import { weatherSection } from "./world-ui.ts";
+import { teachesField } from "./knowing-ui.ts";
 import { boolField, button, check, el, field, help, numField, proseField, select, type InspectorContext } from "./ui.ts";
 
 // ------------------------------------------------------------ scripts
@@ -265,6 +266,14 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
           ...time("dawn", "Dawn", "6:00", "Night is from dusk until dawn: scripts and text can check clock.night."),
           ...time("dusk", "Dusk", "18:00", "Timers can go off at a time of day too, or at dawn or dusk."),
           ...boolField(ctx, ["clock", "show"], "Show the time on the status line", true),
+          el("label", { textContent: "The moon on the first night" }),
+          select(
+            ["new", "waxing crescent", "first quarter", "waxing gibbous", "full", "waning gibbous", "last quarter", "waning crescent"].map((p): [string, string] => [p, p]),
+            String(m.get(["clock", "moon"]) ?? "full"),
+            (v) => ctx.change((x) => x.set(["clock", "moon"], v === "full" ? undefined : v)),
+            "The moon on the first night",
+          ),
+          help("A phase a day. TIME says it at night; clock.moon in scripts; a way out can be open only under a full moon."),
           help("Players type TIME to ask the time. In text, ${clock.time} is the time (\"7:30 pm\"); in scripts, clock.hour, clock.night and clock.day (from 1). pass_time(30) and set_clock(\"6:00\") move it on."),
           el("div", { class: "actions" }, button("Stop keeping time", () => {
             if (confirm("Stop keeping the time of day? Its settings are removed.")) ctx.change((x) => x.set(["clock"], undefined));
@@ -771,6 +780,7 @@ export function choicePanel(panel: HTMLElement, ctx: InspectorContext, id: strin
         multiline: true,
         placeholder: '"Another storm," the old man murmurs.',
       }),
+      ...teachesField(ctx, [...p, "teaches"], "The player learns"),
     );
     const ol = el("ol", { class: "options" });
     n.options.forEach((o, i) => {
@@ -807,6 +817,10 @@ export function choicePanel(panel: HTMLElement, ctx: InspectorContext, id: strin
               (v) => ctx.change((x) => x.set([...op, "disposition"], v ? Number(v) : undefined)),
               "How they feel about it",
             ),
+            ...teachesField(ctx, [...op, "teaches"], "The player learns"),
+            ...(who.some((w) => ctx.model.get(["characters", w.id, "asks"]) !== undefined)
+              ? boolField(ctx, [...op, "promise"], "It promises the favour they ask", false, "As PROMISE does: it goes in the player's journal.")
+              : []),
             el("label", { textContent: "Runs (Lua)" }),
             codeBox(o.do, (v) => ctx.change((x) => x.set([...op, "do"], v.trim() ? v : undefined), { coalesce: `${id}.${n.id}.${i}.do`, redraw: false }), "Runs", 1),
           ),

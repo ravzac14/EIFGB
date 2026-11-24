@@ -181,6 +181,19 @@ fn walkthrough(story: eifgb_engine::ir::Story, file: &str, text: &str) -> Value 
     serde_json::to_value(eifgb_engine::testing::play_walkthrough(&mut g, text, &goal, &name)).unwrap_or(Value::Null)
 }
 
+/// Dead ends along a walkthrough: things it needs, lost for good. See
+/// [`eifgb_engine::testing::DeadEnd`]. `{ error }` when the game can't be played.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_dead_ends(files: *const c_char, entry: *const c_char, walkthrough: *const c_char) -> *const c_char {
+    let files: BTreeMap<String, String> = serde_json::from_str(&arg(files)).unwrap_or_default();
+    let entry = arg(entry);
+    let walkthrough = arg(walkthrough);
+    let out = compile(&MemFiles(files), if entry.is_empty() { "game.yaml" } else { &entry });
+    let Some(story) = out.story else { return give(json!({ "error": "the game has mistakes to fix first" })) };
+    let make = || LuaHost::new().and_then(|h| Game::new(story.clone(), h, 1)).ok();
+    give(serde_json::to_value(eifgb_engine::testing::dead_ends(make, &walkthrough)).unwrap_or(Value::Null))
+}
+
 /// The wanderer: `moves` random moves on new games of `files`, the moves
 /// picked from `seed`. Every game uses seed 1, as test play does, so what
 /// it finds plays the same way there. See
@@ -219,7 +232,8 @@ pub extern "C" fn eifgb_restore(save: *const c_char) -> *const c_char {
 }
 
 /// What the player has seen of the map: `{ here, rooms: [{id, name}],
-/// exits: [{from, dir, to?, door?, closed?}] }`. Only rooms the player has
+/// exits: [{from, dir, to?, door?, closed?}], heard: [{id, name}] }`
+/// (heard: places they've heard of but not been to). Only rooms the player has
 /// been in; an exit from one of them whose far side they haven't visited
 /// has no `to`. Exits through secret doors that haven't been found are left out.
 /// Words that finish the last word of `line` (Tab in the player), from what
@@ -253,7 +267,13 @@ fn map(w: &eifgb_engine::World) -> Value {
             exits.push(x);
         }
     }
-    json!({ "here": key(w.here()), "rooms": rooms, "exits": exits })
+    // Places heard of, not yet found: drawn apart, with a "?".
+    let heard: Vec<Value> = w
+        .heard_of_only()
+        .into_iter()
+        .map(|r| json!({ "id": key(r), "name": w.def(r).name }))
+        .collect();
+    json!({ "here": key(w.here()), "rooms": rooms, "exits": exits, "heard": heard })
 }
 
 fn main() {}

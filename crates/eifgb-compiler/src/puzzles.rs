@@ -582,6 +582,30 @@ pub fn puzzles(story: &Story) -> Puzzles {
             }
         }
     }
+    // A copy made with paper and a pen.
+    let blanks: Vec<usize> = (0..n).filter(|&b| def(b).blank).collect();
+    let pens: Vec<usize> = (0..n).filter(|&w| def(w).writes).collect();
+    for orig in 0..n {
+        let Some(c) = def(orig).copy else { continue };
+        for &b in &blanks {
+            for &w in &pens {
+                let mut r = Rule::new(Fact::Thing(c.index()), vec![Fact::Thing(orig), Fact::Thing(b), Fact::Thing(w)]);
+                r.kind = Some("find");
+                r.text = format!("Copy {} onto {}, with {}.", the(&name(orig)), the(&name(b)), the(&name(w)));
+                rules.push(r);
+            }
+        }
+    }
+    // What someone gives for a favour.
+    for who in 0..n {
+        let Some(ask) = def(who).npc.as_ref().and_then(|x| x.asks.as_ref()) else { continue };
+        for g in &ask.gives {
+            let mut r = Rule::new(Fact::Thing(g.index()), vec![Fact::Thing(ask.wants.index()), Fact::Thing(who)]);
+            r.kind = Some("find");
+            r.text = format!("Bring {} to {}, who gives {} for it.", the(&name(ask.wants.index())), the(&name(who)), a(&name(g.index())));
+            rules.push(r);
+        }
+    }
     // Rooms a script moves the player to.
     for i in 0..n {
         if def(i).kind != EntityKind::Room {

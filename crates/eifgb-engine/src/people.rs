@@ -96,6 +96,11 @@ impl<H: ScriptHost> Game<H> {
                 }
                 heard = true;
                 self.mark_said(npc, index, repeat);
+            } else if self.world.def(here).hears.contains(&room) {
+                // A whispering gallery: as clear as if they were here.
+                self.msg("chatter.carried", &Ctx::new().text("line", line));
+                heard = true;
+                self.mark_said(npc, index, repeat);
             } else if let Some(dir) = self.world.def(here).exits.iter().find(|e| e.to == Some(room)).map(|e| e.direction)
                 && (loud || listening.contains(&room))
             {
@@ -922,6 +927,9 @@ impl<H: ScriptHost> Game<H> {
             self.msg("give.whom", ctx);
             return false;
         };
+        if let Some(ok) = self.keep_favour(item, to) {
+            return ok;
+        }
         let (key, calmed) = match self.world.give(item, to) {
             Gift::NotHeld => ("give.not_held", None),
             Gift::NotPerson => ("give.not_person", None),

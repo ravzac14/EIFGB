@@ -218,6 +218,16 @@ function env.start_timer(key) H.start_timer(key) end
 function env.stop_timer(key) H.stop_timer(key) end
 function env.start_goal(key) H.start_goal(key) end
 function env.set_weather(key) H.set_weather(key) end
+-- Facts: knows("mill") is whether the player's learned it; learn("mill") teaches it.
+function env.knows(key) return H.knows(key) end
+function env.learn(key) H.learn(key) end
+-- Water: flood(world.cellar) starts it rising; flood(world.cellar, 2) sets it
+-- waist-deep; flood(world.cellar, 0) drains it and stops it.
+function env.flood(room, level) H.flood(need_entity(room, "flood's room"), level) end
+-- A place the player's heard of: GO TO works once they know the way.
+function env.hear_of(place) H.hear_of(need_entity(place, "hear_of's place")) end
+-- The player promises someone the favour they asked (`asks:`).
+function env.promise(who) H.promise(need_entity(who, "promise's character")) end
 function env.complete_goal(key) H.complete_goal(key) end
 function env.start_scene(key) H.start_scene(key) end
 function env.end_scene(key) H.end_scene(key) end

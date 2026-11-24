@@ -497,6 +497,12 @@ impl World {
     /// Rooms the player knows of: where they've been, and the rooms next to this one.
     pub fn known_places(&self) -> Vec<EntityId> {
         let mut out: Vec<EntityId> = self.state.visited.iter().copied().collect();
+        // Heard of, if not been to.
+        for r in self.ids().filter(|&r| self.def(r).kind == eifgb_ir::EntityKind::Room && self.heard_of(r)) {
+            if !out.contains(&r) {
+                out.push(r);
+            }
+        }
         for e in &self.def(self.here()).exits {
             if let Some(to) = e.to
                 && self.exit_visible(e)

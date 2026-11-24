@@ -50,6 +50,8 @@ export interface PlayerMap {
   rooms: { id: string; name: string }[];
   /** `to` is missing when the far side hasn't been visited yet. */
   exits: { from: string; dir: string; to?: string; door?: string; closed?: boolean }[];
+  /** Places heard of, but not been to yet. */
+  heard?: { id: string; name: string }[];
 }
 export interface Meta {
   id: string;
@@ -109,6 +111,19 @@ export interface Walkthrough {
   file?: string;
   never?: { rooms: string[]; things: string[]; options: { choice: string; node: string; option: number; text: string }[] };
 }
+/** A way to make a game unwinnable, found along its walkthrough. */
+export interface DeadEnd {
+  /** Walkthrough steps played first. */
+  after: number;
+  command: string;
+  /** What's gone for good. */
+  lost: string[];
+  /** The later walkthrough command that needed it. */
+  needed_by: string;
+  /** Every command, from the start. */
+  commands: string[];
+}
+
 /** What the wanderer found: see crates/eifgb-engine/src/testing.rs. */
 export interface Wandered {
   error?: string;
@@ -133,6 +148,8 @@ export interface Engine {
   check(files: Files, entry?: string): { diagnostics: Diagnostic[]; walkthrough?: Walkthrough; walkthroughs?: Walkthrough[]; puzzles?: Puzzles };
   /** The wanderer: random moves on new games of `files`, apart from the game being played. */
   wander(files: Files, seed: number, moves: number, entry?: string): Wandered;
+  /** Dead ends along a walkthrough: things it needs, lost for good. */
+  deadEnds(files: Files, walkthrough: string, entry?: string): DeadEnd[] | { error: string };
   /** One line of input. */
   input(line: string): Output;
   /** The whole game state, as a string. */
@@ -170,5 +187,6 @@ export async function loadEngine(base: string | URL): Promise<Engine> {
     map: () => call("eifgb_map", [], []),
     complete: (line) => call("eifgb_complete", ["string"], [line]),
     wander: (files, seed, moves, entry = "game.yaml") => call("eifgb_wander", ["string", "string", "number", "number"], [JSON.stringify(files), entry, seed, moves]),
+    deadEnds: (files, walkthrough, entry = "game.yaml") => call("eifgb_dead_ends", ["string", "string", "string"], [JSON.stringify(files), entry, walkthrough]),
   };
 }

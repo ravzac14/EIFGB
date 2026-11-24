@@ -97,6 +97,9 @@ pub struct Story {
     /// The character the player starts out as, in a game with several.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plays: Option<EntityId>,
+    /// What the player can learn: told in conversation, read, examined.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub facts: Vec<Fact>,
     /// The time of day, if the game keeps one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clock: Option<Clock>,
@@ -187,6 +190,9 @@ pub struct Clock {
     pub dusk: u32,
     /// Whether the status line shows the time.
     pub show: bool,
+    /// The moon's phase on the first day (0 new … 4 full … 7), one a day.
+    #[serde(default)]
+    pub moon: u32,
 }
 
 impl Clock {
@@ -213,6 +219,9 @@ impl Clock {
 
 /// A time of day as authors write it, in minutes after midnight: "7:30",
 /// "07:30", "19:00", "7:30 pm", "7pm", "noon", "midnight", or an hour ("7").
+/// The moon's phases, one a day, from new.
+pub const MOON_PHASES: [&str; 8] = ["new", "waxing crescent", "first quarter", "waxing gibbous", "full", "waning gibbous", "last quarter", "waning crescent"];
+
 pub fn parse_time(text: &str) -> Result<u32, String> {
     let bad = |s: &str| format!("'{s}' isn't a time of day; write it like \"7:30\", \"19:00\" or \"7:30 pm\"");
     let s = text.trim().to_ascii_lowercase();
@@ -556,6 +565,48 @@ pub struct Entity {
     /// turns (0: until a script ends it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mood: Option<(String, u32)>,
+    /// Facts the player learns reading it (or, with nothing to read, examining it).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub teaches: Vec<String>,
+    /// Objects: the copy COPY makes of it (a forged pass), unplaced till then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copy: Option<EntityId>,
+    /// Objects: something to copy onto (paper, parchment).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub blank: bool,
+    /// Objects: something to write with (a pen, a quill).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub writes: bool,
+    /// Rooms: the player knows of it from the start, before going there.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub heard_of: bool,
+    /// A pressure plate: with this much weight on it, these open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pressure: Option<Pressure>,
+    /// Overloaded, it sinks (a raft) or gives way, rather than being full.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sinks: bool,
+    /// Rooms: water that rises.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub floods: Option<Flood>,
+    /// Objects: held, it keeps the player afloat in deep water.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub floats: bool,
+    /// Characters: follows a scent it's given (a dog).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sniffs: bool,
+    /// Objects: whose scent it carries, for a character that sniffs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scent_of: Option<EntityId>,
+    /// Rooms: an echo, and what it answers to some words (empty: it just echoes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub echo: Option<BTreeMap<String, Text>>,
+    /// Rooms: what's said in these rooms is heard here (a whispering gallery).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hears: Vec<EntityId>,
+    /// The player: turns they can hold their breath under water.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breath: Option<u32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub handlers: Vec<Handler>,
     /// How a character acts on its turn. Only characters have one.
@@ -702,6 +753,12 @@ pub struct Npc {
     /// The player can SWITCH TO it, and be it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub playable: bool,
+    /// A favour it asks of the player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asks: Option<Ask>,
+    /// Gives directions when asked the way.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub knows_the_way: bool,
     /// Percent chance of moving to a neighbouring room on a turn with
     /// nothing better to do.
     #[serde(default)]
@@ -1183,6 +1240,68 @@ pub fn disposition_of(word: &str) -> Option<i64> {
     }
 }
 
+/// Something the player can learn, and (if it's about a place) where.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Fact {
+    pub key: String,
+    pub text: Text,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<EntityId>,
+}
+
+/// A favour a character asks: bring them something.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Ask {
+    /// What to bring them.
+    pub wants: EntityId,
+    /// How they ask (said on TALK, when they've no conversation).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say: Option<Text>,
+    /// What the player promises, for the journal: "find her cat".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub promise: Option<Text>,
+    /// Said when they're given it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thanks: Option<Text>,
+    /// What they give the player for it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gives: Vec<EntityId>,
+    /// Turns the player has, once they've promised.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub within: Option<u32>,
+    /// Said when they next see the player, after a broken promise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub broken: Option<Text>,
+}
+
+/// A pressure plate.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Pressure {
+    /// The weight it takes: sizes of what's on it, and what's in those.
+    pub at_least: u32,
+    /// Doors and lids it opens while it's held down.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub opens: Vec<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub down: Option<Text>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up: Option<Text>,
+}
+
+/// Water that rises in a room.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Flood {
+    /// Turns between each rise.
+    pub every: u32,
+    /// How deep it gets: 1 ankle-deep, 2 waist-deep, 3 over the player's head.
+    pub depth: u32,
+    /// Rising from the start (else a script starts it).
+    pub starts: bool,
+    /// Something that, open, drains it (a sluice).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drains: Option<EntityId>,
+}
+
 /// What a thing comes apart into.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Split {
@@ -1509,6 +1628,18 @@ pub enum BuiltinAction {
     Plant,
     /// SWITCH TO MARA.
     SwitchTo,
+    /// WHAT DO I KNOW: what the player's learned.
+    Facts,
+    /// ASK THE BAKER THE WAY TO THE MILL.
+    Directions,
+    /// PROMISE THE BAKER.
+    Promise,
+    /// COPY THE LETTER.
+    Copy,
+    /// SWIM NORTH.
+    Swim,
+    /// LET THE DOG SNIFF THE GLOVE.
+    Scent,
 }
 
 impl BuiltinAction {
@@ -1530,6 +1661,7 @@ impl BuiltinAction {
                 | BuiltinAction::Suggest
                 | BuiltinAction::About
                 | BuiltinAction::Notes
+                | BuiltinAction::Facts
                 | BuiltinAction::EraseNote
                 | BuiltinAction::WhereIs
                 | BuiltinAction::Oops
@@ -1720,6 +1852,9 @@ pub struct ChoiceNode {
     /// Only used when there are no options: where to go after showing the node.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Option<Next>,
+    /// Facts the player learns here.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub teaches: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1739,6 +1874,12 @@ pub struct ChoiceOption {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run: Option<Code>,
     pub next: Next,
+    /// Facts the player learns choosing it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub teaches: Vec<String>,
+    /// Choosing it promises the one talked to their favour.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promise: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1882,7 +2023,7 @@ mod clock_tests {
 
     #[test]
     fn night_is_from_dusk_to_dawn() {
-        let c = Clock { start: 0, per_turn: 1, dawn: 360, dusk: 1080, show: true };
+        let c = Clock { start: 0, per_turn: 1, dawn: 360, dusk: 1080, show: true, moon: 4 };
         assert!(c.is_night(0) && c.is_night(359) && !c.is_night(360) && c.is_night(1080));
         assert_eq!([c.period(400), c.period(800), c.period(1050), c.period(1100)], ["morning", "afternoon", "evening", "night"]);
     }

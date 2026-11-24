@@ -93,6 +93,23 @@ pub struct GameState {
     /// Word of what the player did, on its way to the friends of whoever saw.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rumours: Vec<Rumour>,
+    /// Facts the player has learned, in the order they learned them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub learned: Vec<Learned>,
+    /// Rooms the player has heard of (been told, or asked the way to).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub heard_of: BTreeSet<EntityId>,
+    /// Rooms the player's been told the way to: GO TO goes there by any way.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub way_known: BTreeSet<EntityId>,
+}
+
+/// A fact the player has learned, and who told them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Learned {
+    pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<EntityId>,
 }
 
 /// A change in how someone feels about the player, that their friends and
@@ -171,6 +188,9 @@ impl GameState {
             scenes: BTreeMap::new(),
             playing_as: None,
             rumours: Vec::new(),
+            learned: Vec::new(),
+            heard_of: BTreeSet::new(),
+            way_known: BTreeSet::new(),
         };
         // Several player characters: the player starts out as one of them,
         // where they are, with what they carry.

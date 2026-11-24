@@ -27,6 +27,8 @@ export interface Exit {
   blocked?: string;
   /** Things the way goes by (`via`): CLIMB THE STAIRS. */
   via?: string[];
+  /** Only open then (`open_at`): night, day, full moon, 22:00-4:00. */
+  openAt?: string[];
   /**
    * `plain` (a room), `door`, `blocked` (a message), or `advanced`
    * (conditions, or several exits one way): shown, but edited as text.
@@ -351,8 +353,10 @@ export class Model {
         const blocked = str(v.get("blocked"));
         const rawVia = v.get("via");
         const via = isSeq(rawVia) ? rawVia.items.map((i) => str(i)).filter((s): s is string => !!s) : str(rawVia) ? [str(rawVia)!] : [];
-        const simple = v.items.every((i) => ["to", "through", "via"].includes(String(isScalar(i.key) ? i.key.value : i.key)));
-        if (simple && to) out.push({ dir, to, door: through, via, kind: through ? "door" : "plain" });
+        const rawAt = v.get("open_at");
+        const openAt = isSeq(rawAt) ? rawAt.items.map((i) => str(i)).filter((s): s is string => !!s) : str(rawAt) ? [str(rawAt)!] : [];
+        const simple = v.items.every((i) => ["to", "through", "via", "open_at", "blocked"].includes(String(isScalar(i.key) ? i.key.value : i.key)));
+        if (simple && to) out.push({ dir, to, door: through, via, ...(openAt.length ? { openAt } : {}), ...(blocked ? { blocked } : {}), kind: through ? "door" : "plain" });
         else out.push({ dir, to, door: through, blocked, via, kind: "advanced" });
       } else if (isSeq(v)) {
         // Several exits one way: show the first that leads somewhere.
@@ -566,7 +570,7 @@ export class Model {
    * room, rules ("search mat"), and Lua code anywhere in the file.
    */
   private renameEntityRefs(old: string, next: string) {
-    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in", "splits_into", "parts", "answers_to", "friends", "plays", "with", "makes", "keep", "decoy_for", "watches"]);
+    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in", "splits_into", "parts", "answers_to", "friends", "plays", "with", "makes", "keep", "decoy_for", "watches", "for", "gives", "copy"]);
     const RULES = new Set(["revealed_by", "started_by", "stopped_by"]);
     const code = renameInCode("entity", old, next);
     const rule = (s: string) => s.replace(new RegExp(`^(\\s*(?:\\([^)]*\\)|[\\w-]+)\\s+)${esc(old)}(\\s*)$`), `$1${next}$2`);
@@ -650,11 +654,35 @@ export class Model {
     this.doc.deleteIn(["objects", id]);
   }
 
+  /** Takes a fact out of everything that teaches it. */
+  forgetFact(key: string) {
+    const paths: (string | number)[][] = [];
+    for (const s of ["objects", "characters"]) for (const o of this.keys(s)) paths.push([s, o, "teaches"]);
+    for (const c of this.keys("choices")) {
+      for (const n of this.keys2(["choices", c, "nodes"])) {
+        paths.push(["choices", c, "nodes", n, "teaches"]);
+        const opts = this.doc.getIn(["choices", c, "nodes", n, "options"], true);
+        if (isSeq(opts)) opts.items.forEach((_, i) => paths.push(["choices", c, "nodes", n, "options", i, "teaches"]));
+      }
+    }
+    for (const p of paths) {
+      const now = this.list(p);
+      if (now.includes(key)) this.setList(p, now.filter((k) => k !== key));
+    }
+  }
+
+  /** The keys of the map at `path`. */
+  private keys2(path: (string | number)[]): string[] {
+    return (this.map(path)?.items ?? []).map((p) => String(isScalar(p.key) ? p.key.value : p.key));
+  }
+
   /** Takes an ID out of the lists that name it: parts, voices, friends, who the player plays. */
   private forget(id: string) {
     for (const s of ["objects", "characters"]) {
       for (const o of this.keys(s)) {
         if (str(this.get([s, o, "decoy_for"])) === id) this.set([s, o, "decoy_for"], undefined);
+        if (str(this.get([s, o, "copy"])) === id) this.set([s, o, "copy"], undefined);
+        if (str(this.get([s, o, "asks", "for"])) === id) this.set([s, o, "asks"], undefined);
         // A combination with it, or making it, goes.
         const c = this.doc.getIn([s, o, "combines"], true);
         const gone = (n: unknown) => isMap(n) && [n.get("with"), n.get("makes")].includes(id);
@@ -663,7 +691,7 @@ export class Model {
           c.items = c.items.filter((n) => !gone(n));
           if (!c.items.length) this.set([s, o, "combines"], undefined);
         }
-        for (const path of [[s, o, "splits_into"], [s, o, "splits_into", "parts"], [s, o, "answers_to"], [s, o, "friends"], [s, o, "watches"], [s, o, "likes"], [s, o, "tame_with"]]) {
+        for (const path of [[s, o, "splits_into"], [s, o, "splits_into", "parts"], [s, o, "answers_to"], [s, o, "friends"], [s, o, "watches"], [s, o, "likes"], [s, o, "tame_with"], [s, o, "asks", "gives"]]) {
           const v = this.doc.getIn(path, true);
           if (!isSeq(v)) continue;
           const left = this.list(path).filter((x) => x !== id);
@@ -1273,12 +1301,33 @@ export class Model {
   }
 
   private writeExit(room: string, dir: Direction, to: string, door: string | undefined, via: string[]) {
-    if (!door && !via.length) return this.set(["rooms", room, "exits", dir], to);
+    // When it's open, and what it says when it isn't, are kept.
+    const now = this.exit(room, dir);
+    const openAt = now?.openAt ?? [];
+    if (!door && !via.length && !openAt.length) return this.set(["rooms", room, "exits", dir], to);
     const v: Record<string, unknown> = { to };
     if (door) v.through = door;
     if (via.length === 1) v.via = via[0];
     else if (via.length) v.via = via;
+    if (openAt.length) {
+      v.open_at = openAt.length === 1 ? openAt[0] : openAt;
+      if (now?.blocked) v.blocked = now.blocked;
+    }
     this.set(["rooms", room, "exits", dir], v);
+  }
+
+  /** When a way out is open (`open_at`), and what it says when it isn't. */
+  setOpenAt(room: string, dir: Direction, at: string, blocked: string) {
+    const e = this.exit(room, dir);
+    if (!e?.to || e.kind === "advanced") return;
+    const p = ["rooms", room, "exits", dir];
+    if (!at) {
+      this.set([...p], e.to);
+      return this.writeExit(room, dir, e.to, e.door, e.via ?? []);
+    }
+    if (typeof this.get(p) !== "object") this.set(p, { to: e.to });
+    this.set([...p, "open_at"], at);
+    this.set([...p, "blocked"], blocked.trim() || undefined);
   }
 
   /** A room's, object's or character's picture. */

@@ -355,3 +355,120 @@ pub fn wander<H: ScriptHost>(mut make: impl FnMut() -> Option<Game<H>>, seed: u6
     report.never = story.entities.iter().enumerate().filter(|(i, e)| e.kind == EntityKind::Room && !rooms.contains(&EntityId(*i as u32))).map(|(_, e)| e.key.clone()).collect();
     report
 }
+
+// ---------------------------------------------------------- dead ends
+
+/// A way to make the game unwinnable: after `after` steps of the
+/// walkthrough, `command` loses something it needs later, for good.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DeadEnd {
+    /// Walkthrough steps played first.
+    pub after: usize,
+    /// What the player does then.
+    pub command: String,
+    /// What's gone for good: names.
+    pub lost: Vec<String>,
+    /// The later walkthrough command that needed it.
+    pub needed_by: String,
+    /// Every command, from the start: the steps, then `command`.
+    pub commands: Vec<String>,
+}
+
+/// The most candidate moves tried, so a long game stays quick.
+const DEAD_END_TRIES: usize = 600;
+
+/// Looks for dead ends along a walkthrough: at each step, things the rest
+/// of it needs are eaten, drunk, burnt, smashed, given away or thrown at
+/// someone; if one's gone for good and the rest of the walkthrough no
+/// longer wins, that's a dead end. Only the first way of losing each thing
+/// by each verb is said.
+pub fn dead_ends<H: ScriptHost>(mut make: impl FnMut() -> Option<Game<H>>, walkthrough: &str) -> Vec<DeadEnd> {
+    let Some(mut g) = make() else { return Vec::new() };
+    g.start();
+    let steps = walkthrough_steps(walkthrough);
+    // Played once: the game before each step, and what each step named.
+    let mut saves = Vec::new();
+    let mut named: Vec<Vec<EntityId>> = Vec::new();
+    for s in &steps {
+        saves.push(g.world().save());
+        let out = g.input(&s.command);
+        // What it named (the game keeps the last things named, even
+        // through a command that names nothing, so only those whose name is in it).
+        let words: Vec<String> = s.command.to_lowercase().split_whitespace().map(str::to_string).collect();
+        let w = g.world();
+        let pronoun = words.iter().any(|c| matches!(c.as_str(), "it" | "them" | "him" | "her"));
+        named.push(
+            w.state
+                .mentioned
+                .iter()
+                .copied()
+                .filter(|&e| pronoun || w.display_name(e).to_lowercase().split_whitespace().map(str::to_string).chain(w.def(e).vocab.nouns.iter().cloned()).any(|n| words.contains(&n)))
+                .collect(),
+        );
+        if out.ended.is_some() {
+            break;
+        }
+    }
+    let n = saves.len();
+    let Some(mut w) = make() else { return Vec::new() };
+    w.start();
+    let mut found = Vec::new();
+    let mut said: BTreeSet<(String, EntityId)> = BTreeSet::new();
+    let mut tries = 0;
+    for i in 0..n {
+        // Needed later: what the rest of the walkthrough names, and the last
+        // step that does (where it's really wanted: GIVE CAKE TO TROLL).
+        let later: BTreeMap<EntityId, usize> = (i..n).flat_map(|j| named[j].iter().map(move |&e| (e, j))).collect();
+        w.restore(&saves[i]);
+        let world = w.world();
+        let scope = world.scope();
+        let here: Vec<EntityId> = scope.iter().copied().filter(|&c| c != PLAYER && world.def(c).kind == EntityKind::Character && world.is_active(c)).collect();
+        let mut tried: Vec<(String, String)> = Vec::new();
+        for (&x, _) in later.iter().filter(|(x, _)| scope.contains(x) && world.def(**x).kind == EntityKind::Object) {
+            let name = world.display_name(x);
+            for verb in ["eat", "drink", "burn", "smash"] {
+                tried.push((verb.into(), format!("{verb} {name}")));
+            }
+            for &c in &here {
+                let who = world.display_name(c);
+                tried.push(("give".into(), format!("give {name} to {who}")));
+                tried.push(("throw".into(), format!("throw {name} at {who}")));
+            }
+        }
+        for (verb, command) in tried {
+            if tries >= DEAD_END_TRIES {
+                return found;
+            }
+            tries += 1;
+            w.restore(&saves[i]);
+            let before: Vec<(EntityId, bool)> = later.keys().map(|&e| (e, w.world().location(e).is_some() && !w.world().is_dead(e))).collect();
+            let out = w.input(&command);
+            if out.ended.is_some() {
+                continue;
+            }
+            let lost: Vec<EntityId> = before.iter().filter(|(e, was)| *was && (w.world().location(*e).is_none() || w.world().is_dead(*e))).map(|(e, _)| *e).collect();
+            let Some(&first) = lost.first() else { continue };
+            if !said.insert((verb.clone(), first)) {
+                continue;
+            }
+            // Does the rest still win, with that gone?
+            let mut wins = false;
+            for s in &steps[i..] {
+                let out = w.input(&s.command);
+                if let Some(k) = out.ended {
+                    wins = k == EndingKind::Win;
+                    break;
+                }
+            }
+            if wins {
+                continue;
+            }
+            let needed_by = steps[later[&first]].command.clone();
+            let mut commands: Vec<String> = steps[..i].iter().map(|s| s.command.clone()).collect();
+            commands.push(command.clone());
+            let names = lost.iter().map(|&e| w.world().display_name(e)).collect();
+            found.push(DeadEnd { after: i, command, lost: names, needed_by, commands });
+        }
+    }
+    found
+}

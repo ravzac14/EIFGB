@@ -486,9 +486,21 @@ the endings it reached, how much of the game it got to, and its longest
 stretch where nothing new happened, which can be a place players get
 stuck.
 
+**Dead ends** looks along the walkthrough for ways to make the game
+unwinnable: at each step it tries losing what the rest of the
+walkthrough needs (eating it, drinking it, burning it, smashing it,
+giving it away, throwing it at someone), and when that's gone for good
+and the walkthrough no longer wins, it says so: "After step 1 (TAKE
+CAKE), EAT CAKE loses the cake for good, and the walkthrough needs it for
+GIVE CAKE TO TROLL." **Play it here** plays it in Test play. That may be
+fair, as a loss; if not, give the player another way. It doesn't find
+every dead end (a door barred from the wrong side), only those.
+
 Test play can also start part-way. **Start at a step…** plays the
 walkthrough up to the step you pick without showing it, then lets you
-carry on from there. After a change, it offers to play your moves again on
+carry on from there. **Start with…** sets the game up as you choose
+instead: the room, what the player carries, which doors and lids are open
+or unlocked, the variables, and the facts they already know. After a change, it offers to play your moves again on
 the new version, so you can try a fix without typing your way back.
 
 Test play also keeps a list of what the game **didn't understand**, under
@@ -616,10 +628,18 @@ A few more tools in the editor:
   brings on when eaten or drunk, what it combines with and makes, leaves
   a mark, a fake of something, puts out fires, a trap, a disguise, bait);
   a character's has what they watch and what wins them over (gifts they
-  like, taming, a bribe), Playing as them, Voices and friends, and What
-  they remember. Moods are named in the
+  like, taming, a bribe), A favour they ask, Playing as them, Voices and
+  friends, and What they remember. The game's panel lists what the player
+  can learn (its facts), and a conversation's replies say what they teach
+  and whether they promise a favour. Moods are named in the
   game's panel, and then each room, thing and person can say how it reads
   in each one.
+- **How characters sound**, under Problems: what each character says
+  (in conversations, chatter, favours and memories, the words in quotes),
+  side by side, with how long their sentences run, how often they ask or
+  exclaim, how often they say "don't" for "do not", and words only they
+  use. Two characters who sound alike, or one whose later lines sound
+  unlike their early ones, are pointed out, as guesses to read again.
 - **Possible typos**, under Problems: words that aren't in the dictionary
   or the game's names, a letter off a word that is ("lantren", perhaps
   "lantern"), however often they're used. The dictionary is a word list
@@ -1161,6 +1181,73 @@ Scripts read `game.weather` and change it with `set_weather("rain")`, and
 descriptions can depend on it: `${if game.weather == "rain"}The path is
 muddy.${end}`. In the editor: **Weather** in the game's details.
 
+### Water
+
+A room can flood:
+
+```yaml
+player: { breath: 4 }       # turns the player can hold their breath (4 unless set)
+
+rooms:
+  cellar:
+    name: Cellar
+    floods: { every: 3, depth: 3, drains: sluice }
+objects:
+  sluice: { name: sluice gate, in: cellar, traits: [openable] }
+  barrel: { name: empty barrel, in: yard, traits: [portable], floats: true }
+```
+
+The water rises a level every `every` turns (3 unless set), up to
+`depth`: 1 ankle-deep, 2 waist-deep, 3 over the player's head (the
+default). LOOK says how deep it is, and the player is told as it rises.
+Over their head, they swim (SWIM NORTH), and hold their breath: when it
+runs out, they struggle back the way they came, and lose a point of
+health if they have any. Something that `floats`, carried, keeps them
+up. Opening the `drains` thing lets the water out, a level a turn.
+`starts: false` waits for a script: `flood(world.cellar)` starts it
+rising, `flood(world.cellar, 2)` sets it waist-deep, `flood(world.cellar,
+0)` drains it. Scripts read `world.cellar.water` (0 to 3). SWIM is only
+a command in games with water, so a game's own answer to it stands.
+
+### Weight
+
+```yaml
+objects:
+  plate: { name: stone plate, in: vault, traits: [supporter], size: 4, pressure: { at_least: 3, opens: gate } }
+  raft: { name: raft, in: river, traits: [supporter, enterable], capacity: 2, sinks: true }
+```
+
+A `pressure` plate opens its doors (or lids) while there's at least that
+much weight on it, and shuts them again when there isn't: a boulder, or
+the player standing on it with enough in their pack. A thing weighs its
+`size` and what's inside it; the player, their own `size` (1 unless set)
+and what they carry. `down:` and `up:` reword "The stone plate sinks
+under the weight, with a click." Something that `sinks` says it would
+sink, instead of that there's no room, when too much is put on it or the
+player is too heavy to get on.
+
+### Scents
+
+A character that `sniffs` (a dog) can be given a scent: LET THE DOG
+SNIFF THE GLOVE. It leads the way, a room at a time, waiting for the
+player to catch up, to whoever the glove belongs to: its `scent_of:` (a
+character or thing), or whoever had it at the start. There it barks; a
+hidden thing, it digs up.
+
+### Echoes and whispers
+
+```yaml
+rooms:
+  cave:
+    echo: { help: '"…help… help…" And then, faintly, from far below: "Down here!"' }
+    hears: [tunnel]
+```
+
+SHOUT or SAY anything in a room with an `echo` (`true`, or answers to
+words) and it comes back: "…hello… hello…", or the answer for a word
+said. A room that `hears` other rooms is a whispering gallery: what
+characters say there is heard here, word for word.
+
 ## Pictures
 
 A room, an object or a character can have a `picture`. A room's is shown
@@ -1387,6 +1474,88 @@ what she held. EXAMINE ME describes whoever the player is now. What the
 player has seen and learned is shared between them. Characters who are
 enemies of one are enemies of all, since it's the player they know.
 
+## What the player learns
+
+A game can name the things worth knowing, as `facts:`, and say where
+the player learns each: in a conversation, or reading or looking at
+something.
+
+```yaml
+facts:
+  meeting: The smugglers meet at midnight.
+  mill: { text: The smugglers meet at the old mill, past the bridge., place: mill }
+
+objects:
+  plaque: { name: plaque, in: bridge, text: Built in 1802., teaches: built }
+
+choices:
+  gossip:
+    start: hello
+    nodes:
+      hello:
+        options:
+          - { text: Any news?, say: '"They meet at midnight."', teaches: meeting }
+          - { text: Where?, when: 'knows("meeting")', say: '"The old mill."', teaches: mill }
+```
+
+`teaches:` (one fact, or a list) goes on a conversation's node or option,
+or on a thing: READ teaches it (EXAMINE, if there's nothing written on
+it). The first time, the player sees "[You'll remember that.]". Asked
+again, the one telling them says "As I told you before…". WHAT DO I KNOW
+(WHAT HAVE I LEARNED, CLUES, RECALL) lists everything, and who said it;
+WHAT DO I KNOW ABOUT THE BRIDGE just what mentions the bridge. Scripts
+check `knows("mill")`, as the option above does, and `learn("mill")`
+teaches it.
+
+### Places heard of
+
+A fact with a `place:` tells of a room. Until the player has been there
+it's on their map with a "?", and MAP lists it as heard of. GO TO THE
+MILL needs the way: ASK THE GOSSIP THE WAY TO THE MILL (WHICH WAY TO …,
+HOW DO I GET TO …) gets "North twice, then east", and after that GO TO
+walks there. People you can talk to give directions (and shopkeepers);
+`knows_the_way: true` or `false` on a character says otherwise. A room
+with `heard_of: true` is known from the start (the castle on the hill),
+and a script can `hear_of(world.mill)`.
+
+### Promises
+
+A character can ask a favour: bring them something.
+
+```yaml
+characters:
+  baker:
+    name: baker
+    in: shop
+    asks:
+      for: cat
+      say: '"Have you seen my cat? Would you find her?"'
+      promise: find her cat
+      thanks: '"Whiskers!" The baker hugs the cat.'
+      gives: coin
+      within: 40
+      broken: '"You said you''d find her," says the baker coldly.'
+```
+
+TALK TO THE BAKER (if she has no conversation) says what she asks.
+PROMISE (I'LL DO IT, PROMISE THE BAKER) promises it, and she warms to the
+player; JOURNAL lists promises. Giving her the cat keeps it: her
+`thanks`, and what she `gives`. Asked or not, she's grateful, but more so
+for a promise kept. Past `within` turns, the promise is broken: she
+cools, and her friends hear of it, and next time she says her `broken`
+line. An option with `promise: true` in a conversation promises too, as
+does `promise(world.baker)` in a script, and scripts read
+`world.baker.promise`: nil, "made", "kept" or "broken".
+
+### Copying
+
+COPY THE PASS ONTO THE PAPER makes a forgery: the pass's `copy:` (an
+object that starts with no `in:`), from something `blank: true` (paper,
+used up) and something that `writes: true` (a pen) both carried. A copy
+works as a fake of the original (as with `decoy_for`), so it can be
+swapped for it unseen. COPY THE INSCRIPTION, of something with `text`
+and no `copy:`, writes the words into the player's notes.
+
 ## Time of day
 
 A game can keep a clock that moves on with each turn:
@@ -1434,6 +1603,14 @@ on:
 the next 6:00 (tomorrow's, if it's already later). Timers `at` a time go
 off once each day the clock passes it, even when a script jumps over it.
 The time is saved and undone with everything else.
+
+The moon changes a phase a day: `clock: { moon: full }` is the first
+night's (new, waxing crescent, first quarter, waxing gibbous, full,
+waning gibbous, last quarter, waning crescent). TIME says it at night,
+and scripts read `clock.moon`. A way out can be open only some of the
+time: `west: { to: hollow, open_at: full moon, blocked: Only a blank
+hillside. }`, or `open_at: night`, `day`, `22:00-4:00`, or a list that
+must all hold.
 
 In the web editor, choose **Add component → Time of day**, or **Keep the
 time of day** under **Time of day** in the game's details. The Small House
@@ -2310,6 +2487,7 @@ follows:
 | SEARCH … | LOOK IN …, LOOK UNDER …, LOOK BEHIND … | Looks closely, and can turn up hidden things. |
 | N, S, E, W, NE, NW, SE, SW, UP, DOWN, IN, OUT | NORTH, GO NORTH, CLIMB UP, … | Goes that way. |
 | GO THROUGH … | ENTER … | Goes through a door. |
+| SWIM NORTH | WADE …, PADDLE …, DIVE … | Swims, in a game with water. |
 | GO TO … | WALK TO …, RETURN TO … | Walks to a place you've been, by the way you know, a turn a step. It stops if anything happens on the way, and UNDO takes the whole walk back. GO TO THE KEEPER goes to where you last saw them. |
 | GO BACK | BACK, RETURN | Goes back to the room you just came from. |
 | KITCHEN | GO KITCHEN, ENTER KITCHEN | A place's name on its own goes there: next door, or anywhere you've been. |
@@ -2335,6 +2513,7 @@ follows:
 | WEAR … / TAKE OFF … | PUT ON …, REMOVE … | Puts clothing on or takes it off. |
 | EAT … | | Eats something edible. |
 | READ … | | What's written on it (its `text`), or a look at it. |
+| COPY … | COPY … ONTO …, FORGE …, TRACE …, TRANSCRIBE … | Makes a copy, with paper and a pen; or copies the words into your notes. |
 | FILL … FROM … | FILL … WITH …, DIP … IN … | Fills something that holds a liquid. |
 | POUR OUT … | POUR … INTO …, POUR … ON …, EMPTY … | Pours a liquid out, into something, or on a fire. |
 | TYPE 4512 | ENTER 4512 ON …, DIAL …, OPEN … WITH 4512 | Enters a code. |
@@ -2364,8 +2543,11 @@ follows:
 
 | Command | Also | What it does |
 |---|---|---|
+| ASK … THE WAY TO … | WHICH WAY TO …, HOW DO I GET TO …, ASK FOR DIRECTIONS TO … | Asks the way to a place: after that, GO TO goes there. |
+| PROMISE … | I'LL DO IT, PROMISE | Promises someone the favour they asked. |
 | TALK TO … | SPEAK TO …, GREET …, ASK …, TELL …, ASK … ABOUT …, TELL … ABOUT … | Starts a conversation. With one person here to talk to, TALK or ASK ABOUT … needs no name. ASK THE KEEPER ABOUT THE GATE goes straight to the option that mentions the gate, when just one does. |
 | GIVE … TO … | HAND … TO …, FEED … TO … | Hands something over: a gift, or food for an animal. |
+| LET … SNIFF … | HAVE … SMELL …, GIVE … THE SCENT OF … | Gives a dog a scent to follow. |
 | BRIBE … | PAY 5 TO …, BRIBE … WITH 5 | Pays someone off. |
 | TELL … TO … | ORDER … TO …, ASK … TO … | Gives an order to someone who'll take it: TELL THE DOG TO FETCH THE STICK. |
 | CALL … … | NAME … …, RENAME … … | Gives someone a name: CALL THE DOG REX. |
@@ -2407,7 +2589,8 @@ follows:
 | WHERE IS … | FIND …, WHERE DID I LEAVE …, WHERE DID I GET … | Where you last saw something or someone: "You last saw the old keeper in the Base of the Lighthouse." For something you carry, where you found it. GO TO THE KEEPER walks you there. A reminder, not a hint: it only knows what you've seen, so it never tells you where something has gone since, or what's become of it. |
 | BRIEF / VERBOSE | | BRIEF names places you've been before without describing them again (LOOK still does); VERBOSE, the default, always describes them. Kept with saves, and through UNDO and RESTART. |
 | HINT | HINTS, CLUE | The game's next hint for where you're stuck, if it has hints. |
-| JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them, and your notes. |
+| JOURNAL | GOALS, OBJECTIVES, TASKS, QUESTS | Your goals, if the game has them, your promises, and your notes. |
+| WHAT DO I KNOW | WHAT HAVE I LEARNED, CLUES, RECALL, WHAT DO I KNOW ABOUT … | What you've been told or read that matters, and who told you. Takes no turn. |
 | NOTE … | JOT DOWN …, WRITE DOWN …, MAKE A NOTE … | Writes a note of your own, word for word: NOTE The code might be 4512. Takes no turn. |
 | NOTES | MY NOTES, NOTEBOOK | Your notes, numbered. ERASE NOTE 2 rubs one out; CLEAR NOTES rubs out all of them. |
 | TIME | WHAT TIME IS IT | The time of day, if the game keeps one. |

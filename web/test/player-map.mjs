@@ -71,4 +71,14 @@ const words = box.querySelector("svg").getAttribute("aria-label");
 assert.match(words, /^Map of the 3 places you've been\. /);
 assert.match(words, /Attic \(you're here\)/);
 assert.match(words, /not visited yet/);
+assert.equal(m.heard.length, 0);
+
+// Places heard of but not found: dashed, with a "?", and said.
+const rumoured = { ...m, heard: [{ id: "garden", name: "Garden" }] };
+const pos2 = placeRooms(rumoured, new Map());
+assert.ok(pos2.has("garden") && pos2.get("garden").y > Math.max(...m.rooms.map((r) => pos2.get(r.id).y)), "drawn below the rest");
+drawMap(box, rumoured, new Map());
+assert.equal(box.querySelector(".room.heard title").textContent, "Garden: heard of, not found yet");
+assert.match(box.querySelector(".room.heard").textContent, /Garden \?/);
+assert.match(box.querySelector("svg").getAttribute("aria-label"), /Heard of, not yet found: Garden\./);
 console.log("ok   player map");

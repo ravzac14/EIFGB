@@ -24,6 +24,8 @@ pub(crate) struct Lowerer<'a> {
     choice_ids: HashMap<String, ChoiceId>,
     verb_keys: Vec<String>,
     categories: Vec<(String, Vec<String>)>,
+    /// Whether the game keeps time (for `open_at`).
+    has_clock: bool,
 }
 
 impl<'a> Lowerer<'a> {
@@ -37,6 +39,7 @@ impl<'a> Lowerer<'a> {
             choice_ids: HashMap::new(),
             verb_keys: Vec::new(),
             categories: Vec::new(),
+            has_clock: false,
         }
     }
 
@@ -68,8 +71,15 @@ impl<'a> Lowerer<'a> {
         };
 
         self.allocate_ids(&s);
+        self.has_clock = s.clock.is_some();
         self.categories = stdlib.categories.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-        let verbs = self.lower_verbs(&s.verbs, &stdlib);
+        let mut verbs = self.lower_verbs(&s.verbs, &stdlib);
+        // SWIM only in games with water: elsewhere, a game's own answer to it stands.
+        let watery = s.rooms.values().any(|r| r.floods.is_some())
+            || s.on.values().chain(s.rooms.values().flat_map(|r| r.on.values())).chain(s.objects.values().chain(s.characters.values()).flat_map(|t| t.on.values())).any(|c| c.contains("flood("));
+        if !watery {
+            verbs.retain(|v| v.action != VerbAction::Builtin(BuiltinAction::Swim));
+        }
         let lexicon = author_first_lexicon(&stdlib.lexicon, &verbs);
 
         let messages = self.lower_messages(&s.messages, &stdlib);
@@ -115,6 +125,20 @@ impl<'a> Lowerer<'a> {
             reflects: false,
             moods: Default::default(),
             mood: None,
+            teaches: vec![],
+            copy: None,
+            blank: false,
+            writes: false,
+            heard_of: false,
+            pressure: None,
+            sinks: false,
+            floods: None,
+            floats: false,
+            sniffs: false,
+            scent_of: None,
+            echo: None,
+            hears: vec![],
+            breath: s.player.breath,
             handlers: vec![],
             npc: None,
             health: s.player.health,
@@ -269,6 +293,29 @@ impl<'a> Lowerer<'a> {
             }
             Some(id)
         });
+        let facts: Vec<Fact> = s
+            .facts
+            .iter()
+            .map(|(k, f)| {
+                let path = format!("facts.{k}");
+                if let Err(e) = check_id(k) {
+                    self.d.error(&path, e);
+                }
+                let (text, place) = match f {
+                    src::FactSrc::Text(t) => (t.as_str(), None),
+                    src::FactSrc::Full { text, place } => (text.as_str(), place.as_deref()),
+                };
+                Fact { key: k.clone(), text: self.text(text, &format!("{path}.text")), place: place.and_then(|p| self.room_ref(p, &format!("{path}.place"))) }
+            })
+            .collect();
+        // A copy is a fake of what it copies, unless it says otherwise.
+        for i in 0..entities.len() {
+            if let Some(c) = entities[i].copy
+                && entities[c.0 as usize].decoy_for.is_none()
+            {
+                entities[c.0 as usize].decoy_for = Some(EntityId(i as u32));
+            }
+        }
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
         let story = Story {
             ir_version: IR_VERSION,
@@ -308,6 +355,7 @@ impl<'a> Lowerer<'a> {
             scenes,
             moods,
             plays,
+            facts,
             clock,
             weather,
         };
@@ -316,8 +364,42 @@ impl<'a> Lowerer<'a> {
             self.d.error("game.id", e);
         }
         self.check_script_references(&story);
+        self.check_teaches(&story);
 
         if self.d.has_errors() { None } else { Some(story) }
+    }
+
+    /// Every `teaches` names a fact, and every promise is made to someone who asks.
+    fn check_teaches(&mut self, story: &Story) {
+        let known = |k: &str| story.facts.iter().any(|f| f.key == k);
+        let keys: Vec<&str> = story.facts.iter().map(|f| f.key.as_str()).collect();
+        let mut bad = Vec::new();
+        for e in &story.entities {
+            let section = match e.kind {
+                EntityKind::Object => "objects",
+                EntityKind::Character => "characters",
+                _ => continue,
+            };
+            for k in e.teaches.iter().filter(|k| !known(k)) {
+                bad.push((format!("{section}.{}.teaches", e.key), k.clone()));
+            }
+        }
+        for c in &story.choices {
+            for n in &c.nodes {
+                for k in n.teaches.iter().filter(|k| !known(k)) {
+                    bad.push((format!("choices.{}.nodes.{}.teaches", c.key, n.key), k.clone()));
+                }
+                for (i, o) in n.options.iter().enumerate() {
+                    for k in o.teaches.iter().filter(|k| !known(k)) {
+                        bad.push((format!("choices.{}.nodes.{}.options[{i}].teaches", c.key, n.key), k.clone()));
+                    }
+                }
+            }
+        }
+        for (path, k) in bad {
+            let hint = did_you_mean(&k, keys.iter().copied());
+            self.d.error(path, format!("there's no fact called '{k}' in `facts:`{hint}"));
+        }
     }
 
     // ---------------------------------------------------------------- ids
@@ -673,6 +755,29 @@ impl<'a> Lowerer<'a> {
             reflects: false,
             moods: r.moods.iter().map(|(m, p)| (m.trim().to_lowercase(), self.prose(p, &format!("{path}.moods.{m}")))).collect(),
             mood: None,
+            teaches: vec![],
+            copy: None,
+            blank: false,
+            writes: false,
+            heard_of: r.heard_of,
+            pressure: None,
+            sinks: false,
+            floods: r.floods.as_ref().map(|f| Flood {
+                every: f.every.unwrap_or(3).max(1),
+                depth: f.depth.unwrap_or(3).clamp(1, 3),
+                starts: f.starts.unwrap_or(true),
+                drains: f.drains.as_deref().and_then(|d| self.entity_ref(d, &format!("{path}.floods.drains"))),
+            }),
+            floats: false,
+            sniffs: false,
+            scent_of: None,
+            echo: r.echo.as_ref().and_then(|e| match e {
+                src::EchoSrc::On(false) => None,
+                src::EchoSrc::On(true) => Some(BTreeMap::new()),
+                src::EchoSrc::Answers(m) => Some(m.iter().map(|(k, v)| (k.trim().to_lowercase(), self.text(v, &format!("{path}.echo.{k}")))).collect()),
+            }),
+            hears: r.hears.iter().enumerate().filter_map(|(i, h)| self.room_ref(h, &format!("{path}.hears[{i}]"))).collect(),
+            breath: None,
             handlers,
             npc: None,
             health: None,
@@ -750,7 +855,21 @@ impl<'a> Lowerer<'a> {
                         .through
                         .as_deref()
                         .and_then(|t| self.entity_ref(t, &format!("{epath}.through")));
-                    let when = f.when.as_deref().map(|w| self.code(w, &format!("{epath}.when")));
+                    // `open_at`: a condition on the clock, with any `when`.
+                    let wrap = f.open_at.is_some();
+                    let mut cond: Vec<String> = f.when.iter().map(|w| if wrap { format!("({})", w.trim()) } else { w.clone() }).collect();
+                    if let Some(at) = &f.open_at {
+                        if !self.has_clock {
+                            self.d.error(format!("{epath}.open_at"), "needs the game to keep time: add a 'clock:' section");
+                        }
+                        for a in at.items() {
+                            match open_at_code(a) {
+                                Ok(c) => cond.push(c),
+                                Err(e) => self.d.error(format!("{epath}.open_at"), e),
+                            }
+                        }
+                    }
+                    let when = (!cond.is_empty()).then(|| self.code(&cond.join(" and "), &format!("{epath}.when")));
                     let blocked = self.text_opt(f.blocked.as_deref(), &format!("{epath}.blocked"));
                     if f.to.is_none() && blocked.is_none() {
                         self.d.error(&epath, "an exit needs 'to' or 'blocked'");
@@ -1059,6 +1178,25 @@ impl<'a> Lowerer<'a> {
             reflects: t.reflects,
             moods,
             mood,
+            teaches: t.teaches.as_ref().map(|x| x.items().into_iter().map(|k| k.trim().to_string()).collect()).unwrap_or_default(),
+            copy: t.copy.as_deref().and_then(|c| self.entity_ref(c, &format!("{path}.copy"))),
+            blank: t.blank,
+            writes: t.writes,
+            heard_of: false,
+            pressure: t.pressure.as_ref().map(|p| Pressure {
+                at_least: p.at_least,
+                opens: p.opens.as_ref().map(|o| o.items().into_iter().filter_map(|x| self.entity_ref(x, &format!("{path}.pressure.opens"))).collect()).unwrap_or_default(),
+                down: self.text_opt(p.down.as_deref(), &format!("{path}.pressure.down")),
+                up: self.text_opt(p.up.as_deref(), &format!("{path}.pressure.up")),
+            }),
+            sinks: t.sinks,
+            floods: None,
+            floats: t.floats,
+            sniffs: t.sniffs,
+            scent_of: t.scent_of.as_deref().and_then(|x| self.entity_ref(x, &format!("{path}.scent_of"))),
+            echo: None,
+            hears: vec![],
+            breath: None,
             handlers,
             npc,
             health: t.health.filter(|_| is_char),
@@ -1123,6 +1261,9 @@ impl<'a> Lowerer<'a> {
                 ("friends", !t.friends.is_empty()),
                 ("remembers", !t.remembers.is_empty()),
                 ("playable", t.playable),
+                ("asks", t.asks.is_some()),
+                ("knows_the_way", t.knows_the_way.is_some()),
+                ("sniffs", t.sniffs),
                 ("morale", t.morale.is_some()),
                 ("fears", !t.fears.is_empty()),
                 ("behavior", t.behavior.is_some()),
@@ -1220,6 +1361,20 @@ impl<'a> Lowerer<'a> {
                 (m, text)
             })
             .collect();
+        let asks = t.asks.as_ref().and_then(|a| {
+            let apath = format!("{path}.asks");
+            let wants = self.entity_ref(&a.wants, &format!("{apath}.for"))?;
+            let gives = a.gives.as_ref().map(|g| g.items().into_iter().filter_map(|x| self.entity_ref(x, &format!("{apath}.gives"))).collect()).unwrap_or_default();
+            Some(Ask {
+                wants,
+                say: self.prose_opt(a.say.as_ref(), &format!("{apath}.say")),
+                promise: self.text_opt(a.promise.as_deref(), &format!("{apath}.promise")),
+                thanks: self.prose_opt(a.thanks.as_ref(), &format!("{apath}.thanks")),
+                gives,
+                within: a.within,
+                broken: self.prose_opt(a.broken.as_ref(), &format!("{apath}.broken")),
+            })
+        });
         Some(Npc {
             behavior,
             routine,
@@ -1228,6 +1383,8 @@ impl<'a> Lowerer<'a> {
             friends,
             remembers,
             playable: t.playable,
+            asks,
+            knows_the_way: t.knows_the_way.unwrap_or(t.talk.is_some() || matches!(behavior, Behavior::Merchant | Behavior::Conversationalist)),
             wander: t.wander.unwrap_or(behavior.default_wander()),
             area,
             range: t.range,
@@ -1588,7 +1745,17 @@ impl<'a> Lowerer<'a> {
         if dawn == dusk {
             self.d.error("clock.dusk", "dawn and dusk can't be at the same time");
         }
-        Some(Clock { start, per_turn: per_turn.max(1), dawn, dusk, show: c.show.unwrap_or(true) })
+        let moon = match c.moon.as_deref().map(|m| m.trim().to_lowercase()) {
+            None => 4,
+            Some(m) => match MOON_PHASES.iter().position(|p| *p == m || p.replace(' ', "_") == m || (m.ends_with(" moon") && *p == m.trim_end_matches(" moon"))) {
+                Some(i) => i as u32,
+                None => {
+                    self.d.error("clock.moon", format!("the moon is one of {}", MOON_PHASES.join(", ")));
+                    4
+                }
+            },
+        };
+        Some(Clock { start, per_turn: per_turn.max(1), dawn, dusk, show: c.show.unwrap_or(true), moon })
     }
 
     // -------------------------------------------------------------- timers
@@ -1767,6 +1934,8 @@ impl<'a> Lowerer<'a> {
                         disposition: o.disposition.unwrap_or(0),
                         run: o.run.as_deref().map(|r| self.code(r, &format!("{opath}.do"))),
                         next,
+                        teaches: o.teaches.as_ref().map(|x| x.items().into_iter().map(|k| k.trim().to_string()).collect()).unwrap_or_default(),
+                        promise: o.promise,
                     });
                 }
                 let next = if options.is_empty() {
@@ -1784,7 +1953,8 @@ impl<'a> Lowerer<'a> {
                     }
                     None
                 };
-                nodes.push(ChoiceNode { key: nkey.clone(), text, run, options, next });
+                let teaches = n.teaches.as_ref().map(|x| x.items().into_iter().map(|k| k.trim().to_string()).collect()).unwrap_or_default();
+                nodes.push(ChoiceNode { key: nkey.clone(), text, run, options, next, teaches });
             }
             out.push(ChoiceGraph { key: key.clone(), start, nodes });
         }
@@ -2254,6 +2424,31 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
     }
 }
 
+/// `open_at` as Lua: `night`, `day`, `full moon` (a phase), `22:00-4:00`.
+fn open_at_code(at: &str) -> Result<String, String> {
+    let a = at.trim().to_lowercase();
+    if a == "night" || a == "at night" {
+        return Ok("clock.night".into());
+    }
+    if a == "day" || a == "daytime" || a == "by day" {
+        return Ok("clock.daytime".into());
+    }
+    let phase = a.trim_end_matches(" moon").trim();
+    if let Some(p) = MOON_PHASES.iter().find(|p| **p == phase) {
+        return Ok(format!("clock.moon == \"{p}\""));
+    }
+    if let Some((from, to)) = a.split_once('-') {
+        let t = |s: &str| eifgb_ir::parse_time(s.trim());
+        let (from, to) = (t(from)?, t(to)?);
+        return Ok(if from <= to {
+            format!("(clock.minutes >= {from} and clock.minutes < {to})")
+        } else {
+            format!("(clock.minutes >= {from} or clock.minutes < {to})")
+        });
+    }
+    Err(format!("'{at}' isn't a time: say night, day, a moon (full moon), or hours like 22:00-4:00"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::vocab;
@@ -2265,3 +2460,4 @@ mod tests {
         assert_eq!(v.adjectives, vec!["brass", "old", "small"]);
     }
 }
+

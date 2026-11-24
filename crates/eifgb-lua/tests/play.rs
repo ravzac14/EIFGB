@@ -5134,6 +5134,36 @@ fn tricks(extra: &str) -> Game<LuaHost> {
     game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)))
 }
 
+/// Tab: words that finish the last one, from what the player can see.
+#[test]
+fn tab_completes_only_what_the_player_knows() {
+    let src = format!("{TRICKS}  coin: {{ name: gold coin, synonyms: [coin], in: hall, state: {{ hidden: true }} }}\n  vase: {{ name: vase, in: den, on: {{ polish: 'say(\"Shiny.\")' }} }}\nverbs:\n  frotz: {{ patterns: [frotz] }}\n  polish: {{ patterns: [\"polish {{target}}\"] }}\n");
+    let src = src.replace("characters:\n  guard: { name: guard, in: den, watches: [ruby] }\n", "") + "characters:\n  guard: { name: guard, in: den, watches: [ruby] }\n";
+    let out = compile_str(&src);
+    let mut g = game(out.story.unwrap_or_else(|| panic!("{:#?}", out.diagnostics)));
+    say(&mut g, "look");
+    let ta = g.completions("ta");
+    assert!(ta.contains(&"take".to_string()) && ta.iter().all(|w| w.starts_with("ta")), "{ta:?}");
+    assert_eq!(g.completions("take ro")[0], "rope");
+    // A thing in another room, or hidden: not offered.
+    let ru = g.completions("take ru");
+    assert!(!ru.contains(&"ruby".to_string()), "{ru:?}");
+    let co = g.completions("take co");
+    assert!(!co.contains(&"coin".to_string()), "{co:?}");
+    // The game's own verbs: only once something here handles them.
+    let fro = g.completions("fro");
+    assert!(!fro.contains(&"frotz".to_string()), "{fro:?}");
+    assert!(!g.completions("pol").contains(&"polish".to_string()));
+    say(&mut g, "e");
+    assert_eq!(g.completions("pol"), ["polish"]);
+    assert_eq!(g.completions("take ru")[0], "ruby");
+    // After THEN, a new command; a finished word, nothing.
+    assert!(g.completions("x ruby then ta").contains(&"take".to_string()));
+    assert!(g.completions("take ").is_empty());
+    let w = g.completions("we");
+    assert!(w.contains(&"west".to_string()), "{w:?}");
+}
+
 /// Two things that make a third, by the verbs that would.
 #[test]
 fn things_combine_into_others() {

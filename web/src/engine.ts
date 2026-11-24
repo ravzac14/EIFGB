@@ -141,6 +141,8 @@ export interface Engine {
   restore(save: string): Output;
   /** The rooms visited so far and the ways out of them. */
   map(): PlayerMap;
+  /** Words that finish the last word of `line`, from what the player can see now (Tab). */
+  complete(line: string): string[];
 }
 
 interface Module {
@@ -166,6 +168,7 @@ export async function loadEngine(base: string | URL): Promise<Engine> {
     save: () => call("eifgb_save", [], []),
     restore: (save) => call("eifgb_restore", ["string"], [save]),
     map: () => call("eifgb_map", [], []),
+    complete: (line) => call("eifgb_complete", ["string"], [line]),
     wander: (files, seed, moves, entry = "game.yaml") => call("eifgb_wander", ["string", "string", "number", "number"], [JSON.stringify(files), entry, seed, moves]),
   };
 }

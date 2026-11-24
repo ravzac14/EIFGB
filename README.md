@@ -603,10 +603,14 @@ A few more tools in the editor:
   that aren't anything yet are underlined, each a click from being
   scenery ("A narrow path climbs north" means someone will type EXAMINE
   PATH).
-- **Possible typos**, under Problems: words used once that are a letter
-  off a word the game uses elsewhere, or one of its names ("lantren"). The
-  game's own words are always allowed, and the browser spell checks text
-  boxes too.
+- **Possible typos**, under Problems: words that aren't in the dictionary
+  or the game's names, a letter off a word that is ("lantren", perhaps
+  "lantern"), however often they're used. The dictionary is a word list
+  kept with the site ([SCOWL](http://wordlist.aspell.net/), US and British
+  spellings), fetched once: nothing of the game is sent anywhere. Until
+  it's loaded (or offline), the check is the game against itself: words
+  used once that are a letter off one it uses elsewhere. The game's own
+  words are always allowed, and the browser spell checks text boxes too.
 - **Pictures** can be shared: a room, thing or character can use a
   picture that's already in the game, which is kept once. Under each
   picture, the editor says how much space the game's pictures take, and
@@ -2309,7 +2313,19 @@ follows:
 | WHO IS HERE | WHO'S HERE, IS ANYONE HERE | Who else is in the room. |
 | WHAT CAN I DO | WHAT NOW, OPTIONS | A few things worth trying here, right now. |
 | ABOUT | INFO, CREDITS, VERSION | The game's title, author and version. |
+| COMBINE … WITH … | JOIN, CONNECT, MIX, FIT … TO … | Puts two things together, if they make something (TIE and PUT IN can too). |
+| PUSH … AGAINST … | BARRICADE …, BLOCK … WITH … | Blocks a door with something heavy; MOVE … AWAY or UNBLOCK … clears it. |
+| MARK | CHALK …, SCRATCH …, LEAVE A MARK | Leaves a mark here, with something to mark with: CHALK AN ARROW. RUB OUT THE MARK takes it away. |
+| REPLACE … WITH … | SUBSTITUTE … FOR …, SWITCH … WITH … | Takes one thing and leaves another in its place. |
+| PLAY DEAD | FEIGN DEATH, LIE STILL, PLAY POSSUM | Lies still until you do something else. |
 | QUIT | Q | Stops playing. |
+
+In the browser, Up and Down go back through the commands you've typed,
+and **Tab finishes a word** from what you can see: TAKE LA and Tab gives
+TAKE LANTERN. With several matches it puts in the first and shows them all
+under the line; Tab again (Shift+Tab back) goes through them, and Esc puts
+back what you typed. It only offers what you can see or carry, places
+you've been, and the game's commands, never something you haven't found.
 
 Some verbs exist so that players can try them and authors can respond:
 PUSH, PULL, KICK, MOVE (DRAG), LIFT, SHAKE, TURN (TWIST), TOUCH (FEEL),

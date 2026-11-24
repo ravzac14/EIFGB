@@ -3,6 +3,7 @@
 // opened straight from a disk, and can be hosted or emailed anywhere.
 import type { Files } from "./engine.ts";
 import playerJs from "./standalone/player.js?raw";
+import tabJs from "./tab.js?raw";
 import siteCss from "./style.css?raw";
 import playCss from "./play.css?raw";
 
@@ -82,6 +83,7 @@ ${playCss}
 <script type="application/json" id="eifgb-game">${game}</script>
 <script type="application/octet-stream" id="eifgb-wasm">${base64(engine.wasm)}</script>
 <script>${inScript(classicLoader(engine.loader))}</script>
+<script>${inScript(tabJs)}</script>
 <script>${inScript(playerJs)}</script>
 </body>
 </html>

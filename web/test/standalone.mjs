@@ -26,7 +26,7 @@ assert.ok(page.length < 4_000_000, `${(page.length / 1e6).toFixed(1)} MB`);
 assert.match(page, /<title>The &lt;Locked&gt; Door<\/title>/);
 assert.match(page, /Made with <a href="https:\/\/example.org\/EIFGB\/">EIFGB<\/a>/);
 assert.doesNotMatch(page, /<script[^>]+src=|<link[^>]+href=|import\.meta/, "nothing loaded from elsewhere");
-assert.equal(page.match(/<\/script>/g).length, 4, "four scripts, none cut short");
+assert.equal(page.match(/<\/script>/g).length, 5, "five scripts, none cut short");
 assert.match(page, /:root\[data-theme="parchment"\]/, "the site's themes come along");
 assert.throws(() => classicLoader("console.log(1)"), /expected form/);
 
@@ -35,7 +35,7 @@ GlobalRegistrator.register({ url: "file:///C:/games/locked_dungeon.html", width:
 window.scrollTo = () => {};
 const body = page.match(/<body[^>]*>([\s\S]*)<\/body>/)[1];
 const scripts = [...body.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-assert.equal(scripts.length, 2);
+assert.equal(scripts.length, 3);
 const run = () => {
   document.body.innerHTML = body.replace(/<script>[\s\S]*?<\/script>/g, "");
   for (const s of scripts) (0, eval)(s);
@@ -58,6 +58,12 @@ assert.match($("#status").textContent, /Your Cell · Turn 0/);
 const img = $("#log figure.picture img");
 assert.equal(img?.src, cellPicture, "the room's picture, from inside the page");
 assert.equal(img.alt, "Straw on a stone floor.");
+// Tab finishes a word here too.
+const tabKey = new KeyboardEvent("keydown", { key: "Tab", cancelable: true, bubbles: true });
+$("#line").value = "exa";
+$("#line").dispatchEvent(tabKey);
+assert.equal($("#line").value, "examine ");
+$("#line").value = "";
 
 // Part way, then the page is opened again: it carries on.
 type(steps[0]);

@@ -222,6 +222,14 @@ pub extern "C" fn eifgb_restore(save: *const c_char) -> *const c_char {
 /// exits: [{from, dir, to?, door?, closed?}] }`. Only rooms the player has
 /// been in; an exit from one of them whose far side they haven't visited
 /// has no `to`. Exits through secret doors that haven't been found are left out.
+/// Words that finish the last word of `line` (Tab in the player), from what
+/// the player can see now: `["lantern", "ladder"]`.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_complete(line: *const c_char) -> *const c_char {
+    let line = arg(line);
+    give(with_game(|g| json!(g.completions(&line))))
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn eifgb_map() -> *const c_char {
     give(with_game(|g| map(g.world())))

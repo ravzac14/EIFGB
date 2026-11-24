@@ -13,7 +13,7 @@ import { parseTime, timeline, timeText } from "../src/editor/timeline.ts";
 import { walkthroughCommands } from "../src/editor/testplay.ts";
 import { fileBytes, sizeText } from "../src/pictures.ts";
 import { readDescription, wordsHere } from "../src/editor/describe-words.ts";
-import { typos } from "../src/editor/spelling.ts";
+import { typos, useDictionary } from "../src/editor/spelling.ts";
 import { talkLayout } from "../src/editor/talk-graph.ts";
 import { readTalk, writeMap } from "../src/editor/layout.ts";
 import { forChat, fromChat, instructions } from "../src/editor/ai.ts";
@@ -245,6 +245,29 @@ objects:
   // The game's own names are always allowed, and code isn't prose.
   assert.deepEqual(typos(game.replace("lantren", "lanterns")), []);
   assert.deepEqual(typos(`${game.replace("lantren", "lantern")}  wick: { name: lantrn, in: hall, on: { take: 'say("lantren")' } }\n`), []);
+}
+
+// With the dictionary: typos used more than once, and no false alarms for real words.
+{
+  const { readFileSync } = await import("node:fs");
+  useDictionary(readFileSync(new URL("../public/words.txt", import.meta.url), "utf8").split("\n").filter(Boolean));
+  const game = `format: eifgb/0.1
+game: { id: t, title: T, version: '1', start: hall }
+rooms:
+  hall: { name: Hall, description: "The wizzard's tower is cold. A beer stands by the bear. The wizzard sleeps by the hearht. Elsbeth's lanterns glow." }
+objects:
+  lantern: { name: lantern, in: hall }
+characters:
+  elsbeth: { name: Elsbeth, in: hall, description: "The keeper of Zorkmid Hall." }
+`;
+  assert.deepEqual(
+    typos(game).map((t) => [t.word, t.like, t.times ?? 1]),
+    [
+      ["wizzard", "wizard", 2],
+      ["hearht", "hearth", 1],
+    ],
+  );
+  useDictionary(null);
 }
 
 // ------------------------------------------------- conversations as a graph

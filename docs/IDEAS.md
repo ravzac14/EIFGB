@@ -78,12 +78,6 @@ swaps for fakes, and playing dead. Still to do:
 - **Games in more than one language:** a game's own text in a second
   language, chosen by the player.
 
-## The editor
-
-- **A dictionary for spelling:** the typo check compares the game with
-  itself; a bundled English word list would catch typos it uses more than
-  once, too.
-
 ## AI assistants
 
 - **Checking from inside the chat:** a small MCP server (or a skill) for
@@ -95,8 +89,6 @@ swaps for fakes, and playing dead. Still to do:
 
 - **Notes on screen:** the player's NOTEs in a panel beside the story,
   read-only.
-- **Tab completes a word:** while typing, Tab finishes a word the game
-  knows (a name here, a verb). Still typed; nothing is clicked.
 - **The story as a book:** download the transcript as a tidy web page or
   ebook, with bookmarks as chapters.
 - **Sound:** a quiet sound for a room or a timer (`sound_file:`), off

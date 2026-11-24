@@ -212,6 +212,22 @@ impl<H: ScriptHost> Game<H> {
         }
     }
 
+    /// Words that finish the last word of `line`, for Tab: see
+    /// [`Grammar::completions`]. A word starts a command at the beginning,
+    /// or after THEN, a full stop or a comma.
+    pub fn completions(&self, line: &str) -> Vec<String> {
+        if line.ends_with(char::is_whitespace) {
+            return vec![];
+        }
+        let words: Vec<&str> = line.split_whitespace().collect();
+        let Some((last, before)) = words.split_last() else { return vec![] };
+        let (last, starts) = match last.rsplit_once(['.', ',']) {
+            Some((_, l)) => (l, true),
+            None => (*last, before.last().is_none_or(|w| w.eq_ignore_ascii_case("then") || w.ends_with(['.', ',']))),
+        };
+        self.grammar.completions(&self.world, starts, last)
+    }
+
     pub fn world(&self) -> &World {
         &self.world
     }

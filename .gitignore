@@ -11,3 +11,5 @@
 /web/public/sitemap.xml
 /web/node_modules/
 /web/dist/
+/web/public/words.txt
+/web/public/words-copyright.txt

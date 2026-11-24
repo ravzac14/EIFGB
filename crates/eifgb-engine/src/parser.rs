@@ -17,7 +17,7 @@
 
 use crate::lang::{self, Lang};
 use crate::world::World;
-use eifgb_ir::{BuiltinAction, Direction, EntityId, PatternToken, Slot, Story, Trait, VerbAction, PLAYER};
+use eifgb_ir::{BuiltinAction, Direction, EntityId, PatternToken, Slot, Story, Trait, VerbAction, VerbOrigin, PLAYER};
 use std::collections::{HashMap, HashSet};
 
 /// A fully resolved command.
@@ -1214,6 +1214,74 @@ impl Grammar {
             }
         }
         keys.iter().filter_map(|k| first_word(k)).take(6).map(|w| w.to_uppercase()).collect()
+    }
+
+    /// Words that finish `partial`, for Tab in the player: at the start of a
+    /// command its first words (the game's own verbs only once something
+    /// here handles them, so a magic word isn't given away), then the names
+    /// of what the player can see or carry, places they've been, directions
+    /// and the little words in commands ("with", "to"). Nothing hidden.
+    pub fn completions(&self, world: &World, first: bool, partial: &str) -> Vec<String> {
+        let partial = partial.to_lowercase();
+        if partial.is_empty() {
+            return vec![];
+        }
+        let story = world.story();
+        let handled: Vec<&str> = world.scope().into_iter().flat_map(|id| world.def(id).handlers.iter().map(|h| h.event.as_str())).collect();
+        let verbs = story.verbs.iter().filter(|v| v.origin == VerbOrigin::Stdlib || handled.iter().any(|h| h.trim_start_matches("before_").trim_start_matches("after_") == v.key));
+        let mut words: Vec<String> = Vec::new();
+        let add = |words: &mut Vec<String>, w: &str| {
+            if w.len() > partial.len() && w.starts_with(&partial) && w.chars().all(|c| c.is_alphabetic() || c == '-' || c == '\'') && !words.iter().any(|x| x == w) {
+                words.push(w.to_string());
+            }
+        };
+        if first {
+            for v in verbs {
+                for p in &v.patterns {
+                    if let Some(PatternToken::Word(w)) = p.0.first() {
+                        add(&mut words, w);
+                    }
+                }
+            }
+            for d in self.directions.keys() {
+                add(&mut words, d);
+            }
+            words.sort();
+            return words;
+        }
+        // Names first: what's here and carried, then places been.
+        for id in world.scope().into_iter().filter(|&id| id != PLAYER) {
+            let v = &world.def(id).vocab;
+            for w in v.adjectives.iter().chain(&v.nouns) {
+                add(&mut words, w);
+            }
+        }
+        for &r in &world.state.visited {
+            for w in world.def(r).name.to_lowercase().split_whitespace() {
+                add(&mut words, w);
+            }
+        }
+        let names = words.len();
+        for d in self.directions.keys() {
+            add(&mut words, d);
+        }
+        // The little words in commands (WITH, INTO), not the rest of a
+        // pattern, which could name something the player hasn't seen.
+        let stop = &story.lexicon.stopwords;
+        for v in verbs {
+            for p in &v.patterns {
+                for t in p.0.iter().skip(1) {
+                    if let PatternToken::Word(w) = t
+                        && stop.contains(w)
+                    {
+                        add(&mut words, w);
+                    }
+                }
+            }
+        }
+        words[..names].sort();
+        words[names..].sort();
+        words
     }
 
     /// The display word for a direction: its own name if the lexicon has

@@ -1,6 +1,7 @@
 // The player: loads a game (bundled, or one you loaded), plays it, keeps an
 // autosave, and manages save slots and save files.
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
+import "./tab.js";
 import { figure, pictureSrc } from "./pictures.ts";
 import { bookmarksFor, endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type Bookmark, type SaveFile, type Slot } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
@@ -584,6 +585,8 @@ form.addEventListener("submit", (e) => {
   }
   send(text);
 });
+// Tab finishes a word, from what the player can see (see tab.js).
+(globalThis as unknown as { eifgbTab: (input: HTMLInputElement, complete: (line: string) => string[]) => void }).eifgbTab(line, (text) => (engine ? engine.complete(text) : []));
 line.addEventListener("keydown", (e) => {
   if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
   e.preventDefault();

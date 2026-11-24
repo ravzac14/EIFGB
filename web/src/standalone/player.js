@@ -145,6 +145,10 @@
     handle(o);
     reveal(echo);
   });
+  // Tab finishes a word (see ../tab.js, inlined before this script).
+  window.eifgbTab(line, function (text) {
+    return engine ? engine.complete(text) : [];
+  });
   line.addEventListener("keydown", function (e) {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
     e.preventDefault();
@@ -185,6 +189,9 @@
         },
         restore: function (save) {
           return call("eifgb_restore", ["string"], [save]);
+        },
+        complete: function (text) {
+          return call("eifgb_complete", ["string"], [text]);
         },
       };
       if (start(false)) {

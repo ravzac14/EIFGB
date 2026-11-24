@@ -23,7 +23,7 @@ import { describeChange, when } from "./history.ts";
 import { findInGame, MAX_FOUND } from "./find.ts";
 import { mapProblems, tidy, wayKey, type MapProblem, type Way } from "./tidy.ts";
 import { draftHints } from "./hint-drafts.ts";
-import { typos } from "./spelling.ts";
+import { hasDictionary, loadDictionary, typos } from "./spelling.ts";
 import { copyText, forChat, fromChat, instructions } from "./ai.ts";
 import { timeline, timeText } from "./timeline.ts";
 
@@ -821,11 +821,13 @@ $("inspector").addEventListener("focusout", (e) => {
 
 /** Possible typos, under the problems: not counted as problems, only worth a look. */
 function typoList(): HTMLElement | "" {
+  // The dictionary, fetched the first time; the list again once it's here.
+  if (!hasDictionary()) void loadDictionary().then((ok) => ok && showProblems());
   const found = typos(model?.toString() ?? project.files["game.yaml"] ?? "");
   if (!found.length) return "";
   const ul = el("ul", { className: "problems typos" });
   for (const t of found) {
-    const li = el("li", { title: "Show it" }, el("span", { className: "sev", textContent: "Typo?" }), `“${t.word}”, perhaps “${t.like}”`, el("code", { textContent: ` ${t.path}` }));
+    const li = el("li", { title: "Show it" }, el("span", { className: "sev", textContent: "Typo?" }), `“${t.word}”${t.times ? ` (${t.times} times)` : ""}, perhaps “${t.like}”`, el("code", { textContent: ` ${t.path}` }));
     li.addEventListener("click", () => goTo(t.path));
     ul.append(li);
   }
@@ -833,7 +835,12 @@ function typoList(): HTMLElement | "" {
     "details",
     { className: "typos-box" },
     el("summary", { textContent: `Possible typos (${found.length})` }),
-    el("p", { className: "dim", textContent: "Words used once that are one letter off a word the game uses elsewhere, or one of its names. Only a guess: the game's own words are always allowed. Text boxes are spell checked by the browser too." }),
+    el("p", {
+      className: "dim",
+      textContent: hasDictionary()
+        ? "Words that aren't in the dictionary or the game's names, one letter off a word that is. Only a guess: the game's own words are always allowed. Text boxes are spell checked by the browser too."
+        : "Words used once that are one letter off a word the game uses elsewhere, or one of its names. Only a guess: the game's own words are always allowed. Text boxes are spell checked by the browser too.",
+    }),
     ul,
   );
 }

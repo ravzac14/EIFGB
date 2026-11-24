@@ -9,7 +9,7 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
-## Unreleased
+## 2026-11-24
 
 - More for creative players:
   - Throwing something distracts whoever's watching.
@@ -33,8 +33,6 @@ if you like ("## 2026-11-24: editor tools"). -->
   a sentence at a time.
 - The engine the browser downloads is about 30% smaller (3.0 MB to 2.15
   MB), for every game played on the site and every game saved as a page.
-
-## 2026-11-24
 
 - The editor's typo check has a dictionary: a word list kept with the
   site (fetched once; nothing is sent anywhere), so a typo is caught however

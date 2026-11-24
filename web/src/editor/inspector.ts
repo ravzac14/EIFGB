@@ -79,6 +79,7 @@ function withWords(ctx: InspectorContext, owner: { room: string } | { thing: str
   return input ? [...parts, el("div", { class: "vary-link" }, vary, " ", readAloud(() => input.value)), describeWords(ctx, owner, input)] : parts;
 }
 import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
+import { characterTricks, characterWants, moodNames, moodsSection, startsAs, thingEarlierTricks, thingTricks } from "./cunning-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, proseField, roomName, select, type InspectorContext } from "./ui.ts";
@@ -222,6 +223,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
       (v) => ctx.change((x) => x.set(["game", "start"], v)),
       "Starting room",
     ),
+    ...startsAs(ctx),
     ...lookFields(ctx),
     check("List each room's exits after its description", m.bool(["settings", "list_exits"], true), (v) =>
       ctx.change((x) => {
@@ -242,6 +244,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
     help("Groups of characters that fight together, and who they attack on sight."),
     sidesList(ctx),
     addSideRow(ctx),
+    ...moodsSection(ctx, []),
   );
   storySections(panel, ctx);
   scriptsSection(panel, ctx, [], "game");
@@ -357,6 +360,7 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ),
     colourPicker(ctx, id),
     ...roomBehaviour(ctx, id),
+    ...(moodNames(m).length ? moodsSection(ctx, ["rooms", id]) : []),
     ...triesSection(m, id),
     ...pictureSection(ctx, ["rooms", id], "room"),
   );
@@ -794,6 +798,9 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   panel.append(...thingBehaviour(ctx, id, t.traits));
   if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
+  panel.append(...boolField(ctx, ["objects", id, "far"], "Far off, out of reach", false, "Over a ravine, out on the ice: the player can see it, but needs something that reaches (a pole, a hook) to touch it."));
+  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits));
+  if (moodNames(m).length) panel.append(...moodsSection(ctx, ["objects", id]));
 
   // Hidden until found.
   panel.append(...pictureSection(ctx, ["objects", id], "thing"));
@@ -1129,6 +1136,8 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // What they carry.
   panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
+  panel.append(...characterWants(ctx, id), ...characterTricks(ctx, id));
+  if (moodNames(m).length) panel.append(...moodsSection(ctx, p));
   panel.append(...pictureSection(ctx, p, "character"));
 
   scriptsSection(panel, ctx, p, "character");

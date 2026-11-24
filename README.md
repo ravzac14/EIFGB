@@ -611,6 +611,15 @@ A few more tools in the editor:
   TO BAKER), split into what the game answers with something of its own
   (a script, a smell, a description) and what gets only the usual reply.
   A lever that does nothing when pulled is worth a second look.
+- **The tricks, in the panels:** a thing's panel has Far off, and a
+  Tricks section (reaches, a mirror, what it comes apart into, a mood it
+  brings on when eaten or drunk, what it combines with and makes, leaves
+  a mark, a fake of something, puts out fires, a trap, a disguise, bait);
+  a character's has what they watch and what wins them over (gifts they
+  like, taming, a bribe), Playing as them, Voices and friends, and What
+  they remember. Moods are named in the
+  game's panel, and then each room, thing and person can say how it reads
+  in each one.
 - **Possible typos**, under Problems: words that aren't in the dictionary
   or the game's names, a letter off a word that is ("lantren", perhaps
   "lantern"), however often they're used. The dictionary is a word list

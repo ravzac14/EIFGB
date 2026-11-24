@@ -566,7 +566,7 @@ export class Model {
    * room, rules ("search mat"), and Lua code anywhere in the file.
    */
   private renameEntityRefs(old: string, next: string) {
-    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in"]);
+    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in", "splits_into", "parts", "answers_to", "friends", "plays", "with", "makes", "keep", "decoy_for", "watches"]);
     const RULES = new Set(["revealed_by", "started_by", "stopped_by"]);
     const code = renameInCode("entity", old, next);
     const rule = (s: string) => s.replace(new RegExp(`^(\\s*(?:\\([^)]*\\)|[\\w-]+)\\s+)${esc(old)}(\\s*)$`), `$1${next}$2`);
@@ -646,7 +646,36 @@ export class Model {
     const where = this.thing(id)?.in ?? null;
     for (const t of this.contents(id)) this.set(["objects", t.id, "in"], where ?? undefined);
     this.retarget(id, null);
+    this.forget(id);
     this.doc.deleteIn(["objects", id]);
+  }
+
+  /** Takes an ID out of the lists that name it: parts, voices, friends, who the player plays. */
+  private forget(id: string) {
+    for (const s of ["objects", "characters"]) {
+      for (const o of this.keys(s)) {
+        if (str(this.get([s, o, "decoy_for"])) === id) this.set([s, o, "decoy_for"], undefined);
+        // A combination with it, or making it, goes.
+        const c = this.doc.getIn([s, o, "combines"], true);
+        const gone = (n: unknown) => isMap(n) && [n.get("with"), n.get("makes")].includes(id);
+        if (gone(c)) this.set([s, o, "combines"], undefined);
+        else if (isSeq(c)) {
+          c.items = c.items.filter((n) => !gone(n));
+          if (!c.items.length) this.set([s, o, "combines"], undefined);
+        }
+        for (const path of [[s, o, "splits_into"], [s, o, "splits_into", "parts"], [s, o, "answers_to"], [s, o, "friends"], [s, o, "watches"], [s, o, "likes"], [s, o, "tame_with"]]) {
+          const v = this.doc.getIn(path, true);
+          if (!isSeq(v)) continue;
+          const left = this.list(path).filter((x) => x !== id);
+          if (path[3] === "parts" && !left.length) this.set([s, o, "splits_into"], undefined);
+          else this.setList(path, left);
+        }
+      }
+    }
+    if (this.get(["player", "plays"]) === id) {
+      const next = this.characterIds().find((c) => c !== id && this.bool(["characters", c, "playable"], false));
+      this.set(["player", "plays"], next);
+    }
   }
 
   // ------------------------------------------------------ characters
@@ -735,6 +764,7 @@ export class Model {
   deleteCharacter(id: string) {
     const room = this.character(id)?.in ?? null;
     for (const o of this.objectIds()) if (str(this.get(["objects", o, "in"])) === id) this.set(["objects", o, "in"], room ?? undefined);
+    this.forget(id);
     this.doc.deleteIn(["characters", id]);
   }
 

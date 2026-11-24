@@ -9,7 +9,7 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
-## Unreleased
+## 2026-11-24
 
 - The tricks can all be set in the editor's details panels now, without
   writing them in the game file: moods (named in the game's panel, then
@@ -17,8 +17,6 @@ if you like ("## 2026-11-24: editor tools"). -->
   mirrors, coming apart, voices, friends, memories, the characters the
   player can play as, and the earlier ones: combining, marks, fakes,
   watched things, traps, disguises, bait, gifts, taming and bribes.
-
-## 2026-11-24
 
 - More for creative players:
   - Throwing something distracts whoever's watching.

@@ -9,7 +9,7 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
-## Unreleased
+## 2026-11-24
 
 - The editor's typo check has a dictionary: a word list kept with the
   site (fetched once; nothing is sent anywhere), so a typo is caught however
@@ -17,8 +17,6 @@ if you like ("## 2026-11-24: editor tools"). -->
 - Tab finishes a word in the player, from what the player can see: with
   several matches, Tab goes through them (Shift+Tab back, Esc to undo). It
   works in downloaded games too.
-
-## 2026-11-24
 
 - New things for creative players:
   - Making things: `combines:` turns two things into a third, by TIE,

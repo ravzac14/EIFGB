@@ -31,7 +31,7 @@ impl World {
     /// `who` left `room` going `direction`: its prints are left there,
     /// replacing any older ones of its own.
     pub fn leave_tracks(&mut self, who: EntityId, room: EntityId, direction: Direction) {
-        if self.story().meta.settings.track_life == 0 || !self.def(room).leaves_tracks || !self.def(who).leaves_tracks {
+        if self.story().meta.settings.track_life == 0 || !self.def(room).leaves_tracks || !self.def(who).leaves_tracks || self.is_crowded(room) {
             return;
         }
         let key = Value::Str(self.def(who).key.clone());

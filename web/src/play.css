@@ -119,3 +119,7 @@ figure.picture p { margin: 0; }
 .bookmarks-dialog .passage { margin: 0.5rem 0 0; padding: 0.4rem 0.8rem; border-left: 3px solid var(--line); font-family: var(--serif); max-height: 40vh; overflow: auto; }
 .bookmarks-dialog .passage p { margin: 0.3rem 0; }
 .bookmarks-dialog .passage .cmd { font-style: italic; color: var(--dim); }
+
+/* Following a thread: the turns that don't mention it are hidden. */
+.log.threading .thread-out { display: none; }
+.thread-bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.4rem 0.6rem; margin-bottom: 0.75rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }

@@ -164,6 +164,11 @@ Everything is kept in the browser's local storage (`src/store.ts`):
   if it's still on the page); *Go back to this moment* restores it, like a
   save. They're kept per game (`bookmarks:<game>`), and aren't game
   actions: nothing in the story is clicked.
+- **Threads:** *Threads* lists the characters and things the player has
+  met (`engine.met()`); choosing one hides the turns that don't mention
+  it (its name or nouns, as whole words), so the story can be read
+  following the baker. New turns are followed too, until *Show
+  everything*. A way of reading the page, not a game action.
 
 ## The engine API (`src/engine.ts`)
 

@@ -82,6 +82,9 @@ import { roomBehaviour, thingBehaviour } from "./world-ui.ts";
 import { characterTricks, characterWants, moodNames, moodsSection, startsAs, thingEarlierTricks, thingTricks } from "./cunning-ui.ts";
 import { characterKnowing, factsSection, roomKnowing, thingKnowing } from "./knowing-ui.ts";
 import { breathField, characterElements, roomElements, thingElements } from "./elements-ui.ts";
+import { characterHandiwork, exitRope, playerHandiwork, roomHandiwork, thingHandiwork } from "./handiwork-ui.ts";
+import { characterJourneys, exitBy, roomJourneys, thingJourneys } from "./journeys-ui.ts";
+import { likeSection } from "./kinds-ui.ts";
 import { COLOURS, colourStyle } from "./layout.ts";
 import { choicePanel, endingPanel, goalPanel, hintPanel, scriptsSection, storySections, timerPanel, verbPanel } from "./story.ts";
 import { boolField, button, cap, check, el, field, help, idFollows, numField, proseField, roomName, select, type InspectorContext } from "./ui.ts";
@@ -249,6 +252,7 @@ function gamePanel(panel: HTMLElement, ctx: InspectorContext) {
     ...moodsSection(ctx, []),
     ...factsSection(ctx),
     ...breathField(ctx),
+    ...playerHandiwork(ctx),
   );
   storySections(panel, ctx);
   scriptsSection(panel, ctx, [], "game");
@@ -366,6 +370,9 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
     ...roomBehaviour(ctx, id),
     ...roomKnowing(ctx, id),
     ...roomElements(ctx, id),
+    ...roomHandiwork(ctx, id),
+    ...roomJourneys(ctx, id),
+    ...likeSection(ctx, "rooms", id),
     ...(moodNames(m).length ? moodsSection(ctx, ["rooms", id]) : []),
     ...triesSection(m, id),
     ...pictureSection(ctx, ["rooms", id], "room"),
@@ -490,6 +497,8 @@ function exitPanel(panel: HTMLElement, ctx: InspectorContext, room: string, dir:
   } else if (!via.length) {
     panel.append(help(`Add an object to ${from} (stairs, a path…) to choose it here.`));
   }
+
+  panel.append(...exitRope(ctx, room, dir, e.rope ?? false), ...exitBy(ctx, room, dir, e.by ?? []));
 
   // Only open at certain times.
   panel.append(el("h3", { textContent: "When it's open" }));
@@ -738,8 +747,14 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   const m = ctx.model;
   const t = m.thing(id)!;
   const has = (x: string) => t.traits.includes(x);
+  const own = m.ownTraits(["objects", id]);
   const trait = (label: string, name: string, helpText?: string) => {
     const c = check(label, has(name), (v) => ctx.change((x) => x.setTrait(id, name, v)));
+    // Given by its kind: changed there, not here.
+    if (has(name) && !own.includes(name)) {
+      c.querySelector("input")?.setAttribute("disabled", "");
+      c.title = "From its kind";
+    }
     return helpText ? [c, help(helpText)] : [c];
   };
   const state = (label: string, key: string, on: boolean) => check(label, on, (v) => ctx.change((x) => x.setState(id, key, v)));
@@ -826,7 +841,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
   panel.append(...boolField(ctx, ["objects", id, "far"], "Far off, out of reach", false, "Over a ravine, out on the ice: the player can see it, but needs something that reaches (a pole, a hook) to touch it."));
-  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits), ...thingKnowing(ctx, id), ...thingElements(ctx, id, t.traits));
+  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits), ...thingKnowing(ctx, id), ...thingElements(ctx, id, t.traits), ...thingHandiwork(ctx, id, t.traits), ...thingJourneys(ctx, id, t.traits), ...likeSection(ctx, "objects", id));
   if (moodNames(m).length) panel.append(...moodsSection(ctx, ["objects", id]));
 
   // Hidden until found.
@@ -1163,7 +1178,7 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // What they carry.
   panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
-  panel.append(...characterWants(ctx, id), ...characterKnowing(ctx, id), ...characterElements(ctx, id), ...characterTricks(ctx, id));
+  panel.append(...characterWants(ctx, id), ...characterKnowing(ctx, id), ...characterElements(ctx, id), ...characterHandiwork(ctx, id), ...characterJourneys(ctx, id), ...characterTricks(ctx, id), ...likeSection(ctx, "characters", id));
   if (moodNames(m).length) panel.append(...moodsSection(ctx, p));
   panel.append(...pictureSection(ctx, p, "character"));
 

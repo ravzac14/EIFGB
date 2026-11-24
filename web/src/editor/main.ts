@@ -25,6 +25,7 @@ import { mapProblems, tidy, wayKey, type MapProblem, type Way } from "./tidy.ts"
 import { draftHints } from "./hint-drafts.ts";
 import { hasDictionary, loadDictionary, typos } from "./spelling.ts";
 import { voices } from "./voices.ts";
+import { HARD, LONG, prose } from "./prose.ts";
 import { copyText, forChat, fromChat, instructions } from "./ai.ts";
 import { timeline, timeText } from "./timeline.ts";
 
@@ -881,6 +882,35 @@ function voiceList(): HTMLElement | "" {
   );
 }
 
+/** The descriptions read together: words leaned on, long ones, hard ones, rooms that begin alike. */
+function proseList(): HTMLElement | "" {
+  const r = prose(model?.toString() ?? project.files["game.yaml"] ?? "");
+  if (r.passages.length < 3) return "";
+  const go = (kind: "room" | "thing" | "character", id: string, name: string) => {
+    const b = el("button", { type: "button", className: "link", textContent: name });
+    b.addEventListener("click", () => select({ kind, id }));
+    return b;
+  };
+  const list = (items: { kind: "room" | "thing" | "character"; id: string; name: string }[]) => {
+    const out: (Node | string)[] = [];
+    items.forEach((x, i) => out.push(...(i ? [", "] : []), go(x.kind, x.id, x.name)));
+    return out;
+  };
+  const rows: HTMLElement[] = [
+    ...r.overused.map((o) => el("li", {}, el("strong", { textContent: `“${o.word}”` }), ` ${o.times} times, in `, ...list(o.where))),
+    ...r.openings.map((o) => el("li", {}, `${o.rooms.length} rooms begin “${o.start}…”: `, ...list(o.rooms.map((x) => ({ kind: "room" as const, ...x }))))),
+    ...r.long.map((p) => el("li", {}, go(p.kind, p.id, p.name), ` runs to ${p.words} words.`)),
+    ...r.hard.map((p) => el("li", {}, go(p.kind, p.id, p.name), ` is hard going (grade ${p.grade}): long sentences, long words.`)),
+  ];
+  return el(
+    "details",
+    { className: "typos-box prose-box" },
+    el("summary", { textContent: `How the descriptions read${rows.length ? `: ${rows.length} to look at` : ""}` }),
+    el("p", { className: "dim", textContent: `${r.passages.length} descriptions, ${r.passages.reduce((n, p) => n + p.words, 0)} words, reading at about grade ${r.grade}. Pointed out: words used in description after description, ones longer than ${LONG} words, ones at grade ${HARD} or harder, and rooms that all begin the same way. Only pointers: read them and decide.` }),
+    ...(rows.length ? [el("ul", { className: "prose" }, ...rows)] : [el("p", { className: "dim", textContent: "Nothing stands out." })]),
+  );
+}
+
 function showProblems() {
   const panel = $("panel-problems");
   const errors = problems.filter((p) => p.severity === "error").length;
@@ -894,7 +924,7 @@ function showProblems() {
   forAi.title = "The problems and how the walkthrough went, as a message for the AI assistant writing your game";
   const aiRow = el("div", { className: "problems-bar" }, forAi);
   if (!problems.length) {
-    panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }), typoList(), voiceList());
+    panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }), typoList(), voiceList(), proseList());
     return;
   }
   const ul = el("ul", { className: "problems" });
@@ -912,6 +942,7 @@ function showProblems() {
     ul,
     typoList(),
     voiceList(),
+    proseList(),
   );
 }
 

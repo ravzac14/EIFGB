@@ -125,6 +125,25 @@ export interface DeadEnd {
 }
 
 /** What the wanderer found: see crates/eifgb-engine/src/testing.rs. */
+export interface Met {
+  id: string;
+  name: string;
+  kind: "character" | "thing";
+  /** Other words for it: its nouns. */
+  words: string[];
+}
+
+export interface Beat {
+  command: string;
+  room: string;
+  rooms: string[];
+  things: string[];
+  score: number;
+  learned: string[];
+  goals: string[];
+  ending?: string;
+}
+
 export interface Wandered {
   error?: string;
   moves: number;
@@ -150,6 +169,8 @@ export interface Engine {
   wander(files: Files, seed: number, moves: number, entry?: string): Wandered;
   /** Dead ends along a walkthrough: things it needs, lost for good. */
   deadEnds(files: Files, walkthrough: string, entry?: string): DeadEnd[] | { error: string };
+  /** What each step of the walkthrough brings: new rooms, things, points, facts, goals. */
+  pacing(files: Files, walkthrough: string, entry?: string): Beat[] | { error: string };
   /** One line of input. */
   input(line: string): Output;
   /** The whole game state, as a string. */
@@ -158,6 +179,8 @@ export interface Engine {
   restore(save: string): Output;
   /** The rooms visited so far and the ways out of them. */
   map(): PlayerMap;
+  /** The characters and things the player has met, characters first. */
+  met(): Met[] | { error: string };
   /** Words that finish the last word of `line`, from what the player can see now (Tab). */
   complete(line: string): string[];
 }
@@ -185,8 +208,10 @@ export async function loadEngine(base: string | URL): Promise<Engine> {
     save: () => call("eifgb_save", [], []),
     restore: (save) => call("eifgb_restore", ["string"], [save]),
     map: () => call("eifgb_map", [], []),
+    met: () => call("eifgb_met", [], []),
     complete: (line) => call("eifgb_complete", ["string"], [line]),
     wander: (files, seed, moves, entry = "game.yaml") => call("eifgb_wander", ["string", "string", "number", "number"], [JSON.stringify(files), entry, seed, moves]),
     deadEnds: (files, walkthrough, entry = "game.yaml") => call("eifgb_dead_ends", ["string", "string", "string"], [JSON.stringify(files), entry, walkthrough]),
+    pacing: (files, walkthrough, entry = "game.yaml") => call("eifgb_pacing", ["string", "string", "string"], [JSON.stringify(files), entry, walkthrough]),
   };
 }

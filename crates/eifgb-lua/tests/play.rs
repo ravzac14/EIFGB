@@ -4270,7 +4270,7 @@ fn talking_and_everyday_verbs() {
         ("sing", "You hum"),
         ("cut tree", "Cutting that won't help."),
         ("dig", "too hard to dig"),
-        ("knock on the tree", "Nobody answers."),
+        ("knock on the tree", "sounds solid enough."),
         ("wave at the tree", "You wave."),
         ("point at the tree", "You point."),
         ("tie tree to fountain", "You can't see how to tie that."),
@@ -4599,8 +4599,6 @@ objects:
   safe: { name: safe, in: shed, traits: [container, openable, lockable, scenery], state: { locked: true }, code: 4512 }
   gold: { name: gold bar, in: safe, traits: [portable] }
   note: { name: note, in: shed, traits: [portable], description: A scrap of paper with writing on it., text: '\"The code is 4512.\"' }
-verbs:
-  tie: { patterns: [\"tie {target} to {tool}\"], default: \"You tie it.\" }
 ";
 const COMPANIONS: &str = "format: eifgb/0.1
 game: { id: f, title: F, version: '1', start: camp }
@@ -4660,7 +4658,8 @@ fn liquids_fill_pour_drink_and_douse() {
 fn things_wear_out() {
     let mut g = world_game();
     say(&mut g, "take rope");
-    assert_eq!(say(&mut g, "tie rope to tree"), "You tie the rope to the tree, then untie it.");
+    assert_eq!(say(&mut g, "tie rope to tree"), "You tie the rope to the tree, then untie it.\nThe old rope won't last much longer.");
+    assert_eq!(say(&mut g, "x rope"), "It's nearly worn through.");
     assert_eq!(say(&mut g, "tie rope to tree"), "You tie the rope to the tree, then untie it.\nThe rope frays and snaps.");
     assert!(!say(&mut g, "i").contains("rope"), "snapped");
 }
@@ -5913,4 +5912,262 @@ endings:
     assert!(found.iter().any(|d| d.command == "eat cake" && d.lost == ["cake"] && d.needed_by == "give cake to troll" && d.after == 0), "{found:#?}");
     // Eating the bun doesn't matter: the walkthrough doesn't need it.
     assert!(!found.iter().any(|d| d.lost.contains(&"bun".to_string())), "{found:#?}");
+}
+
+const HANDIWORK: &str = r#"format: eifgb/0.1
+game: { id: h, title: H, version: '1', start: cliff }
+player: { hands: 2, warmth: 4 }
+rooms:
+  cliff: { name: Cliff Top, exits: { down: { to: ledge, rope: true }, east: hut } }
+  ledge: { name: Ledge, cold: true, exits: { up: { to: cliff, rope: true } } }
+  hut:
+    name: Hut
+    exits: { west: cliff, north: { to: cellar, through: trapdoor }, east: vault }
+  cellar: { name: Cellar, exits: { south: { to: hut, through: trapdoor } } }
+  vault: { name: Vault, exits: { west: hut } }
+objects:
+  rope: { name: rope, in: cliff, traits: [portable], rope: true }
+  post: { name: post, in: cliff, traits: [scenery], anchor: true }
+  trapdoor: { name: oak door, traits: [door, openable, lockable], state: { locked: true }, unlocks_with: key }
+  key: { name: iron key, in: baker, traits: [portable], uses: 2, breaks_into: broken_key }
+  broken_key: { name: broken key, traits: [portable] }
+  glue: { name: pot of glue, synonyms: [glue], in: hut, traits: [portable], mends: true }
+  panel: { name: loose panel, in: hut, traits: [portable], hollow: true, state: { hidden: true } }
+  safe: { name: safe, in: vault, traits: [container, openable, lockable, scenery], state: { locked: true }, code: 471, tries: 3, feedback: true }
+  bread: { name: loaf of bread, synonyms: [bread], in: hut, traits: [portable, edible], spoils: 9 }
+  plank: { name: plank, in: hut, traits: [portable], size: 2 }
+  chest: { name: chest, in: hut, traits: [portable, container], two_handed: true }
+  coat: { name: coat, in: hut, traits: [portable, wearable], warm: true }
+  soup: { name: bowl of soup, synonyms: [soup], in: ledge, traits: [portable, edible], warm: true }
+characters:
+  baker: { name: baker, in: cellar }
+  guard: { name: guard, in: hut, password: { word: swordfish, bars: east } }
+  sentry: { name: sentry, in: vault, state: { asleep: true } }
+"#;
+
+fn handiwork(from: &str, to: &str) -> Game<LuaHost> {
+    let out = compile_str(&HANDIWORK.replace(from, to));
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+/// A rope tied to a post, to climb down by; tying up a sleeper; the cold,
+/// and soup against it.
+#[test]
+fn ropes_and_the_cold() {
+    let mut g = handiwork("", "");
+    assert_eq!(say(&mut g, "d"), "It's a sheer drop. You'd need a rope.");
+    say(&mut g, "take rope");
+    assert_eq!(say(&mut g, "tie rope"), "What do you want to tie the rope to?");
+    assert_eq!(say(&mut g, "tie rope to post"), "You tie the rope firmly to the post, and drop the other end over the edge.");
+    assert_says(&mut g, "look", "a rope (tied to the post)");
+    assert_eq!(say(&mut g, "take rope"), "The rope is tied to the post. You'd have to untie it first.");
+    assert_says(&mut g, "d", "It's bitterly cold. The chill starts to seep into you.");
+    assert_says(&mut g, "look", "You're shivering hard.");
+    assert_eq!(say(&mut g, "eat soup"), "You eat the bowl of soup.\nWarmth spreads right through you.");
+    say(&mut g, "wait");
+    say(&mut g, "wait");
+    let out = g.input("wait");
+    assert!(out.text().contains("You sink down into the numbness"), "{}", out.text());
+    assert_eq!(out.ending.as_deref(), Some("froze"));
+    // Up again, and the rope back.
+    let mut g = handiwork("", "");
+    for c in ["take rope", "tie rope to post", "d"] {
+        say(&mut g, c);
+    }
+    assert_eq!(say(&mut g, "untie rope"), "You can't reach the knot from here.");
+    assert_says(&mut g, "climb rope", "Cliff Top");
+    assert_eq!(say(&mut g, "untie rope"), "You untie the rope from the post.");
+    assert_eq!(say(&mut g, "d"), "It's a sheer drop. You'd need a rope.");
+    // A sleeper tied up does nothing more.
+    for c in ["e", "say swordfish", "sneak east"] {
+        say(&mut g, c);
+    }
+    assert_eq!(say(&mut g, "tie up sentry"), "Gently, so as not to wake them, you tie the sentry up with the rope.");
+    assert_says(&mut g, "look", "a sentry (asleep, tied up)");
+    assert_eq!(say(&mut g, "untie sentry"), "You untie the sentry, and take back the rope.");
+    // Someone awake won't stand for it.
+    say(&mut g, "w");
+    assert_eq!(say(&mut g, "tie up guard"), "The guard isn't going to stand still for that.");
+    // A coat keeps the cold out.
+    let mut g = handiwork("", "");
+    for c in ["take rope", "tie rope to post", "e", "take coat", "wear coat", "w", "d", "wait", "wait", "wait", "wait"] {
+        assert!(!say(&mut g, c).contains("cold"), "{c}");
+    }
+}
+
+/// Knocking, a password, a code with tries, mending, food going bad, and hands.
+#[test]
+fn knocking_codes_mending_and_hands() {
+    let mut g = handiwork("", "");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "knock on the walls"), "You knock along the walls, and one spot sounds hollow. You find a loose panel.");
+    assert_eq!(say(&mut g, "knock on the door"), "The door opens, and the baker looks out.");
+    assert_eq!(say(&mut g, "e"), "The guard steps in your way. \"Password?\"");
+    assert_eq!(say(&mut g, "say open sesame"), "\"That's not it,\" says the guard.");
+    assert_eq!(say(&mut g, "say swordfish"), "The guard nods, and stands aside.");
+    assert_says(&mut g, "e", "Vault");
+    assert_eq!(say(&mut g, "type 12"), "Nothing happens. It feels like it wants 3 of them.");
+    assert_eq!(say(&mut g, "dial four one seven"), "Nothing opens, but you hear clicks: 1 in the right place, and 2 more right but in the wrong place.\nOne more wrong try, and it'll jam.");
+    assert_eq!(say(&mut g, "type 9 9 9"), "The safe gives a shrill beep, and goes dead.");
+    assert_eq!(say(&mut g, "type 471"), "The safe is dead: it won't take any more tries.");
+    // Food goes bad.
+    say(&mut g, "w");
+    assert_eq!(say(&mut g, "eat bread"), "The loaf of bread has gone bad. You'd rather not.");
+    // Hands: a plank, then no room for a chest.
+    say(&mut g, "take plank");
+    assert_eq!(say(&mut g, "take chest"), "Your hands are full: you're holding the plank.");
+    say(&mut g, "take glue");
+    assert_eq!(say(&mut g, "i"), "You're carrying a pot of glue and a plank.\nIn your hands: the plank.");
+    // A key that breaks, mended.
+    let mut g = handiwork("in: baker, traits: [portable], uses: 2", "in: hut, traits: [portable], uses: 2");
+    for c in ["e", "take key", "take glue"] {
+        say(&mut g, c);
+    }
+    assert_eq!(say(&mut g, "unlock door with key"), "You unlock the oak door with the iron key.\nThe iron key won't last much longer.");
+    assert_eq!(say(&mut g, "lock door with key"), "You lock the oak door with the iron key.\nThe iron key breaks.");
+    let _ = say(&mut g, "i");
+    assert_says(&mut g, "i", "a broken key");
+    assert_eq!(say(&mut g, "mend broken key"), "You mend the broken key with the pot of glue: the iron key is whole again.");
+    assert_says(&mut g, "i", "an iron key");
+    // A locked door, and nobody with the key.
+    let mut g = handiwork("key: { name: iron key, in: baker", "key: { name: iron key, in: hut");
+    say(&mut g, "e");
+    assert_eq!(say(&mut g, "knock on the door"), "\"Who's there?\" calls the baker. \"I can't open it: I haven't got the key.\"");
+}
+
+const JOURNEYS: &str = r#"format: eifgb/0.1
+game: { id: j, title: J, version: '1', start: quay }
+clock: { start: "9:00", minutes_per_turn: 10 }
+rooms:
+  quay: { name: Quay, exits: { east: { to: river, by: boat }, west: market, north: { to: road, by: horse }, south: garden } }
+  river: { name: River Bend, exits: { west: { to: quay, by: boat } } }
+  road: { name: Long Road, exits: { south: { to: quay, by: horse }, north: inn } }
+  inn: { name: Inn, exits: { south: road }, on: { enter: 'end_game("home")' } }
+  market: { name: Market Square, crowd: "8:00-18:00", exits: { east: quay, north: lane } }
+  lane: { name: Mill Lane, exits: { south: market, north: mill } }
+  mill: { name: The Old Mill, exits: { south: lane } }
+  garden: { name: Garden, exits: { north: quay } }
+  garden_then: { name: "Garden, Long Ago", now: garden }
+objects:
+  boat: { name: rowing boat, synonyms: [boat], in: quay, traits: [container, enterable], vehicle: true }
+  paper: { name: sheet of paper, synonyms: [paper], in: quay, traits: [portable], blank: true }
+  pen: { name: pen, in: quay, traits: [portable], writes: true }
+  apple: { name: apple, in: quay, traits: [portable, edible] }
+  purse: { name: purse, in: trader, traits: [portable] }
+  locket: { name: locket, in: quay, traits: [portable], flashback: childhood }
+  ring_then: { name: little ring, synonyms: [ring], traits: [portable], now: ring }
+  ring: { name: old ring, synonyms: [ring], traits: [portable] }
+characters:
+  horse: { name: horse, in: quay, mount: true, stamina: 2, disposition: friendly, likes: [apple] }
+  guard: { name: guard, in: market, behavior: guard, health: 3 }
+  trader: { name: trader, in: market }
+  clerk: { name: clerk, in: lane, reads: true }
+flashbacks:
+  childhood: { at: garden_then, carries: [ring_then], turns: 3, begins: "You're small again, in the garden.", ends: "You're back on the quay." }
+epilogue:
+  - { when: 'world.ring.location == world.garden', text: The ring stayed in the garden for years. }
+  - { endings: [home], text: You never went back. }
+endings:
+  home: { kind: win, text: Home at last. }
+player: { health: 5 }
+"#;
+
+fn journeys() -> Game<LuaHost> {
+    let out = compile_str(JOURNEYS);
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+fn journeys_with(from: &str, to: &str) -> Game<LuaHost> {
+    let out = compile_str(&JOURNEYS.replace(from, to));
+    assert!(out.diagnostics.is_empty(), "{:#?}", out.diagnostics);
+    game(out.story.unwrap())
+}
+
+/// A boat along the river, a horse that tires and is fed, a memory that
+/// leaves a ring in the garden, and the epilogue that remembers it.
+#[test]
+fn boats_horses_flashbacks_and_the_epilogue() {
+    let mut g = journeys();
+    assert_eq!(say(&mut g, "e"), "You can't go that way without a rowing boat.");
+    say(&mut g, "get in boat");
+    assert_says(&mut g, "e", "River Bend (in the rowing boat)");
+    assert_says(&mut g, "w", "Quay (in the rowing boat)");
+    say(&mut g, "get out");
+    // The memory: the ring left in the garden then is there now.
+    assert_says(&mut g, "x locket", "You're small again, in the garden.\nGarden, Long Ago");
+    assert_eq!(say(&mut g, "i"), "You're carrying a little ring.");
+    say(&mut g, "drop ring");
+    assert_says(&mut g, "wait", "You're back on the quay.\nQuay");
+    assert!(!say(&mut g, "x locket").contains("small again"), "only once");
+    assert_says(&mut g, "s", "an old ring");
+    say(&mut g, "n");
+    // The horse.
+    assert_eq!(say(&mut g, "n"), "You can't go that way without a horse.");
+    say(&mut g, "take apple");
+    assert_eq!(say(&mut g, "ride horse"), "You climb up onto the horse.");
+    assert_says(&mut g, "n", "Long Road");
+    assert_says(&mut g, "s", "The horse is flagging. It needs feeding.");
+    assert_eq!(say(&mut g, "n"), "The horse is worn out, and won't go on until it's been fed.");
+    assert_says(&mut g, "give apple to horse", "The horse looks ready to go again.");
+    say(&mut g, "n");
+    let end = say(&mut g, "n");
+    assert!(end.contains("Home at last.\nThe ring stayed in the garden for years.\nYou never went back."), "{end}");
+    // On horseback, GO TO takes half the turns.
+    let mut g = journeys_with("stamina: 2", "stamina: 9");
+    for c in ["w", "n", "n", "s", "s", "e", "ride horse"] {
+        say(&mut g, c);
+    }
+    let before = say(&mut g, "time");
+    assert_says(&mut g, "go to the old mill", "The Old Mill");
+    assert_eq!(before, "It's 10:10 am.");
+    assert_eq!(say(&mut g, "time"), "It's 10:30 am.", "three rooms in two turns");
+}
+
+/// A note that lures the clerk away, and a crowd that hides the player
+/// from a guard, by day.
+#[test]
+fn notes_and_crowds() {
+    let mut g = journeys();
+    say(&mut g, "take paper");
+    assert_eq!(say(&mut g, "write a note"), "What do you want to write?");
+    assert_eq!(say(&mut g, "write \"Meet me at the mill\" on paper"), "You've nothing to write with.");
+    say(&mut g, "take pen");
+    assert_eq!(say(&mut g, "write \"Meet me at the mill\" on paper"), "You write \"Meet me at the mill\" on the sheet of paper.");
+    assert_eq!(say(&mut g, "read paper"), "In your own hand, the sheet of paper says: \"Meet me at the mill\"");
+    assert_says(&mut g, "w", "A crowd mills about");
+    assert_eq!(say(&mut g, "wait"), "Time passes.");
+    say(&mut g, "n");
+    assert_eq!(say(&mut g, "drop paper"), "Dropped.\nThe clerk reads the note, and sets off for The Old Mill at once.");
+    assert_eq!(say(&mut g, "wait"), "Time passes.\nThe clerk goes north.");
+    // After dark, no crowd: the guard knows the player.
+    let mut g = journeys_with("start: \"9:00\"", "start: \"19:00\"");
+    let there = say(&mut g, "w");
+    assert!(!there.contains("crowd"), "{there}");
+    assert_says(&mut g, "wait", "guard");
+}
+
+/// Pacing: what each step of the walkthrough brought.
+#[test]
+fn pacing_along_the_walkthrough() {
+    let src = r#"format: eifgb/0.1
+game: { id: p, title: P, version: '1', start: hall, max_score: 5 }
+facts: { secret: The key is under the mat. }
+rooms:
+  hall: { name: Hall, exits: { north: study } }
+  study: { name: Study, exits: { south: hall } }
+objects:
+  key: { name: key, in: study, traits: [portable], on: { after_take: 'score(5)' } }
+  note: { name: note, in: hall, traits: [portable], text: Under the mat., teaches: secret }
+"#;
+    let story = compile_str(src).story.unwrap();
+    let make = || LuaHost::new().and_then(|h| Game::new(story.clone(), h, 1)).ok();
+    let beats = eifgb_engine::testing::pacing(make, "wait\nread note\nn\ntake key\n");
+    assert_eq!(beats.len(), 4);
+    assert!(beats[0].rooms.is_empty() && beats[0].things.is_empty());
+    assert_eq!(beats[1].learned, ["secret"]);
+    assert_eq!(beats[2].rooms, ["Study"]);
+    assert_eq!(beats[3].things, ["key"]);
+    assert_eq!(beats[3].score, 5);
 }

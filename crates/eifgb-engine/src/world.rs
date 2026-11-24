@@ -386,6 +386,14 @@ impl World {
                     out.push(d);
                 }
             }
+            // A rope tied at the top, hanging down to here.
+            for e in self.def(here).exits.iter().filter(|e| e.rope) {
+                if let Some(r) = e.to.and_then(|to| self.rope_tied_in(to))
+                    && !out.contains(&r)
+                {
+                    out.push(r);
+                }
+            }
         }
         if !out.contains(&PLAYER) {
             out.push(PLAYER);

@@ -399,3 +399,27 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
 .tp-setup { margin: 0.4rem 0; }
 .tp-setup h4 { margin: 0.5rem 0 0.2rem; font-size: 0.9em; }
 .tp-ticks, .tp-vars { display: flex; flex-wrap: wrap; gap: 0.2rem 0.9rem; }
+
+/* The pacing chart: marks in the accent (a darker step of it in dark mode,
+   for contrast), dry stretches in the panel colour, text in text colours. */
+.pacing { --pace-mark: var(--accent); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .pacing { --pace-mark: #c27a35; }
+}
+:root[data-theme="dark"] .pacing { --pace-mark: #c27a35; }
+.pace-scroll { position: relative; overflow-x: auto; padding-bottom: 0.25rem; }
+.pace-scroll svg { display: block; font: 0.75rem var(--sans); }
+.pace-label { fill: var(--fg); }
+.pace-axis, .pace-note { fill: var(--dim); }
+.pace-grid { stroke: var(--line); stroke-width: 1; }
+.pace-mark { fill: var(--pace-mark); stroke: var(--bg); stroke-width: 2; }
+.pace-dry { fill: var(--panel); stroke: var(--line); stroke-dasharray: 3 3; }
+.pace-cross { stroke: var(--dim); stroke-width: 1; }
+.pace-hit { fill: transparent; cursor: pointer; }
+.pace-tip { position: absolute; top: 0; max-width: 210px; padding: 0.4rem 0.55rem; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-size: 0.8rem; pointer-events: none; box-shadow: 0 2px 6px rgb(0 0 0 / 0.15); }
+.pace-table { border-collapse: collapse; font-size: 0.8rem; }
+.pace-table th, .pace-table td { text-align: left; padding: 0.15rem 0.5rem; border-bottom: 1px solid var(--line); }
+@media (forced-colors: active) {
+  .pace-mark { fill: CanvasText; }
+  .pace-dry { fill: Canvas; stroke: CanvasText; }
+}

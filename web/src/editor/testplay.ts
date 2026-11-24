@@ -11,6 +11,7 @@
 // game's walkthrough.txt; the editor's check replays it after every edit
 // and says here (and under Problems) when it no longer wins.
 
+import { DRY, dryStretches, pacingChart } from "./pacing.ts";
 import type { DeadEnd, Engine, Files, Missed, Output, Walkthrough, Wandered } from "../engine.ts";
 import { Model } from "./model.ts";
 import { figure, pictureSrc } from "../pictures.ts";
@@ -142,6 +143,8 @@ export class TestPlay {
   private wanderRuns = 0;
   private deadBox: HTMLDetailsElement;
   private deadButton: HTMLButtonElement;
+  private paceBox: HTMLDetailsElement;
+  private paceButton: HTMLButtonElement;
   private setupBox: HTMLDetailsElement;
   private walk: HTMLElement;
   /** What wasn't understood, this session. */
@@ -172,6 +175,10 @@ export class TestPlay {
     this.deadButton.title = "Along the walkthrough, tries losing what it needs (eating it, burning it, giving it away), and says what makes the game unwinnable";
     this.deadButton.addEventListener("click", () => void this.deadEnds());
     this.deadBox = el("details", { className: "tp-wander", hidden: true });
+    this.paceButton = el("button", { type: "button", textContent: "Pacing" });
+    this.paceButton.title = "Along the walkthrough, where new rooms, things, points and facts come, and the long stretches where nothing does";
+    this.paceButton.addEventListener("click", () => void this.pacing());
+    this.paceBox = el("details", { className: "tp-wander", hidden: true });
     const setupButton = el("button", { type: "button", textContent: "Start with…" });
     setupButton.title = "Start part-way: in a room, carrying things, with doors open and variables set";
     this.setupBox = el("details", { className: "tp-setup", hidden: true });
@@ -220,12 +227,13 @@ export class TestPlay {
     this.log.append(el("p", { className: "dim", textContent: "Play your game here while you work on it. Press Start over to begin." }));
     this.missBox = el("details", { className: "tp-misses", hidden: true });
     panel.append(
-      el("div", { className: "tp-bar" }, restart, this.fromRoom, setupButton, this.jump, this.record, this.recordEnding, wanderButton, this.deadButton, this.status),
+      el("div", { className: "tp-bar" }, restart, this.fromRoom, setupButton, this.jump, this.record, this.recordEnding, wanderButton, this.deadButton, this.paceButton, this.status),
       this.setupBox,
       this.walk,
       this.walks,
       this.wanderBox,
       this.deadBox,
+      this.paceBox,
       this.missBox,
       this.stale,
       this.log,
@@ -369,6 +377,33 @@ export class TestPlay {
       out.push(el("p", { className: "tp-walk" }, `Its longest stretch with nothing new: ${w.quiet.moves} moves from move ${w.quiet.from}, in ${this.host.nameOf(w.quiet.room)}. A player could get stuck there, or it's just hard to find the way on by chance.`));
     }
     box.replaceChildren(...out);
+  }
+
+  /** The pacing chart: what each step of the walkthrough brings. */
+  private async pacing() {
+    this.engine ??= await this.host.engine();
+    const box = this.paceBox;
+    box.hidden = false;
+    box.open = true;
+    const walk = this.host.files()[WALKTHROUGH];
+    if (!walk?.trim()) {
+      box.replaceChildren(el("summary", { textContent: "Pacing" }), el("p", { textContent: "It follows the walkthrough, so it needs one: play to a win from the start, then Save as walkthrough." }));
+      return;
+    }
+    const beats = this.engine.pacing(this.host.files(), walk);
+    if (!Array.isArray(beats)) {
+      box.replaceChildren(el("summary", { textContent: "Pacing" }), el("p", { textContent: `It can't play yet: ${beats.error}.` }));
+      return;
+    }
+    const dry = dryStretches(beats);
+    box.replaceChildren(
+      el("summary", { textContent: `Pacing: ${beats.length} steps${dry.length ? `, ${dry.length} long stretch${dry.length > 1 ? "es" : ""} with nothing new` : ""}` }),
+      el("p", {
+        className: "dim",
+        textContent: `Each dot is a step of the walkthrough that brought something. Shaded: ${DRY} steps or more in a row that brought nothing new, where a player might be bored, or lost. Point at a step to see it; click to play to there.`,
+      }),
+      pacingChart(beats, (i) => void this.replay(beats.slice(0, i + 1).map((b) => b.command), "moves")),
+    );
   }
 
   /** Dead ends along the walkthrough: what makes the game unwinnable, and how. */

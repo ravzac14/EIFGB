@@ -9,6 +9,7 @@
 
 mod diag;
 mod files;
+mod kinds;
 mod lower;
 mod pattern;
 pub mod puzzles;
@@ -52,16 +53,24 @@ pub fn compile(files: &dyn FileProvider, entry: &str) -> Output {
         // Parsing into a generic value first catches duplicate keys (two
         // rooms with the same ID, the same exit direction twice), which
         // typed parsing would silently merge into one.
-        Ok(text) if let Err(e) = serde_yaml::from_str::<serde_yaml::Value>(&text) => {
-            d.error("", format!("{entry}: {e}"));
-            None
-        }
-        Ok(text) => match serde_yaml::from_str::<source::Source>(&text) {
+        Ok(text) => match serde_yaml::from_str::<serde_yaml::Value>(&text) {
             Err(e) => {
                 d.error("", format!("{entry}: {e}"));
                 None
             }
-            Ok(src) => lower::Lowerer::new(&mut d, files, entry).lower(src),
+            Ok(mut doc) => {
+                // With kinds, the game as written with every `like:` filled in.
+                let parsed = if kinds::expand(&mut doc, &mut d) {
+                    if d.0.iter().any(|x| x.severity == Severity::Error) {
+                        None
+                    } else {
+                        serde_yaml::from_value::<source::Source>(doc).map_err(|e| d.error("", format!("{entry} (with its kinds filled in): {e}"))).ok()
+                    }
+                } else {
+                    serde_yaml::from_str::<source::Source>(&text).map_err(|e| d.error("", format!("{entry}: {e}"))).ok()
+                };
+                parsed.and_then(|src| lower::Lowerer::new(&mut d, files, entry).lower(src))
+            }
         },
     };
     let mut diagnostics = d.0;

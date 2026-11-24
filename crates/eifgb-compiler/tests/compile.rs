@@ -665,3 +665,40 @@ fn rooms_and_things_need_names() {
     assert!(errs.iter().any(|e| e.contains("objects.k.name: needs a name")), "{errs:#?}");
     assert!(errs.iter().any(|e| e.contains("characters.c.name: needs a name")), "{errs:#?}");
 }
+
+/// Kinds: written once, used by `like:`, with the thing's own fields on top.
+#[test]
+fn kinds_are_filled_in() {
+    let src = r#"
+format: eifgb/0.1
+game: { id: k, title: K, version: "1", start: hall }
+kinds:
+  person: { traits: [], state: { mood: calm }, health: 3 }
+  guard: { like: person, name: guard, behavior: guard, state: { alert: true }, damage: 2 }
+  lamp: { traits: [portable, light_source], fuel: 20 }
+rooms:
+  hall: { name: Hall }
+objects:
+  lantern: { like: lamp, name: brass lantern, in: hall, traits: [wearable] }
+characters:
+  north_guard: { like: guard, in: hall, health: 6 }
+  south_guard: { like: guard, name: south guard, in: hall }
+"#;
+    let out = compile_str(src);
+    assert!(errors(&out).is_empty(), "{:#?}", out.diagnostics);
+    let s = out.story.unwrap();
+    let e = |k: &str| s.entity(s.entity_by_key(k).unwrap());
+    assert_eq!(e("lantern").traits, vec![Trait::Portable, Trait::LightSource, Trait::Wearable]);
+    assert_eq!(e("lantern").fuel, Some(20));
+    assert_eq!(e("north_guard").name, "guard");
+    assert_eq!(e("north_guard").health, Some(6));
+    assert_eq!(e("south_guard").health, Some(3));
+    assert_eq!(e("south_guard").damage, Some(2));
+    assert_eq!(e("south_guard").state.get("mood"), Some(&Value::Str("calm".into())));
+    assert_eq!(e("south_guard").state.get("alert"), Some(&Value::Bool(true)));
+    // A kind that isn't there, and one that's like itself.
+    let bad = compile_str(&src.replace("like: lamp", "like: lammp"));
+    assert!(bad.diagnostics.iter().any(|d| d.path == "objects.lantern.like" && d.message.contains("did you mean 'lamp'")), "{:#?}", bad.diagnostics);
+    let bad = compile_str(&src.replace("person: { traits: []", "person: { like: guard, traits: []"));
+    assert!(bad.diagnostics.iter().any(|d| d.message.contains("is like itself")), "{:#?}", bad.diagnostics);
+}

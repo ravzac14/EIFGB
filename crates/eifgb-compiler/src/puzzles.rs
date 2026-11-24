@@ -417,6 +417,17 @@ pub fn puzzles(story: &Story) -> Puzzles {
                 let verb = r.category.clone().map(|c| format!("({c})")).or_else(|| r.verbs.first().cloned()).unwrap_or_default();
                 ways.push(Part::new(vec![place_fact(r.target.index())], format!("reveal:{} the {}", cap(&verb), name(r.target.index()))));
             }
+            // Hollow: knocking finds it.
+            if def(i).hollow
+                && let Some(r) = at.filter(|&r| r != PLAYER.index())
+            {
+                let holder = def(i).location.map(|l| l.index()).filter(|&h| h != r);
+                let text = match holder {
+                    Some(h) => format!("reveal:Knock on {}", the(&name(h))),
+                    None => format!("reveal:Knock on the walls of {}", the_room(&name(r))),
+                };
+                ways.push(Part::new(vec![Fact::Room(r)], text));
+            }
             for s in naming(i) {
                 ways.push(Part::code(s, format!("reveal:{}", by_script(story, s))));
             }
@@ -502,6 +513,28 @@ pub fn puzzles(story: &Story) -> Puzzles {
                     lists.push(ways);
                 }
             }
+            // A sheer drop: a rope tied to something at the top.
+            if e.rope {
+                let ropes: Vec<usize> = (0..n).filter(|&x| def(x).rope).collect();
+                let anchors: Vec<usize> = (0..n).filter(|&x| def(x).anchor && def(x).location.map(|l| l.index()) == Some(r)).collect();
+                let mut ways = Vec::new();
+                for &rope in &ropes {
+                    for &an in &anchors {
+                        ways.push(Part::new(vec![Fact::Thing(rope)], format!("open:Tie {} to {}", the(&name(rope)), the(&name(an)))));
+                    }
+                }
+                lists.push(ways);
+            }
+            // Only in a boat, or on a horse.
+            if !e.by.is_empty() {
+                lists.push(e.by.iter().map(|b| Part::new(vec![Fact::Thing(b.index())], "")).collect());
+            }
+            // A doorkeeper here, who wants the password.
+            for c in (0..n).filter(|&c| def(c).location.map(|l| l.index()) == Some(r)) {
+                if let Some(pw) = def(c).npc.as_ref().and_then(|x| x.password.as_ref()).filter(|p| p.bars.contains(&e.direction)) {
+                    lists.push(vec![Part::new(vec![], format!("open:Say the password, “{}”, to {}", pw.word, the(&name(c))))]);
+                }
+            }
             // A condition on the way: what sets the variables it reads (to the
             // value it wants, if it wants one). One it checks is still unset
             // ("not vars.alarm") holds from the start.
@@ -580,6 +613,56 @@ pub fn puzzles(story: &Story) -> Puzzles {
                 r.text = format!("Take {} apart: {list}.", the(&name(whole)));
                 rules.push(r);
             }
+        }
+    }
+    // Flashbacks: the past is reached by what brings the memory back, and
+    // what's left there is found in the present.
+    for fb in &story.flashbacks {
+        let at = fb.at.index();
+        for t in (0..n).filter(|&t| def(t).flashback.as_deref() == Some(fb.key.as_str())) {
+            let mut r = Rule::new(Fact::Room(at), vec![Fact::Thing(t)]);
+            r.kind = Some("reach");
+            r.text = format!("Look at {}: a memory of {}.", the(&name(t)), the_room(&name(at)));
+            rules.push(r);
+        }
+        for sn in code.iter().filter(|sn| sn.acts && literal_calls(sn.src, "flashback").contains(&fb.key.as_str())) {
+            let mut r = Rule::new(Fact::Room(at), vec![Fact::Code(sn.idx)]);
+            r.kind = Some("reach");
+            r.text = format!("{} plays a memory of {}.", cap(&by_origin(story, sn)), the_room(&name(at)));
+            r.script = Some(sn.origin.clone());
+            rules.push(r);
+        }
+        for &c in &fb.carries {
+            rules.push(Rule::new(Fact::Thing(c.index()), vec![Fact::Room(at)]));
+        }
+    }
+    for then in 0..n {
+        let Some(now) = def(then).now.map(|x| x.index()) else { continue };
+        if def(then).kind != EntityKind::Object || def(now).location.is_some() {
+            continue;
+        }
+        let rooms: Vec<usize> = (0..n).filter(|&r| def(r).kind == EntityKind::Room && def(r).now.is_some()).collect();
+        for r in rooms {
+            let Some(r_now) = def(r).now.map(|x| x.index()) else { continue };
+            let mut rule = Rule::new(Fact::Thing(now), vec![Fact::Thing(then), Fact::Room(r), Fact::Room(r_now)]);
+            rule.kind = Some("find");
+            rule.text = format!("In the memory, leave {} in {}: {} is in {} now.", the(&name(then)), the_room(&name(r)), a(&name(now)), the_room(&name(r_now)));
+            rules.push(rule);
+        }
+    }
+    // Something broken, mended whole again.
+    let menders: Vec<usize> = (0..n).filter(|&m| def(m).mends).collect();
+    for whole in 0..n {
+        let Some(bits) = def(whole).breaks_into else { continue };
+        // Not a step to take: what's left once it's worn out.
+        let mut r = Rule::new(Fact::Thing(bits.index()), vec![Fact::Thing(whole)]);
+        r.text = format!("Use {} till it breaks: {}.", the(&name(whole)), a(&name(bits.index())));
+        rules.push(r);
+        for &m in &menders {
+            let mut r = Rule::new(Fact::Thing(whole), vec![Fact::Thing(bits.index()), Fact::Thing(m)]);
+            r.kind = Some("find");
+            r.text = format!("Mend {} with {}: {}.", the(&name(bits.index())), the(&name(m)), a(&name(whole)));
+            rules.push(r);
         }
     }
     // A copy made with paper and a pen.

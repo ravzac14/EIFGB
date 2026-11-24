@@ -302,3 +302,76 @@ endings:
     );
     assert_eq!(p.assumes[0].message, "Assumes the way north from Hall to Garden opens (when: clock.night).");
 }
+
+/// A rope down a cliff, a doorkeeper's password, and a hollow hiding place.
+#[test]
+fn ropes_passwords_knocking_and_mending() {
+    let p = puzzles(
+        &compile_str(
+            r#"
+format: eifgb/0.1
+game: { id: t, title: T, version: "1", start: cliff }
+rooms:
+  cliff: { name: Cliff, exits: { down: { to: ledge, rope: true } } }
+  ledge: { name: Ledge, exits: { east: gate } }
+  gate: { name: Gate, exits: { north: keep } }
+  keep: { name: Keep, on: { enter: 'end_game("inside")' } }
+objects:
+  rope: { name: rope, in: cliff, traits: [portable], rope: true }
+  post: { name: post, in: cliff, traits: [scenery], anchor: true }
+  coin: { name: coin, in: ledge, traits: [portable], hollow: true, state: { hidden: true } }
+  key: { name: key, in: gate, traits: [portable], uses: 1, breaks_into: bits }
+  bits: { name: broken key, traits: [portable] }
+  glue: { name: glue, in: gate, traits: [portable], mends: true }
+characters:
+  porter: { name: porter, in: gate, password: { word: swordfish, bars: north } }
+endings:
+  inside: { kind: win, text: In. }
+"#,
+        )
+        .story
+        .unwrap(),
+    );
+    let all = texts(&p);
+    for want in [
+        "Tie the rope to the post: Ledge opens up.",
+        "Knock on the walls of Ledge: a coin.",
+        "Say the password, “swordfish”, to the porter: Keep opens up.",
+    ] {
+        assert!(p.steps.iter().any(|s| s.text == want || s.or.iter().any(|o| o == want)) || all.iter().any(|t| t == want), "{want}\n{all:#?}");
+    }
+}
+
+/// A river only crossed by boat; a memory that leaves a ring in the garden.
+#[test]
+fn boats_and_flashbacks() {
+    let p = puzzles(
+        &compile_str(
+            r#"
+format: eifgb/0.1
+game: { id: t, title: T, version: "1", start: quay }
+rooms:
+  quay: { name: Quay, exits: { east: { to: isle, by: boat }, south: garden } }
+  isle: { name: Isle, on: { enter: 'if world.ring.location == world.player then end_game("found") end' } }
+  garden: { name: Garden, exits: { north: quay } }
+  garden_then: { name: Old Garden, now: garden }
+objects:
+  boat: { name: boat, in: quay, traits: [container, enterable], vehicle: true }
+  locket: { name: locket, in: quay, traits: [portable], flashback: past }
+  ring_then: { name: little ring, traits: [portable], now: ring }
+  ring: { name: ring, traits: [portable] }
+flashbacks:
+  past: { at: garden_then, carries: [ring_then], turns: 3 }
+endings:
+  found: { kind: win, text: Found. }
+"#,
+        )
+        .story
+        .unwrap(),
+    );
+    let all = texts(&p);
+    for want in ["Look at the locket: a memory of Old Garden.", "In the memory, leave the little ring in Old Garden: a ring is in Garden now."] {
+        assert!(all.iter().any(|t| t == want), "{want}\n{all:#?}");
+    }
+    assert!(p.problems.is_empty(), "{:#?}", p.problems);
+}

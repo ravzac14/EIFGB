@@ -578,6 +578,10 @@ impl World {
         if target == PLAYER && self.player_hidden() {
             return false;
         }
+        // Lost in a crowd, to anyone who'd go for them.
+        if target == PLAYER && viewer != PLAYER && self.lost_in_crowd() && self.would_be_hostile(viewer, PLAYER) {
+            return false;
+        }
         let Some(room) = self.room_of(target) else { return false };
         self.is_lit(room) || self.sees_in_dark(viewer)
     }

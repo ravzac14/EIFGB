@@ -68,6 +68,56 @@ pub struct Source {
     /// The game's own words for words the game knows: `using: with`.
     #[serde(default)]
     pub aliases: IndexMap<String, String>,
+    /// Lines after an ending, by what the player did.
+    #[serde(default)]
+    pub epilogue: Vec<EpilogueSrc>,
+    /// Memories the player plays through.
+    #[serde(default)]
+    pub flashbacks: IndexMap<String, FlashbackSrc>,
+}
+
+/// `- { when: 'world.dog.name == "Rex"', text: Rex lived to be old. }`, or just text.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum EpilogueSrc {
+    Text(String),
+    Full(EpilogueFull),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EpilogueFull {
+    pub text: String,
+    #[serde(default)]
+    pub when: Option<String>,
+    /// Only after these endings.
+    #[serde(default)]
+    pub endings: Option<OneOrMany>,
+}
+
+/// `{ at: garden_then, carries: [ring_then], turns: 10, begins: ..., ends: ... }`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FlashbackSrc {
+    pub at: String,
+    #[serde(default)]
+    pub carries: Option<OneOrMany>,
+    #[serde(default)]
+    pub begins: Option<String>,
+    #[serde(default)]
+    pub ends: Option<String>,
+    #[serde(default)]
+    pub turns: Option<u32>,
+    #[serde(default)]
+    pub until: Option<String>,
+}
+
+/// `crowd: true`, or the hours it's crowded: `crowd: "8:00-18:00"`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum CrowdSrc {
+    Always(bool),
+    Hours(String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -162,6 +212,12 @@ pub struct Player {
     /// Turns the player can hold their breath under water (4 unless set).
     #[serde(default)]
     pub breath: Option<u32>,
+    /// How many hands they have for big things (unset: hands don't count).
+    #[serde(default)]
+    pub hands: Option<u32>,
+    /// Turns they last in the cold before it hurts (8 unless set).
+    #[serde(default)]
+    pub warmth: Option<u32>,
 }
 
 /// A carrying capacity: a whole number, or `none` (or null) for no limit.
@@ -258,6 +314,15 @@ pub struct Room {
     pub smell: Option<String>,
     #[serde(default)]
     pub outdoors: bool,
+    /// Bitterly cold: the player needs to keep warm.
+    #[serde(default)]
+    pub cold: bool,
+    /// Crowded: `true`, or `"8:00-18:00"`.
+    #[serde(default)]
+    pub crowd: Option<CrowdSrc>,
+    /// In a flashback, the room this past one is now.
+    #[serde(default)]
+    pub now: Option<String>,
 }
 
 /// A code, written as a number or as text: `code: 4512`, `code: "0042"`.
@@ -285,6 +350,9 @@ pub struct WeatherKind {
     pub describe: Option<String>,
     #[serde(default)]
     pub begins: Option<String>,
+    /// Bitterly cold out of doors.
+    #[serde(default)]
+    pub cold: bool,
 }
 
 /// A chance in percent: `25`, or `"25%"`.
@@ -351,6 +419,12 @@ pub struct FullExit {
     /// Only open then: `night`, `day`, `full moon`, `22:00-4:00`, or a list (all must hold).
     #[serde(default)]
     pub open_at: Option<OneOrMany>,
+    /// A sheer drop: only with a rope tied at the top (or the bottom).
+    #[serde(default)]
+    pub rope: bool,
+    /// Only in (or riding) one of these: `by: boat`.
+    #[serde(default)]
+    pub by: Option<OneOrMany>,
 }
 
 /// An object or a character. Only characters may use `talk`.
@@ -617,6 +691,71 @@ pub struct Thing {
     /// How victims of this weapon or character look: "run through".
     #[serde(default)]
     pub kills: Option<String>,
+    /// A rope: to tie to an anchor, or tie someone up with.
+    #[serde(default)]
+    pub rope: bool,
+    /// Something to tie a rope to.
+    #[serde(default)]
+    pub anchor: bool,
+    /// Hidden, it sounds hollow when knocked on.
+    #[serde(default)]
+    pub hollow: bool,
+    /// With a `code`: wrong tries before it jams.
+    #[serde(default)]
+    pub tries: Option<u32>,
+    /// With a `code`: a wrong one says how close it was.
+    #[serde(default)]
+    pub feedback: bool,
+    /// What's left when it breaks.
+    #[serde(default)]
+    pub breaks_into: Option<String>,
+    /// Mends what's worn or broken.
+    #[serde(default)]
+    pub mends: bool,
+    /// Goes bad after this many turns.
+    #[serde(default)]
+    pub spoils: Option<u32>,
+    /// Takes both hands to carry.
+    #[serde(default)]
+    pub two_handed: bool,
+    /// Worn, keeps out the cold; eaten or drunk, warms the player.
+    #[serde(default)]
+    pub warm: bool,
+    /// Characters: won't let the player by without the password.
+    #[serde(default)]
+    pub password: Option<PasswordSrc>,
+    /// Characters: read notes (unset: those with something to say do).
+    #[serde(default)]
+    pub reads: Option<bool>,
+    /// Objects: a boat or cart, going by the ways that are `by` it.
+    #[serde(default)]
+    pub vehicle: bool,
+    /// Characters: can be ridden.
+    #[serde(default)]
+    pub mount: bool,
+    /// Ridden: moves before it needs feeding.
+    #[serde(default)]
+    pub stamina: Option<u32>,
+    /// In a flashback, the thing this past one is now.
+    #[serde(default)]
+    pub now: Option<String>,
+    /// Objects: examining or reading it plays this flashback, once.
+    #[serde(default)]
+    pub flashback: Option<String>,
+}
+
+/// `password: { word: swordfish, bars: north }`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PasswordSrc {
+    pub word: String,
+    pub bars: OneOrMany,
+    #[serde(default)]
+    pub ask: Option<String>,
+    #[serde(default)]
+    pub right: Option<String>,
+    #[serde(default)]
+    pub wrong: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

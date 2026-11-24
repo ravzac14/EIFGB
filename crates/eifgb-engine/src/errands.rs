@@ -161,9 +161,12 @@ impl<H: ScriptHost> Game<H> {
         for (i, (dir, next)) in steps.into_iter().enumerate() {
             let before = self.out.lines.len();
             self.passing = i < last;
+            // On horseback, every other step is free.
+            self.free_step = i % 2 == 0 && i < last && self.world.riding().is_some();
             let word = self.grammar.direction_word(dir);
             ok = self.execute_command(Command { verb: go, targets: Vec::new(), tool: None, text: None, direction: Some(dir), words: vec![word] });
             self.passing = false;
+            self.free_step = false;
             if !ok || self.world.here() != next {
                 break;
             }

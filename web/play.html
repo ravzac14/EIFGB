@@ -23,6 +23,7 @@
   <span class="tools">
     <button id="map-open" type="button" aria-pressed="false" aria-controls="map" disabled>Map</button>
     <button id="bookmarks-open" type="button" disabled title="Mark this moment in the story, to read it again later">Bookmarks</button>
+    <button id="threads-open" type="button" disabled title="Read the story so far following one character or thing">Threads</button>
     <button id="saves-open" type="button" disabled>Saves</button>
     <button id="restart" type="button" disabled>Restart</button>
     <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
@@ -31,6 +32,7 @@
   </span>
 </header>
 <main class="wrap">
+  <div id="thread-bar" class="thread-bar ui" hidden role="status"></div>
   <div id="log" class="log" aria-live="polite"><p class="notice">Loading the game…</p></div>
   <div id="after" class="after ui"></div>
   <form id="prompt" class="prompt" hidden>
@@ -45,6 +47,7 @@
 <dialog id="saves"></dialog>
 <dialog id="bookmarks" class="bookmarks-dialog" aria-labelledby="bookmarks-title"></dialog>
 <dialog id="settings"></dialog>
+<dialog id="threads" class="bookmarks-dialog" aria-labelledby="threads-title"></dialog>
 <script type="module" src="./src/play.ts"></script>
 </body>
 </html>

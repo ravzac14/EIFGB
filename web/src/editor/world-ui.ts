@@ -1,6 +1,7 @@
 // The editor's panels for how things behave: flames and fuel, liquids,
 // wear, codes, writing, sounds and smells; outdoor rooms; the weather.
 
+import { weatherCold } from "./handiwork-ui.ts";
 import { boolField, button, el, field, help, numField, select, type InspectorContext } from "./ui.ts";
 
 const text = (ctx: InspectorContext, path: string[], label: string, opts: { multiline?: boolean; placeholder?: string; help?: string } = {}) =>
@@ -84,6 +85,7 @@ export function weatherSection(ctx: InspectorContext): HTMLElement[] {
       el("h4", {}, k, " ", button("✕", () => ctx.change((x) => x.set(["weather", "kinds", k], undefined)), "small")),
       ...text(ctx, ["weather", "kinds", k, "describe"], "Outdoors, rooms add", { placeholder: "Rain falls steadily." }),
       ...text(ctx, ["weather", "kinds", k, "begins"], "When it starts, it says", { placeholder: "It starts to rain." }),
+      ...weatherCold(ctx, k),
     ]),
     el(
       "div",

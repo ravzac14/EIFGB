@@ -472,3 +472,56 @@ pub fn dead_ends<H: ScriptHost>(mut make: impl FnMut() -> Option<Game<H>>, walkt
     }
     found
 }
+
+/// One step of the walkthrough, for the pacing chart: what it brought.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Beat {
+    pub command: String,
+    /// The room the player ends the step in.
+    pub room: String,
+    /// Rooms seen for the first time.
+    pub rooms: Vec<String>,
+    /// Things picked up for the first time.
+    pub things: Vec<String>,
+    /// Points scored.
+    pub score: i64,
+    /// Facts learned, and goals done.
+    pub learned: Vec<String>,
+    pub goals: Vec<String>,
+    /// The ending reached, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ending: Option<String>,
+}
+
+/// Plays the walkthrough, saying what each step brought: new rooms, new
+/// things, points, facts, goals. Where nothing comes for a long stretch,
+/// a player may be bored, or lost.
+pub fn pacing<H: ScriptHost>(make: impl FnOnce() -> Option<Game<H>>, walkthrough: &str) -> Vec<Beat> {
+    let Some(mut g) = make() else { return Vec::new() };
+    g.start();
+    let mut out = Vec::new();
+    for s in walkthrough_steps(walkthrough) {
+        let (visited, got, score, learned, goals) = {
+            let st = &g.world().state;
+            (st.visited.clone(), st.got.keys().copied().collect::<BTreeSet<EntityId>>(), st.score, st.learned.len(), st.goals.iter().filter(|(_, d)| **d).map(|(k, _)| k.clone()).collect::<BTreeSet<String>>())
+        };
+        let o = g.input(&s.command);
+        let w = g.world();
+        let st = &w.state;
+        let name = |e: &EntityId| w.def(*e).name.clone();
+        out.push(Beat {
+            command: s.command.clone(),
+            room: w.def(w.here()).name.clone(),
+            rooms: st.visited.difference(&visited).map(name).collect(),
+            things: st.got.keys().filter(|k| !got.contains(k)).map(name).collect(),
+            score: st.score - score,
+            learned: st.learned[learned.min(st.learned.len())..].iter().map(|l| l.key.replace('_', " ")).collect(),
+            goals: st.goals.iter().filter(|(k, d)| **d && !goals.contains(*k)).map(|(k, _)| k.replace('_', " ")).collect(),
+            ending: o.ending.clone(),
+        });
+        if o.ended.is_some() {
+            break;
+        }
+    }
+    out
+}

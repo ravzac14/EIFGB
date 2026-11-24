@@ -3,6 +3,8 @@
 
 import { EVENTS } from "./model.ts";
 import { weatherSection } from "./world-ui.ts";
+import { epilogueSection, flashbacksSection } from "./journeys-ui.ts";
+import { kindsSection } from "./kinds-ui.ts";
 import { teachesField } from "./knowing-ui.ts";
 import { boolField, button, check, el, field, help, numField, proseField, select, type InspectorContext } from "./ui.ts";
 
@@ -249,6 +251,13 @@ export function storySections(panel: HTMLElement, ctx: InspectorContext) {
     ...(scenes.length ? [] : [help("Named stretches of the story, from a condition to another: the morning rush, the storm, the chase. RECAP says which is going on.")]),
     el("div", { class: "actions" }, button("Add a scene", () => ctx.change((x) => x.addScene()))),
   );
+
+  // Kinds.
+  group("Kinds", ...kindsSection(ctx));
+
+  // Flashbacks and the epilogue.
+  group("Flashbacks", ...flashbacksSection(ctx));
+  group("Epilogue", ...epilogueSection(ctx));
 
   // The time of day.
   const clock = m.get(["clock"]) !== undefined;

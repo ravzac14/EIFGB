@@ -9,6 +9,7 @@ import { settingsDialog } from "./settings-ui.ts";
 import { speak, stopSpeaking } from "./speech.ts";
 import { feedbackButton, feedbackContext } from "./feedback.ts";
 import { fetchGame, resolve } from "./remote.ts";
+import { follow, unfollow } from "./threads.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const log = $("log");
@@ -496,12 +497,16 @@ function send(text: string, echo = text) {
   handle(o);
   momentFrom(start);
   noteTurn(start, echo, !!o.ended);
+  if (thread) applyThread();
   scrollTo(start);
 }
 
 function begin(): boolean {
   skipTyping();
   log.replaceChildren();
+  // A new story: no thread to follow yet.
+  thread = null;
+  applyThread();
   after.replaceChildren();
   over = false;
   const loaded = engine.load(files);
@@ -562,6 +567,58 @@ function restoreFrom(save: string) {
   saves.setAuto(engine.save());
   scrollTo(first);
   line.focus();
+}
+
+// -------------------------------------------------------------- threads
+
+const threadsDialog = $<HTMLDialogElement>("threads");
+const threadBar = $("thread-bar");
+/** The thread being followed: whose, and the words for them. */
+let thread: { name: string; words: string[] } | null = null;
+
+/** Shows only the turns about the thread, and says so above them. */
+function applyThread() {
+  if (!thread) {
+    unfollow(log);
+    threadBar.hidden = true;
+    return;
+  }
+  const { shown, total } = follow(log, [thread.name, ...thread.words]);
+  threadBar.replaceChildren(
+    el("span", { textContent: `Following ${thread.name}: ${shown} of ${total} turns. ` }),
+    button("Show everything", () => {
+      thread = null;
+      applyThread();
+    }),
+  );
+  threadBar.hidden = false;
+}
+
+function openThreads() {
+  const met = engine.met();
+  const list = Array.isArray(met) ? met : [];
+  threadsDialog.replaceChildren(
+    button("Done", () => threadsDialog.close(), "close"),
+    el("h2", { id: "threads-title", textContent: "Threads" }),
+    el("p", { className: "dim", textContent: "Read the story so far following one character or thing: only the turns that mention them. Playing on, new turns are followed too." }),
+  );
+  if (!list.length) threadsDialog.append(el("p", { className: "dim", textContent: "You haven't met anyone or found anything yet." }));
+  for (const kind of ["character", "thing"] as const) {
+    const these = list.filter((x) => x.kind === kind);
+    if (!these.length) continue;
+    const ul = el("ul", { className: "slots" });
+    for (const x of these) {
+      const b = button(x.name, () => {
+        thread = { name: x.name, words: x.words };
+        threadsDialog.close();
+        applyThread();
+      });
+      if (thread?.name === x.name) b.setAttribute("aria-current", "true");
+      ul.append(el("li", {}, b));
+    }
+    threadsDialog.append(el("h3", { textContent: kind === "character" ? "People" : "Things" }), ul);
+  }
+  if (!threadsDialog.open) threadsDialog.showModal();
 }
 
 // ------------------------------------------------------------ bookmarks
@@ -762,6 +819,7 @@ log.addEventListener("click", () => {
 });
 $("saves-open").addEventListener("click", openSaves);
 $("bookmarks-open").addEventListener("click", openBookmarks);
+$("threads-open").addEventListener("click", openThreads);
 mapButton.addEventListener("click", () => showMap(mapBox.hidden));
 $("map-close").addEventListener("click", () => {
   showMap(false);
@@ -798,7 +856,7 @@ async function main() {
   if (!begin()) return;
   document.title = meta.title;
   $("title").textContent = meta.title;
-  for (const b of ["map-open", "bookmarks-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
+  for (const b of ["map-open", "bookmarks-open", "threads-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
   form.hidden = false;
 
   const auto = saves.auto();

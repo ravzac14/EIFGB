@@ -2,7 +2,7 @@
 # (or `web/scripts/build-wasm.sh`, which also copies the result into web/).
 [target.wasm32-unknown-emscripten]
 rustflags = [
-  "-C", "link-arg=-sEXPORTED_FUNCTIONS=_eifgb_load,_eifgb_check,_eifgb_input,_eifgb_save,_eifgb_restore,_eifgb_map,_eifgb_complete,_eifgb_wander,_eifgb_dead_ends",
+  "-C", "link-arg=-sEXPORTED_FUNCTIONS=_eifgb_load,_eifgb_check,_eifgb_input,_eifgb_save,_eifgb_restore,_eifgb_map,_eifgb_complete,_eifgb_wander,_eifgb_dead_ends,_eifgb_pacing,_eifgb_met",
   "-C", "link-arg=-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString",
   "-C", "link-arg=-sMODULARIZE=1",
   "-C", "link-arg=-sEXPORT_ES6=1",

@@ -70,6 +70,9 @@ swaps for fakes, and playing dead. Still to do:
   opens an exit that wasn't there.
 - **Following someone:** FOLLOW THE BAKER, a room behind on their routine,
   unseen if sneaking.
+- **Gossip that travels:** news of what the player did spreads along
+  characters' `friends`, a step every few turns: "The miller's already
+  heard you stole the bread." Builds on witnesses and broken promises.
 - **Busking and odd jobs:** SING in a busy square for coins; characters
   with `jobs:` pay for errands.
 

@@ -496,6 +496,13 @@ GIVE CAKE TO TROLL." **Play it here** plays it in Test play. That may be
 fair, as a loss; if not, give the player another way. It doesn't find
 every dead end (a door barred from the wrong side), only those.
 
+**Pacing** follows the walkthrough step by step and draws where things
+come: new rooms, new things, points, facts learned and goals done, a dot
+for each step that brought one. Stretches of eight steps or more that
+bring nothing new are shaded, as places a player might be bored, or
+lost. Point at a step to see what it was and what it brought; click it to
+play to there. It's a table too.
+
 Test play can also start part-way. **Start at a step…** plays the
 walkthrough up to the step you pick without showing it, then lets you
 carry on from there. **Start with…** sets the game up as you choose
@@ -640,6 +647,16 @@ A few more tools in the editor:
   exclaim, how often they say "don't" for "do not", and words only they
   use. Two characters who sound alike, or one whose later lines sound
   unlike their early ones, are pointed out, as guesses to read again.
+- **How the descriptions read**, under Problems: the room, thing and
+  character descriptions read together. Words leaned on in description
+  after description ("ancient", 14 times), descriptions longer than 120
+  words, ones that are hard going (a reading grade of 12 or more: long
+  sentences, long words), and rooms that all begin the same way ("You are
+  standing…"). Only pointers, to read and decide.
+- **Kinds**: in a thing's, character's or room's details, **Make a kind
+  of this** turns its fields into a kind others can be like; **Its kind**
+  ticks which kinds something is like. The game's panel lists the kinds
+  and what's like each. See [Kinds](#kinds).
 - **Possible typos**, under Problems: words that aren't in the dictionary
   or the game's names, a letter off a word that is ("lantren", perhaps
   "lantern"), however often they're used. The dictionary is a word list
@@ -1149,11 +1166,19 @@ objects:
   water" means the bottle with water in it. Its `liquid` state says what's
   in it; lists say "a glass bottle (full of water)".
 - **Wear:** something with `uses` breaks after being used that many
-  times as a tool (a key, a knife), or by one of your verbs' handlers.
-  `breaks` says how.
+  times as a tool (a key, a knife, a rope), or by one of your verbs'
+  handlers. `breaks` says how. On its last use it says so ("The iron key
+  won't last much longer."), and examining it says it's nearly worn
+  through. `breaks_into: broken_key` leaves something behind (start it
+  with no `in:`); see [Mending](#ropes-knocking-and-mending).
 - **Codes:** something lockable with a `code` unlocks when the player
-  types it: TYPE 4512, ENTER 4512 ON THE KEYPAD, OPEN THE SAFE WITH 4512.
-  Hide the code in a clue, or a [picture](#pictures).
+  types it: TYPE 4512, ENTER 4512 ON THE KEYPAD, OPEN THE SAFE WITH 4512,
+  DIAL FOUR SEVEN ONE, TURN THE DIAL TO 4-7-1. Hide the code in a clue,
+  or a [picture](#pictures). `tries: 3` jams it after three wrong codes
+  (it beeps, and anyone hunting nearby comes to look); `feedback: true`
+  says how close a wrong one was: "2 in the right place, and 1 more right
+  but in the wrong place." Its `tries` state counts down, so a script can
+  reset it.
 - **Writing:** `text` is what READ shows (a book, a note, a sign), apart
   from what EXAMINE says about the thing itself.
 - **Sounds and smells:** LISTEN and SMELL say a room's `sound` and
@@ -1248,6 +1273,105 @@ words) and it comes back: "…hello… hello…", or the answer for a word
 said. A room that `hears` other rooms is a whispering gallery: what
 characters say there is heard here, word for word.
 
+### Ropes, knocking and mending
+
+```yaml
+rooms:
+  cliff: { name: Cliff Top, exits: { down: { to: ledge, rope: true } } }
+objects:
+  rope: { name: rope, in: shed, traits: [portable], rope: true }
+  post: { name: post, in: cliff, traits: [scenery], anchor: true }
+  panel: { name: loose panel, in: study, traits: [portable], hollow: true, state: { hidden: true } }
+  key: { name: iron key, in: hall, traits: [portable], uses: 3, breaks_into: broken_key }
+  broken_key: { name: broken key, traits: [portable] }
+  glue: { name: pot of glue, in: shed, traits: [portable], mends: true }
+  bread: { name: loaf of bread, in: kitchen, traits: [portable, edible], spoils: 40 }
+characters:
+  porter: { name: porter, in: gate, password: { word: swordfish, bars: north } }
+```
+
+- **Ropes:** TIE THE ROPE TO THE POST (anything that's an `anchor`).
+  An exit with `rope: true` is a sheer drop, only to be climbed with a
+  rope tied at the top or the bottom: GO DOWN, or CLIMB THE ROPE, from
+  either end. A tied rope can't be taken until it's untied (UNTIE THE
+  ROPE). TIE UP THE GUARD (WITH THE ROPE) works on someone asleep,
+  caught in a trap, cowering or nearly beaten: tied up, they do nothing
+  at all until someone unties them, though they can still be talked to.
+  Scripts read `world.rope.tied_to` and `world.guard.bound`.
+- **Knocking:** KNOCK ON THE WALLS finds anything `hollow` that's hidden
+  in the room; KNOCK ON THE WARDROBE, anything hollow hidden in it. KNOCK
+  ON A DOOR, and whoever's on the other side may open it: if they don't
+  dislike the player, and it isn't locked (or they have its key).
+  Someone hostile comes to see who it is.
+- **Passwords:** a character with a `password` won't let the player go
+  the ways it `bars` (The porter steps in your way. "Password?"),
+  until they SAY it. `ask:`, `right:` and `wrong:` reword it. Asleep or
+  tied up, they let anyone by.
+- **Mending:** MEND THE KEY (WITH THE GLUE), with something that
+  `mends`: something worn is as good as new, and what a thing
+  `breaks_into` is made whole again. Give the mender `uses` to have it
+  used up.
+- **Going bad:** food or drink that `spoils` goes bad that many turns
+  into the game, wherever it is ("The loaf of bread has gone bad."), and
+  won't be eaten. Its `spoiled` state turns true.
+
+### Boats, horses and crowds
+
+```yaml
+rooms:
+  quay: { name: Quay, exits: { east: { to: river, by: boat }, north: { to: road, by: horse } } }
+  market: { name: Market Square, crowd: "8:00-18:00" }     # or crowd: true
+objects:
+  boat: { name: rowing boat, in: quay, traits: [container, enterable], vehicle: true }
+characters:
+  horse: { name: horse, in: stable, mount: true, stamina: 12, likes: [apple], disposition: friendly }
+```
+
+- **Boats and carts:** something `enterable` that's a `vehicle` carries
+  the player along the ways that are `by` it: GET IN THE BOAT, then ROW
+  EAST (or GO EAST, SAIL, PADDLE…). Any other way, they get out and walk.
+  On foot, a way `by` the boat says "You can't go that way without a
+  rowing boat."
+- **Horses:** RIDE THE HORSE, if it's tame, friendly, or obeys the
+  player: it goes where they go, ways `by` it are open, and GO TO takes
+  half the turns. With `stamina`, it tires after that many moves, and
+  won't go on until it's fed something it `likes`. DISMOUNT (GET OFF) to
+  get down. Scripts read `world.player.riding`.
+- **Crowds:** a `crowd` room (always, or at the hours given, in a game
+  with a clock) says so when the player looks. Nobody who'd go for the
+  player can pick them out of it, unless they make a scene (attack
+  someone, or get caught stealing); thieves are hardly ever noticed by
+  their victims, though someone in the crowd may shout "Thief!"; and
+  nobody leaves tracks there. Scripts read `world.market.crowded`.
+
+### Hands and the cold
+
+```yaml
+player: { hands: 2, warmth: 8 }
+rooms:
+  pass: { name: Mountain Pass, cold: true }
+objects:
+  chest: { name: chest, in: hall, traits: [portable, container], two_handed: true }
+  coat: { name: fur coat, in: hall, traits: [portable, wearable], warm: true }
+  soup: { name: bowl of soup, in: inn, traits: [portable, edible], warm: true }
+```
+
+- **Hands:** with `hands:` on the player, only so much can be held. Big
+  things (size 2 or more), weapons and burning lights take a hand, and
+  `two_handed` things both; small things go in pockets, and worn things
+  don't count. "Your hands are full: you're holding the torch and the
+  shield." Climbing (a rope, or CLIMB) takes a hand free. INVENTORY says
+  what's in their hands.
+- **The cold:** in a `cold` room, or out of doors in weather that's
+  `cold: true`, the player lasts `warmth` turns (8 unless set), shivering
+  near the end; then each turn costs a point of health, or, if they
+  can't be hurt, they freeze (the `froze` ending, which you can write
+  yourself). Something `warm` worn keeps the cold out; a fire in the room
+  (something on fire, or a fixed flame like a hearth) warms them quickly;
+  anywhere else, slowly. Eating or drinking something `warm` warms them
+  right through. Soaked by deep water, the cold bites twice as hard. The
+  `warmth` state counts down, for scripts to read or set.
+
 ## Pictures
 
 A room, an object or a character can have a `picture`. A room's is shown
@@ -1307,6 +1431,35 @@ side isn't a word the game knows, and when the left-hand side already
 means something (the alias then replaces it everywhere). For new verbs
 with their own behaviour, add a verb under `verbs:` instead. In the
 editor, aliases are under **Words** in the game's details.
+
+## Kinds
+
+Something you'd otherwise write out again and again (guards, lamps, a
+stretch of forest) can be written once, as a kind, and the rest can be
+`like` it:
+
+```yaml
+kinds:
+  guard: { name: guard, behavior: guard, faction: watch, health: 5, damage: 2, state: { alert: true } }
+  lamp: { traits: [portable, light_source], needs_flame: true, fuel: 20 }
+  forest: { outdoors: true, sound: Leaves rustle overhead., trackless: true }
+rooms:
+  wood_1: { like: forest, name: Dark Wood, exits: { north: wood_2 } }
+  wood_2: { like: forest, name: Deeper Wood, exits: { south: wood_1 } }
+objects:
+  candle: { like: lamp, name: candle, in: hall, fuel: 10 }
+characters:
+  north_guard: { like: guard, in: gate }
+  captain: { like: guard, name: captain, in: keep, health: 9 }
+```
+
+Something that's `like` a kind starts with the kind's fields, and its
+own go on top: the captain's `health: 9` replaces the guard's 5. Maps
+(`state`, `on`, `moods`…) are merged, and `traits` add up, so a kind's
+traits and the thing's own are all there. A kind can be `like` another,
+and something can be like several (`like: [guard, archer]`, the later on
+top). The compiler fills them in before anything else, so everything
+else reads the game as if it were written out in full.
 
 ## Timed events
 
@@ -1424,6 +1577,53 @@ RECAP says so ("Now: The storm."), and conditions can check it:
 `scenes.storm` is `nil` (not begun), `"running"` or `"done"`. Scripts can
 begin and end scenes themselves with `start_scene("storm")` and
 `end_scene("storm")`.
+
+## Flashbacks
+
+A flashback is a memory the player plays through. What they carry is set
+aside, and they're somewhere in the past, with what the memory gives
+them, until it's over; then they're back where they were, with what they
+had.
+
+```yaml
+flashbacks:
+  childhood:
+    at: garden_then              # a room of the past, reached no other way
+    carries: [ring_then]
+    turns: 6                     # or until: 'world.ring_then.location == world.garden_then'
+    begins: You're small again, and the garden is enormous.
+    ends: The memory fades. You're on the quay, holding the locket.
+rooms:
+  garden_then: { name: "The Garden, Long Ago", now: garden }
+objects:
+  locket: { name: locket, in: quay, traits: [portable], flashback: childhood }
+  ring_then: { name: little ring, traits: [portable], now: ring }
+  ring: { name: old ring, traits: [portable] }   # no `in:`: the past decides
+```
+
+EXAMINE or READ the locket (the first time) and the memory plays; or a
+script calls `flashback("childhood")`, and `end_flashback()` ends one
+early (`in_flashback()` says which is playing). What the past does stays
+done: a past thing with `now:` left in a past room with `now:` is found
+in the present room afterwards. Drop the little ring in the garden then,
+and the old ring is in the garden now. Variables set in the past stay
+set.
+
+## Epilogue
+
+After an ending, the epilogue looks back on what the player did:
+
+```yaml
+epilogue:
+  - { when: 'world.dog.name == "Rex"', text: Rex lived to be very old. }
+  - { when: 'world.baker.promise == "broken"', text: The baker never forgave you. }
+  - { endings: [escaped], text: You never went back to the island. }
+  - And the lighthouse still shines.
+```
+
+Each line is said after the ending's own text, if its `when` holds (and
+only after the `endings` it names, if any). A line on its own is always
+said.
 
 ## Moods
 
@@ -1555,6 +1755,18 @@ used up) and something that `writes: true` (a pen) both carried. A copy
 works as a fake of the original (as with `decoy_for`), so it can be
 swapped for it unseen. COPY THE INSCRIPTION, of something with `text`
 and no `copy:`, writes the words into the player's notes.
+
+### Notes
+
+With the same paper and pen, WRITE "MEET ME AT THE MILL" ON THE PAPER.
+READ shows what the player wrote, and scripts read `world.paper.written`.
+Give the note to someone who `reads` (characters with something to say
+do, unless `reads: false`), or leave it where they'll find it. If they
+believe it (they don't dislike the player, or it names one of their
+`friends` or someone they answer to) and it names a place ("the mill",
+for The Old Mill), they go there and wait a while: long enough to slip
+past, or to take what they were watching. A character's `read_note`
+handler (`on: { read_note: ... }`, with `args.text`) answers instead.
 
 ## Time of day
 
@@ -2516,14 +2728,22 @@ follows:
 | COPY … | COPY … ONTO …, FORGE …, TRACE …, TRANSCRIBE … | Makes a copy, with paper and a pen; or copies the words into your notes. |
 | FILL … FROM … | FILL … WITH …, DIP … IN … | Fills something that holds a liquid. |
 | POUR OUT … | POUR … INTO …, POUR … ON …, EMPTY … | Pours a liquid out, into something, or on a fire. |
-| TYPE 4512 | ENTER 4512 ON …, DIAL …, OPEN … WITH 4512 | Enters a code. |
+| TYPE 4512 | ENTER 4512 ON …, DIAL …, TURN … TO 4-7-1, OPEN … WITH 4512 | Enters a code. |
 | LISTEN / SMELL | LISTEN TO …, SMELL … | What can be heard or smelt here, and from next door. |
 | DRINK … | DRINK FROM …, SIP … | Drinks something `drinkable`. A drink you carry is used up; a fountain isn't. |
 | CLIMB … | CLIMB UP …, CLIMB DOWN …, SCALE … | Goes up or down a way that goes `via` it, or climbs onto something you can stand on. |
 | WAKE … | WAKE UP …, ROUSE … | Wakes someone who's asleep. |
 | SHOW … TO … | SHOW … | Shows someone something (and frightens them, if they fear it). |
 | SAY … | SAY … TO …, WHISPER … | Says something aloud, for your `on: { say: ... }` handlers (the words are `args.text`). |
-| CUT, TIE … TO …, DIG, KNOCK ON …, WAVE AT …, POINT AT … | CHOP, SLICE, ATTACH …, RAP ON … | Tries it out; the game decides if anything happens. |
+| TIE … TO …, TIE UP … | ATTACH, FASTEN, LASH … TO …, BIND … | Ties a rope to something, or someone up with it. |
+| UNTIE … | UNKNOT, UNBIND, FREE … | Unties a rope, or someone tied up. |
+| KNOCK ON …, KNOCK ON THE WALLS | RAP ON, BANG ON …, SOUND THE WALLS | Knocks on a door (someone may open it), or listens for a hollow spot. |
+| MEND … WITH … | REPAIR, FIX, PATCH, GLUE, SEW UP … | Mends what's worn or broken. |
+| WRITE "…" ON … | SCRIBBLE "…" ON …, JOT DOWN … | Writes a note, with paper and a pen. |
+| RIDE … | MOUNT …, CLIMB ONTO … | Rides a horse, if it'll let you. |
+| DISMOUNT | GET OFF …, JUMP OFF … | Gets down off the horse. |
+| ROW EAST | SAIL, DRIVE, STEER, PUNT, RIDE, GALLOP … | Goes, in a boat, a cart or on horseback. |
+| CUT, DIG, WAVE AT …, POINT AT … | CHOP, SLICE … | Tries it out; the game decides if anything happens. |
 | INVENTORY | I | Lists what you carry. |
 | INVENTORY BY PLACE | WHERE DID I GET EVERYTHING | What you carry, by where you found it: "From the start: a pocket watch. From the Yard: a coin and a pebble." |
 | USE … | USE … ON …, USE … WITH … | Does what the thing is for: lights a lamp, wears a hat, eats food, opens a door (or goes through it once it's open). USE KEY ON DOOR unlocks it, and USE SWORD ON GOBLIN attacks. |
@@ -2654,8 +2874,8 @@ carrying limit is `player: { capacity: N }`: `0` carries nothing, `none`
 `nameable`, `prints`, `leaves_tracks`, `tracker`, `sees_in_dark`, `chatter`, `obeys`, `morale`, `fears`; rooms can be `trackless`,
 `diggable` or `dark`; top-level `factions:` with `hostile_to`, `eats_corpses`, `kills`,
 `patience`, `prints`, `sees_in_dark`, `morale`, `fears` and `calls`; objects
-can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls`, `trap`, `douses` and (worn) `sees_in_dark`; the player can have `health`,
-`damage`, `money`, `voice` and `sees_in_dark`. Events: `defeated` on a character, `died` at the
+can have `damage` (weapons), `kills`, `price`, `disguise`, `eaten_by`, `nameable`, `calls`, `trap`, `douses`, `rope`, `anchor`, `hollow`, `mends`, `breaks_into`, `spoils`, `two_handed`, `warm`, `tries`, `feedback` and (worn) `sees_in_dark`; characters a `password`, `reads`, `mount` and `stamina`; objects a `vehicle`, `flashback` and `now`; rooms can be `cold` or a `crowd` (and `now`), and exits need a `rope` or go `by` something; top-level `flashbacks:` and `epilogue:`; the player can have `health`,
+`damage`, `money`, `voice`, `sees_in_dark`, `hands` and `warmth`. Events: `defeated` on a character, `died` at the
 top level. See [Characters](#characters-npcs-and-enemies).
 
 **Settings:** `describe_state` (default `true`) describes state

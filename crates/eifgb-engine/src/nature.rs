@@ -88,26 +88,32 @@ impl<H: ScriptHost> Game<H> {
 
     // ------------------------------------------------------------- wear
 
-    /// Something used as a tool wears a little; with no uses left, it breaks.
+    /// Something used as a tool wears a little; with no uses left, it
+    /// breaks, leaving what it `breaks_into`.
     pub(crate) fn wear_out(&mut self, t: EntityId) {
-        if self.world.def(t).uses.is_none() {
-            return;
-        }
+        let Some(full) = self.world.def(t).uses else { return };
         let left = match self.world.get(t, "uses") {
             Some(Value::Int(n)) => *n,
             _ => 0,
         } - 1;
+        let ctx = Ctx::new().entity("target", t);
         if left > 0 {
             self.world.set(t, "uses", Value::Int(left));
+            if left == 1 && full >= 2 && self.world.is_within(t, PLAYER) {
+                self.msg_kind(LineKind::Notice, "wear.last", &ctx);
+            }
             return;
         }
         self.world.set(t, "uses", Value::Int(0));
-        let ctx = Ctx::new().entity("target", t);
         match self.world.def(t).breaks.clone() {
             Some(s) => self.render_line(LineKind::Text, &s, &ctx.clone().this(t)),
-            None => self.msg("wear.breaks", &ctx),
+            None => self.msg(if self.world.def(t).breaks_into.is_some() { "wear.breaks_into" } else { "wear.breaks" }, &ctx),
         }
+        let place = self.world.location(t);
         let _ = self.world.move_to(t, None);
+        if let Some(rest) = self.world.def(t).breaks_into {
+            let _ = self.world.move_to(rest, place);
+        }
     }
 
     // ----------------------------------------------------------- liquids
@@ -227,9 +233,10 @@ impl<H: ScriptHost> Game<H> {
 
     // ------------------------------------------------------------- codes
 
-    /// TYPE 4512 (ON THE KEYPAD), OPEN THE SAFE WITH 4512.
+    /// TYPE 4512 (ON THE KEYPAD), OPEN THE SAFE WITH 4512, DIAL 4-7-1.
+    /// Wrong ones use up its `tries`, and may say how close they were.
     pub(crate) fn enter_code(&mut self, target: Option<EntityId>, code: &str, ctx: &Ctx) -> bool {
-        let code: String = code.split_whitespace().collect::<Vec<_>>().join("");
+        let code = normal_code(code);
         let w = &self.world;
         let locks: Vec<EntityId> = match target {
             Some(t) => vec![t],
@@ -240,8 +247,42 @@ impl<H: ScriptHost> Game<H> {
             return false;
         };
         let ctx = ctx.clone().entity("target", lock).text("code", code.clone());
-        if self.world.def(lock).code.as_deref().map(|c| c.replace(' ', "")) != Some(code) {
-            self.msg("code.wrong", &ctx);
+        let tries = match self.world.get(lock, "tries") {
+            Some(Value::Int(n)) if self.world.def(lock).tries.is_some() => Some(*n),
+            _ => None,
+        };
+        if tries == Some(0) {
+            self.msg("code.jammed", &ctx);
+            return false;
+        }
+        let right = self.world.def(lock).code.as_deref().map(normal_code).unwrap_or_default();
+        if right != code {
+            match tries.map(|n| n - 1) {
+                Some(0) => {
+                    self.world.set(lock, "tries", Value::Int(0));
+                    self.msg("code.jams", &ctx);
+                    self.world.make_noise(lock, 2);
+                    return true;
+                }
+                Some(n) => self.world.set(lock, "tries", Value::Int(n)),
+                None => {}
+            }
+            if self.world.def(lock).feedback {
+                let (placed, misplaced) = closeness(&right, &code);
+                let key = if right.chars().count() != code.chars().count() {
+                    "code.length"
+                } else if placed + misplaced == 0 {
+                    "code.none_right"
+                } else {
+                    "code.close"
+                };
+                self.msg(key, &ctx.clone().value("placed", Value::Int(placed)).value("misplaced", Value::Int(misplaced)).value("length", Value::Int(right.chars().count() as i64)));
+            } else {
+                self.msg("code.wrong", &ctx);
+            }
+            if tries == Some(2) {
+                self.msg_kind(LineKind::Notice, "code.last_try", &ctx);
+            }
             return true;
         }
         if !self.world.flag(lock, "locked") {
@@ -378,4 +419,35 @@ impl<H: ScriptHost> Game<H> {
             self.push_sentence(s, true);
         }
     }
+}
+
+/// A code as typed, for comparing: lower case, without spaces, dashes or
+/// dots, and with number words as digits ("four seven one" is 471).
+fn normal_code(s: &str) -> String {
+    const DIGITS: [&str; 10] = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    let words: Vec<String> = s.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).map(String::from).collect();
+    if words.len() > 1 && words.iter().all(|w| DIGITS.contains(&w.as_str()) || w == "oh") {
+        return words.iter().map(|w| DIGITS.iter().position(|d| d == w).unwrap_or(0).to_string()).collect();
+    }
+    words.concat()
+}
+
+/// How close a guess is: how many are right and in the right place, and
+/// how many more are right but elsewhere.
+fn closeness(right: &str, guess: &str) -> (i64, i64) {
+    let r: Vec<char> = right.chars().collect();
+    let g: Vec<char> = guess.chars().collect();
+    let placed = r.iter().zip(&g).filter(|(a, b)| a == b).count();
+    let mut pool: Vec<char> = r.iter().zip(g.iter().map(Some).chain(std::iter::repeat(None))).filter(|(a, b)| Some(*a) != *b).map(|(a, _)| *a).collect();
+    let mut misplaced = 0;
+    for (i, c) in g.iter().enumerate() {
+        if r.get(i) == Some(c) {
+            continue;
+        }
+        if let Some(p) = pool.iter().position(|x| x == c) {
+            pool.remove(p);
+            misplaced += 1;
+        }
+    }
+    (placed as i64, misplaced)
 }

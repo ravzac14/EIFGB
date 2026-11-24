@@ -23,7 +23,11 @@ impl<H: ScriptHost> Game<H> {
             }
             // Woken by something earlier this turn: say so before it acts.
             self.report_woken();
-            if !self.world.is_active(npc) || self.world.is_asleep(npc) {
+            if !self.world.is_active(npc) || self.world.is_asleep(npc) || self.world.is_bound(npc) || self.world.riding() == Some(npc) {
+                continue;
+            }
+            // Gone where a note said: on its way, or waiting there.
+            if self.lured_turn(npc) {
                 continue;
             }
             // A body of its own, left in plain sight: raising the alarm is
@@ -62,7 +66,7 @@ impl<H: ScriptHost> Game<H> {
             .filter(|&id| self.world.def(id).npc.as_ref().is_some_and(|n| !n.chatter.is_empty()))
             .collect();
         for npc in talkers {
-            if !self.world.is_active(npc) || self.world.is_asleep(npc) {
+            if !self.world.is_active(npc) || self.world.is_asleep(npc) || self.world.is_bound(npc) {
                 continue;
             }
             let Some(room) = self.world.room_of(npc) else { continue };
@@ -644,7 +648,9 @@ impl<H: ScriptHost> Game<H> {
             self.msg(k, &ctx);
             return false;
         }
-        if self.world.notices_theft(victim) {
+        // In a crowd, nobody notices; unless somebody does.
+        let crowd = self.world.room_of(PLAYER).is_some_and(|r| self.world.is_crowded(r));
+        if (!crowd && self.world.notices_theft(victim)) || (crowd && self.thief_spotted_in_crowd()) {
             self.msg("steal.caught", &ctx);
             if self.world.def(victim).npc.as_ref().is_some_and(|n| n.behavior == Behavior::Merchant) {
                 self.world.set(victim, "_refuses", Value::Bool(true));

@@ -106,6 +106,54 @@ pub struct Story {
     /// The weather, if the game has some: outdoor rooms describe it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weather: Option<Weather>,
+    /// Lines after an ending that look back on what the player did.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub epilogue: Vec<EpilogueLine>,
+    /// Memories the player plays through.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flashbacks: Vec<Flashback>,
+}
+
+/// A line of the epilogue: said after the ending, when its condition holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EpilogueLine {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<Code>,
+    /// Only after these endings (empty: any).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub endings: Vec<EndingId>,
+    pub text: Text,
+}
+
+/// A memory played through: somewhere in the past, for a while, then back.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Flashback {
+    pub key: String,
+    /// Where it starts.
+    pub at: EntityId,
+    /// What the player has in it (what they carry now is set aside).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub carries: Vec<EntityId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub begins: Option<Text>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ends: Option<Text>,
+    /// It ends after this many turns…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turns: Option<u32>,
+    /// …or once this is true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<Code>,
+}
+
+/// When a room is crowded: always, or between two times of day (minutes
+/// after midnight).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Crowd {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<u32>,
 }
 
 /// The weather: kinds, the one it starts as, and how often it changes.
@@ -130,6 +178,9 @@ pub struct WeatherKind {
     /// Said, outdoors, when the weather turns to this: "It starts to rain."
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub begins: Option<Text>,
+    /// Bitterly cold, out of doors.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cold: bool,
 }
 
 /// Something the player is trying to do, listed by JOURNAL. It's added
@@ -720,6 +771,71 @@ pub struct Entity {
     /// Objects: puts out a fire (water, sand), and is used up doing it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub douses: bool,
+    /// Objects: a rope: TIE IT TO an anchor, or TIE UP someone with it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rope: bool,
+    /// Objects: something to tie a rope to (a tree, a hook, a post).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub anchor: bool,
+    /// Objects: hidden, it sounds hollow when knocked on (a secret panel).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hollow: bool,
+    /// Objects with a `code`: wrong tries before it jams (the `tries` state).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tries: Option<u32>,
+    /// Objects with a `code`: a wrong one says how close it was.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub feedback: bool,
+    /// Objects: what's left when it breaks (a snapped key).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breaks_into: Option<EntityId>,
+    /// Objects: mends what's worn or broken (glue, needle and thread).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mends: bool,
+    /// Objects: goes bad after this many turns in the world (food).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spoils: Option<u32>,
+    /// Objects: takes both hands to carry (in a game where hands count).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub two_handed: bool,
+    /// The player: how many hands they have, to hold big things in. None:
+    /// hands don't count.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hands: Option<u32>,
+    /// Objects: worn, keeps the cold out (a coat); eaten or drunk, warms
+    /// the player up (soup).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub warm: bool,
+    /// Rooms: bitterly cold.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cold: bool,
+    /// The player: turns they last in the cold before it hurts (the
+    /// `warmth` state).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warmth: Option<u32>,
+    /// Characters: read notes they're given, or find lying about.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reads: bool,
+    /// Objects: something to get in and go in (a boat, a cart), by the
+    /// ways that are `by` it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub vehicle: bool,
+    /// Characters: something to RIDE (a horse).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mount: bool,
+    /// Characters that are ridden: moves before it needs feeding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stamina: Option<u32>,
+    /// Rooms: crowded, always or at some hours.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crowd: Option<Crowd>,
+    /// In a flashback: what this past room or thing is now. A past thing
+    /// left in a past room is in that room's present one afterwards.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub now: Option<EntityId>,
+    /// Objects: examining or reading it plays this flashback, once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flashback: Option<String>,
 }
 
 /// How a trap works. Its damage, if any, is the object's `damage`.
@@ -759,6 +875,9 @@ pub struct Npc {
     /// Gives directions when asked the way.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub knows_the_way: bool,
+    /// Won't let the player go a way without the password.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<Password>,
     /// Percent chance of moving to a neighbouring room on a turn with
     /// nothing better to do.
     #[serde(default)]
@@ -1167,6 +1286,12 @@ pub struct Exit {
     /// THE STAIRS, GO DOWN THE PATH, CROSS THE BRIDGE.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub via: Vec<EntityId>,
+    /// Only with a rope tied at one end or the other: a sheer drop.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rope: bool,
+    /// Only in (or on) one of these: a boat, a cart, a horse.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub by: Vec<EntityId>,
 }
 
 // --------------------------------------------------------------- text & code
@@ -1272,6 +1397,24 @@ pub struct Ask {
     /// Said when they next see the player, after a broken promise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broken: Option<Text>,
+}
+
+/// A doorkeeper's password.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Password {
+    /// The word, lower case.
+    pub word: String,
+    /// The ways it won't let the player go without it.
+    pub bars: Vec<Direction>,
+    /// Said when it stops the player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<Text>,
+    /// Said when it's given the password.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub right: Option<Text>,
+    /// Said for a wrong one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wrong: Option<Text>,
 }
 
 /// A pressure plate.
@@ -1640,6 +1783,20 @@ pub enum BuiltinAction {
     Swim,
     /// LET THE DOG SNIFF THE GLOVE.
     Scent,
+    /// TIE THE ROPE TO THE TREE, TIE UP THE GUARD.
+    Tie,
+    /// UNTIE THE ROPE, UNTIE THE GUARD.
+    Untie,
+    /// KNOCK ON THE DOOR, KNOCK ON THE WALLS.
+    Knock,
+    /// MEND THE NET WITH THE THREAD.
+    Mend,
+    /// WRITE "MEET ME AT THE MILL" ON THE PAPER.
+    Write,
+    /// RIDE THE HORSE.
+    Ride,
+    /// DISMOUNT.
+    Dismount,
 }
 
 impl BuiltinAction {
@@ -1826,7 +1983,7 @@ pub struct Handler {
 /// Events that aren't verbs, and where each may be declared.
 pub const GLOBAL_EVENTS: &[&str] = &["start", "turn", "parse_failed", "died"];
 /// Events on a character: `defeated` runs when its health reaches 0.
-pub const CHARACTER_EVENTS: &[&str] = &["defeated"];
+pub const CHARACTER_EVENTS: &[&str] = &["defeated", "read_note"];
 pub const ROOM_EVENTS: &[&str] = &["enter", "leave", "turn"];
 
 // ------------------------------------------------------------------- choices

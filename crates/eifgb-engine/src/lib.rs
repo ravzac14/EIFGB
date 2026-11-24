@@ -41,6 +41,10 @@ mod tricks;
 mod cunning;
 mod knowing;
 mod elements;
+mod handiwork;
+mod letters;
+mod memory;
+mod travels;
 pub mod world;
 
 pub use game::{Game, Line, LineKind, Missed, Output, Status};

@@ -29,6 +29,10 @@ export interface Exit {
   via?: string[];
   /** Only open then (`open_at`): night, day, full moon, 22:00-4:00. */
   openAt?: string[];
+  /** A sheer drop: only with a rope tied at one end. */
+  rope?: boolean;
+  /** Only in (or riding) one of these: a boat, a horse. */
+  by?: string[];
   /**
    * `plain` (a room), `door`, `blocked` (a message), or `advanced`
    * (conditions, or several exits one way): shown, but edited as text.
@@ -355,8 +359,11 @@ export class Model {
         const via = isSeq(rawVia) ? rawVia.items.map((i) => str(i)).filter((s): s is string => !!s) : str(rawVia) ? [str(rawVia)!] : [];
         const rawAt = v.get("open_at");
         const openAt = isSeq(rawAt) ? rawAt.items.map((i) => str(i)).filter((s): s is string => !!s) : str(rawAt) ? [str(rawAt)!] : [];
-        const simple = v.items.every((i) => ["to", "through", "via", "open_at", "blocked"].includes(String(isScalar(i.key) ? i.key.value : i.key)));
-        if (simple && to) out.push({ dir, to, door: through, via, ...(openAt.length ? { openAt } : {}), ...(blocked ? { blocked } : {}), kind: through ? "door" : "plain" });
+        const rope = v.get("rope") === true;
+        const rawBy = v.get("by");
+        const by = isSeq(rawBy) ? rawBy.items.map((i) => str(i)).filter((s): s is string => !!s) : str(rawBy) ? [str(rawBy)!] : [];
+        const simple = v.items.every((i) => ["to", "through", "via", "open_at", "blocked", "rope", "by"].includes(String(isScalar(i.key) ? i.key.value : i.key)));
+        if (simple && to) out.push({ dir, to, door: through, via, ...(openAt.length ? { openAt } : {}), ...(blocked ? { blocked } : {}), ...(rope ? { rope } : {}), ...(by.length ? { by } : {}), kind: through ? "door" : "plain" });
         else out.push({ dir, to, door: through, blocked, via, kind: "advanced" });
       } else if (isSeq(v)) {
         // Several exits one way: show the first that leads somewhere.
@@ -403,9 +410,82 @@ export class Model {
       .map((id) => ({ id, name: str(this.get(["objects", id, "name"])) ?? id }));
   }
 
+  /** Its traits: its own, and those its kinds give it. */
   traits(path: string[]): string[] {
+    const own = this.ownTraits(path);
+    for (const t of this.kindTraits(this.list([...path, "like"]), [])) if (!own.includes(t)) own.push(t);
+    return own;
+  }
+
+  /** The traits written on it, not counting its kinds'. */
+  ownTraits(path: string[]): string[] {
     const t = this.doc.getIn([...path, "traits"], true);
     return isSeq(t) ? t.items.map((i) => String(isScalar(i) ? i.value : i)) : [];
+  }
+
+  private kindTraits(kinds: string[], seen: string[]): string[] {
+    const out: string[] = [];
+    for (const k of kinds) {
+      if (seen.includes(k) || !this.map(["kinds", k])) continue;
+      for (const t of [...this.kindTraits(this.list(["kinds", k, "like"]), [...seen, k]), ...this.ownTraits(["kinds", k])]) if (!out.includes(t)) out.push(t);
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------------ kinds
+
+  /** The game's kinds: things written once, and used by `like:`. */
+  kindNames(): string[] {
+    return this.keys("kinds");
+  }
+
+  /** A kind's own fields. */
+  kindFields(kind: string): Record<string, unknown> {
+    return (this.map(["kinds", kind])?.toJSON() ?? {}) as Record<string, unknown>;
+  }
+
+  /** What's `like` a kind: [section, id] pairs. */
+  usersOfKind(kind: string): [string, string][] {
+    return ["rooms", "objects", "characters"].flatMap((s) => this.keys(s).filter((id) => this.list([s, id, "like"]).includes(kind)).map((id): [string, string] => [s, id]));
+  }
+
+  /** Makes a kind of what's at `path`: its fields go to the kind (all
+   * but what makes it itself: name, place, words, description, picture),
+   * and it's `like` the kind. Returns the kind's name, or null if taken. */
+  makeKind(path: string[], name: string): string | null {
+    const k = slug(name, "kind");
+    if (this.map(["kinds", k])) return null;
+    const own = this.map(path);
+    if (!own) return null;
+    const keep = new Set(["name", "in", "synonyms", "adjectives", "description", "picture", "like"]);
+    const fields: Record<string, unknown> = {};
+    for (const p of [...own.items]) {
+      const key = String(isScalar(p.key) ? p.key.value : p.key);
+      if (keep.has(key)) continue;
+      fields[key] = isScalar(p.value) ? p.value.value : (p.value as { toJSON?: () => unknown })?.toJSON?.();
+      own.delete(key);
+    }
+    if (this.map(["kinds"])) this.set(["kinds", k], fields);
+    else this.addSection("kinds", { [k]: fields }, ["player", "vars", "settings", "presentation", "game"]);
+    const likes = this.list([...path, "like"]);
+    this.set([...path, "like"], likes.length ? [...likes, k] : k);
+    return k;
+  }
+
+  /** Deletes a kind. What was like it keeps what it gave them, written out. */
+  deleteKind(kind: string) {
+    const fields = (this.map(["kinds", kind])?.toJSON() ?? {}) as Record<string, unknown>;
+    delete fields.like;
+    for (const [s, id] of this.usersOfKind(kind)) {
+      const own = (this.map([s, id])?.toJSON() ?? {}) as Record<string, unknown>;
+      const merged = mergeKind(fields, own);
+      const likes = this.list([s, id, "like"]).filter((x) => x !== kind);
+      if (likes.length) merged.like = likes.length === 1 ? likes[0] : likes;
+      else delete merged.like;
+      this.set([s, id], merged);
+    }
+    this.set(["kinds", kind], undefined);
+    if (!this.kindNames().length) this.set(["kinds"], undefined);
   }
 
   /** What's placed in a room (objects and characters), for warnings when deleting it. */
@@ -531,13 +611,13 @@ export class Model {
     if (!on && trait === "lockable") this.set(["objects", id, "state", "locked"], undefined);
     if (!on && trait === "light_source") this.set(["objects", id, "state", "lit"], undefined);
     if (on && trait === "lockable") this.setTraits(["objects", id], ["openable"], []);
-    if (this.traits(["objects", id]).length === 0) this.set(["objects", id, "traits"], undefined);
+    if (this.ownTraits(["objects", id]).length === 0) this.set(["objects", id, "traits"], undefined);
   }
 
   /** "Can the player pick it up?": yes (portable), no and it's part of the room (scenery), or no. */
   setPortability(id: string, how: "portable" | "scenery" | "fixed") {
     this.setTraits(["objects", id], how === "fixed" ? [] : [how], ["portable", "scenery"].filter((t) => t !== how));
-    if (this.traits(["objects", id]).length === 0) this.set(["objects", id, "traits"], undefined);
+    if (this.ownTraits(["objects", id]).length === 0) this.set(["objects", id, "traits"], undefined);
   }
 
   setState(id: string, key: string, on: boolean) {
@@ -570,7 +650,7 @@ export class Model {
    * room, rules ("search mat"), and Lua code anywhere in the file.
    */
   private renameEntityRefs(old: string, next: string) {
-    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in", "splits_into", "parts", "answers_to", "friends", "plays", "with", "makes", "keep", "decoy_for", "watches", "for", "gives", "copy"]);
+    const REFS = new Set(["to", "through", "via", "in", "unlocks_with", "area", "at", "tame_with", "likes", "fears", "blocked", "hidden", "heard_in", "splits_into", "parts", "answers_to", "friends", "plays", "with", "makes", "keep", "decoy_for", "watches", "for", "gives", "copy", "breaks_into", "by", "now", "carries"]);
     const RULES = new Set(["revealed_by", "started_by", "stopped_by"]);
     const code = renameInCode("entity", old, next);
     const rule = (s: string) => s.replace(new RegExp(`^(\\s*(?:\\([^)]*\\)|[\\w-]+)\\s+)${esc(old)}(\\s*)$`), `$1${next}$2`);
@@ -682,6 +762,8 @@ export class Model {
       for (const o of this.keys(s)) {
         if (str(this.get([s, o, "decoy_for"])) === id) this.set([s, o, "decoy_for"], undefined);
         if (str(this.get([s, o, "copy"])) === id) this.set([s, o, "copy"], undefined);
+        if (str(this.get([s, o, "breaks_into"])) === id) this.set([s, o, "breaks_into"], undefined);
+        if (str(this.get([s, o, "now"])) === id) this.set([s, o, "now"], undefined);
         if (str(this.get([s, o, "asks", "for"])) === id) this.set([s, o, "asks"], undefined);
         // A combination with it, or making it, goes.
         const c = this.doc.getIn([s, o, "combines"], true);
@@ -698,6 +780,15 @@ export class Model {
           if (path[3] === "parts" && !left.length) this.set([s, o, "splits_into"], undefined);
           else this.setList(path, left);
         }
+      }
+    }
+    for (const f of this.keys("flashbacks")) {
+      const carries = this.list(["flashbacks", f, "carries"]);
+      if (carries.includes(id)) this.setList(["flashbacks", f, "carries"], carries.filter((x) => x !== id));
+    }
+    for (const r of this.roomIds()) {
+      for (const e of this.exits(r)) {
+        if (e.by?.includes(id)) this.setBy(r, e.dir, e.by.filter((b) => b !== id));
       }
     }
     if (this.get(["player", "plays"]) === id) {
@@ -1304,16 +1395,46 @@ export class Model {
     // When it's open, and what it says when it isn't, are kept.
     const now = this.exit(room, dir);
     const openAt = now?.openAt ?? [];
-    if (!door && !via.length && !openAt.length) return this.set(["rooms", room, "exits", dir], to);
+    const rope = now?.rope ?? false;
+    const by = now?.by ?? [];
+    if (!door && !via.length && !openAt.length && !rope && !by.length) return this.set(["rooms", room, "exits", dir], to);
     const v: Record<string, unknown> = { to };
     if (door) v.through = door;
     if (via.length === 1) v.via = via[0];
     else if (via.length) v.via = via;
-    if (openAt.length) {
-      v.open_at = openAt.length === 1 ? openAt[0] : openAt;
-      if (now?.blocked) v.blocked = now.blocked;
-    }
+    if (openAt.length) v.open_at = openAt.length === 1 ? openAt[0] : openAt;
+    if (rope) v.rope = true;
+    if (by.length) v.by = by.length === 1 ? by[0] : by;
+    if ((openAt.length || rope) && now?.blocked) v.blocked = now.blocked;
     this.set(["rooms", room, "exits", dir], v);
+  }
+
+  /** What a way out can only be taken in, or on (`by`): a boat, a horse. */
+  setBy(room: string, dir: Direction, by: string[]) {
+    const e = this.exit(room, dir);
+    if (!e?.to || e.kind === "advanced") return;
+    const p = ["rooms", room, "exits", dir];
+    if (by.length) {
+      if (typeof this.get(p) !== "object") this.set(p, { to: e.to });
+      this.set([...p, "by"], by.length === 1 ? by[0] : by);
+    } else {
+      this.set([...p, "by"], undefined);
+      if (!e.door && !(e.via ?? []).length && !(e.openAt ?? []).length && !e.rope && !e.blocked) this.set(p, e.to);
+    }
+  }
+
+  /** Whether a way out is a sheer drop, needing a rope (`rope: true`). */
+  setRope(room: string, dir: Direction, on: boolean) {
+    const e = this.exit(room, dir);
+    if (!e?.to || e.kind === "advanced") return;
+    const p = ["rooms", room, "exits", dir];
+    if (on) {
+      if (typeof this.get(p) !== "object") this.set(p, { to: e.to });
+      this.set([...p, "rope"], true);
+    } else {
+      this.set([...p, "rope"], undefined);
+      if (!e.door && !(e.via ?? []).length && !(e.openAt ?? []).length && !e.blocked) this.set(p, e.to);
+    }
   }
 
   /** When a way out is open (`open_at`), and what it says when it isn't. */
@@ -1422,7 +1543,7 @@ export class Model {
   }
 
   setTraits(path: string[], add: string[], remove: string[]) {
-    const now = this.traits(path).filter((t) => !remove.includes(t));
+    const now = this.ownTraits(path).filter((t) => !remove.includes(t));
     for (const t of add) if (!now.includes(t)) now.push(t);
     const node = this.doc.getIn([...path, "traits"], true);
     if (isSeq(node)) {
@@ -1448,4 +1569,17 @@ export class Model {
     const s = this.doc.getIn([...path, "state"], true);
     if (isMap(s)) s.flow = true;
   }
+}
+
+/** A kind's fields with a thing's own on top: maps merge, traits add up,
+ * anything else of its own replaces the kind's (as the compiler does). */
+export function mergeKind(base: Record<string, unknown>, over: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(over)) {
+    const b = out[k];
+    if (k === "traits" && Array.isArray(b) && Array.isArray(v)) out[k] = [...b, ...v.filter((t) => !b.includes(t))];
+    else if (b && v && typeof b === "object" && typeof v === "object" && !Array.isArray(b) && !Array.isArray(v)) out[k] = mergeKind(b as Record<string, unknown>, v as Record<string, unknown>);
+    else out[k] = v;
+  }
+  return out;
 }

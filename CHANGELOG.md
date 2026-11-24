@@ -37,7 +37,45 @@ if you like ("## 2026-11-24: editor tools"). -->
   good.
 - **How characters sound**, under Problems: each character's lines side
   by side, and a word when two sound alike or one's voice drifts.
+- Ropes: TIE THE ROPE TO THE POST and climb down a sheer drop (or back
+  up), or TIE UP a sleeping guard.
+- Knocking: KNOCK ON THE WALLS for a hollow spot, or KNOCK ON A DOOR and
+  whoever's inside may open it.
+- Passwords: a doorkeeper who won't let you by until you SAY it.
+- Codes can jam after too many wrong tries (`tries:`), say how close a
+  wrong one was (`feedback:`), and be dialled in words: DIAL FOUR SEVEN
+  ONE.
+- Wear: a warning before something breaks, what's left of it
+  (`breaks_into:`), and MEND, with something that `mends`.
+- Food that goes bad (`spoils:`).
+- Hands (`player: { hands: 2 }`): only so much can be held at once, and
+  climbing takes a hand free.
+- The cold: cold rooms and cold weather, warm coats, soup, and a fire to
+  warm up by.
+- Notes: WRITE "MEET ME AT THE MILL" ON THE PAPER, and whoever reads it,
+  and believes it, goes there and waits.
+- Boats and carts that carry you along the ways only they can go, and
+  horses to ride: faster, until they tire and need feeding.
+- Crowds, always or at certain hours: enemies can't pick you out,
+  pickpockets mostly go unnoticed, and nobody leaves tracks.
+- Flashbacks: play through a memory somewhere in the past, and what you
+  leave there is found in the present.
+- An epilogue after the ending, looking back on what the player did.
+- Kinds: write a guard or a lamp once (`kinds:`), and have others be
+  `like` it, with their own fields on top. In the editor, **Make a kind
+  of this**.
+- In the editor: **How the descriptions read**, under Problems (words
+  used again and again, long or hard descriptions, rooms that all begin
+  alike), and **Pacing** in Test play: where the walkthrough brings new
+  rooms, things, points and facts, and the long stretches where it
+  doesn't.
+- In the web player: **Threads**, to read the story so far following one
+  character or thing.
 - All of these can be set in the editor's details panels too.
+- Changed: TIE and KNOCK are built in now. A game's own `verbs: tie:` or
+  `knock:` gets a warning that its patterns replace the standard ones,
+  and its `default:` reply isn't used; handlers (`on: tie:`) still come
+  first, as before.
 
 ## 2026-11-24
 

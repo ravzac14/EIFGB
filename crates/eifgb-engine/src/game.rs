@@ -124,6 +124,8 @@ pub struct Game<H: ScriptHost> {
     pub(crate) no_turn: bool,
     /// Walking through on the way somewhere (GO TO): rooms show only their name.
     pub(crate) passing: bool,
+    /// A step of GO TO on horseback that takes no turn of its own.
+    pub(crate) free_step: bool,
     /// Waiting several turns: WAIT says nothing each turn.
     pub(crate) quiet_wait: bool,
     /// What the player was holding when this input began.
@@ -178,6 +180,7 @@ impl<H: ScriptHost> Game<H> {
             last: None,
             no_turn: false,
             passing: false,
+            free_step: false,
             quiet_wait: false,
             held_before: Vec::new(),
             chosen: std::collections::BTreeSet::new(),
@@ -477,6 +480,8 @@ impl<H: ScriptHost> Game<H> {
                     self.world.state.heard_of.insert(r);
                 }
                 Effect::Promise(c) => self.make_promise(c),
+                Effect::Flashback(k) => self.start_flashback(&k),
+                Effect::EndFlashback => self.end_flashback(),
                 Effect::Npc(event) => self.narrate(&event),
             }
         }
@@ -690,6 +695,11 @@ impl<H: ScriptHost> Game<H> {
         if std::mem::take(&mut self.no_turn) {
             return false;
         }
+        // Galloping: two rooms for the turn of one.
+        if std::mem::take(&mut self.free_step) {
+            self.last = Some(cmd.words);
+            return true;
+        }
         let mentioned: Vec<EntityId> = cmd.targets.iter().copied().chain(cmd.tool).collect();
         if !mentioned.is_empty() {
             self.world.state.mentioned = mentioned;
@@ -699,6 +709,10 @@ impl<H: ScriptHost> Game<H> {
         self.cunning_turn();
         self.promises_turn();
         self.elements_turn();
+        self.spoil_turn();
+        self.cold_turn();
+        self.notes_turn();
+        self.flashback_turn();
         self.dead_act_seen();
         self.world.push_undo(before);
         self.last = Some(cmd.words);
@@ -920,7 +934,7 @@ impl<H: ScriptHost> Game<H> {
             && target.is_some_and(|t| self.world.health(t).is_none() && !self.world.is_invincible(t));
         let quiet = !reveals.is_empty()
             && (pointless_attack
-                || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search | BuiltinAction::Smell | BuiltinAction::Listen | BuiltinAction::Read)));
+                || matches!(verb.action, VerbAction::Script | VerbAction::Builtin(BuiltinAction::Search | BuiltinAction::Smell | BuiltinAction::Listen | BuiltinAction::Read | BuiltinAction::Knock)));
 
         let before_action = self.out.lines.len();
         let combination = self.combination(&verb.key, target, cmd.tool);
@@ -934,6 +948,8 @@ impl<H: ScriptHost> Game<H> {
             }
             None => match verb.action {
                 VerbAction::Builtin(a) => self.builtin(a, target, cmd, &ctx),
+                // SAY SWORDFISH to a doorkeeper.
+                VerbAction::Script if verb.key == "say" && self.say_password(cmd.text.as_deref()) => true,
                 // SAY HELLO where there's an echo.
                 VerbAction::Script if verb.key == "say" && self.echo(cmd.text.as_deref()) => false,
                 VerbAction::Script => {
@@ -952,6 +968,7 @@ impl<H: ScriptHost> Game<H> {
             && let Some(t) = target
         {
             self.take_mood(t);
+            self.warm_up(t);
         }
         // A tool that wears out: a use for each time it's used.
         if ok {
@@ -964,7 +981,9 @@ impl<H: ScriptHost> Game<H> {
                 )
                 => cmd.tool,
                 // A game's own verb, done by its handler: what it was done with, or to.
-                VerbAction::Script => cmd.tool.filter(|t| self.world.def(*t).uses.is_some()).or(target.filter(|t| self.world.def(*t).uses.is_some())),
+                VerbAction::Script | VerbAction::Builtin(BuiltinAction::Tie) => {
+                    cmd.tool.filter(|t| self.world.def(*t).uses.is_some()).or(target.filter(|t| self.world.def(*t).uses.is_some()))
+                }
                 _ => None,
             };
             if let Some(t) = tool {
@@ -1191,6 +1210,7 @@ impl<H: ScriptHost> Game<H> {
         self.world.state.choice = None;
         let ending = self.world.story().endings[id.index()].clone();
         self.render_line(LineKind::Ending, &ending.text, &Ctx::new());
+        self.epilogue(id);
         let banner = match ending.kind {
             EndingKind::Win => "ending.win",
             EndingKind::Loss => "ending.loss",

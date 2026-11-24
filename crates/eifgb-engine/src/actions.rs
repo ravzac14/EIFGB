@@ -18,7 +18,7 @@ use eifgb_ir::{BuiltinAction, Direction, EntityId, EntityKind, Exit, PatternToke
 /// [`World::door_blocked`]: crate::World::door_blocked
 const BUILTIN_STATE: &[&str] = &[
     "open", "locked", "worn", "hidden", "health", "money", "dead", "patience", "foes", "killed_by", "killed_with", "asleep",
-    "sees_in_dark", "fuel", "uses", "liquid", "dark", "disposition",
+    "sees_in_dark", "fuel", "uses", "liquid", "dark", "disposition", "tries", "spoiled", "warmth", "written",
 ];
 
 /// One thing the automatic state descriptions can say.
@@ -87,6 +87,11 @@ impl<H: ScriptHost> Game<H> {
                 true
             }
             (A::Use, Some(t)) => self.use_action(t, cmd.tool, ctx),
+            // Gone bad: not to be eaten or drunk.
+            (A::Eat | A::Drink, Some(t)) if self.world.flag(t, "spoiled") && self.world.def(t).spoils.is_some() => {
+                self.msg("spoil.eat", ctx);
+                false
+            }
             (A::Drink, Some(t)) if self.world.def(t).holds_liquid => self.drink_from(t, ctx),
             (A::Drink, Some(t)) if self.world.def(t).liquid_source.is_some() => {
                 self.msg("drink.from", ctx);
@@ -94,11 +99,12 @@ impl<H: ScriptHost> Game<H> {
             }
             (A::Drink, Some(t)) => self.drink(t, ctx),
             (A::Read, Some(t)) => {
-                let ok = match self.read(t, ctx) {
+                let ok = match self.read_written(t, ctx).or_else(|| self.read(t, ctx)) {
                     Some(ok) => ok,
                     None => self.examine(t),
                 };
                 self.taught_by(t, true);
+                self.remembered_by(t);
                 ok
             }
             (A::Listen, Some(t)) => self.sense(t, false, ctx),
@@ -111,7 +117,19 @@ impl<H: ScriptHost> Game<H> {
                 let text = cmd.text.clone().unwrap_or_default();
                 self.enter_code(t, &text, ctx)
             }
-            (A::Climb, Some(t)) => self.climb(t, ctx),
+            (A::Climb, Some(_)) if !self.hand_to_climb() => false,
+            (A::Climb, Some(t)) => match self.climb_rope(t) {
+                Some(ok) => ok,
+                None => self.climb(t, ctx),
+            },
+            (A::Tie, Some(t)) => self.tie(t, cmd.tool, ctx),
+            (A::Untie, Some(t)) => self.untie(t, ctx),
+            (A::Knock, t) => self.knock(t, ctx),
+            (A::Mend, Some(t)) => self.mend(t, cmd.tool, ctx),
+            (A::Write, t) => self.write(t, cmd.tool, cmd.text.as_deref(), ctx),
+            (A::Ride, Some(t)) => self.ride(t, ctx),
+            (A::Dismount, _) => self.dismount(ctx),
+            (A::GetOut, t) if self.world.riding().is_some() && (t.is_none() || t == self.world.riding()) && self.world.vehicle_here().is_none() => self.dismount(ctx),
             (A::Wake, Some(t)) => self.wake_action(t, ctx),
             (A::FeelAround, _) => self.feel_around(ctx),
             (A::FeelFor, _) => self.feel_for(cmd, ctx),
@@ -123,6 +141,7 @@ impl<H: ScriptHost> Game<H> {
             (A::Examine, Some(t)) => {
                 let ok = self.examine(t);
                 self.taught_by(t, false);
+                self.remembered_by(t);
                 ok
             }
             (A::Take, Some(t)) => self.take(t, cmd.tool, ctx),
@@ -156,11 +175,21 @@ impl<H: ScriptHost> Game<H> {
             (A::Wear, Some(t)) => self.wear(t, ctx),
             (A::TakeOff, Some(t)) => self.take_off(t, ctx),
             (A::Eat, Some(t)) => self.eat(t, ctx),
-            (A::Attack, Some(t)) => self.attack_action(t, cmd.tool, ctx),
+            (A::Attack, Some(t)) => {
+                self.world.make_scene();
+                self.attack_action(t, cmd.tool, ctx)
+            }
             (A::Buy, Some(t)) => self.buy(t, cmd.tool, ctx),
             (A::Sell, Some(t)) => self.sell(t, cmd.tool, cmd.text.as_deref(), ctx),
             (A::Accept, _) => self.accept(ctx),
-            (A::Give, Some(t)) => self.give_action(t, cmd.tool, ctx),
+            (A::Give, Some(t)) if cmd.tool.is_some_and(|to| self.hand_note(t, to)) => true,
+            (A::Give, Some(t)) => {
+                let ok = self.give_action(t, cmd.tool, ctx);
+                if ok && let Some(to) = cmd.tool {
+                    self.feed_mount(t, to);
+                }
+                ok
+            }
             (A::Bribe, Some(t)) => self.bribe_action(t, cmd.text.as_deref(), ctx),
             (A::Trade, Some(t)) => self.trade(t, cmd.tool, ctx),
             (A::Combine, Some(t)) => self.combine_action(t, cmd.tool, ctx),
@@ -325,6 +354,9 @@ impl<H: ScriptHost> Game<H> {
             }
             // Outdoors: the weather.
             self.describe_weather();
+            if self.world.is_crowded(here) {
+                self.msg("crowd.here", &Ctx::new());
+            }
         }
         let described = self.out.lines.len() > before;
         // Things that won't be listed (scenery) still get their state
@@ -514,6 +546,7 @@ impl<H: ScriptHost> Game<H> {
         for item in items {
             self.inventory_contents(item, 0);
         }
+        self.report_hands();
         self.report_money();
         true
     }
@@ -545,9 +578,11 @@ impl<H: ScriptHost> Game<H> {
             self.msg("go.no_exit", ctx);
             return false;
         };
+        // In a boat, going a way that's `by` it: the boat goes.
+        let afloat = self.world.vehicle_here().is_some_and(|v| self.world.def(here).exits.iter().any(|e| e.direction == dir && e.by.contains(&v)));
         // In or on something: OUT means getting out of it; any other
         // direction gets out first, then goes.
-        if self.world.location(PLAYER) != Some(here) {
+        if self.world.location(PLAYER) != Some(here) && !afloat {
             if dir == Direction::Out && self.world.exit(here, Direction::Out).is_none() {
                 return self.get_out(None);
             }
@@ -581,6 +616,14 @@ impl<H: ScriptHost> Game<H> {
             0 => {
                 match group.iter().find_map(|e| e.blocked.clone()) {
                     Some(t) => self.render_line(LineKind::Text, &t, &Ctx::new().this(here)),
+                    None if group.iter().any(|e| self.world.needs_rope(e, here)) => self.msg("rope.needed", ctx),
+                    None if group.iter().any(|e| !self.world.conveyed(e)) => {
+                        let by = group.iter().find_map(|e| e.by.first().copied());
+                        match by {
+                            Some(b) => self.msg("by.needed", &ctx.clone().entity("tool", b)),
+                            None => self.msg("go.blocked", ctx),
+                        }
+                    }
                     None if group.iter().any(|e| e.to.is_some()) => self.msg("go.blocked", ctx),
                     None => self.msg("go.no_exit", ctx),
                 }
@@ -657,6 +700,9 @@ impl<H: ScriptHost> Game<H> {
     }
 
     fn exit_allowed(&mut self, e: &Exit, here: EntityId) -> bool {
+        if self.world.needs_rope(e, here) || !self.world.conveyed(e) {
+            return false;
+        }
         match &e.when {
             Some(w) => self.run(w, &Ctx::new().this(here)).truthy(),
             None => true,
@@ -698,6 +744,13 @@ impl<H: ScriptHost> Game<H> {
             self.msg("trap.stuck", &Ctx::new().entity("trap", trap));
             return false;
         }
+        if self.stopped_by_keeper(here, exit.direction) || !self.mount_will_go() {
+            return false;
+        }
+        // Down a rope takes a hand free.
+        if exit.rope && !self.hand_to_climb() {
+            return false;
+        }
         if let Some(door) = exit.through
             && let Some(b) = self.world.door_blocked(door, here)
         {
@@ -725,9 +778,17 @@ impl<H: ScriptHost> Game<H> {
         self.room_event(here, "leave");
         // BRIEF: somewhere the player has been is only named, not described again.
         let been = self.world.state.visited.contains(&to);
-        if self.world.move_to(PLAYER, Some(to)).is_err() {
+        // In a boat going by its way, the boat goes, with the player in it.
+        let boat = self.world.vehicle_here().filter(|v| exit.by.contains(v));
+        let moved = match boat {
+            Some(b) => self.world.move_to(b, Some(to)),
+            None => self.world.move_to(PLAYER, Some(to)),
+        };
+        if moved.is_err() {
             return false;
         }
+        self.mount_follows(to);
+        self.world.unset(PLAYER, "_scene");
         self.world.state.came_from = Some(here);
         // Pushing something: it goes first, and the player follows it in.
         if let Some(t) = self.pushing.take()
@@ -793,6 +854,21 @@ impl<H: ScriptHost> Game<H> {
         if id != PLAYER && w.held_by(id).is_some() && !w.is_dead(id) {
             notes.push(StateNote::Builtin("caught"));
         }
+        if w.is_bound(id) && !w.is_dead(id) {
+            notes.push(StateNote::Builtin("bound"));
+        }
+        if w.def(id).rope && w.tied_to(id).is_some_and(|a| w.def(a).kind != EntityKind::Character) {
+            notes.push(StateNote::Builtin("tied"));
+        }
+        if w.def(id).spoils.is_some() && w.flag(id, "spoiled") {
+            notes.push(StateNote::Builtin("spoiled"));
+        }
+        if w.def(id).tries.is_some() && matches!(w.get(id, "tries"), Some(Value::Int(0))) {
+            notes.push(StateNote::Builtin("jammed"));
+        }
+        if w.def(id).uses.is_some_and(|u| u >= 2) && matches!(w.get(id, "uses"), Some(Value::Int(1))) {
+            notes.push(StateNote::Builtin("worn_thin"));
+        }
         if w.is_dead(id) {
             notes.push(StateNote::Builtin("dead"));
             if w.get(id, "killed_by").is_some() || w.flag(id, "_burnt") {
@@ -839,6 +915,9 @@ impl<H: ScriptHost> Game<H> {
                 let builtin = match field.as_str() {
                     "fuel" => w.def(id).fuel.is_some(),
                     "uses" => w.def(id).uses.is_some(),
+                    "tries" => w.def(id).tries.is_some(),
+                    "spoiled" => w.def(id).spoils.is_some(),
+                    "warmth" => id == PLAYER,
                     "liquid" => w.def(id).holds_liquid,
                     "dark" => w.def(id).kind == EntityKind::Room,
                     _ => true,
@@ -880,6 +959,8 @@ impl<H: ScriptHost> Game<H> {
             || self.world.is_asleep(id)
             || self.world.is_frightened(id)
             || self.world.held_by(id).is_some()
+            || self.world.is_bound(id)
+            || self.world.tied_to(id).is_some()
             || self.world.on_fire(id);
         if !self.world.known(id) && !obvious {
             return Vec::new();
@@ -894,6 +975,11 @@ impl<H: ScriptHost> Game<H> {
                         Some(Value::Str(l)) => Some(format!("{full} {l}")),
                         _ => None,
                     }
+                }
+                // "tied to the tree": what to follows.
+                StateNote::Builtin("tied") => {
+                    let tied = self.world.story().messages.get("state.tag.tied").and_then(Text::as_literal)?;
+                    self.world.tied_to(id).map(|a| format!("{tied} {}", self.the(a)))
                 }
                 StateNote::Builtin(t) => {
                     self.world.story().messages.get(&format!("state.tag.{t}")).and_then(Text::as_literal)
@@ -951,7 +1037,8 @@ impl<H: ScriptHost> Game<H> {
             StateNote::Builtin("wounded" | "badly_wounded") => self.mentions(text, id, &["health"], is_own),
             StateNote::Builtin("dead") => self.mentions(text, id, &["dead"], is_own),
             StateNote::Builtin("asleep") => self.mentions(text, id, &["asleep"], is_own),
-            StateNote::Builtin("frightened" | "caught") => false,
+            StateNote::Builtin("frightened" | "caught" | "bound" | "tied" | "jammed" | "worn_thin") => false,
+            StateNote::Builtin("spoiled") => self.mentions(text, id, &["spoiled"], is_own),
             StateNote::Builtin("killed") => self.mentions(text, id, &["killed_by", "killed_with"], is_own),
             StateNote::Builtin(_) => self.mentions(text, id, &["open", "locked"], is_own),
             StateNote::Flag { field, .. } | StateNote::Value { field, .. } => self.mentions(text, id, &[field], is_own),
@@ -965,7 +1052,10 @@ impl<H: ScriptHost> Game<H> {
             if self.note_mentioned(&note, description, id, true) {
                 continue;
             }
-            let ctx = Ctx::new().entity("target", id);
+            let mut ctx = Ctx::new().entity("target", id);
+            if let Some(a) = self.world.tied_to(id) {
+                ctx = ctx.entity("anchor", a);
+            }
             let s = match note {
                 StateNote::Builtin("killed") => match self.kill_story(id) {
                     Some(s) => s,
@@ -1004,7 +1094,10 @@ impl<H: ScriptHost> Game<H> {
             })
             .filter(|n| !self.note_mentioned(n, room_description, id, false))
             .collect();
-        let ctx = Ctx::new().entity("target", id);
+        let mut ctx = Ctx::new().entity("target", id);
+        if let Some(a) = self.world.tied_to(id) {
+            ctx = ctx.entity("anchor", a);
+        }
         let s = match notes.as_slice() {
             [] => return,
             [StateNote::Builtin(t)] => self.msg_str(&format!("state.here.{t}"), &ctx),
@@ -1103,6 +1196,8 @@ impl<H: ScriptHost> Game<H> {
             Some("take.self")
         } else if w.location(t) == Some(PLAYER) {
             Some("take.already")
+        } else if w.tied_to(t).is_some() {
+            Some("take.tied")
         } else if w.def(t).kind == EntityKind::Character && !w.is_dead(t) {
             Some("take.person")
         } else if w.def(t).kind == EntityKind::Room || w.has(t, Trait::Scenery) {
@@ -1126,7 +1221,14 @@ impl<H: ScriptHost> Game<H> {
             None
         };
         if let Some(k) = key {
-            self.msg(k, ctx);
+            let ctx = match self.world.tied_to(t) {
+                Some(a) => ctx.clone().entity("anchor", a),
+                None => ctx.clone(),
+            };
+            self.msg(k, &ctx);
+            return false;
+        }
+        if !self.hands_allow(t, ctx) {
             return false;
         }
         let armed = self.world.def(t).trap.is_some() && self.world.flag(t, "armed");

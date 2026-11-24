@@ -135,6 +135,10 @@ pub enum Effect {
     HearOf(EntityId),
     /// `promise`: the player promises someone their favour.
     Promise(EntityId),
+    /// `flashback`: into a memory.
+    Flashback(String),
+    /// `end_flashback`: back to the present.
+    EndFlashback,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -194,6 +194,19 @@ pub extern "C" fn eifgb_dead_ends(files: *const c_char, entry: *const c_char, wa
     give(serde_json::to_value(eifgb_engine::testing::dead_ends(make, &walkthrough)).unwrap_or(Value::Null))
 }
 
+/// What each step of a walkthrough brings, for the pacing chart. See
+/// [`eifgb_engine::testing::Beat`]. `{ error }` when the game can't be played.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_pacing(files: *const c_char, entry: *const c_char, walkthrough: *const c_char) -> *const c_char {
+    let files: BTreeMap<String, String> = serde_json::from_str(&arg(files)).unwrap_or_default();
+    let entry = arg(entry);
+    let walkthrough = arg(walkthrough);
+    let out = compile(&MemFiles(files), if entry.is_empty() { "game.yaml" } else { &entry });
+    let Some(story) = out.story else { return give(json!({ "error": "the game has mistakes to fix first" })) };
+    let make = || LuaHost::new().and_then(|h| Game::new(story, h, 1)).ok();
+    give(serde_json::to_value(eifgb_engine::testing::pacing(make, &walkthrough)).unwrap_or(Value::Null))
+}
+
 /// The wanderer: `moves` random moves on new games of `files`, the moves
 /// picked from `seed`. Every game uses seed 1, as test play does, so what
 /// it finds plays the same way there. See
@@ -247,6 +260,29 @@ pub extern "C" fn eifgb_complete(line: *const c_char) -> *const c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn eifgb_map() -> *const c_char {
     give(with_game(|g| map(g.world())))
+}
+
+/// The characters and things the player has met, for following one through
+/// the story: `[{ id, name, kind, words }]`, characters first.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_met() -> *const c_char {
+    give(with_game(|g| met(g.world())))
+}
+
+fn met(w: &eifgb_engine::World) -> Value {
+    use eifgb_engine::ir::{EntityKind, PLAYER};
+    let st = &w.state;
+    let mut ids: Vec<eifgb_engine::ir::EntityId> = st.located.keys().chain(st.got.keys()).chain(st.known.iter()).copied().filter(|&e| e != PLAYER && w.def(e).kind != EntityKind::Room).collect();
+    ids.sort_by_key(|&e| (w.def(e).kind != EntityKind::Character, w.display_name(e).to_lowercase()));
+    ids.dedup();
+    Value::Array(
+        ids.into_iter()
+            .map(|e| {
+                let d = w.def(e);
+                json!({ "id": d.key, "name": w.display_name(e), "kind": if d.kind == EntityKind::Character { "character" } else { "thing" }, "words": d.vocab.nouns })
+            })
+            .collect(),
+    )
 }
 
 fn map(w: &eifgb_engine::World) -> Value {

@@ -177,6 +177,35 @@ field is an error, not ignored, so a typo is caught.
   on a thing (LET DOG SNIFF GLOVE, and it leads the way); `echo: { help:
   ... }` and `hears: [tunnel]` on rooms; `clock: { moon: full }` and
   `open_at: full moon` (or `night`, `day`, `22:00-4:00`) on an exit.
+- **Handiwork:** `rope: true` and `anchor: true` on objects, `rope: true`
+  on an exit (a sheer drop: TIE ROPE TO POST, then GO DOWN or CLIMB
+  ROPE; TIE UP a sleeping guard); `hollow: true` on a hidden thing
+  (KNOCK ON THE WALLS finds it; KNOCK ON A DOOR and someone may open
+  it); `password: { word: swordfish, bars: north }` on a character (SAY
+  SWORDFISH); `tries: 3` and `feedback: true` beside a `code`;
+  `breaks_into: broken_key` beside `uses`, and `mends: true` on glue
+  (MEND KEY); `spoils: 40` on food; `player: { hands: 2 }` with
+  `two_handed: true` on big things; `cold: true` on rooms (or a weather
+  kind), `player: { warmth: 8 }`, and `warm: true` on a coat or soup.
+- **Getting about:** `vehicle: true` on an enterable boat, and `by: boat`
+  on the exits only it goes (ROW EAST); `mount: true` (and `stamina: 12`,
+  fed with what it `likes`) on a horse (RIDE HORSE, DISMOUNT), and `by:
+  horse` on a long road; `crowd: true` (or `"8:00-18:00"`) on a room,
+  where enemies can't pick the player out and thieves go unnoticed.
+- **Notes:** with paper (`blank`) and a pen (`writes`), WRITE "MEET ME AT
+  THE MILL" ON PAPER; given or left lying, a character who `reads` and
+  believes it goes to the room it names and waits there.
+- **Flashbacks and the epilogue:** a top-level `flashbacks` section,
+  `{ childhood: { at: garden_then, carries: [ring_then], turns: 6,
+  begins: ..., ends: ... } }`, started by `flashback: childhood` on an
+  object (EXAMINE it) or `flashback("childhood")`; `now: garden` on a
+  past room and `now: ring` on a past thing carry what's left in the past
+  into the present. A top-level `epilogue` list, `[{ when:
+  'world.dog.name == "Rex"', text: ... }]`, is said after the ending.
+- **Kinds:** a top-level `kinds` section, `{ guard: { behavior: guard,
+  health: 5, faction: watch } }`, and `like: guard` on characters (or
+  objects, rooms) that start from it; their own fields go on top, maps
+  merge, traits add up. Use it for anything repeated.
 - **Copying:** `copy: forged_pass` on an object (the copy starts with no
   `in:`); COPY PASS ONTO PAPER with something `blank: true` and something
   that `writes: true` carried. The copy can be swapped for the original.

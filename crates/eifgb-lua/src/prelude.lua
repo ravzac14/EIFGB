@@ -226,6 +226,11 @@ function env.learn(key) H.learn(key) end
 function env.flood(room, level) H.flood(need_entity(room, "flood's room"), level) end
 -- A place the player's heard of: GO TO works once they know the way.
 function env.hear_of(place) H.hear_of(need_entity(place, "hear_of's place")) end
+-- Flashbacks: flashback("childhood") plays it; end_flashback() comes back;
+-- in_flashback() is the one being played, or nil.
+function env.flashback(key) H.flashback(key) end
+function env.end_flashback() H.end_flashback() end
+function env.in_flashback() return H.in_flashback() end
 -- The player promises someone the favour they asked (`asks:`).
 function env.promise(who) H.promise(need_entity(who, "promise's character")) end
 function env.complete_goal(key) H.complete_goal(key) end

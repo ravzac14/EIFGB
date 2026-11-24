@@ -268,7 +268,7 @@ fn kind_name(k: EntityKind) -> &'static str {
 }
 
 /// Fields every entity has. Scripts can read them but not assign them.
-const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling", "remembers", "promise", "water"];
+const BUILTIN_FIELDS: &[&str] = &["key", "name", "kind", "location", "proper", "seen", "visits", "feeling", "remembers", "promise", "water", "tied_to", "bound", "crowded", "riding"];
 
 impl ScriptHost for LuaHost {
     fn load(&mut self, story: &Story) -> Result<(), ScriptError> {
@@ -348,6 +348,20 @@ impl ScriptHost for LuaHost {
                             "promise" => match w.get(id, "_promise") {
                                 Some(eifgb_engine::ir::Value::Str(d)) => (s(d)?, false),
                                 _ => (mlua::Value::Nil, false),
+                            },
+                            // A rope: what it's tied to (an anchor, or someone tied up).
+                            "tied_to" => match w.tied_to(id) {
+                                Some(t) => (mlua::Value::Integer(i64::from(t.0)), true),
+                                None => (mlua::Value::Nil, false),
+                            },
+                            // A character: tied up.
+                            "bound" => (mlua::Value::Boolean(w.is_bound(id)), false),
+                            // A room: crowded right now.
+                            "crowded" => (mlua::Value::Boolean(w.is_crowded(id)), false),
+                            // The player: the horse they're riding.
+                            "riding" => match w.riding().filter(|_| id == eifgb_engine::ir::PLAYER) {
+                                Some(m) => (mlua::Value::Integer(i64::from(m.0)), true),
+                                None => (mlua::Value::Nil, false),
                             },
                             "remembers" => match w.get(id, "_remembers") {
                                 Some(eifgb_engine::ir::Value::Str(d)) => (s(d)?, false),
@@ -779,6 +793,30 @@ impl ScriptHost for LuaHost {
                         }
                         effects.borrow_mut().push(Effect::Promise(who));
                         Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "flashback",
+                    scope.create_function(move |_, key: String| {
+                        if !world.borrow().story().flashbacks.iter().any(|f| f.key == key) {
+                            return Err(rt(format!("flashback: there's no flashback called '{key}'")));
+                        }
+                        effects.borrow_mut().push(Effect::Flashback(key));
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "end_flashback",
+                    scope.create_function(move |_, ()| {
+                        effects.borrow_mut().push(Effect::EndFlashback);
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "in_flashback",
+                    scope.create_function(move |lua, ()| match world.borrow().in_flashback() {
+                        Some(k) => lua.create_string(&k).map(mlua::Value::String),
+                        None => Ok(mlua::Value::Nil),
                     })?,
                 )?;
                 h.set(

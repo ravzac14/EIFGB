@@ -173,6 +173,26 @@ impl<'a> Lowerer<'a> {
             calls: None,
             trap: None,
             douses: false,
+            rope: false,
+            anchor: false,
+            hollow: false,
+            tries: None,
+            feedback: false,
+            breaks_into: None,
+            mends: false,
+            spoils: None,
+            two_handed: false,
+            hands: s.player.hands,
+            warm: false,
+            cold: false,
+            warmth: s.player.warmth,
+            reads: false,
+            vehicle: false,
+            mount: false,
+            stamina: None,
+            crowd: None,
+            now: None,
+            flashback: None,
         }];
         if s.player.health == Some(0) {
             self.d.error("player.health", "health must be at least 1");
@@ -197,6 +217,12 @@ impl<'a> Lowerer<'a> {
         if s.player.health.is_some() && !endings.iter().any(|e| e.key == "died") {
             let text = stdlib.messages.get("ending.died").map(String::as_str).unwrap_or("You have died.");
             endings.push(Ending { key: "died".into(), kind: EndingKind::Loss, text: self.text(text, "stdlib.messages.ending.died") });
+        }
+        // A player in the cold, who can't be hurt, can freeze to death.
+        let cold = s.rooms.values().any(|r| r.cold) || s.weather.as_ref().is_some_and(|w| w.kinds.values().any(|k| k.cold));
+        if cold && s.player.health.is_none() && !endings.iter().any(|e| e.key == "froze") {
+            let text = stdlib.messages.get("ending.froze").map(String::as_str).unwrap_or("You have frozen to death.");
+            endings.push(Ending { key: "froze".into(), kind: EndingKind::Loss, text: self.text(text, "stdlib.messages.ending.froze") });
         }
         let factions = self.lower_factions(&s.factions);
         for e in &entities {
@@ -316,6 +342,26 @@ impl<'a> Lowerer<'a> {
                 entities[c.0 as usize].decoy_for = Some(EntityId(i as u32));
             }
         }
+        let epilogue = self.lower_epilogue(&s.epilogue, &endings);
+        let flashbacks = self.lower_flashbacks(&s.flashbacks);
+        for e in &entities {
+            let section = if e.kind == EntityKind::Character { "characters" } else { "objects" };
+            if let Some(f) = &e.flashback
+                && !flashbacks.iter().any(|x| &x.key == f)
+            {
+                let hint = did_you_mean(f, flashbacks.iter().map(|x| x.key.as_str()));
+                self.d.error(format!("{section}.{}.flashback", e.key), format!("no flashback called '{f}'{hint}; add it under 'flashbacks:'"));
+            }
+            if e.vehicle && !e.traits.contains(&Trait::Enterable) {
+                self.d.warn(format!("objects.{}.vehicle", e.key), "a vehicle needs to be 'enterable', to get in (or on)");
+            }
+            if let Some(n) = e.now
+                && entities[n.index()].kind != e.kind
+            {
+                let section = if e.kind == EntityKind::Room { "rooms" } else { section };
+                self.d.error(format!("{section}.{}.now", e.key), "'now' names what this is in the present: a room for a room, a thing for a thing");
+            }
+        }
         let intro = self.text_opt(s.game.intro.as_deref(), "game.intro");
         let story = Story {
             ir_version: IR_VERSION,
@@ -358,6 +404,8 @@ impl<'a> Lowerer<'a> {
             facts,
             clock,
             weather,
+            epilogue,
+            flashbacks,
         };
 
         if let Err(e) = check_id(&story.meta.id) {
@@ -812,6 +860,26 @@ impl<'a> Lowerer<'a> {
             calls: None,
             trap: None,
             douses: false,
+            rope: false,
+            anchor: false,
+            hollow: false,
+            tries: None,
+            feedback: false,
+            breaks_into: None,
+            mends: false,
+            spoils: None,
+            two_handed: false,
+            hands: None,
+            warm: false,
+            cold: r.cold,
+            warmth: None,
+            reads: false,
+            vehicle: false,
+            mount: false,
+            stamina: None,
+            crowd: r.crowd.as_ref().and_then(|c| self.crowd(c, &format!("{path}.crowd"))),
+            now: r.now.as_deref().and_then(|n| self.room_ref(n, &format!("{path}.now"))),
+            flashback: None,
         }
     }
 
@@ -842,12 +910,12 @@ impl<'a> Lowerer<'a> {
             match exit {
                 src::OneExit::Short(s) if is_identifier(s.trim()) => {
                     if let Some(to) = self.room_ref(s.trim(), &epath) {
-                        exits.push(Exit { direction, to: Some(to), through: None, when: None, blocked: None, via: Vec::new() });
+                        exits.push(Exit { direction, to: Some(to), through: None, when: None, blocked: None, via: Vec::new(), rope: false, by: Vec::new() });
                     }
                 }
                 src::OneExit::Short(msg) => {
                     let blocked = Some(self.text(msg, &epath));
-                    exits.push(Exit { direction, to: None, through: None, when: None, blocked, via: Vec::new() });
+                    exits.push(Exit { direction, to: None, through: None, when: None, blocked, via: Vec::new(), rope: false, by: Vec::new() });
                 }
                 src::OneExit::Full(f) => {
                     let to = f.to.as_deref().and_then(|t| self.room_ref(t, &format!("{epath}.to")));
@@ -885,7 +953,12 @@ impl<'a> Lowerer<'a> {
                     if f.to.is_none() && !via.is_empty() {
                         self.d.warn(&epath, "'via' does nothing without 'to'");
                     }
-                    exits.push(Exit { direction, to, through, when, blocked, via });
+                    let by: Vec<EntityId> = f
+                        .by
+                        .as_ref()
+                        .map(|v| v.items().into_iter().filter_map(|t| self.entity_ref(t, &format!("{epath}.by"))).collect())
+                        .unwrap_or_default();
+                    exits.push(Exit { direction, to, through, when, blocked, via, rope: f.rope, by });
                 }
             }
         }
@@ -1115,6 +1188,29 @@ impl<'a> Lowerer<'a> {
         {
             self.d.error(format!("{path}.code"), "a code can't be empty");
         }
+        for (field, set) in [("tries", t.tries.is_some()), ("feedback", t.feedback)] {
+            if set && t.code.is_none() {
+                self.d.warn(format!("{path}.{field}"), "only matters for something with a 'code'");
+            }
+        }
+        if t.tries == Some(0) {
+            self.d.error(format!("{path}.tries"), "tries must be at least 1");
+        }
+        if let Some(n) = t.tries {
+            state.entry("tries".into()).or_insert(Value::Int(i64::from(n)));
+        }
+        if t.breaks_into.is_some() && t.uses.is_none() {
+            self.d.warn(format!("{path}.breaks_into"), "only matters for something that wears out: add 'uses'");
+        }
+        if t.spoils == Some(0) {
+            self.d.error(format!("{path}.spoils"), "spoils must be at least 1 (turns)");
+        }
+        if t.spoils.is_some() && !has(Trait::Edible) && !has(Trait::Drinkable) {
+            self.d.warn(format!("{path}.spoils"), "only food and drink go bad; add 'edible' or 'drinkable'");
+        }
+        if t.rope && t.anchor {
+            self.d.error(&path, "a rope can't be its own anchor; set 'rope' or 'anchor', not both");
+        }
         if let Some(f) = t.fuel {
             state.entry("fuel".into()).or_insert(Value::Int(i64::from(f)));
         }
@@ -1234,6 +1330,52 @@ impl<'a> Lowerer<'a> {
             calls: t.calls.as_ref().map(|n| Noise { at: None, loudness: n.loudness, faction: n.faction.clone() }),
             trap: t.trap.as_ref().filter(|_| kind == EntityKind::Object).map(|tr| TrapSpec { holds: tr.holds }),
             douses: t.douses && kind == EntityKind::Object,
+            rope: t.rope,
+            anchor: t.anchor,
+            hollow: t.hollow,
+            tries: t.tries,
+            feedback: t.feedback,
+            breaks_into: t.breaks_into.as_deref().and_then(|b| self.entity_ref(b, &format!("{path}.breaks_into"))),
+            mends: t.mends,
+            spoils: t.spoils,
+            two_handed: t.two_handed,
+            hands: None,
+            warm: t.warm,
+            cold: false,
+            warmth: None,
+            reads: is_char && t.reads.unwrap_or(t.talk.is_some() || matches!(t.behavior.as_deref(), Some("merchant" | "conversationalist"))),
+            vehicle: t.vehicle && kind == EntityKind::Object,
+            mount: t.mount && is_char,
+            stamina: t.stamina.filter(|_| is_char),
+            crowd: None,
+            now: t.now.as_deref().and_then(|n| self.entity_ref(n, &format!("{path}.now"))),
+            flashback: t.flashback.clone().filter(|_| kind == EntityKind::Object),
+        }
+    }
+
+    /// `crowd: true`, or the hours it's crowded: "8:00-18:00".
+    fn crowd(&mut self, c: &src::CrowdSrc, path: &str) -> Option<Crowd> {
+        match c {
+            src::CrowdSrc::Always(false) => None,
+            src::CrowdSrc::Always(true) => Some(Crowd { from: None, to: None }),
+            src::CrowdSrc::Hours(h) => {
+                let Some((a, b)) = h.split_once('-') else {
+                    self.d.error(path, "crowded hours are a range of times: \"8:00-18:00\"");
+                    return None;
+                };
+                match (eifgb_ir::parse_time(a.trim()), eifgb_ir::parse_time(b.trim())) {
+                    (Ok(from), Ok(to)) => {
+                        if !self.has_clock {
+                            self.d.error(path, "crowded hours need the game to keep time: add a 'clock:' section");
+                        }
+                        Some(Crowd { from: Some(from), to: Some(to) })
+                    }
+                    (Err(e), _) | (_, Err(e)) => {
+                        self.d.error(path, e);
+                        None
+                    }
+                }
+            }
         }
     }
 
@@ -1264,6 +1406,10 @@ impl<'a> Lowerer<'a> {
                 ("asks", t.asks.is_some()),
                 ("knows_the_way", t.knows_the_way.is_some()),
                 ("sniffs", t.sniffs),
+                ("password", t.password.is_some()),
+                ("reads", t.reads.is_some()),
+                ("mount", t.mount),
+                ("stamina", t.stamina.is_some()),
                 ("morale", t.morale.is_some()),
                 ("fears", !t.fears.is_empty()),
                 ("behavior", t.behavior.is_some()),
@@ -1375,8 +1521,33 @@ impl<'a> Lowerer<'a> {
                 broken: self.prose_opt(a.broken.as_ref(), &format!("{apath}.broken")),
             })
         });
+        let password = t.password.as_ref().map(|p| {
+            let ppath = format!("{path}.password");
+            let word = p.word.trim().trim_matches('"').to_lowercase();
+            if word.is_empty() {
+                self.d.error(format!("{ppath}.word"), "a password can't be empty");
+            }
+            let mut bars = Vec::new();
+            for b in p.bars.items() {
+                match Direction::from_key(b.trim()) {
+                    Some(d) => bars.push(d),
+                    None => {
+                        let hint = did_you_mean(b, Direction::ALL.iter().map(|d| d.key()));
+                        self.d.error(format!("{ppath}.bars"), format!("unknown direction '{b}'{hint}"));
+                    }
+                }
+            }
+            Password {
+                word,
+                bars,
+                ask: self.text_opt(p.ask.as_deref(), &format!("{ppath}.ask")),
+                right: self.text_opt(p.right.as_deref(), &format!("{ppath}.right")),
+                wrong: self.text_opt(p.wrong.as_deref(), &format!("{ppath}.wrong")),
+            }
+        });
         Some(Npc {
             behavior,
+            password,
             routine,
             watches,
             answers_to,
@@ -1477,7 +1648,7 @@ impl<'a> Lowerer<'a> {
                 );
                 continue;
             }
-            back.push(Exit { direction: opposite, to: Some(a), through: Some(door), when: None, blocked: None, via: Vec::new() });
+            back.push(Exit { direction: opposite, to: Some(a), through: Some(door), when: None, blocked: None, via: Vec::new(), rope: false, by: Vec::new() });
         }
     }
 
@@ -1674,6 +1845,54 @@ impl<'a> Lowerer<'a> {
     }
 
     // --------------------------------------------------------------- goals
+
+    fn lower_epilogue(&mut self, raw: &[src::EpilogueSrc], endings: &[Ending]) -> Vec<EpilogueLine> {
+        let mut out = Vec::new();
+        for (i, l) in raw.iter().enumerate() {
+            let path = format!("epilogue[{i}]");
+            let (text, when, only) = match l {
+                src::EpilogueSrc::Text(t) => (t.as_str(), None, None),
+                src::EpilogueSrc::Full(f) => (f.text.as_str(), f.when.as_deref(), f.endings.as_ref()),
+            };
+            let mut ids = Vec::new();
+            for k in only.map(|o| o.items()).unwrap_or_default() {
+                match endings.iter().position(|e| e.key == k) {
+                    Some(n) => ids.push(EndingId(n as u32)),
+                    None => {
+                        let hint = did_you_mean(k, endings.iter().map(|e| e.key.as_str()));
+                        self.d.error(format!("{path}.endings"), format!("no ending called '{k}'{hint}"));
+                    }
+                }
+            }
+            out.push(EpilogueLine { when: when.map(|w| self.code(w, &format!("{path}.when"))), endings: ids, text: self.text(text, &format!("{path}.text")) });
+        }
+        out
+    }
+
+    fn lower_flashbacks(&mut self, raw: &indexmap::IndexMap<String, src::FlashbackSrc>) -> Vec<Flashback> {
+        let mut out = Vec::new();
+        for (key, f) in raw {
+            let path = format!("flashbacks.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&path, e);
+            }
+            let Some(at) = self.room_ref(&f.at, &format!("{path}.at")) else { continue };
+            let carries = f.carries.as_ref().map(|c| c.items().into_iter().filter_map(|x| self.entity_ref(x, &format!("{path}.carries"))).collect()).unwrap_or_default();
+            if f.turns.is_none() && f.until.is_none() {
+                self.d.warn(&path, "it never ends by itself: add 'turns' or 'until' (or end it from a script, end_flashback())");
+            }
+            out.push(Flashback {
+                key: key.clone(),
+                at,
+                carries,
+                begins: self.text_opt(f.begins.as_deref(), &format!("{path}.begins")),
+                ends: self.text_opt(f.ends.as_deref(), &format!("{path}.ends")),
+                turns: f.turns,
+                until: f.until.as_deref().map(|u| self.code(u, &format!("{path}.until"))),
+            });
+        }
+        out
+    }
 
     fn lower_scenes(&mut self, raw: &indexmap::IndexMap<String, src::Scene>) -> Vec<Scene> {
         let mut out = Vec::new();
@@ -2055,6 +2274,7 @@ impl<'a> Lowerer<'a> {
                 key: k.clone(),
                 describe: self.text_opt(v.describe.as_deref(), &format!("weather.kinds.{k}.describe")),
                 begins: self.text_opt(v.begins.as_deref(), &format!("weather.kinds.{k}.begins")),
+                cold: v.cold,
             })
             .collect();
         if !kinds.iter().any(|k| k.key == w.start) {

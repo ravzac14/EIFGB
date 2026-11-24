@@ -16,6 +16,7 @@ import { readDescription, wordsHere } from "../src/editor/describe-words.ts";
 import { typos } from "../src/editor/spelling.ts";
 import { talkLayout } from "../src/editor/talk-graph.ts";
 import { readTalk, writeMap } from "../src/editor/layout.ts";
+import { forChat, fromChat, instructions } from "../src/editor/ai.ts";
 import { loadEngine } from "../src/engine.ts";
 
 const spec = (p) => readFileSync(new URL(`../../spec/${p}`, import.meta.url), "utf8");
@@ -261,6 +262,33 @@ objects:
   assert.match(text, /talk:\n {2}keeper_talk:\n {4}\w+: \[40, 50\]\n$/);
   assert.deepEqual(readTalk(text).get("keeper_talk").get(c.start), { x: 40, y: 50 });
   assert.equal(talkLayout(c, readTalk(text).get("keeper_talk")).get(c.start).x, 40);
+}
+
+// ------------------------------------------------- made with an AI assistant
+
+{
+  const game = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall }\n";
+  const reply = `Here's your game!\n\n\`\`\`yaml\n${game}\`\`\`\n\nAnd a walkthrough:\n\n\`\`\`text\nlook\nn\n\`\`\`\n\nEnjoy.`;
+  assert.deepEqual(fromChat(reply), { yaml: game, walkthrough: "look\nn\n" });
+  // Just the file, pasted as it is; or a block with no language; or nothing that's a game.
+  assert.deepEqual(fromChat(game), { yaml: game });
+  assert.deepEqual(fromChat(`\`\`\`\n${game}\`\`\``), { yaml: game });
+  assert.equal(fromChat("Sure! What's your story about?"), null);
+  assert.equal(fromChat("```js\nconsole.log(1)\n```"), null);
+  // The instructions carry the guide, so the AI needn't fetch it.
+  const inst = instructions("# Writing games with an AI assistant\n...");
+  assert.match(inst, /one ```yaml block/);
+  assert.match(inst, /Here is the guide to the format:\n\n# Writing games with an AI assistant/);
+  assert.match(instructions(null), /https:\/\/ravzac14\.github\.io\/EIFGB\/docs\/ai\.md/);
+  // Problems, as a message back.
+  const msg = forChat(
+    [{ severity: "error", path: "objects.cat.talk", message: "unknown choice 'cat_chat' (did you mean 'cat_talk'?)" }, { severity: "warning", path: "rooms.hall", message: "nothing leads here" }],
+    [{ file: "walkthrough.txt", result: "unfinished", steps: 3, problem: "the walkthrough no longer wins: after its 3 commands the game is still going" }],
+  );
+  assert.match(msg, /^The EIFGB checker found 1 error and 1 warning in the game:\n\n- Error at objects\.cat\.talk: unknown choice/);
+  assert.match(msg, /- walkthrough\.txt: the walkthrough no longer wins/);
+  assert.match(msg, /send the whole game\.yaml again, in one ```yaml block\.$/);
+  assert.equal(forChat([]), "The checker found no problems.");
 }
 
 console.log("ok   editor tools");

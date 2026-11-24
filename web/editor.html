@@ -40,6 +40,18 @@
       <li><span class="name">Blank game</span><span class="dim">One empty room, ready for yours.</span><button id="new-game" class="primary" type="button">New game</button></li>
     </ul>
   </section>
+  <section class="ai-start">
+    <h2>Make a game with your AI</h2>
+    <p class="dim">Write your story with Claude or another AI assistant, then play and change it here.</p>
+    <ol class="ai-steps">
+      <li><button id="ai-copy" type="button">Copy instructions for your AI</button> Paste them into a new chat, and describe your story where it says.</li>
+      <li><label for="ai-reply">Paste its whole reply here, code and all:</label>
+        <textarea id="ai-reply" rows="4" spellcheck="false" placeholder="```yaml&#10;format: eifgb/0.1&#10;…"></textarea>
+        <button id="ai-open" type="button" class="primary">Open it</button></li>
+      <li>If the editor finds problems, <em>Copy for your AI</em>, under Problems, gives you a message to send back. Paste its next reply over game.yaml, in the Files tab.</li>
+    </ol>
+    <p id="ai-msg" class="ui" role="status"></p>
+  </section>
   <section>
     <h2>Your games</h2>
     <ul id="mine" class="picks"></ul>

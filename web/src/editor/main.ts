@@ -4,7 +4,7 @@
 
 import { dataBytes, fileBytes, isPicture, pictureSrc, shrink } from "../pictures.ts";
 import { zipSync, strToU8 } from "fflate";
-import { loadEngine, type Diagnostic, type Engine, type Files, type Puzzles } from "../engine.ts";
+import { loadEngine, type Diagnostic, type Engine, type Files, type Puzzles, type Walkthrough } from "../engine.ts";
 import { fromFileList } from "../files.ts";
 import { localGames, mapTheme, storageUse, type LocalGame, type MapTheme } from "../store.ts";
 import { settingsDialog } from "../settings-ui.ts";
@@ -24,6 +24,7 @@ import { findInGame, MAX_FOUND } from "./find.ts";
 import { mapProblems, tidy, wayKey, type MapProblem, type Way } from "./tidy.ts";
 import { draftHints } from "./hint-drafts.ts";
 import { typos } from "./spelling.ts";
+import { copyText, forChat, fromChat, instructions } from "./ai.ts";
 import { timeline, timeText } from "./timeline.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -60,6 +61,8 @@ let talkPos: TalkPositions = new Map();
 let talkPicked: string | null = null;
 let selection: Selection = null;
 let problems: Diagnostic[] = [];
+/** How each walkthrough played, at the last check. */
+let walkthroughs: Walkthrough[] = [];
 let mapView: MapView;
 
 // Test play, in the drawer.
@@ -622,7 +625,8 @@ function scheduleCheck() {
       problems = checked.diagnostics;
       puzzles = checked.puzzles ?? null;
       testPlay.walkthrough(files[WALKTHROUGH] === undefined ? "none" : (checked.walkthrough ?? "unchecked"), files[WALKTHROUGH]);
-      testPlay.walkthroughs(checked.walkthroughs ?? []);
+      walkthroughs = checked.walkthroughs ?? [];
+      testPlay.walkthroughs(walkthroughs);
     } catch (e) {
       problems = [{ severity: "error", path: "", message: `The checker couldn't run: ${e}` }];
     }
@@ -838,6 +842,14 @@ function showProblems() {
   const panel = $("panel-problems");
   const errors = problems.filter((p) => p.severity === "error").length;
   $("tab-problems").textContent = problems.length ? `Problems (${problems.length})` : "Problems";
+  // For a game written with an AI assistant: the problems, as a message to send it.
+  const forAi = button("Copy for your AI", async () => {
+    const ok = await copyText(forChat(problems, walkthroughs));
+    forAi.textContent = ok ? "Copied: paste it into your chat" : "Couldn't copy: select the problems and copy them";
+    setTimeout(() => (forAi.textContent = "Copy for your AI"), 2500);
+  });
+  forAi.title = "The problems and how the walkthrough went, as a message for the AI assistant writing your game";
+  const aiRow = el("div", { className: "problems-bar" }, forAi);
   if (!problems.length) {
     panel.replaceChildren(el("p", { className: "ok-msg", textContent: "No problems: the game is ready to play." }), typoList());
     return;
@@ -852,6 +864,7 @@ function showProblems() {
     ul.append(li);
   }
   panel.replaceChildren(
+    aiRow,
     el("p", { className: "dim", textContent: errors ? "The game can't be played until the errors are fixed. Click one to go to it." : "Warnings don't stop the game, but are worth a look." }),
     ul,
     typoList(),
@@ -1015,6 +1028,23 @@ $("yaml").addEventListener("input", () => {
     }
     typingYaml = false;
   }, 600);
+});
+// A reply from an AI assistant pasted over game.yaml: the code, without the chat around it.
+$("yaml").addEventListener("paste", (e) => {
+  if (currentFile !== "game.yaml") return;
+  const text = e.clipboardData?.getData("text") ?? "";
+  if (!/^(`{3,}|~{3,})/m.test(text)) return;
+  const reply = fromChat(text);
+  if (!reply) return;
+  e.preventDefault();
+  const ta = $<HTMLTextAreaElement>("yaml");
+  ta.value = reply.yaml;
+  ta.dispatchEvent(new Event("input"));
+  if (reply.walkthrough) {
+    const walk = reply.walkthrough;
+    change(() => (project = { ...project, files: { ...project.files, [WALKTHROUGH]: walk } }), { label: "Pasted the walkthrough" });
+  }
+  $("yaml-msg").textContent = `Pasted the game${reply.walkthrough ? ", and its walkthrough," : ""} from the reply.`;
 });
 $("tab-problems").addEventListener("click", () => showTab("problems"));
 $("tab-puzzles").addEventListener("click", () => showTab("puzzles"));
@@ -1329,6 +1359,35 @@ async function startScreen() {
   } catch {
     $("examples").replaceChildren(el("li", { className: "dim", textContent: "The examples couldn't be loaded." }));
   }
+  // Made with an AI assistant: the instructions to give it, and its reply to open.
+  $("ai-copy").addEventListener("click", async () => {
+    const guide = await fetch("./docs/ai.md")
+      .then((r) => (r.ok ? r.text() : null))
+      .catch(() => null);
+    const ok = await copyText(instructions(guide));
+    $("ai-msg").textContent = ok
+      ? "Copied, with the guide to the format. Paste it into a new chat, and describe your story where it says."
+      : "Couldn't copy here. Tell your AI to read https://ravzac14.github.io/EIFGB/docs/ai.md and reply with one game.yaml.";
+    $("ai-msg").classList.toggle("err", !ok);
+  });
+  $("ai-open").addEventListener("click", () => {
+    const reply = fromChat($<HTMLTextAreaElement>("ai-reply").value);
+    if (!reply) {
+      $("ai-msg").textContent = "There's no game in that: paste the reply with the block that starts format: eifgb/0.1.";
+      $("ai-msg").classList.add("err");
+      return;
+    }
+    let title = "Untitled game";
+    try {
+      title = new Model(reply.yaml).title();
+    } catch {
+      /* opens on the file tab, with what's wrong */
+    }
+    const files: Files = { "game.yaml": reply.yaml, ...(reply.walkthrough ? { [WALKTHROUGH]: reply.walkthrough } : {}) };
+    const g: LocalGame = { key: newKey(), title, files, added: Date.now() };
+    if (!localGames.put(g)) return void ($("ai-msg").textContent = "There's no room left in this browser's storage.");
+    open(g);
+  });
   const take = async (list: FileList) => {
     const files = await fromFileList(list).catch((e: unknown) => `That couldn't be read: ${e}`);
     if (typeof files === "string") return void ($("open-msg").textContent = files);

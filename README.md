@@ -51,6 +51,15 @@ Test play, at the bottom, plays it as you go. Everything in this guide can
 be done there; the YAML shown is what the editor writes for you, in the
 Files tab.
 
+**With your AI assistant (Claude, say):** on the editor's first page,
+*Make a game with your AI* copies the instructions to paste into a chat,
+with [the guide for AI assistants](docs/AI.md) in them, so it knows the
+format. Describe your story; paste its whole reply back, and it opens as a
+game. If the editor finds problems, *Copy for your AI*, under Problems,
+gives you a message to send back, and its next reply can be pasted
+straight over `game.yaml` in the Files tab: the chat around the code is
+left out.
+
 **As files, with the command line:** write `game.yaml` in any editor, and
 check and play it with the `eifgb` tool. The quick start below sets it up,
 and the tutorial builds a whole game this way.

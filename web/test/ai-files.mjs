@@ -36,4 +36,14 @@ for (const page of readdirSync(pub + "docs").filter((f) => f.endsWith(".html")))
   const md = readFileSync(pub + "docs/" + page, "utf8").match(/<link rel="alternate" type="text\/markdown" href="([^"]+)"/)?.[1];
   assert.ok(md && existsSync(pub + "docs/" + md), `${page} has a Markdown copy`);
 }
+// The guide for AI assistants keeps up with the format: every top-level
+// section of a game, and the features most worth knowing about.
+const guide = readFileSync(new URL("../../docs/AI.md", import.meta.url), "utf8");
+const source = readFileSync(new URL("../../crates/eifgb-compiler/src/source.rs", import.meta.url), "utf8");
+const sections = [...source.match(/pub struct Source \{([\s\S]*?)\n\}/)[1].matchAll(/pub (\w+):/g)].map((m) => m[1]);
+assert.ok(sections.length >= 20, sections.join(" "));
+for (const s of sections) assert.match(guide, new RegExp("`" + s + "`|^" + s + ":", "m"), `docs/AI.md doesn't mention the \`${s}\` section`);
+for (const word of ["why_not", "disposition", "routine", "cycle", "random", "first:", "visits", "seen", "start_scene", "=>", "walkthrough-<ending>.txt", "Make a game with your AI", "Copy for your AI"]) {
+  assert.ok(guide.includes(word), `docs/AI.md doesn't mention ${word}`);
+}
 console.log("ok   files for AI assistants");

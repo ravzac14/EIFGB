@@ -11,6 +11,12 @@ if you like ("## 2026-11-24: editor tools"). -->
 
 ## 2026-11-23: help for players, editor tools and the puzzle graph
 
+- Making a game with an AI assistant: *Make a game with your AI*, on the
+  editor's first page, copies instructions (with the guide to the format)
+  to paste into a chat, and opens its reply as a game, chat and all.
+  *Copy for your AI*, under Problems, gives a message to send back, and a
+  reply pasted over `game.yaml` keeps just the code. The guide for AI
+  assistants covers everything new, and a test keeps it up to date.
 - The editor is simpler to find your way around: each panel starts with
   the essentials, and folds the rest under headings that say what's set;
   the game's sections are folded too, with how many each has; and a new

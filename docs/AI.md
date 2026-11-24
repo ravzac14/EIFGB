@@ -12,6 +12,23 @@ and the [format reference](../spec/FORMAT.md) go deeper.
 > site's [`llms.txt`](../web/llms.txt) lists them all, and
 > [`llms-full.txt`](../web/llms-full.txt) has them in one file.
 
+## Working in a chat
+
+Most authors talk to you in a chat, with no way for you to run anything.
+Then:
+
+- **Reply with the whole game in one fenced block**, ```` ```yaml ````, from
+  `format:` to the end, every time. Not a part, not a diff: the author
+  pastes the whole block into the editor (*Make a game with your AI*, on
+  its first page), and it replaces what was there.
+- **Keep it one file.** Write Lua inline in handlers (`on: { take: … }`)
+  rather than in separate script files.
+- **Add a walkthrough** in a second fenced block, ```` ```text ````: the
+  commands that win, one a line. The editor plays it after every change.
+- **When the author pastes back problems** (from the editor's
+  *Copy for your AI* button), each has a path in the file and usually a
+  fix. Fix every one, and send the whole file again.
+
 ## The loop
 
 1. Write `game.yaml` (and any `.lua` files it lists under `scripts:`).
@@ -43,8 +60,9 @@ endings: {}                # every ending end_game() can name
 ```
 
 Other top-level sections: `settings`, `presentation`, `vars`, `player`,
-`verbs`, `choices`, `on`, `timers`, `factions`, `messages`, `scripts`. An
-unknown section or field is an error, not ignored, so a typo is caught.
+`verbs`, `choices`, `on`, `timers`, `factions`, `goals`, `scenes`, `hints`,
+`clock`, `weather`, `aliases`, `messages`, `scripts`. An unknown section or
+field is an error, not ignored, so a typo is caught.
 
 ## Rules that matter
 
@@ -104,13 +122,32 @@ unknown section or field is an error, not ignored, so a typo is caught.
 - **Text templates:** `${expr}` inserts a value, and
   `${if cond}…${else}…${end}` chooses text. `the(x)`, `The(x)`, `a(x)`
   and `A(x)` add articles.
+- **Text that varies:** a description, a verb's `default`, a timer's
+  `say`, a conversation's `text` or `say`, or a message can be a list
+  (each in turn, then the last for ever), `{ first: …, later: … }`,
+  `{ cycle: [...] }` or `{ random: [...] }`. A room's visits are
+  `here.visits` (1 on the first).
 - **Your own verbs:** under `verbs:`, with `patterns` such as
   `"flip {target}"` (and `{tool}` for a second thing), and a `default`
   reply. Handle them on things with `on: { flip: … }`.
 - **Conversations:** a character's `talk: <choice id>` opens a choice
   graph under `choices:`: a `start` node, and `nodes` with `text` and
   `options`, each option with `text` and any of `say`, `do`, `goto`, `end`.
-  Players answer by typing the option's number.
+  Players answer by typing the option's number. In a conversation `self`
+  is the one being talked to. An option's `when` hides it while false,
+  unless it has `why_not: "reason"`, which shows it greyed with the reason;
+  `disposition: 2` (or -2) changes how the one talked to feels.
+- **Disposition:** how a character feels about the player, -10 to 10:
+  `disposition: friendly` (or hostile, wary, neutral, devoted, or a
+  number). Liked gifts, apologies and bribes warm them; attacks, theft and
+  insults cool them. It shows on EXAMINE, in merchants' prices, and a
+  hostile one won't talk or trade. Scripts read `self.disposition` and
+  `self.feeling`.
+- **Routines:** with a `clock:`, a character can keep to one: `routine: {
+  "6:00": bakery, "13:00": square }`.
+- **Scenes:** under `scenes:`, each with `title`, Lua `when` (begins) and
+  `done` (ends), and `begins`/`ends` text. `scenes.storm` is `nil`,
+  `"running"` or `"done"`; `start_scene(id)` and `end_scene(id)`.
 - **Timers:** under `timers:`, `after: N` (or `every: N`) actions, where N
   can be a range for a random wait (`every: 5-10`), with
   `say`, `do` (Lua), `when` and `end` (an ending ID).
@@ -123,7 +160,12 @@ unknown section or field is an error, not ignored, so a typo is caught.
 - **Hints:** under `hints:`, one entry per puzzle in the order players
   meet them, each with `steps` (a list of text, nudge first, answer last)
   and a Lua `when` that's true while the puzzle is unsolved. HINT shows the
-  next step of the first one whose `when` is true.
+  next step of the first one whose `when` is true. `not world.key.seen` is
+  a good `when` for a thing to find: `seen` is true once the player has
+  seen or held it.
+- **Walkthroughs:** a line can say what the game should answer, after
+  `=>`: `look under the mat => small key` (the reply must contain it).
+  `walkthrough-<ending>.txt` is one that must reach that ending.
 
 The standard commands (LOOK, TAKE, OPEN, PUT … IN, UNLOCK … WITH, TALK
 TO, the directions, and many more) work in every game without any setup.

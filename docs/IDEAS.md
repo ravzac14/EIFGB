@@ -63,6 +63,13 @@ COINS, TAKE ALL BUT THE KEY) was already there.
   itself; a bundled English word list would catch typos it uses more than
   once, too.
 
+## AI assistants
+
+- **Checking from inside the chat:** a small MCP server (or a skill) for
+  Claude Desktop and Claude Code wrapping `eifgb check` and `eifgb play
+  --commands`, so an assistant can check and test its own game, and fix
+  it, without the author passing problems back and forth.
+
 ## The player
 
 - **Notes on screen:** the player's NOTEs in a panel beside the story,

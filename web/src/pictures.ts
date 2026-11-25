@@ -8,7 +8,25 @@ import type { Files } from "./engine.ts";
 /** Picture files a project can hold. */
 export const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
-const TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml" };
+/** Sound files a project can hold (`sound_file:`). */
+export const SOUND = /\.(mp3|ogg|oga|wav|m4a|opus)$/i;
+/** Every file a project keeps as a `data:` URL: pictures and sounds. */
+export const MEDIA = /\.(png|jpe?g|gif|webp|svg|mp3|ogg|oga|wav|m4a|opus)$/i;
+
+const TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  mp3: "audio/mpeg",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/ogg",
+  wav: "audio/wav",
+  m4a: "audio/mp4",
+};
 
 /** The address to show a picture from, or null when it's missing. */
 export function pictureSrc(file: string, files: Files): string | null {
@@ -17,7 +35,14 @@ export function pictureSrc(file: string, files: Files): string | null {
   return v?.startsWith("data:image/") ? v : null;
 }
 
-/** A picture file's bytes as a `data:` URL. */
+/** The address to play a sound from, or null when it's missing. */
+export function soundSrc(file: string, files: Files): string | null {
+  if (/^https:\/\//i.test(file)) return file;
+  const v = files[file];
+  return v?.startsWith("data:audio/") ? v : null;
+}
+
+/** A picture or sound file's bytes as a `data:` URL. */
 export function dataUrl(name: string, bytes: Uint8Array): string {
   const type = TYPES[name.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
   let s = "";
@@ -37,6 +62,10 @@ export function dataBytes(url: string): Uint8Array | null {
 
 /** Whether a project file is a picture (kept as a `data:` URL). */
 export const isPicture = (path: string, text: string) => IMAGE.test(path) && text.startsWith("data:image/");
+/** Whether a project file is a sound (kept as a `data:` URL). */
+export const isSound = (path: string, text: string) => SOUND.test(path) && text.startsWith("data:audio/");
+/** Whether a project file is kept as bytes (a picture or a sound), not text. */
+export const isMedia = (path: string, text: string) => isPicture(path, text) || isSound(path, text);
 
 /**
  * A picture the author chose, made small enough to keep in the browser:
@@ -65,7 +94,7 @@ function hasClearParts(g: CanvasRenderingContext2D, w: number, h: number): boole
   return false;
 }
 
-/** The pictures a game.yaml names (rooms, objects, characters), as project paths. */
+/** The pictures and sounds a game.yaml names (rooms, objects, characters, timers), as project paths. */
 export async function picturesOf(yamlText: string): Promise<string[]> {
   const { parse } = await import("yaml");
   let doc: Record<string, unknown>;
@@ -82,6 +111,15 @@ export async function picturesOf(yamlText: string): Promise<string[]> {
       const p = (v as { picture?: unknown } | null)?.picture;
       const file = typeof p === "string" ? p : typeof (p as { file?: unknown } | null)?.file === "string" ? (p as { file: string }).file : null;
       if (file && !/^https?:/i.test(file) && IMAGE.test(file)) out.add(file);
+    }
+  }
+  // Sounds: rooms' and timers' `sound_file:`.
+  for (const section of ["rooms", "timers"]) {
+    const s = doc[section];
+    if (!s || typeof s !== "object") continue;
+    for (const v of Object.values(s as Record<string, unknown>)) {
+      const file = (v as { sound_file?: unknown } | null)?.sound_file;
+      if (typeof file === "string" && !/^https?:/i.test(file) && SOUND.test(file)) out.add(file);
     }
   }
   return [...out];

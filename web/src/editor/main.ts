@@ -2,7 +2,7 @@
 // the drawer (problems, and the game file). Projects are kept in the
 // browser with the games you've loaded, so they're on the home page too.
 
-import { dataBytes, fileBytes, isPicture, pictureSrc, shrink } from "../pictures.ts";
+import { dataBytes, dataUrl, fileBytes, isMedia, isPicture, isSound, pictureSrc, shrink, soundSrc } from "../pictures.ts";
 import { zipSync, strToU8 } from "fflate";
 import { loadEngine, type Diagnostic, type Engine, type Files, type Puzzles, type Walkthrough } from "../engine.ts";
 import { fromFileList } from "../files.ts";
@@ -476,6 +476,9 @@ function inspectorContext(model: Model): InspectorContext {
     addScriptFile,
     addPicture,
     pictureUrl: (file) => pictureSrc(file, project.files),
+    addSound,
+    soundUrl: (file) => soundSrc(file, project.files),
+    sounds: () => Object.keys(project.files).filter((f) => isSound(f, project.files[f])).sort(),
     pictures: () => {
       const users = new Map<string, { owner: string[]; name: string }[]>();
       const kinds = [["rooms", "Room"], ["objects", "Thing"], ["characters", "Character"]] as const;
@@ -523,6 +526,25 @@ async function addPicture(file: File, base: string): Promise<string | null> {
   let path = `pictures/${slug(base, "picture")}.${ext}`;
   for (let i = 2; project.files[path] !== undefined && project.files[path] !== shrunk.url; i++) path = `pictures/${slug(base, "picture")}_${i}.${ext}`;
   project = { ...project, files: { ...project.files, [path]: shrunk.url } };
+  return path;
+}
+
+/** A sound the author chose, kept as it is under sounds/. Returns its path. */
+async function addSound(file: File, base: string): Promise<string | null> {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!["mp3", "ogg", "oga", "wav", "m4a", "opus"].includes(ext)) {
+    $("saved").textContent = "A sound should be a .mp3, .ogg, .wav, .m4a or .opus file.";
+    return null;
+  }
+  // Kept in the browser with everything else: a big one leaves little room.
+  if (file.size > 2_000_000) {
+    $("saved").textContent = `That sound is ${Math.round(file.size / 100_000) / 10} MB; a short one under 2 MB (an .mp3 or .ogg) keeps the game small enough for the browser.`;
+    return null;
+  }
+  const url = dataUrl(file.name, new Uint8Array(await file.arrayBuffer()));
+  let path = `sounds/${slug(base, "sound")}.${ext}`;
+  for (let i = 2; project.files[path] !== undefined && project.files[path] !== url; i++) path = `sounds/${slug(base, "sound")}_${i}.${ext}`;
+  project = { ...project, files: { ...project.files, [path]: url } };
   return path;
 }
 
@@ -1153,7 +1175,7 @@ $("download").addEventListener("click", () => {
   const errors = problems.filter((p) => p.severity === "error").length;
   const zip = button("Download the files (.zip)", () => {
     const id = gameId();
-    downloadBlob(new Blob([zipSync(Object.fromEntries(Object.entries(project.files).map(([p, t]) => [`${id}/${p}`, (isPicture(p, t) && dataBytes(t)) || strToU8(t)])))], { type: "application/zip" }), `${id}.zip`);
+    downloadBlob(new Blob([zipSync(Object.fromEntries(Object.entries(project.files).map(([p, t]) => [`${id}/${p}`, (isMedia(p, t) && dataBytes(t)) || strToU8(t)])))], { type: "application/zip" }), `${id}.zip`);
     dialog.close();
   });
   const page = button(

@@ -139,6 +139,8 @@ pub enum Effect {
     Flashback(String),
     /// `end_flashback`: back to the present.
     EndFlashback,
+    /// `play_sound`: a sound file to play once.
+    Sound(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

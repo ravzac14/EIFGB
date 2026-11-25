@@ -3,13 +3,14 @@
 import { loadEngine, type Diagnostic, type Engine, type Files, type Meta, type Output } from "./engine.ts";
 import "./tab.js";
 import { figure, pictureSrc } from "./pictures.ts";
-import { bookmarksFor, endingsFor, endingsText, localGames, mapPanel, savesFor, setGameLook, settings, type Bookmark, type SaveFile, type Slot } from "./store.ts";
+import { bookmarksFor, endingsFor, endingsText, localGames, mapPanel, notesPanel, savesFor, setGameLook, settings, togetherFor, type Bookmark, type SaveFile, type Slot, type Together } from "./store.ts";
 import { authorPositions, drawMap } from "./player-map.ts";
 import { settingsDialog } from "./settings-ui.ts";
 import { speak, stopSpeaking } from "./speech.ts";
 import { feedbackButton, feedbackContext } from "./feedback.ts";
 import { fetchGame, resolve } from "./remote.ts";
 import { follow, unfollow } from "./threads.ts";
+import { soundPlayer } from "./sound.ts";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const log = $("log");
@@ -17,6 +18,16 @@ const after = $("after");
 const form = $<HTMLFormElement>("prompt");
 const line = $<HTMLInputElement>("line");
 const savesDialog = $<HTMLDialogElement>("saves");
+/** In a frame on another page (play.html?embed=1): no way back to the site's pages, a link to a full page instead. */
+const embedded = new URLSearchParams(location.search).has("embed");
+if (embedded) {
+  document.body.classList.add("embedded");
+  const back = document.querySelector<HTMLAnchorElement>("header .back")!;
+  const full = new URL(location.href);
+  full.searchParams.delete("embed");
+  Object.assign(back, { href: full.href, target: "_blank", rel: "noopener", textContent: "Full page ↗", title: "Play this in a page of its own" });
+  back.removeAttribute("aria-label");
+}
 const bookmarksDialog = $<HTMLDialogElement>("bookmarks");
 settingsDialog($<HTMLDialogElement>("settings"), $("settings-open"));
 feedbackButton($("feedback-open"));
@@ -27,6 +38,7 @@ feedbackContext({
     where: last ? `${last.status.room || "?"}, turn ${last.status.turns}${last.status.time ? `, ${last.status.time}` : ""}${last.status.max_score !== null ? `, score ${last.status.score}/${last.status.max_score}` : ""}` : "",
     state: over ? "the game has ended" : last?.options.length ? "choosing from a list" : "playing",
     map: mapBox.hidden ? "closed" : "open",
+    notes: notesBox.hidden ? "closed" : "open",
   }),
   versions: () => (meta ? { game: `${meta.id} ${meta.version}`, "game built with": `stdlib v${meta.stdlib ?? "?"}, IR ${meta.ir ?? "?"}, engine ${meta.engine ?? "?"}` } : {}),
   // The last lines of the story, commands marked with ">".
@@ -168,7 +180,9 @@ function show(o: Output): HTMLElement | null {
   speak(o.lines.filter((l) => l.kind !== "error").map((l) => (l.kind === "picture" ? `Picture: ${l.text}` : l.text)), settings.get().speech, meta?.language ?? "en");
   status(o);
   last = o;
+  hearSounds(o);
   refreshMap();
+  refreshNotes();
   return (first ? first.nextElementSibling : log.firstElementChild) as HTMLElement | null;
 }
 
@@ -305,12 +319,63 @@ function refreshMap() {
   if (roomPicture) mapBody.prepend(figure(pictureSrc(roomPicture.picture ?? "", files), roomPicture.text));
 }
 
+/** Wide enough for the map and notes at the side, beside the story. */
+const wide = () => matchMedia("(min-width: 70rem)").matches;
+
 function showMap(open: boolean, remember = true) {
   mapBox.hidden = !open;
   document.body.classList.toggle("with-map", open);
   mapButton.setAttribute("aria-pressed", String(open));
-  if (remember) mapPanel.set(open);
+  if (remember && !embedded) mapPanel.set(open);
+  // On a narrow screen there's room for one panel at a time.
+  if (open && !wide() && !notesBox.hidden) showNotes(false, false);
   refreshMap();
+}
+
+// ----------------------------------------------------------- the notes
+
+/*
+ * The notes panel: what JOURNAL says (goals, promises and the player's
+ * NOTEs), kept up to date beside the story. Read-only: the player writes
+ * with NOTE, and erases with ERASE NOTE.
+ */
+const notesBox = $("notes");
+const notesBody = $("notes-body");
+const notesButton = $<HTMLButtonElement>("notes-open");
+
+function refreshNotes() {
+  if (notesBox.hidden || !engine) return;
+  const j = engine.journal();
+  if (!Array.isArray(j)) return;
+  if (!j.length) {
+    notesBody.replaceChildren(el("p", { className: "notice", textContent: "Nothing yet. Type NOTE and anything you want to remember (NOTE THE CODE IS 4512), and it's kept here, with your goals and promises." }));
+    return;
+  }
+  notesBody.replaceChildren(...j.map((l) => el("p", { textContent: l.text, className: l.kind === "text" ? "" : l.kind })));
+}
+
+function showNotes(open: boolean, remember = true) {
+  notesBox.hidden = !open;
+  document.body.classList.toggle("with-notes", open);
+  notesButton.setAttribute("aria-pressed", String(open));
+  if (remember && !embedded) notesPanel.set(open);
+  if (open && !wide() && !mapBox.hidden) showMap(false, false);
+  refreshNotes();
+}
+
+// ---------------------------------------------------------- the sounds
+
+const sound = soundPlayer(() => files);
+/** Whether the player's been told this game has sounds, this visit. */
+let toldOfSound = false;
+
+function hearSounds(o: Output) {
+  sound.ambient(o.status.ambient);
+  sound.play(o.sounds);
+  if (!toldOfSound && sound.heard() && settings.get().sound === "off") {
+    toldOfSound = true;
+    say("This game has sounds. To hear them, turn on Sound under Aa, at the top.", "notice");
+  }
 }
 
 /** The story so far, as plain text: what's on the page, commands marked with ">". */
@@ -354,7 +419,7 @@ function finish(message: string) {
     button("Play again", () => restart(false), "primary"),
     button("Look back over the story", lookBack),
     button("Download the transcript", downloadTranscript),
-    el("a", { href: "./", textContent: "Back to the games" }),
+    ...(embedded ? [] : [el("a", { href: "./", textContent: "Back to the games" })]),
   );
 }
 
@@ -451,7 +516,11 @@ function playOnFrom(i: number) {
   const o = engine.restore(t.save);
   status(o);
   last = o;
+  hearSounds(o);
   refreshMap();
+  refreshNotes();
+  alignTurn();
+  drawTurnBar();
   over = false;
   form.hidden = false;
   after.replaceChildren();
@@ -492,17 +561,25 @@ function send(text: string, echo = text) {
   skipTyping();
   say(echo, "cmd");
   const start = log.lastElementChild as HTMLElement;
+  const before = last?.status.turns ?? 0;
   const o = engine.input(text);
   show(o);
   handle(o);
   momentFrom(start);
   noteTurn(start, echo, !!o.ended);
+  // Taking turns: a move that took a turn (and isn't mid-conversation) passes it on.
+  if (together) {
+    alignTurn();
+    if (!over && !o.options.length && o.status.turns > before) passTurn();
+    else drawTurnBar();
+  }
   if (thread) applyThread();
   scrollTo(start);
 }
 
 function begin(): boolean {
   skipTyping();
+  sound.stop();
   log.replaceChildren();
   // A new story: no thread to follow yet.
   thread = null;
@@ -539,6 +616,13 @@ function restart(ask: boolean) {
   saves.clearAuto();
   if (begin()) {
     form.hidden = false;
+    // Taking turns: the first player starts again.
+    if (together) {
+      together.turn = 0;
+      turnStore.set(together);
+      becomePlayer(false);
+    }
+    drawTurnBar();
     saves.setAuto(engine.save());
     line.focus();
   }
@@ -565,8 +649,134 @@ function restoreFrom(save: string) {
   turns = [];
   noteTurn(first, "");
   saves.setAuto(engine.save());
+  alignTurn();
+  drawTurnBar();
   scrollTo(first);
   line.focus();
+}
+
+// --------------------------------------------------------- taking turns
+
+/*
+ * Two players, one screen: in a game with several characters to play,
+ * each player plays one, and after each move that takes a turn it's the
+ * next player's: the game becomes their character (engine.playAs, which
+ * takes no turn) and the bar above the prompt says whose turn it is.
+ * Kept per game, with its saves, until they stop.
+ */
+const togetherDialog = $<HTMLDialogElement>("together");
+const turnBar = $("turn-bar");
+const togetherButton = $<HTMLButtonElement>("together-open");
+let together: Together | null = null;
+let turnStore: ReturnType<typeof togetherFor>;
+
+const playerNow = () => (together ? together.players[together.turn % together.players.length] : null);
+const characterName = (id: string) => meta?.playable?.find((c) => c.id === id)?.name ?? id;
+
+function drawTurnBar() {
+  const p = playerNow();
+  if (!p || over) {
+    turnBar.hidden = true;
+    line.setAttribute("aria-label", "What do you do?");
+    return;
+  }
+  turnBar.replaceChildren(
+    el("span", {}, el("strong", { textContent: p.name }), `'s turn, as ${characterName(p.character)}.`),
+    button("Stop taking turns", stopTogether),
+  );
+  turnBar.hidden = false;
+  line.setAttribute("aria-label", `${p.name}, as ${characterName(p.character)}: what do you do?`);
+}
+
+/** Whose turn it is follows the character being played (after UNDO, a save, SWITCH TO). */
+function alignTurn() {
+  if (!together) return;
+  const i = together.players.findIndex((p) => p.character === last?.status.playing);
+  if (i >= 0 && i !== together.turn) {
+    together.turn = i;
+    turnStore.set(together);
+  }
+}
+
+/** Becomes the character of the player whose turn it is. Whether it could. */
+function becomePlayer(announce: boolean): boolean {
+  const p = playerNow();
+  if (!p) return false;
+  if (last?.status.playing === p.character) return true;
+  const start = announce ? say(`Over to ${p.name}, as ${characterName(p.character)}.`, "notice") : null;
+  const o = engine.playAs(p.character);
+  const first = show(o);
+  saves.setAuto(engine.save());
+  momentFrom(start ?? first);
+  return o.status.playing === p.character;
+}
+
+/** On to the next player whose character can go on. */
+function passTurn() {
+  if (!together) return;
+  const n = together.players.length;
+  const from = together.turn;
+  for (let k = 1; k < n + 1; k++) {
+    together.turn = (from + k) % n;
+    if (becomePlayer(true)) break;
+    // That one can't go on: they sit out, and it's the next one's turn.
+    say(`${playerNow()!.name} sits this turn out.`, "notice");
+  }
+  if (last?.status.playing !== playerNow()?.character) alignTurn();
+  turnStore.set(together);
+  drawTurnBar();
+}
+
+function startTogether(players: Together["players"]) {
+  together = { players, turn: 0 };
+  turnStore.set(together);
+  becomePlayer(true);
+  drawTurnBar();
+  scrollTo(log.lastElementChild as HTMLElement);
+  line.focus();
+}
+
+function stopTogether() {
+  together = null;
+  turnStore.clear();
+  drawTurnBar();
+  say("You're playing on your own now. (Two players, at the top, takes turns again.)", "notice");
+}
+
+function openTogether() {
+  const chars = meta.playable ?? [];
+  const had = together?.players ?? [];
+  togetherDialog.replaceChildren(
+    button("Done", () => togetherDialog.close(), "close"),
+    el("h2", { id: "together-title", textContent: "Two players, one screen" }),
+    el("p", { className: "dim", textContent: "Take turns at one keyboard, or pass the phone between you. Each of you plays one of the story's characters; after each move, it's the other's turn. A conversation finishes before the turn passes." }),
+  );
+  const grid = el("div", { className: "players" });
+  const rows = [0, 1].map((i) => {
+    const name = document.createElement("input");
+    name.type = "text";
+    name.value = had[i]?.name ?? `Player ${i + 1}`;
+    name.setAttribute("aria-label", `Player ${i + 1}'s name`);
+    const pick = document.createElement("select");
+    pick.setAttribute("aria-label", `Player ${i + 1} plays`);
+    for (const c of chars) pick.append(el("option", { value: c.id, textContent: c.name, selected: c.id === (had[i]?.character ?? chars[i]?.id) }));
+    grid.append(el("span", { textContent: `Player ${i + 1}` }), name, pick);
+    return { name, pick };
+  });
+  const msg = el("p", { className: "dim", role: "status" });
+  const go = button(
+    together ? "Start again with these" : "Start taking turns",
+    () => {
+      const players = rows.map((r, i) => ({ name: r.name.value.trim() || `Player ${i + 1}`, character: r.pick.value }));
+      if (players[0].character === players[1].character) return void (msg.textContent = "Choose a different character for each of you.");
+      if (players[0].name === players[1].name) return void (msg.textContent = "Give yourselves different names, so you know whose turn it is.");
+      togetherDialog.close();
+      startTogether(players);
+    },
+    "primary",
+  );
+  togetherDialog.append(grid, msg, el("div", { className: "row" }, go, ...(together ? [button("Stop taking turns", () => (togetherDialog.close(), stopTogether()))] : [])));
+  if (!togetherDialog.open) togetherDialog.showModal();
 }
 
 // -------------------------------------------------------------- threads
@@ -803,7 +1013,9 @@ form.addEventListener("submit", (e) => {
     history.push(text);
     back = 0;
   }
-  send(text);
+  // Taking turns: the story says whose move it was.
+  const who = playerNow();
+  send(text, who && text ? `${who.name}: ${text}` : text);
 });
 // Tab finishes a word, from what the player can see (see tab.js).
 (globalThis as unknown as { eifgbTab: (input: HTMLInputElement, complete: (line: string) => string[]) => void }).eifgbTab(line, (text) => (engine ? engine.complete(text) : []));
@@ -820,10 +1032,16 @@ log.addEventListener("click", () => {
 $("saves-open").addEventListener("click", openSaves);
 $("bookmarks-open").addEventListener("click", openBookmarks);
 $("threads-open").addEventListener("click", openThreads);
+togetherButton.addEventListener("click", openTogether);
 mapButton.addEventListener("click", () => showMap(mapBox.hidden));
 $("map-close").addEventListener("click", () => {
   showMap(false);
   mapButton.focus();
+});
+notesButton.addEventListener("click", () => showNotes(notesBox.hidden));
+$("notes-close").addEventListener("click", () => {
+  showNotes(false);
+  notesButton.focus();
 });
 $("restart").addEventListener("click", () => restart(true));
 
@@ -845,6 +1063,7 @@ async function main() {
   }
   saves = savesFor(src.key);
   bookmarks = bookmarksFor(src.key);
+  turnStore = togetherFor(src.key);
   gameKey = src.key;
   // The editor's Play button: always from the beginning.
   if (new URLSearchParams(location.search).has("fresh")) {
@@ -856,7 +1075,7 @@ async function main() {
   if (!begin()) return;
   document.title = meta.title;
   $("title").textContent = meta.title;
-  for (const b of ["map-open", "bookmarks-open", "threads-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
+  for (const b of ["map-open", "notes-open", "bookmarks-open", "threads-open", "saves-open", "restart"]) $<HTMLButtonElement>(b).disabled = false;
   form.hidden = false;
 
   const auto = saves.auto();
@@ -876,9 +1095,20 @@ async function main() {
       begin();
     }
   }
+  // Taking turns, as they were: if the game still has their characters.
+  togetherButton.hidden = (meta.playable?.length ?? 0) < 2;
+  const kept = turnStore.get();
+  if (kept && !togetherButton.hidden && kept.players.every((p) => meta.playable!.some((c) => c.id === p.character))) {
+    together = kept;
+    alignTurn();
+    becomePlayer(false);
+  } else if (kept) turnStore.clear();
+  drawTurnBar();
   saves.setAuto(engine.save());
-  // The map starts open on wide screens, until the player says otherwise.
-  showMap(mapPanel.open() ?? matchMedia("(min-width: 70rem)").matches, false);
+  // The map starts open on wide screens, until the player says otherwise
+  // (but not in a frame on another page, where there's seldom room).
+  showMap(!embedded && (mapPanel.open() ?? wide()), false);
+  showNotes(!embedded && notesPanel.open() && (wide() || mapBox.hidden), false);
   line.focus({ preventScroll: true });
 }
 

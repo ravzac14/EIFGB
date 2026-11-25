@@ -58,6 +58,14 @@ pub struct Status {
     pub turns: u64,
     /// The time of day, like "7:30 am", when the game keeps time and shows it.
     pub time: Option<String>,
+    /// The room's own sound (`sound_file:`), played over and over while
+    /// the player is there.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ambient: Option<String>,
+    /// In a game with several characters to play, the one being played
+    /// (its key).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub playing: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -79,6 +87,10 @@ pub struct Output {
     /// handler answered it): why, for an editor to suggest a fix.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub missed: Option<Missed>,
+    /// Sound files to play once, in order (a timer going off, a script's
+    /// `play_sound`). Only for players who turn sound on.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sounds: Vec<String>,
 }
 
 /// Why a command wasn't understood.
@@ -328,7 +340,7 @@ impl<H: ScriptHost> Game<H> {
         self.settle();
     }
 
-    fn finish(&mut self) -> Output {
+    pub(crate) fn finish(&mut self) -> Output {
         // The light changed without the room being described (a timer, a
         // script, a lamp running dry): describe it, or the darkness.
         let dark = self.world.in_darkness();
@@ -361,6 +373,8 @@ impl<H: ScriptHost> Game<H> {
             max_score: self.world.story().meta.max_score,
             turns: self.world.state.turn,
             time: self.world.clock().filter(|_| self.world.story().clock.as_ref().is_some_and(|c| c.show)).map(|c| c.time),
+            ambient: self.world.def(here).sound_file.clone(),
+            playing: self.world.state.playing_as.map(|c| self.world.def(c).key.clone()),
         };
         out.ended = self.world.state.ending.map(|e| self.world.story().endings[e.index()].kind);
         out.ending = self.world.state.ending.map(|e| self.world.story().endings[e.index()].key.clone());
@@ -482,6 +496,7 @@ impl<H: ScriptHost> Game<H> {
                 Effect::Promise(c) => self.make_promise(c),
                 Effect::Flashback(k) => self.start_flashback(&k),
                 Effect::EndFlashback => self.end_flashback(),
+                Effect::Sound(f) => self.out.sounds.push(f),
                 Effect::Npc(event) => self.narrate(&event),
             }
         }
@@ -708,6 +723,8 @@ impl<H: ScriptHost> Game<H> {
         self.keep_barricades();
         self.cunning_turn();
         self.promises_turn();
+        self.jobs_turn();
+        self.gossip_turn();
         self.elements_turn();
         self.spoil_turn();
         self.cold_turn();
@@ -1172,6 +1189,9 @@ impl<H: ScriptHost> Game<H> {
             let here = self.world.here();
             let heard = t.heard_in.is_empty() || t.heard_in.iter().any(|&h| h == here || self.world.room_of(h) == Some(here));
             // The first time it's heard, `say`; after that, `say_again` if there is one.
+            if heard && let Some(f) = &t.sound_file {
+                self.out.sounds.push(f.clone());
+            }
             if heard && (t.say.is_some() || t.say_again.is_some()) {
                 let again = !self.world.state.fired.insert(t.key.clone());
                 if let Some(s) = t.say_again.as_ref().filter(|_| again).or(t.say.as_ref()) {

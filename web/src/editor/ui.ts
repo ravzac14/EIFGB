@@ -41,8 +41,14 @@ export interface InspectorContext {
   hasWalkthrough(): boolean;
   /** How much of the browser's storage is used, and about how much there is, in bytes. */
   storage(): { used: number; limit: number };
-  /** Deletes a picture file nothing uses any more. */
+  /** Deletes a picture (or sound) file nothing uses any more. */
   dropPicture(file: string): void;
+  /** Adds a sound file to the game, under sounds/; returns its path. */
+  addSound(file: File, base: string): Promise<string | null>;
+  /** Where to play a sound from: the project's copy, or its web address. */
+  soundUrl(file: string): string | null;
+  /** The game's own sound files. */
+  sounds(): string[];
   /** A room's colour on the map (kept in map.yaml), or undefined. */
   roomColour(id: string): string | undefined;
   setRoomColour(id: string, colour: string | null): void;

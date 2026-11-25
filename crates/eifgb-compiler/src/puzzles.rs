@@ -689,6 +689,24 @@ pub fn puzzles(story: &Story) -> Puzzles {
             rules.push(r);
         }
     }
+    // What someone gives for a job: what it's for, or (done by a condition
+    // the chain can't see into) just finding them.
+    for who in 0..n {
+        let Some(jobs) = def(who).npc.as_ref().map(|x| &x.jobs) else { continue };
+        for job in jobs {
+            for g in &job.gives {
+                let mut needs = vec![Fact::Thing(who)];
+                needs.extend(job.wants.map(|w| Fact::Thing(w.index())));
+                let mut r = Rule::new(Fact::Thing(g.index()), needs);
+                r.kind = Some("find");
+                r.text = match job.wants {
+                    Some(w) => format!("Bring {} to {} for a job, and get {} for it.", the(&name(w.index())), the(&name(who)), a(&name(g.index()))),
+                    None => format!("Do {}'s job ({}), and get {} for it.", the(&name(who)), job.key.replace('_', " "), a(&name(g.index()))),
+                };
+                rules.push(r);
+            }
+        }
+    }
     // Rooms a script moves the player to.
     for i in 0..n {
         if def(i).kind != EntityKind::Room {

@@ -423,3 +423,4 @@ body.editor { font-family: var(--sans); font-size: 0.95rem; }
   .pace-mark { fill: CanvasText; }
   .pace-dry { fill: Canvas; stroke: CanvasText; }
 }
+.sound-preview { display: block; width: 100%; margin: 0.3rem 0; }

@@ -208,6 +208,11 @@ impl<H: ScriptHost> Game<H> {
             (A::SwitchTo, _) => self.switch_to(cmd.text.as_deref(), ctx),
             (A::Directions, t) => self.directions(t, cmd.text.as_deref(), ctx),
             (A::Promise, t) => self.promise_action(t, ctx),
+            (A::Busk, t) => {
+                let singing = cmd.words.first().is_some_and(|w| matches!(w.as_str(), "sing" | "hum" | "whistle" | "serenade"));
+                self.busk(t.or(cmd.tool), singing, ctx)
+            }
+            (A::Work, t) => self.work_action(t, ctx),
             (A::Copy, Some(t)) => self.copy_action(t, cmd.tool, ctx),
             (A::Swim, _) => self.swim(cmd, ctx),
             (A::Scent, Some(t)) => self.scent_action(t, cmd.tool, ctx),
@@ -235,6 +240,8 @@ impl<H: ScriptHost> Game<H> {
                 }
             },
             (A::Douse, Some(t)) => self.douse(t, cmd.tool, ctx),
+            // PLAY THE FIDDLE: an instrument that calls no one is busking.
+            (A::Sound, Some(t)) if self.world.def(t).instrument && self.world.def(t).calls.is_none() => self.busk(Some(t), false, ctx),
             (A::Sound, Some(t)) => self.sound_action(t, cmd, ctx),
             (A::SetTrap, Some(t)) => self.set_trap(t, ctx),
             (A::DisarmTrap, Some(t)) => self.disarm_trap(t, ctx),
@@ -1585,6 +1592,10 @@ impl<H: ScriptHost> Game<H> {
             None => {
                 self.topic = None;
                 if self.ask_favour(t) {
+                    return true;
+                }
+                // Someone with work to give, and nothing else to say: they offer it.
+                if !self.world.jobs_of(t).is_empty() && self.offer_job(t, &ctx.clone().entity("npc", t)) {
                     return true;
                 }
                 self.msg("talk.no_response", ctx);

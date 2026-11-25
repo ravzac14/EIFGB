@@ -236,7 +236,7 @@ impl<H: ScriptHost> Game<H> {
 
     // ----------------------------------------------------------- promises
 
-    fn promise_state(&self, c: EntityId) -> Option<String> {
+    pub(crate) fn promise_state(&self, c: EntityId) -> Option<String> {
         match self.world.get(c, "_promise") {
             Some(Value::Str(s)) => Some(s.clone()),
             _ => None,
@@ -374,7 +374,13 @@ impl<H: ScriptHost> Game<H> {
         }
         self.world.set(to, "_promise", Value::Str("kept".into()));
         self.world.unset(to, "_promise_due");
-        self.world.remember(to, "gift");
+        // A promise kept is what gets round; else, a gift.
+        if promised {
+            self.world.remember_only(to, "gift");
+            self.world.start_tale("kept_promise", to);
+        } else {
+            self.world.remember(to, "gift");
+        }
         self.world.shift_disposition(to, if promised { 2 } else { 1 });
         if promised {
             self.msg_kind(LineKind::Notice, "promise.kept", &ctx);
@@ -395,6 +401,7 @@ impl<H: ScriptHost> Game<H> {
                 self.world.unset(c, "_promise_due");
                 self.world.set(c, "_let_down", Value::Bool(true));
                 self.world.shift_disposition(c, -2);
+                self.world.start_tale("broke_promise", c);
                 self.msg_kind(LineKind::Notice, "promise.broken", &Ctx::new().entity("npc", c));
             }
             if self.world.flag(c, "_let_down") && self.world.is_active(c) && !self.world.is_asleep(c) && self.world.together(c, PLAYER) && self.world.can_see(c, PLAYER) {

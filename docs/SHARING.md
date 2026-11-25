@@ -63,6 +63,24 @@ like:
 https://<the site>/play.html?game=https%3A%2F%2Fgithub.com%2Fyou%2Fcave
 ```
 
+### 3. Put it on your own page (optional)
+
+**Share your game** also gives you a snippet of HTML that puts the game
+in a frame on any web page: a blog post, your own site, or a site
+builder's "embed" or "HTML" block. Every game in the gallery has one too,
+under **Embed**. It looks like:
+
+```html
+<iframe src="https://<the site>/play.html?game=…&embed=1" title="The Cave"
+  width="100%" height="600" style="border:1px solid #8884;border-radius:8px;max-width:48rem"
+  loading="lazy" allow="autoplay"></iframe>
+```
+
+In the frame, the game plays just as on the site, with less around it: a
+*Full page ↗* link opens it in a page of its own. Change `height` to suit
+your page. A game saved as one web page can be put in a frame too:
+upload the `.html` file and use its address as the `src`.
+
 ## What players see
 
 - A line above the story says where the game came from: "This game comes

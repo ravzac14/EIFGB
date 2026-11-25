@@ -4,6 +4,7 @@ import { feedbackButton } from "./feedback.ts";
 import { endingsText, savesFor } from "./store.ts";
 import { fetchGame, resolve } from "./remote.ts";
 import { loadEngine } from "./engine.ts";
+import { embedBox } from "./embed.ts";
 
 interface Game {
   title: string;
@@ -69,6 +70,14 @@ function show() {
       actions.append(el("a", { href: href(g), textContent: savesFor(saveKey(g)).auto() ? "Continue" : "Play" }));
       for (const t of g.tags) actions.append(el("span", { className: "tag", textContent: t }));
       li.append(actions);
+      // Putting it on another page: the snippet, made when it's first opened.
+      const embed = el("details", { className: "embed-card" }, el("summary", { textContent: "Embed" }));
+      embed.addEventListener("toggle", () => {
+        if (embed.open && embed.children.length === 1) {
+          embed.append(el("p", { className: "dim", textContent: "To put this game on your own page, paste this where the page's HTML goes:" }), embedBox(new URL(href(g), location.href).href, g.title));
+        }
+      });
+      li.append(embed);
       return li;
     }),
   );
@@ -141,6 +150,8 @@ $("share").addEventListener("submit", async (e) => {
       el("p", { className: "ok", textContent: `It works: ${n} file${n > 1 ? "s" : ""}, no mistakes.${warn} Anyone with this link can play it:` }),
       box,
       el("div", { className: "actions" }, copy, " ", el("a", { href: link, textContent: "Play it now" })),
+      el("p", { className: "dim", textContent: "Or put it on a web page of your own, with this:" }),
+      embedBox(link, url.replace(/^https:\/\//, "")),
     );
   } catch (err) {
     out.replaceChildren(el("p", { className: "bad", textContent: err instanceof Error ? err.message : String(err) }));

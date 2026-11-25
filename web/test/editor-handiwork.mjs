@@ -60,6 +60,9 @@ const base = {
   addScriptFile: () => null,
   addPicture: async () => null,
   pictureUrl: () => null,
+  addSound: async () => null,
+  soundUrl: () => null,
+  sounds: () => [],
   pictures: () => [],
   hasWalkthrough: () => false,
   roomColour: () => null,
@@ -144,6 +147,14 @@ assert.equal(m.get(["objects", "safe", "feedback"]), true);
 show({ kind: "room", id: "ledge" });
 tick("Bitterly cold");
 assert.equal(m.get(["rooms", "ledge", "cold"]), true);
+// Its own sound: an address, then taking it off.
+assert.ok(labelled("Its own sound"), "a room has a sound field");
+const addr = [...panel.querySelectorAll('input[type="url"]')].find((i) => i.placeholder === "https://…" && labelled("Its own sound").compareDocumentPosition(i) & Node.DOCUMENT_POSITION_FOLLOWING);
+addr.value = "https://example.com/wind.ogg";
+[...panel.querySelectorAll("button")].find((b) => b.textContent === "Use this address").click();
+assert.equal(m.get(["rooms", "ledge", "sound_file"]), "https://example.com/wind.ogg");
+[...panel.querySelectorAll("button")].find((b) => b.textContent === "Remove the sound").click();
+assert.equal(m.get(["rooms", "ledge", "sound_file"]), undefined);
 show(null);
 tick("Hands count: only so much can be held at once");
 assert.equal(m.get(["player", "hands"]), 2);
@@ -163,6 +174,29 @@ assert.deepEqual(m.list(["characters", "porter", "password", "bars"]), ["north",
 box("west").checked = false;
 box("west").dispatchEvent(new Event("change"));
 assert.equal(m.get(["characters", "porter", "password", "bars"]), "north");
+
+// Work the porter pays for, and what they say once word reaches them.
+show({ kind: "character", id: "porter" });
+panel.querySelector('input[placeholder="fetch_flour"]').value = "fetch bread";
+button("Add a job");
+assert.deepEqual(m.get(["characters", "porter", "jobs", "fetch_bread"]).toJSON(), { say: "", pays: 1 });
+typeIn("How they offer it", '"Bring me bread?"');
+choose("It's done when the player brings", "bread");
+typeIn("They pay (money)", "3");
+assert.equal(m.get(["characters", "porter", "jobs", "fetch_bread", "for"]), "bread");
+assert.equal(m.get(["characters", "porter", "jobs", "fetch_bread", "pays"]), 3);
+typeIn("Heard the player robbed someone", "The porter spits.");
+assert.equal(m.get(["characters", "porter", "heard", "robbed"]), "The porter spits.");
+// Busking at the gate, and a fiddle to busk with.
+show({ kind: "room", id: "gate" });
+choose("Busking here", "pays");
+assert.deepEqual(m.get(["rooms", "gate", "busking"]).toJSON(), { pays: "1-2", times: 3 });
+typeIn("Coins each time", "4");
+assert.equal(m.get(["rooms", "gate", "busking", "pays"]), 4);
+show({ kind: "thing", id: "chest" });
+tick("A musical instrument, to busk with");
+assert.equal(m.get(["objects", "chest", "instrument"]), true);
+tick("A musical instrument, to busk with");
 
 // Renaming and deleting what breaks into what.
 m.renameThing("bits", "broken_key");

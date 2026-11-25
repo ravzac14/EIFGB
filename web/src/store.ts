@@ -44,6 +44,8 @@ export type Width = "narrow" | "medium" | "wide";
 export type Reveal = "instant" | "typewriter" | "sentence";
 /** Whether the player reads new text aloud, and how fast. */
 export type Speech = "off" | "on" | "slow" | "fast";
+/** A game's sounds (`sound_file:`): off until the player turns them on. */
+export type Sound = "off" | "quiet" | "on";
 export interface Settings {
   theme: Theme;
   size: Size;
@@ -52,8 +54,9 @@ export interface Settings {
   width: Width;
   reveal: Reveal;
   speech: Speech;
+  sound: Sound;
 }
-const DEFAULTS: Settings = { theme: "auto", size: "medium", face: "serif", spacing: "normal", width: "medium", reveal: "instant", speech: "off" };
+const DEFAULTS: Settings = { theme: "auto", size: "medium", face: "serif", spacing: "normal", width: "medium", reveal: "instant", speech: "off", sound: "off" };
 
 export const settings = {
   get: (): Settings => ({ ...DEFAULTS, ...read<Partial<Settings>>("settings", {}) }),
@@ -204,12 +207,36 @@ export function bookmarksFor(game: string) {
   };
 }
 
+// -------------------------------------------------- taking turns
+
+/** Two (or more) people playing one game on one screen, each as a character. */
+export interface Together {
+  players: { name: string; character: string }[];
+  /** Whose turn it is: an index into `players`. */
+  turn: number;
+}
+
+/** Taking turns in one game, kept with its saves until the players stop. */
+export function togetherFor(game: string) {
+  return {
+    get: () => read<Together | null>(`together:${game}`, null),
+    set: (t: Together) => void write(`together:${game}`, t),
+    clear: () => remove(`together:${game}`),
+  };
+}
+
 // ------------------------------------------------------------- the map
 
 /** Whether the player's map panel is open; `null` until they've chosen. */
 export const mapPanel = {
   open: (): boolean | null => read<boolean | null>("map-open", null),
   set: (open: boolean) => void write("map-open", open),
+};
+
+/** Whether the player keeps the notes panel open. */
+export const notesPanel = {
+  open: (): boolean => read<boolean>("notes-open", false),
+  set: (open: boolean) => void write("notes-open", open),
 };
 
 // ------------------------------------------------------------- endings

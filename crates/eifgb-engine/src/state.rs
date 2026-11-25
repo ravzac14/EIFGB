@@ -93,6 +93,9 @@ pub struct GameState {
     /// Word of what the player did, on its way to the friends of whoever saw.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rumours: Vec<Rumour>,
+    /// Gossip: what the player did, going round from friend to friend.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tales: Vec<Tale>,
     /// Facts the player has learned, in the order they learned them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub learned: Vec<Learned>,
@@ -110,6 +113,23 @@ pub struct Learned {
     pub key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<EntityId>,
+}
+
+/// Something the player did (`deed`, to `about`), and who's heard of it:
+/// each with how many tellings it took to reach them (0: they were there).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Tale {
+    pub deed: String,
+    pub about: EntityId,
+    pub knows: Vec<(EntityId, u32)>,
+    /// Those who've heard it and said so to the player.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mentioned: Vec<EntityId>,
+    /// The turn it's told on again.
+    pub next: u64,
+    /// Everyone it can reach has heard it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub done: bool,
 }
 
 /// A change in how someone feels about the player, that their friends and
@@ -188,6 +208,7 @@ impl GameState {
             scenes: BTreeMap::new(),
             playing_as: None,
             rumours: Vec::new(),
+            tales: Vec::new(),
             learned: Vec::new(),
             heard_of: BTreeSet::new(),
             way_known: BTreeSet::new(),

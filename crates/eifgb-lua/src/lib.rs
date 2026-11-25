@@ -661,6 +661,25 @@ impl ScriptHost for LuaHost {
                     "together",
                     scope.create_function(move |_, (a, b): (u32, u32)| Ok(world.borrow().together(check(a)?, check(b)?)))?,
                 )?;
+                h.set(
+                    "heard",
+                    scope.create_function(move |_, (npc, deed, about): (u32, String, Option<u32>)| {
+                        let npc = check(npc)?;
+                        let about = about.map(check).transpose()?;
+                        Ok(world.borrow().has_heard(npc, &deed.trim().to_lowercase(), about))
+                    })?,
+                )?;
+                h.set(
+                    "job_state",
+                    scope.create_function(move |_, (npc, key): (u32, String)| {
+                        let npc = check(npc)?;
+                        let w = world.borrow();
+                        if !w.jobs_of(npc).iter().any(|j| j.key == key) {
+                            return Err(rt(format!("job: '{}' has no job called '{key}'", w.def(npc).key)));
+                        }
+                        Ok(w.job_state(npc, &key))
+                    })?,
+                )?;
 
                 h.set(
                     "timer_left",
@@ -809,6 +828,17 @@ impl ScriptHost for LuaHost {
                     "end_flashback",
                     scope.create_function(move |_, ()| {
                         effects.borrow_mut().push(Effect::EndFlashback);
+                        Ok(())
+                    })?,
+                )?;
+                h.set(
+                    "play_sound",
+                    scope.create_function(move |_, file: String| {
+                        let file = file.trim().to_string();
+                        if file.is_empty() {
+                            return Err(rt("play_sound needs a sound file, like play_sound(\"bell.mp3\")"));
+                        }
+                        effects.borrow_mut().push(Effect::Sound(file));
                         Ok(())
                     })?,
                 )?;

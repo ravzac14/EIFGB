@@ -6171,3 +6171,164 @@ objects:
     assert_eq!(beats[3].things, ["key"]);
     assert_eq!(beats[3].score, 5);
 }
+
+// ------------------------------------------------- sounds and the journal
+
+#[test]
+fn rooms_timers_and_scripts_make_sounds() {
+    let mut g = small(
+        "  cellar: { name: Cellar, sound_file: drip.ogg }\ntimers:\n  bell: { every: 2, say: A bell rings., sound_file: bell.mp3, heard_in: hall }\nverbs:\n  ring: { patterns: ['ring'] }\non:\n  ring: 'play_sound(\"chime.wav\")'\n",
+    );
+    // The hall has no sound of its own.
+    let o = g.input("wait");
+    assert_eq!(o.status.ambient, None);
+    let o = g.input("wait");
+    assert_eq!(o.sounds, vec!["bell.mp3".to_string()], "{}", o.text());
+    let o = g.input("ring");
+    assert!(o.sounds.contains(&"chime.wav".to_string()), "{:?}", o.sounds);
+    // Out in the yard the bell goes off unheard, and so unplayed.
+    let o = g.input("north");
+    let o2 = g.input("wait");
+    assert!(o.sounds.is_empty() && o2.sounds.is_empty(), "{:?} {:?}", o.sounds, o2.sounds);
+}
+
+#[test]
+fn a_room_plays_its_sound_while_youre_there() {
+    let src = "format: eifgb/0.1\ngame: { id: t, title: T, version: '1', start: hall }\nrooms:\n  hall: { name: Hall, sound_file: fire.ogg, exits: { north: yard } }\n  yard: { name: Yard, exits: { south: hall } }\n";
+    let out = compile_str(src);
+    let mut g = Game::new(out.story.unwrap(), LuaHost::new().unwrap(), 1).unwrap();
+    assert_eq!(g.start().status.ambient.as_deref(), Some("fire.ogg"));
+    assert_eq!(g.input("north").status.ambient, None);
+    assert_eq!(g.input("south").status.ambient.as_deref(), Some("fire.ogg"));
+}
+
+#[test]
+fn the_journal_for_the_notes_panel_changes_nothing() {
+    let mut g = small("goals:\n  out: { text: Get outside, done: 'player:is_in(world.yard)' }\n");
+    assert!(g.journal_lines().iter().any(|l| l.text.contains("Get outside")));
+    g.input("note the code is 4512");
+    let before = g.world().save();
+    let lines = g.journal_lines();
+    assert!(lines.iter().any(|l| l.text.contains("the code is 4512")), "{lines:?}");
+    assert_eq!(g.world().save(), before);
+    // A game with nothing to list says nothing.
+    let mut g = small("");
+    assert!(g.journal_lines().is_empty());
+}
+
+// ------------------------------------------- gossip, busking and odd jobs
+
+#[test]
+fn gossip_travels_a_friend_at_a_time() {
+    let mut g = small(
+        "objects:\n  bread: { name: bread, in: hall, traits: [portable] }\ncharacters:\n  baker: { name: baker, in: hall, likes: [bread] }\n  miller: { name: miller, in: yard, friends: [baker] }\n  farmer: { name: farmer, in: yard, friends: [miller], heard: { gift: 'The farmer grins. \"Heard you fed the baker!\"' } }\n",
+    );
+    let id = |g: &Game<LuaHost>, k: &str| g.world().story().entity_by_key(k).unwrap();
+    let (baker, miller, farmer) = (id(&g, "baker"), id(&g, "miller"), id(&g, "farmer"));
+    say(&mut g, "take bread");
+    say(&mut g, "give bread to baker");
+    assert!(g.world().has_heard(baker, "gift", None));
+    assert!(!g.world().has_heard(miller, "gift", None));
+    let farmer_was = g.world().disposition(farmer);
+    for _ in 0..3 {
+        say(&mut g, "wait");
+    }
+    assert!(g.world().has_heard(miller, "gift", Some(baker)), "the baker's friend hears first");
+    assert!(!g.world().has_heard(farmer, "gift", None), "then, a telling later, the miller's");
+    for _ in 0..3 {
+        say(&mut g, "wait");
+    }
+    assert!(g.world().has_heard(farmer, "gift", None));
+    assert_eq!(g.world().disposition(farmer), farmer_was + 1, "further off, they think better of the player");
+    // Meeting them, they say so: once each.
+    let out = say(&mut g, "north");
+    assert!(out.contains("word's got round that you were good to the baker"), "{out}");
+    assert!(out.contains("Heard you fed the baker!"), "{out}");
+    let again = say(&mut g, "wait");
+    assert!(!again.contains("word's got round") && !again.contains("Heard you fed"), "{again}");
+    // Scripts know who's heard.
+    let mut g = small(
+        "objects:\n  bread: { name: bread, in: hall, traits: [portable] }\ncharacters:\n  baker: { name: baker, in: hall, likes: [bread] }\n  miller: { name: miller, in: hall, friends: [baker] }\nverbs:\n  gossip: { patterns: ['gossip'] }\non:\n  gossip: 'say(world.miller:heard(\"gift\", world.baker) and \"yes\" or \"no\")'\n",
+    );
+    assert_says(&mut g, "gossip", "no");
+    say(&mut g, "take bread");
+    // The miller saw it, so knows straight away, and doesn't need telling.
+    say(&mut g, "give bread to baker");
+    assert_says(&mut g, "gossip", "yes");
+}
+
+#[test]
+fn a_crowd_pays_a_busker() {
+    let money = |g: &Game<LuaHost>| g.world().money(eifgb_engine::ir::PLAYER);
+    // Nobody about: just a tune.
+    let mut g = small("");
+    assert_says(&mut g, "sing", "You hum a little tune.");
+    assert_says(&mut g, "busk", "There's nobody here to play to.");
+    assert_eq!(money(&g), 0);
+    // A crowd pays a little, three times; an instrument a coin more.
+    let mut g = small("  square: { name: Square, crowd: true }\nobjects:\n  fiddle: { name: fiddle, in: square, traits: [portable], instrument: true }\non:\n  start: 'player:move_to(world.square)'\n");
+    let out = say(&mut g, "sing");
+    assert!(out.contains("You sing, and a few people stop to listen"), "{out}");
+    let after_one = money(&g);
+    assert!((1..=2).contains(&after_one), "{after_one}");
+    say(&mut g, "take fiddle");
+    let out = say(&mut g, "play fiddle");
+    assert!(out.contains("You play the fiddle"), "{out}");
+    assert!(money(&g) - after_one >= 2, "an instrument earns a coin more");
+    let out = say(&mut g, "play the fiddle for coins");
+    assert!(out.contains("all they'll pay for a while"), "{out}");
+    assert_says(&mut g, "busk", "People have heard enough for now.");
+    // A room that says what it pays, and one where nobody does.
+    let mut g = small("  inn: { name: Inn, busking: { pays: 5, times: 1 } }\n  chapel: { name: Chapel, crowd: true, busking: false }\non:\n  start: 'player:move_to(world.inn)'\n");
+    say(&mut g, "sing for my supper");
+    assert_eq!(money(&g), 5);
+    let mut g = small("  chapel: { name: Chapel, crowd: true, busking: false }\non:\n  start: 'player:move_to(world.chapel)'\n");
+    assert_says(&mut g, "sing", "Nobody here is going to pay for it.");
+}
+
+#[test]
+fn odd_jobs_pay() {
+    let mut g = small(
+        "vars: { swept: false }\nobjects:\n  flour: { name: sack of flour, in: yard, traits: [portable], synonyms: [flour, sack] }\n  loaf: { name: loaf }\ncharacters:\n  baker:\n    name: baker\n    in: hall\n    jobs:\n      flour: { say: '\"Fetch me the flour from the yard?\"', for: flour, pays: 3, task: fetch the flour }\n      sweep: { say: '\"Sweep up, would you?\"', done: 'vars.swept', pays: 1, gives: loaf, thanks: '\"Spotless!\"' }\nverbs:\n  sweep: { patterns: ['sweep'] }\non:\n  sweep: 'vars.swept = true; say(\"You sweep.\")'\n",
+    );
+    let money = |g: &Game<LuaHost>| g.world().money(eifgb_engine::ir::PLAYER);
+    let out = say(&mut g, "ask baker for work");
+    assert!(out.contains("Fetch me the flour") && out.contains("You said you'd fetch the flour for the baker"), "{out}");
+    assert_says(&mut g, "ask for work", "How's that job coming along?");
+    assert_says(&mut g, "journal", "– For the baker: fetch the flour.");
+    say(&mut g, "north");
+    say(&mut g, "take flour");
+    say(&mut g, "south");
+    let out = say(&mut g, "give flour to baker");
+    assert!(out.contains("The baker pays you 3 coins") && out.contains("You finished the job"), "{out}");
+    assert_eq!(money(&g), 3);
+    assert_says(&mut g, "journal", "✓ For the baker: fetch the flour.");
+    // The next job: done once the condition is true, while the baker sees.
+    assert_says(&mut g, "talk to baker", "Sweep up, would you?");
+    let out = say(&mut g, "sweep");
+    assert!(out.contains("Spotless!") && out.contains("gives you a loaf"), "{out}");
+    assert_eq!(money(&g), 4);
+    assert_says(&mut g, "ask baker for a job", "Nothing more today");
+}
+
+// ------------------------------------------------- two players, one screen
+
+#[test]
+fn taking_turns_switches_without_a_turn_passing() {
+    let mut g = cunning("");
+    let list = g.playable_characters();
+    assert_eq!(list.first().map(|(k, _)| k.as_str()), Some("mara"), "the one being played first: {list:?}");
+    assert!(list.iter().any(|(k, n)| k == "tobin" && n == "Tobin"), "{list:?}");
+    let turns = g.input("look").status.turns;
+    let o = g.play_as("tobin");
+    assert!(o.text().starts_with("You're Tobin now.\nKitchen"), "{}", o.text());
+    assert_eq!(o.status.turns, turns, "no turn passes");
+    assert_eq!(o.status.playing.as_deref(), Some("tobin"));
+    // The same one again: nothing to say.
+    assert_eq!(g.play_as("tobin").text(), "");
+    // Not someone to play.
+    assert_eq!(g.play_as("guard").text(), "You can only be yourself here.");
+    let o = g.play_as("mara");
+    assert!(o.text().contains("Hall"), "{}", o.text());
+    assert_eq!(o.status.playing.as_deref(), Some("mara"));
+}

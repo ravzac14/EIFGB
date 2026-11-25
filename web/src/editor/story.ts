@@ -6,6 +6,7 @@ import { weatherSection } from "./world-ui.ts";
 import { epilogueSection, flashbacksSection } from "./journeys-ui.ts";
 import { kindsSection } from "./kinds-ui.ts";
 import { teachesField } from "./knowing-ui.ts";
+import { soundSection } from "./sound-ui.ts";
 import { boolField, button, check, el, field, help, numField, proseField, select, type InspectorContext } from "./ui.ts";
 
 // ------------------------------------------------------------ scripts
@@ -627,6 +628,7 @@ export function timerPanel(panel: HTMLElement, ctx: InspectorContext, id: string
       help: "Optional. Leave it empty to say the same thing every time.",
     }),
     ...heardIn(ctx, p),
+    ...soundSection(ctx, p, "timer"),
     ...field("Chance each time it's due (%)", String(m.get([...p, "chance"]) ?? "").replace(/%$/, ""), (v) => {
       const n = Number.parseInt(v, 10);
       ctx.change((x) => x.set([...p, "chance"], Number.isFinite(n) && n >= 0 && n <= 100 && n !== 100 ? `${n}%` : undefined), { coalesce: `${id}.chance`, redraw: false });

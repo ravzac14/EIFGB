@@ -125,6 +125,17 @@ end
 function Entity:is_with(other)
   return H.together(need_entity(self, "the thing"), need_entity(other, "is_with's other"))
 end
+-- Gossip: world.miller:heard("robbed") is whether the miller knows the
+-- player robbed someone (there, or by word of mouth); :heard("robbed",
+-- world.baker), robbed the baker.
+function Entity:heard(deed, about)
+  if type(deed) ~= "string" then error("heard needs a deed, like heard(\"robbed\")", 2) end
+  return H.heard(need_entity(self, "the character"), deed, about and need_entity(about, "heard's about"))
+end
+-- Jobs: world.baker:job("flour") is nil (not taken yet), "taken" or "done".
+function Entity:job(key)
+  return H.job_state(need_entity(self, "the character"), key)
+end
 
 -- Whether `thing` would fit in or on this (or be carried, for the
 -- player), by size and capacity. True if it's already there.
@@ -231,6 +242,11 @@ function env.hear_of(place) H.hear_of(need_entity(place, "hear_of's place")) end
 function env.flashback(key) H.flashback(key) end
 function env.end_flashback() H.end_flashback() end
 function env.in_flashback() return H.in_flashback() end
+-- A sound, once: play_sound("bell.mp3"). Only players who turn sound on hear it.
+function env.play_sound(file)
+  if type(file) ~= "string" then error("play_sound needs a sound file, like play_sound(\"bell.mp3\")", 2) end
+  H.play_sound(file)
+end
 -- The player promises someone the favour they asked (`asks:`).
 function env.promise(who) H.promise(need_entity(who, "promise's character")) end
 function env.complete_goal(key) H.complete_goal(key) end

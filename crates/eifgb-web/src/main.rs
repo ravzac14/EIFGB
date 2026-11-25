@@ -68,11 +68,16 @@ fn load(files: &str, entry: &str, seed: u64) -> Value {
         return json!({ "diagnostics": diagnostics });
     }
     let m = &story.meta;
-    let meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version, "language": m.language, "presentation": m.presentation, "endings": story.endings.iter().map(|e| e.key.clone()).collect::<Vec<_>>(), "stdlib": m.stdlib, "ir": story.ir_version, "engine": env!("CARGO_PKG_VERSION") });
+    let mut meta = json!({ "id": m.id, "title": m.title, "author": m.author, "version": m.version, "language": m.language, "presentation": m.presentation, "endings": story.endings.iter().map(|e| e.key.clone()).collect::<Vec<_>>(), "stdlib": m.stdlib, "ir": story.ir_version, "engine": env!("CARGO_PKG_VERSION") });
     let started = LuaHost::new().and_then(|h| Game::new(story, h, seed));
     match started {
         Ok(mut g) => {
             let opening = output(g.start());
+            // Characters to play, for taking turns (two players, one screen).
+            let playable = g.playable_characters();
+            if playable.len() > 1 {
+                meta["playable"] = Value::Array(playable.into_iter().map(|(id, name)| json!({ "id": id, "name": name })).collect());
+            }
             GAME.with(|cell| *cell.borrow_mut() = Some(g));
             json!({ "diagnostics": diagnostics, "meta": meta, "output": opening })
         }
@@ -260,6 +265,21 @@ pub extern "C" fn eifgb_complete(line: *const c_char) -> *const c_char {
 #[unsafe(no_mangle)]
 pub extern "C" fn eifgb_map() -> *const c_char {
     give(with_game(|g| map(g.world())))
+}
+
+/// Pass-and-play: be the character with key `key` now, without a turn
+/// passing: the output (it says so, and looks around).
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_play_as(key: *const c_char) -> *const c_char {
+    let key = arg(key);
+    give(with_game(|g| output(g.play_as(&key))))
+}
+
+/// What JOURNAL says now (goals, promises and notes), for the notes panel:
+/// `[{ kind, text }]`, empty when there's nothing yet. Changes nothing.
+#[unsafe(no_mangle)]
+pub extern "C" fn eifgb_journal() -> *const c_char {
+    give(with_game(|g| serde_json::to_value(g.journal_lines()).unwrap_or(Value::Null)))
 }
 
 /// The characters and things the player has met, for following one through

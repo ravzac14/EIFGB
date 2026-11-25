@@ -933,6 +933,9 @@ impl<H: ScriptHost> Game<H> {
             self.msg("give.whom", ctx);
             return false;
         };
+        if let Some(ok) = self.job_given(item, to) {
+            return ok;
+        }
         if let Some(ok) = self.keep_favour(item, to) {
             return ok;
         }

@@ -26,6 +26,7 @@ You unlock the pantry door with the small key.
 - [Containers and supporters](#containers-and-supporters)
 - [How things behave](#how-things-behave)
 - [Pictures](#pictures)
+- [Sounds](#sounds)
 - [Your own words: aliases](#your-own-words-aliases)
 - [Timed events](#timed-events)
 - [Goals: a journal](#goals-a-journal)
@@ -1409,6 +1410,45 @@ objects:
   adds something to look at. Downloads, single web pages and links to a
   game's folder all bring their pictures along.
 
+## Sounds
+
+A room can have a sound of its own, played over and over while the player
+is there: rain on the windows, a fire, the sea. A timer can play a sound
+when it goes off, and a script can play one with `play_sound`.
+
+```yaml
+rooms:
+  hall:
+    name: Front Hall
+    sound_file: sounds/clock.ogg
+timers:
+  bell:
+    every: 10
+    say: Far off, the church bell rings.
+    sound_file: sounds/bell.mp3
+on:
+  start: 'play_sound("sounds/door.mp3")'
+```
+
+- **`sound_file`** is a sound beside `game.yaml` (a `.mp3`, `.ogg`,
+  `.wav`, `.m4a` or `.opus`), or an `https://` address. The compiler warns
+  when the file isn't there.
+- Sounds are **off unless the player turns them on**: *Sound* in the web
+  player's **Aa** settings (Off, Quiet or On), or the *Sound* button on a
+  game saved as one web page. The first time the game makes a sound with
+  it off, the player is told the game has sounds. The terminal plays
+  none.
+- A room's sound fades in as the player arrives and out as they leave. A
+  timer's sound plays only where its message is heard (`heard_in`).
+- Say what happens in words too, as you would anyway: a player with
+  sound off, or with a screen reader, gets everything from the text.
+- In the editor, a room's **Light, sound and the map** has *Its own
+  sound*, and a timer's *When it goes off* has *Plays a sound*: choose a
+  file (kept with the game, under `sounds/`) or paste a web address.
+- Keep sound files small (a few hundred KB): they're kept in the
+  browser with the game. Downloads, single web pages and links to a
+  game's folder all bring them along, like pictures.
+
 ## Your own words: aliases
 
 Players type the words they know. If your game's players say "using"
@@ -1554,7 +1594,10 @@ Players can also keep notes of their own, in any game: NOTE THE GUARD
 SLEEPS AFTER DARK. A note is the rest of the line exactly as typed, it
 takes no turn, and JOURNAL (or NOTES) lists them under the goals. Notes
 are kept with the game's saves, but UNDO and RESTART leave them alone:
-they're the player's, not the story's.
+they're the player's, not the story's. In the web player, **Notes** at
+the top opens the journal in a panel beside the story (beside the map, on
+a wide screen), kept up to date as the player plays. Players can read it
+there; they still write with NOTE.
 
 ## Scenes
 
@@ -1674,6 +1717,18 @@ what she held. EXAMINE ME describes whoever the player is now. What the
 player has seen and learned is shared between them. Characters who are
 enemies of one are enemies of all, since it's the player they know.
 
+**Two players, one screen.** In the web player, a game with more than
+one playable character has a **Two players** button. Each player gives a
+name and picks a character, and they take turns at one keyboard (or pass
+the phone): after each move that takes a turn, it's the other's, and the
+game becomes their character without a turn passing ("Over to Jo, as
+Tobin."). The bar above the prompt says whose turn it is, and the story
+says whose move each was ("Sam: take pebble"). A conversation finishes
+before the turn passes; UNDO gives the move back to whoever made it; a
+character who can't go on (dead, say) sits out. It's kept with the
+game's saves until *Stop taking turns*. Write such a game so each
+character has things to do, and puzzles that need both of them.
+
 ## What the player learns
 
 A game can name the things worth knowing, as `facts:`, and say where
@@ -1746,6 +1801,65 @@ cools, and her friends hear of it, and next time she says her `broken`
 line. An option with `promise: true` in a conversation promises too, as
 does `promise(world.baker)` in a script, and scripts read
 `world.baker.promise`: nil, "made", "kept" or "broken".
+
+### Odd jobs
+
+A character can pay for errands: `jobs:`, offered one at a time, in
+order.
+
+```yaml
+characters:
+  baker:
+    name: baker
+    in: shop
+    jobs:
+      flour:
+        say: '"Fetch me a sack of flour from the mill? Three coins in it."'
+        task: fetch flour from the mill
+        for: flour                  # done when they're given it
+        pays: 3
+      weeds:
+        say: '"The garden''s full of weeds. Pull them for me?"'
+        task: weed the garden
+        done: vars.weeded           # or: done once this is true, while they see you
+        pays: 2
+        gives: loaf
+        thanks: '"Lovely. Have a loaf, still warm."'
+```
+
+ASK THE BAKER FOR WORK (ASK FOR A JOB, WORK FOR THE BAKER, or just TALK
+TO her, if she has no conversation and no favour to ask) offers the next
+job, and the player takes it on; JOURNAL lists jobs, taken and done.
+Asked again before it's done, she asks how it's going. A job is done
+when she's given what it's `for`, or once its `done` condition is true
+while she can see the player. She says her `thanks` (or "Good work"),
+pays `pays` (from her own `money`, if she keeps count of it) and
+`gives`, and warms to the player. When they're all done: "Nothing more
+today." Scripts read `world.baker:job("flour")`: nil, "taken" or "done".
+In the editor, they're under **Work they pay for**.
+
+### Busking
+
+SING, BUSK, or PLAY THE FIDDLE (FOR COINS) where people pay a busker
+earns a little money: anywhere that's crowded pays 1 or 2 coins, three
+times, before people have heard enough (they pay again 40 turns later).
+Something with `instrument: true`, carried, earns a coin more. A room can
+say what it pays, crowd or not, or that nobody does:
+
+```yaml
+rooms:
+  tavern:
+    name: The Crooked Tankard
+    busking: { pays: 2-4, times: 2 }
+  chapel:
+    name: Chapel
+    crowd: true
+    busking: false
+objects:
+  fiddle: { name: fiddle, in: attic, traits: [portable], instrument: true }
+```
+
+Anywhere else, SING just hums a tune, as before.
 
 ### Copying
 
@@ -2457,6 +2571,31 @@ Nineteen features reward players who try something clever:
   feels about the player changes, its friends (and those who count it a
   friend) hear of it three turns later, and shift a step the same way.
   Factions already share their own word, their attitude.
+- **Gossip:** what the player did goes further. Robbing someone,
+  attacking them, a gift, sparing them, fooling them, and promises
+  broken or kept each start a tale, known to whoever it was done to and
+  anyone awake who saw. Every three turns, everyone who knows it tells
+  their `friends`, so it travels a friend at a time, as far as the
+  friendships reach. Someone who's heard says so the next time they see
+  the player, once: "The miller gives you a hard look: word's got round
+  that you robbed the baker." Their own line for it goes in `heard:`, by
+  deed (`robbed`, `attacked`, `fooled`, `gift`, `spared`,
+  `broke_promise`, `kept_promise`):
+
+  ```yaml
+  characters:
+    miller:
+      name: miller
+      friends: [baker]
+      heard:
+        robbed: '"Thief," the miller mutters, and turns away.'
+        kept_promise: '"The baker says you''re as good as your word."'
+  ```
+
+  Those further off than the victim's own friends (who hear how the
+  victim feels anyway) think a step better or worse of the player too.
+  Scripts ask `world.miller:heard("robbed")`, or
+  `world.miller:heard("robbed", world.baker)` for robbing the baker.
 - **Remembering:** characters remember the last thing the player did to
   them: `gift`, `attacked`, `robbed`, `spared` (fled from a fight) or
   `fooled`. `remembers: { gift: "She smiles at the brooch.", robbed: "He
@@ -2765,6 +2904,8 @@ follows:
 |---|---|---|
 | ASK … THE WAY TO … | WHICH WAY TO …, HOW DO I GET TO …, ASK FOR DIRECTIONS TO … | Asks the way to a place: after that, GO TO goes there. |
 | PROMISE … | I'LL DO IT, PROMISE | Promises someone the favour they asked. |
+| ASK … FOR WORK | ASK FOR A JOB, WORK FOR …, LOOK FOR WORK | Takes on the next job someone pays for (`jobs:`). |
+| SING | BUSK, PERFORM, PLAY … FOR COINS, HUM | Busks, where people pay for it: in a crowd, or a room with `busking:`. |
 | TALK TO … | SPEAK TO …, GREET …, ASK …, TELL …, ASK … ABOUT …, TELL … ABOUT … | Starts a conversation. With one person here to talk to, TALK or ASK ABOUT … needs no name. ASK THE KEEPER ABOUT THE GATE goes straight to the option that mentions the gate, when just one does. |
 | GIVE … TO … | HAND … TO …, FEED … TO … | Hands something over: a gift, or food for an animal. |
 | LET … SNIFF … | HAVE … SMELL …, GIVE … THE SCENT OF … | Gives a dog a scent to follow. |

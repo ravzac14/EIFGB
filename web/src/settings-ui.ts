@@ -25,10 +25,11 @@ const CHOICES: { [K in keyof Settings]: [Settings[K], string][] } = {
   width: [["narrow", "Narrow"], ["medium", "Medium"], ["wide", "Wide"]],
   reveal: [["instant", "All at once"], ["typewriter", "Letter by letter"], ["sentence", "A sentence at a time (Enter for the next)"]],
   speech: [["off", "Off"], ["on", "Read new text aloud"], ["slow", "Read aloud, slower"], ["fast", "Read aloud, faster"]],
+  sound: [["off", "Off"], ["quiet", "Quiet"], ["on", "On"]],
 };
-const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width", reveal: "Text appears", speech: "Read aloud" };
+const LABELS: Record<keyof Settings, string> = { theme: "Colours", size: "Text size", face: "Typeface", spacing: "Line spacing", width: "Column width", reveal: "Text appears", speech: "Read aloud", sound: "Sound" };
 /** Settings that only mean something while playing: shown on the play page. */
-const PLAYER_ONLY = new Set<keyof Settings>(["reveal", "speech"]);
+const PLAYER_ONLY = new Set<keyof Settings>(["reveal", "speech", "sound"]);
 
 export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
   applySettings();
@@ -67,9 +68,18 @@ export function settingsDialog(dialog: HTMLDialogElement, opener: HTMLElement) {
         settings.set(next);
         applySettings(next);
         if (key === "speech") stopSpeaking();
+        if (key === "sound") dispatchEvent(new Event("eifgb-sound"));
       });
       row.append(label, select);
       dialog.append(row);
+      if (key === "sound") {
+        dialog.append(
+          Object.assign(document.createElement("p"), {
+            className: "help dim",
+            textContent: "For games with sounds: a room's own (rain, a crackling fire), and sounds when things happen. The words always say what happens too.",
+          }),
+        );
+      }
       if (key === "speech") {
         const note = Object.assign(document.createElement("p"), {
           className: "help dim",

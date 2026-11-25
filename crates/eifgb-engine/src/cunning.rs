@@ -3,7 +3,7 @@
 //! apart, calling out in someone else's voice, word getting round,
 //! characters remembering, planting evidence, moods, and being someone else.
 
-use crate::game::{Game, LineKind};
+use crate::game::{Game, LineKind, Output};
 use crate::script::{Ctx, ScriptHost};
 use crate::state::Rumour;
 use eifgb_ir::{Direction, EntityId, EntityKind, Exit, Text, Trait, Value, PLAYER};
@@ -271,12 +271,7 @@ impl<H: ScriptHost> Game<H> {
     /// Who `npc` tells: its friends, and those it's a friend of. (A faction
     /// has word of its own: its attitude to the player.)
     fn told_by(&self, npc: EntityId) -> Vec<EntityId> {
-        let w = &self.world;
-        let friends = w.def(npc).npc.as_ref().map(|n| n.friends.clone()).unwrap_or_default();
-        w.ids()
-            .filter(|&c| c != npc && c != PLAYER && w.def(c).kind == EntityKind::Character && w.is_active(c))
-            .filter(|&c| friends.contains(&c) || w.def(c).npc.as_ref().is_some_and(|n| n.friends.contains(&npc)))
-            .collect()
+        self.world.friends_of(npc)
     }
 
     fn spread_word(&mut self) {
@@ -460,6 +455,35 @@ impl<H: ScriptHost> Game<H> {
         true
     }
 
+    /// The characters the player can be, in a game with several: each's
+    /// key and name, the one being played first.
+    pub fn playable_characters(&self) -> Vec<(String, String)> {
+        let now = self.world.state.playing_as;
+        let mut list = self.playable();
+        list.sort_by_key(|&c| Some(c) != now);
+        list.into_iter().map(|c| (self.world.def(c).key.clone(), self.world.display_name(c))).collect()
+    }
+
+    /// For a host taking turns between players (pass-and-play): be `key`
+    /// now, without a turn passing. Says so, and looks around. A character
+    /// that's dead, or not one to be played, can't be: nothing changes.
+    pub fn play_as(&mut self, key: &str) -> Output {
+        self.out = Output::default();
+        let next = self.world.story().entity_by_key(key).filter(|&c| self.playable().contains(&c));
+        match (self.world.state.playing_as, next) {
+            (Some(now), Some(next)) if now == next => {}
+            (Some(now), Some(next)) if !self.world.is_dead(next) && self.world.state.ending.is_none() => {
+                self.world.become_character(now, next);
+                self.world.state.playing_as = Some(next);
+                self.msg_kind(LineKind::Notice, "switch.done", &Ctx::new().entity("target", next));
+                self.look();
+            }
+            (_, Some(next)) => self.msg_kind(LineKind::Notice, "switch.cant", &Ctx::new().entity("target", next)),
+            (_, None) => self.msg_kind(LineKind::Notice, "switch.none", &Ctx::new()),
+        }
+        self.finish()
+    }
+
     /// After every turn.
     pub(crate) fn cunning_turn(&mut self) {
         self.found_out();
@@ -473,10 +497,17 @@ impl<H: ScriptHost> Game<H> {
 impl crate::World {
     /// `npc` remembers what the player did (the latest thing): `gift`,
     /// `attacked`, `robbed`, `spared` or `fooled`. Scripts read it as `remembers`.
+    /// And the tale of it goes round (see `gossip`).
     pub fn remember(&mut self, npc: EntityId, deed: &str) {
         if npc == PLAYER || self.def(npc).kind != EntityKind::Character {
             return;
         }
+        self.remember_only(npc, deed);
+        self.start_tale(deed, npc);
+    }
+
+    /// The same, without a tale going round: one that's told another way.
+    pub(crate) fn remember_only(&mut self, npc: EntityId, deed: &str) {
         self.set(npc, "_remembers", Value::Str(deed.into()));
         // Said the next time they meet, not now.
         self.set(npc, "_recalled", Value::Str(deed.into()));

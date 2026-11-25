@@ -13,7 +13,7 @@ use eifgb_stdlib::Stdlib;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Names scripts already use on every entity: built-in fields and methods.
-const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "disposition", "visits", "seen", "feeling", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise", "proper", "rename"];
+const RESERVED_FIELDS: &[&str] = &["key", "name", "kind", "location", "capacity", "health", "money", "patience", "disposition", "visits", "seen", "feeling", "move_to", "is_in", "contents", "has", "can_hold", "wander", "step_toward", "go", "attack", "behave", "distance_to", "is_with", "eat", "is_hostile_to", "make_noise", "proper", "rename", "heard", "job"];
 
 pub(crate) struct Lowerer<'a> {
     pub d: &'a mut Diagnostics,
@@ -115,6 +115,7 @@ impl<'a> Lowerer<'a> {
             capacity: s.player.capacity.and_then(|c| c.limit()),
             size: s.player.size.unwrap_or(1),
             picture: None,
+            sound_file: None,
             revealed_by: vec![],
             combines: vec![],
             marks: false,
@@ -191,6 +192,8 @@ impl<'a> Lowerer<'a> {
             mount: false,
             stamina: None,
             crowd: None,
+            busking: None,
+            instrument: false,
             now: None,
             flashback: None,
         }];
@@ -793,6 +796,7 @@ impl<'a> Lowerer<'a> {
             capacity: None,
             size: 1,
             picture: self.picture(r.picture.as_ref(), &format!("{path}.picture")),
+            sound_file: self.sound_file(r.sound_file.as_deref(), &format!("{path}.sound_file")),
             revealed_by: vec![],
             combines: vec![],
             marks: false,
@@ -878,6 +882,8 @@ impl<'a> Lowerer<'a> {
             mount: false,
             stamina: None,
             crowd: r.crowd.as_ref().and_then(|c| self.crowd(c, &format!("{path}.crowd"))),
+            busking: r.busking.as_ref().and_then(|b| self.busking(b, &format!("{path}.busking"))),
+            instrument: false,
             now: r.now.as_deref().and_then(|n| self.room_ref(n, &format!("{path}.now"))),
             flashback: None,
         }
@@ -1264,6 +1270,7 @@ impl<'a> Lowerer<'a> {
             capacity: t.capacity,
             size: t.size.unwrap_or(1),
             picture: self.picture(t.picture.as_ref(), &format!("{path}.picture")),
+            sound_file: None,
             revealed_by,
             combines,
             marks: t.marks,
@@ -1348,8 +1355,33 @@ impl<'a> Lowerer<'a> {
             mount: t.mount && is_char,
             stamina: t.stamina.filter(|_| is_char),
             crowd: None,
+            busking: None,
+            instrument: t.instrument && kind == EntityKind::Object,
             now: t.now.as_deref().and_then(|n| self.entity_ref(n, &format!("{path}.now"))),
             flashback: t.flashback.clone().filter(|_| kind == EntityKind::Object),
+        }
+    }
+
+    /// `busking: false`, `true`, or `{ pays: 1-3, times: 3 }`.
+    fn busking(&mut self, b: &src::BuskingSrc, path: &str) -> Option<Busking> {
+        match b {
+            src::BuskingSrc::On(false) => Some(Busking { pays: 0, spread: 0, times: 0 }),
+            src::BuskingSrc::On(true) => Some(DEFAULT_BUSKING),
+            src::BuskingSrc::Full { pays, times } => {
+                let (pays, spread) = match pays.as_ref().map(actions_range) {
+                    None => (DEFAULT_BUSKING.pays, DEFAULT_BUSKING.spread),
+                    Some(Ok((lo, hi))) => (lo, hi - lo),
+                    Some(Err(e)) => {
+                        self.d.error(format!("{path}.pays"), e.replace("actions", "coins"));
+                        return None;
+                    }
+                };
+                let times = times.unwrap_or(DEFAULT_BUSKING.times);
+                if times == 0 || pays + spread == 0 {
+                    self.d.warn(path, "nobody pays here; to say so, write 'busking: false'");
+                }
+                Some(Busking { pays, spread, times })
+            }
         }
     }
 
@@ -1404,6 +1436,8 @@ impl<'a> Lowerer<'a> {
                 ("remembers", !t.remembers.is_empty()),
                 ("playable", t.playable),
                 ("asks", t.asks.is_some()),
+                ("jobs", !t.jobs.is_empty()),
+                ("heard", !t.heard.is_empty()),
                 ("knows_the_way", t.knows_the_way.is_some()),
                 ("sniffs", t.sniffs),
                 ("password", t.password.is_some()),
@@ -1507,6 +1541,53 @@ impl<'a> Lowerer<'a> {
                 (m, text)
             })
             .collect();
+        let heard = t
+            .heard
+            .iter()
+            .map(|(m, p)| {
+                let m = m.trim().to_lowercase();
+                if !GOSSIP_DEEDS.contains(&m.as_str()) {
+                    self.d.error(format!("{path}.heard.{m}"), format!("what a character hears of is one of {}", GOSSIP_DEEDS.join(", ")));
+                }
+                let text = self.prose(p, &format!("{path}.heard.{m}"));
+                (m, text)
+            })
+            .collect();
+        let mut jobs = Vec::new();
+        for (key, j) in &t.jobs {
+            let jpath = format!("{path}.jobs.{key}");
+            if let Err(e) = check_id(key) {
+                self.d.error(&jpath, e);
+            }
+            let wants = j.wants.as_deref().and_then(|w| self.entity_ref(w, &format!("{jpath}.for")));
+            if j.wants.is_none() && j.done.is_none() {
+                self.d.error(&jpath, "a job needs 'for' (something to bring them) or 'done' (a Lua condition for when it's done)");
+            }
+            if j.wants.is_some() && j.done.is_some() {
+                self.d.error(&jpath, "use 'for' (something to bring them) or 'done' (a condition), not both");
+            }
+            let pays = j.pays.unwrap_or(0);
+            if pays < 0 {
+                self.d.error(format!("{jpath}.pays"), "a job can't pay less than nothing");
+            }
+            let gives: Vec<EntityId> = j.gives.as_ref().map(|g| g.items().into_iter().filter_map(|x| self.entity_ref(x, &format!("{jpath}.gives"))).collect()).unwrap_or_default();
+            if pays == 0 && gives.is_empty() {
+                self.d.warn(&jpath, "this job pays nothing; give it 'pays' (money) or 'gives' (things), or make it a favour with 'asks'");
+            }
+            if j.say.is_none() {
+                self.d.warn(&jpath, "say how they offer it, with 'say'");
+            }
+            jobs.push(Job {
+                key: key.clone(),
+                say: self.prose_opt(j.say.as_ref(), &format!("{jpath}.say")),
+                task: self.text_opt(j.task.as_deref(), &format!("{jpath}.task")),
+                wants,
+                done: j.done.as_deref().map(|d| self.code(d, &format!("{jpath}.done"))),
+                pays: pays.max(0),
+                gives,
+                thanks: self.prose_opt(j.thanks.as_ref(), &format!("{jpath}.thanks")),
+            });
+        }
         let asks = t.asks.as_ref().and_then(|a| {
             let apath = format!("{path}.asks");
             let wants = self.entity_ref(&a.wants, &format!("{apath}.for"))?;
@@ -1555,6 +1636,8 @@ impl<'a> Lowerer<'a> {
             remembers,
             playable: t.playable,
             asks,
+            jobs,
+            heard,
             knows_the_way: t.knows_the_way.unwrap_or(t.talk.is_some() || matches!(behavior, Behavior::Merchant | Behavior::Conversationalist)),
             wander: t.wander.unwrap_or(behavior.default_wander()),
             area,
@@ -2061,7 +2144,7 @@ impl<'a> Lowerer<'a> {
                 let at = n.at.as_deref().and_then(|a| self.entity_ref(a, &format!("{path}.noise.at")));
                 Noise { at, loudness: n.loudness, faction: n.faction.clone() }
             });
-            if t.say.is_none() && t.run.is_none() && t.end.is_none() && noise.is_none() {
+            if t.say.is_none() && t.run.is_none() && t.end.is_none() && noise.is_none() && t.sound_file.is_none() {
                 self.d.warn(&path, "this timer does nothing; give it 'say', 'do', 'end' or 'noise'");
             }
             out.push(Timer {
@@ -2102,6 +2185,7 @@ impl<'a> Lowerer<'a> {
                 run: t.run.as_deref().map(|r| self.code(r, &format!("{path}.do"))),
                 end,
                 noise,
+                sound_file: self.sound_file(t.sound_file.as_deref(), &format!("{path}.sound_file")),
             });
         }
         out
@@ -2331,6 +2415,33 @@ impl<'a> Lowerer<'a> {
             self.d.warn(path, "say what the picture shows, with 'alt', for players who can't see it");
         }
         Some(Picture { file, alt })
+    }
+
+    /// `sound_file: rain.mp3`: a sound beside the game, or an https address.
+    fn sound_file(&mut self, f: Option<&str>, path: &str) -> Option<String> {
+        let file = f?.trim().to_string();
+        if file.is_empty() {
+            self.d.error(path, "a sound needs a file");
+            return None;
+        }
+        if file.starts_with("http://") {
+            self.d.warn(path, "web pages on https can't play sounds from http:// addresses; use https://");
+        } else if !file.starts_with("https://") {
+            match files::normalize(&file) {
+                Err(e) => {
+                    self.d.error(path, e);
+                    return None;
+                }
+                Ok(_) if !self.files.exists(&files::sibling(self.entry, &file)) => {
+                    self.d.warn(path, format!("there's no sound file '{file}' beside the game"));
+                }
+                Ok(_) => {}
+            }
+            if !is_sound_file(&file) {
+                self.d.warn(path, "a sound should be a .mp3, .ogg, .wav, .m4a or .opus file");
+            }
+        }
+        Some(file)
     }
 
     fn load_scripts(&mut self, paths: &[String]) -> Vec<Script> {
@@ -2644,6 +2755,18 @@ pub fn visit_code(story: &Story, f: &mut dyn FnMut(&Code)) {
     }
 }
 
+/// What can be heard of, in `heard:` (and gossip): what a character
+/// `remembers`, and promises broken and kept.
+const GOSSIP_DEEDS: &[&str] = &["gift", "attacked", "robbed", "spared", "fooled", "broke_promise", "kept_promise"];
+
+/// What a crowd pays a busker, when a room doesn't say: 1 or 2 coins, three times.
+const DEFAULT_BUSKING: Busking = Busking { pays: 1, spread: 1, times: 3 };
+
+/// Whether a file name is a sound the web player can play.
+fn is_sound_file(file: &str) -> bool {
+    file.rsplit('.').next().is_some_and(|e| ["mp3", "ogg", "oga", "wav", "m4a", "opus"].contains(&e.to_ascii_lowercase().as_str()))
+}
+
 /// `open_at` as Lua: `night`, `day`, `full moon` (a phase), `22:00-4:00`.
 fn open_at_code(at: &str) -> Result<String, String> {
     let a = at.trim().to_lowercase();
@@ -2680,4 +2803,3 @@ mod tests {
         assert_eq!(v.adjectives, vec!["brass", "old", "small"]);
     }
 }
-

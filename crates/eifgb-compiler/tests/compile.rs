@@ -636,6 +636,49 @@ objects:
 }
 
 #[test]
+fn sounds_are_checked() {
+    use eifgb_compiler::MemFiles;
+    let game = r#"
+format: eifgb/0.1
+game: { id: t, title: T, version: "1", start: hall }
+rooms:
+  hall: { name: Hall, sound_file: sounds/fire.ogg }
+  yard: { name: Yard, sound_file: sounds/missing.mp3 }
+  attic: { name: Attic, sound_file: notes.txt }
+  web: { name: Web, sound_file: "http://example.com/rain.mp3" }
+timers:
+  bell: { every: 3, sound_file: "https://example.com/bell.mp3" }
+  bad: { every: 3, sound_file: "../secret.mp3" }
+"#;
+    let files = MemFiles::new().with("game.yaml", game).with("sounds/fire.ogg", "data:audio/ogg;base64,AAAA");
+    let out = compile(&files, "game.yaml");
+    let ws = warnings(&out);
+    let has = |s: &str| ws.iter().any(|w| w.contains(s));
+    assert!(has("rooms.yard.sound_file: there's no sound file 'sounds/missing.mp3' beside the game"), "{ws:#?}");
+    assert!(has("rooms.attic.sound_file: a sound should be a .mp3"), "{ws:#?}");
+    assert!(has("rooms.web.sound_file: web pages on https can't play sounds from http://"), "{ws:#?}");
+    // A timer with only a sound does something.
+    assert!(!has("timers.bell: this timer does nothing"), "{ws:#?}");
+    assert!(!has("rooms.hall"), "{ws:#?}");
+    assert_error(&out, "timers.bad.sound_file");
+}
+
+#[test]
+fn jobs_busking_and_gossip_are_checked() {
+    assert_error(&with("characters:\n  baker: { name: baker, in: hall, jobs: { sweep: { say: Sweep, pays: 1 } } }\n"), "a job needs 'for'");
+    assert_error(&with("objects:\n  flour: { name: flour }\ncharacters:\n  baker: { name: baker, in: hall, jobs: { sweep: { say: Sweep, for: flour, done: 'true', pays: 1 } } }\n"), "not both");
+    assert_error(&with("characters:\n  baker: { name: baker, in: hall, heard: { stole: Thief! } }\n"), "what a character hears of is one of gift");
+    // Another room, after BASE's hall.
+    assert_error(&with("  inn: { name: Inn, busking: { pays: lots } }\n"), "rooms.inn.busking.pays");
+    let out = with("objects:\n  flour: { name: flour }\ncharacters:\n  baker: { name: baker, in: hall, jobs: { fetch: { for: flour } } }\n");
+    let ws = warnings(&out);
+    assert!(ws.iter().any(|w| w.contains("characters.baker.jobs.fetch: this job pays nothing")), "{ws:#?}");
+    assert!(ws.iter().any(|w| w.contains("say how they offer it")), "{ws:#?}");
+    let out = with("objects:\n  jobby: { name: thing, in: hall, jobs: { x: { for: jobby, pays: 1 } } }\n");
+    assert!(warnings(&out).iter().chain(errors(&out).iter()).any(|w| w.contains("jobs")), "{:#?}", out.diagnostics);
+}
+
+#[test]
 fn world_fields_are_checked() {
     let warned = |extra: &str, needle: &str| {
         let out = with(extra);

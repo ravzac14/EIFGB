@@ -53,3 +53,9 @@ footer { margin: 3rem auto 2rem; }
 .demo-hint { margin: 0.3rem 0 0.2rem; }
 .demo-hint code { font-family: var(--mono); }
 .demo .after { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 0.3rem 0 0.4rem; font-family: var(--sans); font-size: 0.9em; }
+/* Embedding a game on another page: the snippet, with a Copy button. */
+.embed { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0.4rem 0; }
+.embed textarea { flex: 1; min-width: 0; padding: 0.4em 0.6em; font-family: var(--mono); font-size: 0.8em; background: var(--panel); color: inherit; border: 1px solid var(--line); border-radius: 6px; resize: vertical; }
+.embed-card { margin-top: 0.4rem; font-size: 0.9em; }
+.embed-card summary { cursor: pointer; color: var(--dim); }
+.embed-card p { margin: 0.4rem 0 0; }

@@ -17,7 +17,9 @@
 //! * [`npc`]: what characters do on their turn: moving and fighting;
 //! * [`journal`]: goals for the JOURNAL, and the time of day;
 //! * `recall`: WHERE IS, RECAP, UNDO 3, OOPS, AGAIN WITH and ASK ABOUT a topic;
-//! * [`lang`]: language rules such as stemming, articles and lists.
+//! * [`lang`]: language rules such as stemming, articles and lists;
+//! * `gossip`: what the player did, going round from friend to friend;
+//! * `work`: busking, and paid errands (`jobs:`).
 
 mod actions;
 pub mod game;
@@ -45,6 +47,8 @@ mod handiwork;
 mod letters;
 mod memory;
 mod travels;
+mod gossip;
+mod work;
 pub mod world;
 
 pub use game::{Game, Line, LineKind, Missed, Output, Status};

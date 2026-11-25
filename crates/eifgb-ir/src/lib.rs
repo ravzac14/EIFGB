@@ -414,6 +414,9 @@ pub struct Timer {
     /// A noise that hunters within earshot come to investigate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noise: Option<Noise>,
+    /// A sound file played once when it goes off where it's heard.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound_file: Option<String>,
 }
 
 /// A noise: where it is, and how many rooms away it can be heard.
@@ -583,6 +586,10 @@ pub struct Entity {
     /// A picture: shown above a room's description, or when a thing is examined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picture: Option<Picture>,
+    /// Rooms: a sound file played over and over while the player is here
+    /// (`sound_file:`), for players who turn sound on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sound_file: Option<String>,
     /// Actions that reveal this entity while it's `hidden`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub revealed_by: Vec<ActionRule>,
@@ -829,6 +836,13 @@ pub struct Entity {
     /// Rooms: crowded, always or at some hours.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crowd: Option<Crowd>,
+    /// Rooms: what passers-by pay a busker. None: what a crowd pays, when
+    /// it's crowded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub busking: Option<Busking>,
+    /// Objects: a musical instrument: PLAY IT where people pay, for more.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub instrument: bool,
     /// In a flashback: what this past room or thing is now. A past thing
     /// left in a past room is in that room's present one afterwards.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -872,6 +886,13 @@ pub struct Npc {
     /// A favour it asks of the player.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asks: Option<Ask>,
+    /// Paid errands, offered in order when the player ASKs FOR WORK.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub jobs: Vec<Job>,
+    /// What it says on meeting the player, once it's heard what they did
+    /// (gossip): by deed, as in `remembers`, and `broke_promise`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub heard: BTreeMap<String, Text>,
     /// Gives directions when asked the way.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub knows_the_way: bool,
@@ -1399,6 +1420,44 @@ pub struct Ask {
     pub broken: Option<Text>,
 }
 
+/// What busking pays in a room: `pays` to `pays + spread` coins a time,
+/// up to `times` times before the people here have heard enough (for a
+/// while). `times: 0` is nobody paying here, crowd or not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Busking {
+    pub pays: u32,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub spread: u32,
+    pub times: u32,
+}
+
+/// A paid errand a character offers (`jobs:`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Job {
+    pub key: String,
+    /// How they offer it, on ASK FOR WORK.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub say: Option<Text>,
+    /// What the player's to do, for the journal: "fetch flour from the mill".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<Text>,
+    /// Something to give them: done when they're given it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wants: Option<EntityId>,
+    /// Or done once this is true, the next time they see the player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done: Option<Code>,
+    /// Money they pay for it.
+    #[serde(default)]
+    pub pays: i64,
+    /// Things they give for it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gives: Vec<EntityId>,
+    /// Said when it's done.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thanks: Option<Text>,
+}
+
 /// A doorkeeper's password.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Password {
@@ -1797,6 +1856,10 @@ pub enum BuiltinAction {
     Ride,
     /// DISMOUNT.
     Dismount,
+    /// BUSK, SING FOR COINS, PLAY THE FIDDLE FOR MONEY.
+    Busk,
+    /// ASK THE BAKER FOR WORK.
+    Work,
 }
 
 impl BuiltinAction {

@@ -23,6 +23,10 @@ export interface Status {
   turns: number;
   /** The time of day ("7:30 am"), when the game keeps time and shows it. */
   time?: string | null;
+  /** The room's own sound (`sound_file:`), played over and over while the player's there. */
+  ambient?: string | null;
+  /** In a game with several characters to play, the one being played (its key). */
+  playing?: string | null;
 }
 export interface Output {
   lines: Line[];
@@ -38,6 +42,8 @@ export interface Output {
   quit_requested: boolean;
   /** Set when the command wasn't understood: why, for the editor to suggest a fix. */
   missed?: Missed;
+  /** Sound files to play once, in order. */
+  sounds?: string[];
 }
 export interface Missed {
   kind: "unknown_verb" | "unknown_word" | "scenery" | "not_here" | "partial" | "no_pronoun" | "other";
@@ -64,6 +70,8 @@ export interface Meta {
   presentation?: Presentation | null;
   /** Every ending's key, from `endings:`. */
   endings?: string[];
+  /** In a game with several characters to play: each one, the starting one first. */
+  playable?: { id: string; name: string }[];
   /** The standard library version the game was built with, the IR version and the engine's. */
   stdlib?: number;
   ir?: number;
@@ -181,6 +189,10 @@ export interface Engine {
   map(): PlayerMap;
   /** The characters and things the player has met, characters first. */
   met(): Met[] | { error: string };
+  /** What JOURNAL says now (goals, promises, notes), without changing the game. Empty when there's nothing yet. */
+  journal(): Line[] | { error: string };
+  /** Taking turns: be this character now, without a turn passing. */
+  playAs(character: string): Output;
   /** Words that finish the last word of `line`, from what the player can see now (Tab). */
   complete(line: string): string[];
 }
@@ -209,6 +221,8 @@ export async function loadEngine(base: string | URL): Promise<Engine> {
     restore: (save) => call("eifgb_restore", ["string"], [save]),
     map: () => call("eifgb_map", [], []),
     met: () => call("eifgb_met", [], []),
+    journal: () => call("eifgb_journal", [], []),
+    playAs: (character) => call("eifgb_play_as", ["string"], [character]),
     complete: (line) => call("eifgb_complete", ["string"], [line]),
     wander: (files, seed, moves, entry = "game.yaml") => call("eifgb_wander", ["string", "string", "number", "number"], [JSON.stringify(files), entry, seed, moves]),
     deadEnds: (files, walkthrough, entry = "game.yaml") => call("eifgb_dead_ends", ["string", "string", "string"], [JSON.stringify(files), entry, walkthrough]),

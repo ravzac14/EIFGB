@@ -7,6 +7,8 @@ import {
 } from "./model.ts";
 import { THING_DRAG, factionHue } from "./map.ts";
 import { pictureSection } from "./picture-ui.ts";
+import { soundSection } from "./sound-ui.ts";
+import { characterWork, roomBusking, thingInstrument } from "./work-ui.ts";
 import { describeWords } from "./describe-words.ts";
 import { foldSections } from "./fold.ts";
 import { gettingStartedHidden } from "../store.ts";
@@ -367,8 +369,10 @@ function roomPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
       ctx.change((x) => x.setBool(["rooms", id, "list_exits"], v, x.bool(["settings", "list_exits"], true))),
     ),
     colourPicker(ctx, id),
+    ...soundSection(ctx, ["rooms", id], "room"),
     ...roomBehaviour(ctx, id),
     ...roomKnowing(ctx, id),
+    ...roomBusking(ctx, id),
     ...roomElements(ctx, id),
     ...roomHandiwork(ctx, id),
     ...roomJourneys(ctx, id),
@@ -841,7 +845,7 @@ function thingPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
   if (!has("portable")) panel.append(...trait("Can be pushed to the next room", "pushable", "Too heavy to carry, but PUSH IT NORTH moves it. Stand on it to reach things up high."));
   panel.append(...boolField(ctx, ["objects", id, "high"], "Up high, out of reach", false, "The player can see it (and whatever is on it), but needs to stand on something to reach it."));
   panel.append(...boolField(ctx, ["objects", id, "far"], "Far off, out of reach", false, "Over a ravine, out on the ice: the player can see it, but needs something that reaches (a pole, a hook) to touch it."));
-  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits), ...thingKnowing(ctx, id), ...thingElements(ctx, id, t.traits), ...thingHandiwork(ctx, id, t.traits), ...thingJourneys(ctx, id, t.traits), ...likeSection(ctx, "objects", id));
+  panel.append(...thingTricks(ctx, id, t.traits), ...thingEarlierTricks(ctx, id, t.traits), ...thingKnowing(ctx, id), ...thingInstrument(ctx, id), ...thingElements(ctx, id, t.traits), ...thingHandiwork(ctx, id, t.traits), ...thingJourneys(ctx, id, t.traits), ...likeSection(ctx, "objects", id));
   if (moodNames(m).length) panel.append(...moodsSection(ctx, ["objects", id]));
 
   // Hidden until found.
@@ -1178,7 +1182,7 @@ function characterPanel(panel: HTMLElement, ctx: InspectorContext, id: string) {
 
   // What they carry.
   panel.append(el("h3", { textContent: behavior === "merchant" ? "For sale" : "Carrying" }), thingTree(ctx, id, "Nothing. Drag things here, or add one."), addThingRow(ctx, id));
-  panel.append(...characterWants(ctx, id), ...characterKnowing(ctx, id), ...characterElements(ctx, id), ...characterHandiwork(ctx, id), ...characterJourneys(ctx, id), ...characterTricks(ctx, id), ...likeSection(ctx, "characters", id));
+  panel.append(...characterWants(ctx, id), ...characterKnowing(ctx, id), ...characterWork(ctx, id), ...characterElements(ctx, id), ...characterHandiwork(ctx, id), ...characterJourneys(ctx, id), ...characterTricks(ctx, id), ...likeSection(ctx, "characters", id));
   if (moodNames(m).length) panel.append(...moodsSection(ctx, p));
   panel.append(...pictureSection(ctx, p, "character"));
 

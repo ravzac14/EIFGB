@@ -52,6 +52,63 @@
     return f;
   }
 
+  // Sounds: a room's own, over and over while the player's there, and
+  // sounds played once. Off until the player turns them on with the Sound
+  // button, which shows once the game has made a sound.
+  var soundButton = $("sound");
+  var room = { file: null, audio: null };
+  function soundOn() {
+    return recall("sound") === "on";
+  }
+  function soundSrc(file) {
+    if (/^https:\/\//i.test(file)) return file;
+    var v = gameFiles[file] || "";
+    return v.indexOf("data:audio/") === 0 ? v : null;
+  }
+  function startRoom() {
+    if (!room.file || room.audio || !soundOn()) return;
+    var src = soundSrc(room.file);
+    if (!src) return;
+    var a = new Audio(src);
+    a.loop = true;
+    a.volume = 0.6;
+    room.audio = a;
+    a.play().catch(function () {
+      if (room.audio === a) room.audio = null;
+    });
+  }
+  function stopRoom() {
+    if (room.audio) room.audio.pause();
+    room.audio = null;
+  }
+  function sounds(o) {
+    var file = o.status.ambient || null;
+    if (file || (o.sounds && o.sounds.length)) soundButton.hidden = false;
+    if (file !== room.file) {
+      stopRoom();
+      room.file = file;
+    }
+    startRoom();
+    if (!soundOn() || !o.sounds) return;
+    o.sounds.forEach(function (f) {
+      var src = soundSrc(f);
+      if (!src) return;
+      var a = new Audio(src);
+      a.volume = 0.6;
+      a.play().catch(function () {});
+    });
+  }
+  function labelSound() {
+    soundButton.textContent = soundOn() ? "Sound: on" : "Sound: off";
+    soundButton.setAttribute("aria-pressed", String(soundOn()));
+  }
+  soundButton.addEventListener("click", function () {
+    remember("sound", soundOn() ? null : "on");
+    labelSound();
+    if (soundOn()) startRoom();
+    else stopRoom();
+  });
+
   // Kept in this browser; private windows and some local files can't keep
   // anything, and then the game just starts afresh each time.
   function remember(name, value) {
@@ -83,6 +140,7 @@
     if (s.time) parts.push(s.time);
     parts.push("Turn " + s.turns);
     statusLine.textContent = parts.filter(Boolean).join(" · ");
+    sounds(o);
     return first;
   }
 
@@ -118,6 +176,7 @@
     }
     var meta = loaded.meta;
     key = "eifgb-page:" + meta.id + ":";
+    labelSound();
     document.title = meta.title;
     $("title").textContent = meta.title;
     var look = meta.presentation;

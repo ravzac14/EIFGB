@@ -71,6 +71,7 @@ ${playCss}
 <header class="bar ui">
   <span id="title" class="title">${html(title)}</span>
   <span id="status" class="status" aria-live="off"></span>
+  <button id="sound" type="button" aria-pressed="false" hidden>Sound: off</button>
 </header>
 <main class="wrap">
   <div id="log" class="log" aria-live="polite"><p class="notice">Loading the game…</p></div>

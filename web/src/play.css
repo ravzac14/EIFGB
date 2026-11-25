@@ -123,3 +123,26 @@ figure.picture p { margin: 0; }
 /* Following a thread: the turns that don't mention it are hidden. */
 .log.threading .thread-out { display: none; }
 .thread-bar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.4rem 0.6rem; margin-bottom: 0.75rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+
+/* Notes: the player's journal (goals, promises, NOTEs), read-only, in a
+   panel like the map's. With both open on a wide screen, they share the side. */
+.notes-body { flex: 1; overflow: auto; scrollbar-width: thin; padding: 0.6rem 16px; font-family: var(--serif); }
+.notes-body p { margin: 0 0 0.5em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notes-body .notice { color: var(--dim); font-style: italic; }
+#notes-open[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+@media (min-width: 70rem) {
+  body.with-notes { padding-right: 24rem; }
+  body.with-map.with-notes .map-panel:not(.notes-panel) { bottom: 50%; }
+  body.with-map.with-notes .notes-panel { top: 50%; border-top: 1px solid var(--line); }
+}
+
+/* In a frame on someone else's page (play.html?embed=1): less around the story. */
+.embedded #feedback-open { display: none; }
+.embedded .bar { padding: 0.35rem 10px; gap: 0.5rem; }
+.embedded .wrap { padding-left: 12px; padding-right: 12px; }
+
+/* Taking turns: whose turn it is, just above the prompt. */
+.turn-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; padding: 0.35rem 0.6rem; margin-top: 0.5rem; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; font-size: 0.95em; }
+.turn-bar strong { color: var(--accent); }
+#together .players { display: grid; grid-template-columns: auto 1fr 1fr; gap: 0.4rem 0.6rem; align-items: center; margin: 0.6rem 0; }
+#together .players input, #together .players select { min-width: 0; }

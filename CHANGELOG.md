@@ -9,6 +9,29 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
+## Unreleased
+
+- Sounds: `sound_file:` on a room plays over and over while the player's
+  there; on a timer, once when it goes off; and scripts can
+  `play_sound("bell.mp3")`. Off unless the player turns on *Sound* (under
+  **Aa**), and the game says once that it has some.
+- **Notes** in the web player: the journal (goals, promises and your
+  NOTEs) in a panel beside the story, kept up to date as you play.
+- Embedding: the gallery's games, and **Share your game**, give a snippet
+  of HTML that puts a game in a frame on any web page.
+- Gossip: what you do to someone (rob them, attack them, a gift, a
+  promise broken or kept) gets round, a friend at a time, and people say
+  so when they see you: "The miller gives you a hard look: word's got
+  round that you robbed the baker." Their own lines go in `heard:`.
+- Odd jobs: `jobs:` on a character are errands they pay for. ASK THE
+  BAKER FOR WORK, and JOURNAL lists them.
+- **Two players** in the web player: in a game with more than one
+  playable character, two people take turns on one screen, each as a
+  character, passing the turn after every move.
+- Busking: SING or PLAY THE FIDDLE in a crowd for a few coins;
+  `busking:` on a room says what it pays, and `instrument: true` earns
+  more. SING still hums a tune anywhere else.
+
 ## 2026-11-24
 
 - What the player learns: `facts:`, taught in conversations (`teaches:`)

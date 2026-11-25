@@ -22,8 +22,10 @@
   <span id="status" class="status" aria-live="off"></span>
   <span class="tools">
     <button id="map-open" type="button" aria-pressed="false" aria-controls="map" disabled>Map</button>
+    <button id="notes-open" type="button" aria-pressed="false" aria-controls="notes" disabled title="Your notes, goals and promises, beside the story">Notes</button>
     <button id="bookmarks-open" type="button" disabled title="Mark this moment in the story, to read it again later">Bookmarks</button>
     <button id="threads-open" type="button" disabled title="Read the story so far following one character or thing">Threads</button>
+    <button id="together-open" type="button" hidden title="Two people, one screen: take turns, each as a character">Two players</button>
     <button id="saves-open" type="button" disabled>Saves</button>
     <button id="restart" type="button" disabled>Restart</button>
     <button id="settings-open" type="button" aria-label="Text and colours">Aa</button>
@@ -35,6 +37,7 @@
   <div id="thread-bar" class="thread-bar ui" hidden role="status"></div>
   <div id="log" class="log" aria-live="polite"><p class="notice">Loading the game…</p></div>
   <div id="after" class="after ui"></div>
+  <div id="turn-bar" class="turn-bar ui" hidden role="status"></div>
   <form id="prompt" class="prompt" hidden>
     <label for="line" class="caret">&gt;</label>
     <input id="line" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-label="What do you do?">
@@ -44,10 +47,15 @@
   <div class="map-head"><h2>Map</h2><span class="dim">Places you've been</span><button id="map-close" type="button" aria-label="Close the map">×</button></div>
   <div id="map-body" class="map-body"></div>
 </aside>
+<aside id="notes" class="map-panel notes-panel ui" aria-label="Notes" hidden>
+  <div class="map-head"><h2>Notes</h2><span class="dim">Your journal</span><button id="notes-close" type="button" aria-label="Close the notes">×</button></div>
+  <div id="notes-body" class="notes-body"></div>
+</aside>
 <dialog id="saves"></dialog>
 <dialog id="bookmarks" class="bookmarks-dialog" aria-labelledby="bookmarks-title"></dialog>
 <dialog id="settings"></dialog>
 <dialog id="threads" class="bookmarks-dialog" aria-labelledby="threads-title"></dialog>
+<dialog id="together" aria-labelledby="together-title"></dialog>
 <script type="module" src="./src/play.ts"></script>
 </body>
 </html>

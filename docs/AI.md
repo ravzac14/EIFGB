@@ -95,6 +95,10 @@ field is an error, not ignored, so a typo is caught.
   rooms, and an exit `through:` it. The way back is added automatically.
 - **Pictures:** `picture: { file: pictures/hall.jpg, alt: "What it shows" }`
   on a room, object or character. Always write `alt`, with any clue in it.
+- **Sounds:** `sound_file: sounds/rain.ogg` on a room (played over and
+  over while the player's there) or a timer (once, when it goes off), and
+  Lua `play_sound("sounds/bell.mp3")`. Players turn sound on themselves,
+  so always say what happens in words too.
 - **Behaviour without scripts:** `needs_flame`, `fuel`, `burns_away` on
   light sources; `holds_liquid`/`full_of` and `liquid: water` for liquids;
   `uses`/`breaks`; `code` on lockable things; `text` for READ; `sound` and
@@ -151,12 +155,21 @@ field is an error, not ignored, so a typo is caught.
   character feels about the player; `remembers: { gift: ..., robbed: ...,
   attacked: ..., spared: ..., fooled: ... }` is said when they meet again.
   Throwing something distracts watchers; PLANT RUBY ON COOK frames them.
+- **Gossip and work:** with `friends`, what the player does to someone
+  travels a friend at a time; `heard: { robbed: "...", gift: "..." }` is
+  what a character says once word reaches them. `jobs: { flour: { say,
+  task, for: flour, pays: 3 } }` (or `done: <Lua condition>` instead of
+  `for`) are paid errands: ASK FOR WORK. Crowded rooms pay buskers (SING,
+  PLAY THE FIDDLE); `busking: { pays: 2-4, times: 2 }` or `busking: false`
+  on a room, `instrument: true` on an object.
 - **Moods:** `moods: { drunk: ... }` on rooms, things and characters
   replaces their description while the player's state `drunk` is true;
   a top-level `moods` section adds a line to every LOOK; `mood: { drunk:
   5 }` on something eaten or drunk brings one on.
 - **Several player characters:** `playable: true` on characters, and
   `player: { plays: mara }` for who the player starts as; SWITCH TO TOBIN.
+  The web player lets two people take turns, one character each, so give
+  each character things to do and puzzles that need both.
 - **What the player learns:** a top-level `facts` section, `{ meeting: text }` (or
   `{ text, place: mill }`, for one that tells of a room); `teaches:
   meeting` on a conversation node or option, or on a thing (READ teaches

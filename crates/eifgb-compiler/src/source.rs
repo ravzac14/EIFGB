@@ -310,6 +310,9 @@ pub struct Room {
     pub picture: Option<PictureSrc>,
     #[serde(default)]
     pub sound: Option<String>,
+    /// A sound file played over and over while the player is here.
+    #[serde(default)]
+    pub sound_file: Option<String>,
     #[serde(default)]
     pub smell: Option<String>,
     #[serde(default)]
@@ -320,6 +323,9 @@ pub struct Room {
     /// Crowded: `true`, or `"8:00-18:00"`.
     #[serde(default)]
     pub crowd: Option<CrowdSrc>,
+    /// What busking pays here: `false`, or `{ pays: 1-3, times: 3 }`.
+    #[serde(default)]
+    pub busking: Option<BuskingSrc>,
     /// In a flashback, the room this past one is now.
     #[serde(default)]
     pub now: Option<String>,
@@ -515,6 +521,15 @@ pub struct Thing {
     /// Characters: a favour they ask.
     #[serde(default)]
     pub asks: Option<AskSrc>,
+    /// Characters: paid errands, offered in order.
+    #[serde(default)]
+    pub jobs: IndexMap<String, JobSrc>,
+    /// Characters: what they say once they've heard what the player did.
+    #[serde(default)]
+    pub heard: IndexMap<String, Prose>,
+    /// Objects: a musical instrument, to busk with.
+    #[serde(default)]
+    pub instrument: bool,
     /// Characters: whether they give directions (people you can talk to do).
     #[serde(default)]
     pub knows_the_way: Option<bool>,
@@ -886,6 +901,39 @@ pub enum FactSrc {
     },
 }
 
+/// `busking: false`, or what it pays.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum BuskingSrc {
+    On(bool),
+    Full {
+        #[serde(default)]
+        pays: Option<Actions>,
+        #[serde(default)]
+        times: Option<u32>,
+    },
+}
+
+/// A paid errand a character offers.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JobSrc {
+    #[serde(default)]
+    pub say: Option<Prose>,
+    #[serde(default)]
+    pub task: Option<String>,
+    #[serde(default, rename = "for")]
+    pub wants: Option<String>,
+    #[serde(default)]
+    pub done: Option<String>,
+    #[serde(default)]
+    pub pays: Option<i64>,
+    #[serde(default)]
+    pub gives: Option<OneOrMany>,
+    #[serde(default)]
+    pub thanks: Option<Prose>,
+}
+
 /// A favour a character asks.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1137,6 +1185,9 @@ pub struct Timer {
     /// A noise hunters come to investigate.
     #[serde(default)]
     pub noise: Option<Noise>,
+    /// A sound file played once when it goes off where it's heard.
+    #[serde(default)]
+    pub sound_file: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -221,14 +221,32 @@ impl<H: ScriptHost> Game<H> {
     pub(crate) fn journal(&mut self) {
         if self.world.story().goals.is_empty() {
             let promised = self.journal_promises();
-            if !promised && self.world.state.notes.is_empty() {
+            let worked = self.journal_jobs();
+            if !promised && !worked && self.world.state.notes.is_empty() {
                 return self.msg("journal.none_in_game", &Ctx::new());
             }
             return self.show_notes(false);
         }
         self.journal_goals();
         self.journal_promises();
+        self.journal_jobs();
         self.show_notes(false);
+    }
+
+    /// What JOURNAL would say now (goals, promises, notes), for a panel
+    /// beside the story. Nothing in the game changes: it's said on a copy
+    /// of the state, which is put back after. Empty when there's nothing
+    /// to list yet.
+    pub fn journal_lines(&mut self) -> Vec<crate::game::Line> {
+        let state = self.world.state.clone();
+        let out = std::mem::take(&mut self.out);
+        let something = !self.world.state.notes.is_empty() || !self.world.state.goals.is_empty() || self.world.ids().any(|c| self.promise_state(c).is_some() || self.world.get(c, "_job").is_some() || self.world.int(c, "_jobs_done") > 0);
+        if something {
+            self.journal();
+        }
+        let lines = std::mem::replace(&mut self.out, out).lines;
+        self.world.state = state;
+        lines
     }
 
     fn journal_goals(&mut self) {

@@ -169,6 +169,47 @@ Everything is kept in the browser's local storage (`src/store.ts`):
   it (its name or nouns, as whole words), so the story can be read
   following the baker. New turns are followed too, until *Show
   everything*. A way of reading the page, not a game action.
+- **Notes:** *Notes* opens a panel beside the story, like the map (the
+  two share the side on a wide screen; on a narrow one, opening one
+  closes the other). It shows what JOURNAL would say (`engine.journal()`,
+  which says it on a copy of the state, so nothing changes and no turn
+  passes): goals, promises and the player's NOTEs, refreshed after every
+  turn. Read-only. Whether it's open is kept (`notes-open`).
+
+## Taking turns
+
+In a game with two or more playable characters (`meta.playable`), *Two
+players* opens a dialog for two names and a character each. Then after
+every command that takes a turn (`status.turns` went up, no choice
+open), `engine.playAs` makes the next player's character the one played,
+without a turn passing, and `#turn-bar` above the prompt says whose turn
+it is. Commands are echoed with the player's name ("Sam: take pebble").
+Whose turn it is follows `status.playing` (after UNDO, a restore, a
+bookmark or SWITCH TO); one whose character can't be played sits out.
+Kept per game (`together:<game>`) until *Stop taking turns*;
+`test/player-together.mjs` plays it through.
+
+## Sounds
+
+Rooms' `sound_file` comes in `status.ambient`, and sounds to play once in
+`output.sounds`; `src/sound.ts` plays them (a room's on a loop, faded in
+and out). Sound is a setting, *Sound* (Off, Quiet, On) in **Aa**, off by
+default; until it's on nothing plays, and the first sound the game makes
+adds a notice saying it has some. Sound files are kept in a project as
+`data:audio/` URLs, like pictures (`SOUND` and `MEDIA` in
+`src/pictures.ts`), and come along in zips, folders, links and single web
+pages, where a *Sound* button shows once the game makes one.
+
+## Embedding
+
+`play.html?…&embed=1` is the player made to sit in a frame on someone
+else's page: the header's link back to the site becomes *Full page ↗*
+(the same game in a new tab), *Feedback* is hidden, the map and notes
+start closed, and opening them isn't remembered for the site. The
+gallery's cards (*Embed*) and *Share your game* give the snippet
+(`src/embed.ts`): an `<iframe>` 100% wide and 600 pixels tall. A game in
+a frame keeps its own saves, like any other link, though some browsers
+keep a frame's storage apart from the site's.
 
 ## The engine API (`src/engine.ts`)
 

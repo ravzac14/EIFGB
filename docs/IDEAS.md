@@ -55,7 +55,8 @@ COINS, TAKE ALL BUT THE KEY) was already there.
 ## Players
 
 Built from this list: making things (`combines:`), barricades, marks,
-swaps for fakes, and playing dead. Still to do:
+swaps for fakes, playing dead, gossip that travels (`heard:`), and
+busking and odd jobs (`jobs:`). Still to do:
 
 - **Favours from friends:** ASK THE BAKER TO OPEN THE GATE, if they're
   friendly enough: orders, for those who like you.
@@ -70,11 +71,6 @@ swaps for fakes, and playing dead. Still to do:
   opens an exit that wasn't there.
 - **Following someone:** FOLLOW THE BAKER, a room behind on their routine,
   unseen if sneaking.
-- **Gossip that travels:** news of what the player did spreads along
-  characters' `friends`, a step every few turns: "The miller's already
-  heard you stole the bread." Builds on witnesses and broken promises.
-- **Busking and odd jobs:** SING in a busy square for coins; characters
-  with `jobs:` pay for errands.
 
 ## Writing games
 
@@ -102,20 +98,21 @@ swaps for fakes, and playing dead. Still to do:
 
 ## The player
 
-- **Notes on screen:** the player's NOTEs in a panel beside the story,
-  read-only.
+Built from this list: notes on screen (the journal in a panel beside the
+story), sound (`sound_file:`, off unless the player turns it on), and two
+players, one story (taking turns, each as a playable character). Still
+to do:
+
 - **The story as a book:** download the transcript as a tidy web page or
   ebook, with bookmarks as chapters.
-- **Sound:** a quiet sound for a room or a timer (`sound_file:`), off
-  unless the player turns it on.
-- **Two players, one story:** pass-and-play on one screen, each as one of
-  the playable characters.
 - **Postcards:** at an ending, an image to share: the title, the ending, a
   line from the story and the room's picture.
 
 ## The website
 
-- **Embedding:** a snippet to put a game in a frame on any web page.
+Built from this list: embedding (a snippet that puts a game in a frame on
+any web page). Still to do:
+
 - **Collections:** a list of games around a theme, to share as one link.
 - **Author pages:** an author's games together, from the gallery.
 - **Remix a game:** "Make a copy to change" on a gallery game, crediting

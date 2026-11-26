@@ -9,7 +9,7 @@ if it's not there). When the site is deployed, GitHub Actions turns it into
 the day's date (web/scripts/date-changelog.mjs); add a title after the date
 if you like ("## 2026-11-24: editor tools"). -->
 
-## Unreleased
+## 2026-11-26
 
 - Sounds: `sound_file:` on a room plays over and over while the player's
   there; on a timer, once when it goes off; and scripts can
